@@ -47,7 +47,9 @@ public class SecurityConfig {
                 // ── Public ────────────────────────────────────────────────────
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
-                // ── Protected ─────────────────────────────────────────────────
+                // ── Superadmin-only management plane ──────────────────────────
+                .requestMatchers("/api/superadmin/**").hasRole("SUPERADMIN")
+                // ── Protected (any authenticated user) ────────────────────────
                 .anyRequest().authenticated()
             );
 
