@@ -1,0 +1,50 @@
+version: '3.9'
+
+services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: ldap-portal-db
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-ldapportal}
+      POSTGRES_USER:     ${POSTGRES_USER:-ldapportal}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ldapportal}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ldapportal} -d ${POSTGRES_DB:-ldapportal}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ldap-portal-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Database
+      DB_URL:      jdbc:postgresql://db:5432/${POSTGRES_DB:-ldapportal}
+      DB_USERNAME: ${POSTGRES_USER:-ldapportal}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ldapportal}
+      # Security — these MUST be supplied; no defaults for secrets
+      ENCRYPTION_KEY:                  ${ENCRYPTION_KEY}
+      JWT_SECRET:                      ${JWT_SECRET}
+      # Bootstrap superadmin (only active when no permanent superadmin exists)
+      BOOTSTRAP_SUPERADMIN_USERNAME:   ${BOOTSTRAP_SUPERADMIN_USERNAME:-superadmin}
+      BOOTSTRAP_SUPERADMIN_PASSWORD:   ${BOOTSTRAP_SUPERADMIN_PASSWORD}
+      # Logging
+      LOG_LEVEL:     ${LOG_LEVEL:-INFO}
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-INFO}
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  pgdata:

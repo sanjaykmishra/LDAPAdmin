@@ -1,0 +1,24 @@
+# Maven build output
+target/
+*.class
+*.jar
+*.war
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# Environment / secrets — NEVER commit these
+.env
+*.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
