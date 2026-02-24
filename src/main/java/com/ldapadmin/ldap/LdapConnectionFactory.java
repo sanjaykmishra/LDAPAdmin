@@ -5,6 +5,7 @@ import com.ldapadmin.entity.enums.SslMode;
 import com.ldapadmin.exception.LdapConnectionException;
 import com.ldapadmin.service.EncryptionService;
 import com.unboundid.ldap.sdk.*;
+import com.unboundid.ldap.sdk.extensions.StartTLSExtendedRequest;
 import com.unboundid.util.ssl.SSLUtil;
 import com.unboundid.util.ssl.TrustAllTrustManager;
 import lombok.RequiredArgsConstructor;
@@ -98,6 +99,54 @@ public class LdapConnectionFactory {
         if (pool != null) {
             pool.close();
             log.info("Evicted LDAP pool for connection {}", connectionId);
+        }
+    }
+
+    /**
+     * Opens a single, unbound LDAP connection to the given directory server.
+     *
+     * <p>Unlike {@link #getPool}, this method creates a fresh connection every
+     * time and does <em>not</em> cache it.  The intended use-case is credential
+     * verification (e.g. admin login via LDAP bind) where the caller must bind
+     * with user-supplied credentials and then immediately close the connection.</p>
+     *
+     * <p>The caller is responsible for closing the connection (try-with-resources
+     * is recommended).</p>
+     *
+     * @throws LdapConnectionException if the connection cannot be established
+     */
+    public LDAPConnection openUnboundConnection(DirectoryConnection dc) {
+        try {
+            LDAPConnectionOptions options = buildOptions(dc);
+
+            if (dc.getSslMode() == SslMode.LDAPS) {
+                SSLUtil sslUtil = buildSslUtil(dc);
+                return new LDAPConnection(sslUtil.createSSLSocketFactory(),
+                        options, dc.getHost(), dc.getPort());
+            }
+
+            LDAPConnection conn = new LDAPConnection(options, dc.getHost(), dc.getPort());
+
+            if (dc.getSslMode() == SslMode.STARTTLS) {
+                SSLUtil sslUtil = buildSslUtil(dc);
+                ExtendedResult startTlsResult = conn.processExtendedOperation(
+                        new StartTLSExtendedRequest(sslUtil.createSSLContext()));
+                if (!startTlsResult.getResultCode().equals(ResultCode.SUCCESS)) {
+                    conn.close();
+                    throw new LdapConnectionException(
+                            "STARTTLS negotiation failed for [" + dc.getDisplayName() + "]: "
+                            + startTlsResult.getResultCode());
+                }
+            }
+
+            return conn;
+
+        } catch (LdapConnectionException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new LdapConnectionException(
+                    "Failed to open unbound connection to [" + dc.getDisplayName() + "]: "
+                    + e.getMessage(), e);
         }
     }
 
