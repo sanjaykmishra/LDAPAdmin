@@ -47,6 +47,8 @@ class LdapOperationServiceTest {
     @Mock private LdapGroupService              groupService;
     @Mock private LdapSchemaService             schemaService;
     @Mock private AuditService                  auditService;
+    @Mock private BulkUserService               bulkUserService;
+    @Mock private CsvMappingTemplateService     csvTemplateService;
 
     private LdapOperationService service;
 
@@ -57,7 +59,8 @@ class LdapOperationServiceTest {
     @BeforeEach
     void setUp() {
         service = new LdapOperationService(
-                dirRepo, permissionService, userService, groupService, schemaService, auditService);
+                dirRepo, permissionService, userService, groupService, schemaService,
+                auditService, bulkUserService, csvTemplateService);
     }
 
     // ── Directory loading ─────────────────────────────────────────────────────
