@@ -15,6 +15,7 @@ import com.ldapadmin.ldap.LdapSchemaService;
 import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.ldap.model.LdapUser;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
+import com.ldapadmin.service.AuditService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,6 +46,7 @@ class LdapOperationServiceTest {
     @Mock private LdapUserService               userService;
     @Mock private LdapGroupService              groupService;
     @Mock private LdapSchemaService             schemaService;
+    @Mock private AuditService                  auditService;
 
     private LdapOperationService service;
 
@@ -55,7 +57,7 @@ class LdapOperationServiceTest {
     @BeforeEach
     void setUp() {
         service = new LdapOperationService(
-                dirRepo, permissionService, userService, groupService, schemaService);
+                dirRepo, permissionService, userService, groupService, schemaService, auditService);
     }
 
     // ── Directory loading ─────────────────────────────────────────────────────
@@ -81,7 +83,7 @@ class LdapOperationServiceTest {
     void searchUsers_superadmin_noTenantScope() {
         DirectoryConnection dc = enabledDir(true);
         when(dirRepo.findById(dirId)).thenReturn(Optional.of(dc));
-        when(userService.searchUsers(eq(dc), anyString(), any(), any())).thenReturn(List.of());
+        when(userService.searchUsers(eq(dc), anyString(), any())).thenReturn(List.of());
 
         List<LdapEntryResponse> result = service.searchUsers(dirId, superadminPrincipal(),
                 "(cn=*)", null, 100, new String[0]);
@@ -98,7 +100,7 @@ class LdapOperationServiceTest {
         when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dc));
         LdapUser user = new LdapUser("cn=Alice,ou=Users,dc=example,dc=com",
                 Map.of("cn", List.of("Alice")));
-        when(userService.getUser(eq(dc), anyString(), any())).thenReturn(user);
+        when(userService.getUser(eq(dc), anyString())).thenReturn(user);
 
         AuthPrincipal principal = adminPrincipal();
         service.getUser(dirId, principal, "cn=Alice,ou=Users,dc=example,dc=com", new String[0]);
@@ -190,7 +192,7 @@ class LdapOperationServiceTest {
                 new LdapUser("cn=A,dc=example,dc=com", Map.of()),
                 new LdapUser("cn=B,dc=example,dc=com", Map.of()),
                 new LdapUser("cn=C,dc=example,dc=com", Map.of()));
-        when(userService.searchUsers(eq(dc), anyString(), any(), any())).thenReturn(bigList);
+        when(userService.searchUsers(eq(dc), anyString(), any())).thenReturn(bigList);
 
         List<LdapEntryResponse> result = service.searchUsers(
                 dirId, adminPrincipal(), null, null, 2, new String[0]);
