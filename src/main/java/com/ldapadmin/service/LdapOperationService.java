@@ -8,6 +8,7 @@ import com.ldapadmin.dto.ldap.LdapEntryResponse;
 import com.ldapadmin.dto.ldap.MoveUserRequest;
 import com.ldapadmin.dto.ldap.UpdateEntryRequest;
 import com.ldapadmin.entity.DirectoryConnection;
+import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.ldap.LdapGroupService;
 import com.ldapadmin.ldap.LdapSchemaService;
@@ -21,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -33,6 +35,7 @@ import java.util.UUID;
  *       (or unscoped for superadmins).</li>
  *   <li>Enforces branch access (dimension 3) for entry-level operations.</li>
  *   <li>Delegates to the underlying LDAP service.</li>
+ *   <li>Fires an async audit event via {@link AuditService} for write ops.</li>
  * </ol>
  *
  * <p>Feature permission checks (dimensions 1, 2, 4) are enforced by the
@@ -50,6 +53,7 @@ public class LdapOperationService {
     private final LdapUserService               userService;
     private final LdapGroupService              groupService;
     private final LdapSchemaService             schemaService;
+    private final AuditService                  auditService;
 
     // ── Schema ────────────────────────────────────────────────────────────────
 
@@ -81,16 +85,6 @@ public class LdapOperationService {
 
     // ── Users — read ──────────────────────────────────────────────────────────
 
-    /**
-     * Searches users. Enforces directory access (dim 1+2); branch access is
-     * not checked on searches — admins see matching entries, the view is not
-     * further restricted by branch.
-     *
-     * @param filter      LDAP filter string (defaults to {@code (objectClass=*)} if blank)
-     * @param baseDn      search base DN (null uses the directory's baseDn)
-     * @param limit       maximum number of results to return (1–2000)
-     * @param attributes  specific attributes to retrieve; empty = all
-     */
     public List<LdapEntryResponse> searchUsers(UUID directoryId, AuthPrincipal principal,
                                                String filter, String baseDn,
                                                int limit, String[] attributes) {
@@ -101,10 +95,6 @@ public class LdapOperationService {
                 .stream().limit(limit).map(LdapEntryResponse::from).toList();
     }
 
-    /**
-     * Retrieves a single user by DN.
-     * Enforces directory access + branch access (dim 3).
-     */
     public LdapEntryResponse getUser(UUID directoryId, AuthPrincipal principal,
                                      String dn, String[] attributes) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
@@ -115,60 +105,59 @@ public class LdapOperationService {
 
     // ── Users — write ─────────────────────────────────────────────────────────
 
-    /**
-     * Creates a new user entry.
-     * Feature check (USER_CREATE) is enforced by the calling controller via @RequiresFeature.
-     * Branch access is checked here before delegation.
-     */
     public LdapEntryResponse createUser(UUID directoryId, AuthPrincipal principal,
                                         CreateEntryRequest req) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireBranchAccess(principal, directoryId, req.dn());
         userService.createUser(dc, req.dn(), req.attributes());
-        return LdapEntryResponse.from(userService.getUser(dc, req.dn()));
+        LdapEntryResponse result = LdapEntryResponse.from(userService.getUser(dc, req.dn()));
+        auditService.record(principal, directoryId, AuditAction.USER_CREATE, req.dn(),
+                Map.of("attributes", req.attributes().keySet()));
+        return result;
     }
 
-    /**
-     * Applies attribute modifications to an existing user entry.
-     */
     public LdapEntryResponse updateUser(UUID directoryId, AuthPrincipal principal,
                                         String dn, UpdateEntryRequest req) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireBranchAccess(principal, directoryId, dn);
         List<Modification> mods = toModifications(req);
         userService.updateUser(dc, dn, mods);
-        return LdapEntryResponse.from(userService.getUser(dc, dn));
+        LdapEntryResponse result = LdapEntryResponse.from(userService.getUser(dc, dn));
+        auditService.record(principal, directoryId, AuditAction.USER_UPDATE, dn,
+                Map.of("modifiedAttributes", req.modifications().stream()
+                        .map(AttributeModification::attribute).toList()));
+        return result;
     }
 
-    /** Deletes a user entry. */
     public void deleteUser(UUID directoryId, AuthPrincipal principal, String dn) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireBranchAccess(principal, directoryId, dn);
         userService.deleteUser(dc, dn);
+        auditService.record(principal, directoryId, AuditAction.USER_DELETE, dn, null);
     }
 
-    /** Enables a user account via the directory's enable/disable attribute. */
     public void enableUser(UUID directoryId, AuthPrincipal principal, String dn) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireBranchAccess(principal, directoryId, dn);
         userService.enableUser(dc, dn);
+        auditService.record(principal, directoryId, AuditAction.USER_ENABLE, dn, null);
     }
 
-    /** Disables a user account. */
     public void disableUser(UUID directoryId, AuthPrincipal principal, String dn) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireBranchAccess(principal, directoryId, dn);
         userService.disableUser(dc, dn);
+        auditService.record(principal, directoryId, AuditAction.USER_DISABLE, dn, null);
     }
 
-    /** Moves a user entry to a new parent DN. */
     public void moveUser(UUID directoryId, AuthPrincipal principal,
                          String dn, MoveUserRequest req) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireBranchAccess(principal, directoryId, dn);
-        // Also verify the target branch is accessible
         permissionService.requireBranchAccess(principal, directoryId, req.newParentDn());
         userService.moveUser(dc, dn, req.newParentDn());
+        auditService.record(principal, directoryId, AuditAction.USER_MOVE, dn,
+                Map.of("newParentDn", req.newParentDn()));
     }
 
     // ── Groups — read ─────────────────────────────────────────────────────────
@@ -206,13 +195,17 @@ public class LdapOperationService {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireBranchAccess(principal, directoryId, req.dn());
         groupService.createGroup(dc, req.dn(), req.attributes());
-        return LdapEntryResponse.from(groupService.getGroup(dc, req.dn()));
+        LdapEntryResponse result = LdapEntryResponse.from(groupService.getGroup(dc, req.dn()));
+        auditService.record(principal, directoryId, AuditAction.GROUP_CREATE, req.dn(),
+                Map.of("attributes", req.attributes().keySet()));
+        return result;
     }
 
     public void deleteGroup(UUID directoryId, AuthPrincipal principal, String dn) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireBranchAccess(principal, directoryId, dn);
         groupService.deleteGroup(dc, dn);
+        auditService.record(principal, directoryId, AuditAction.GROUP_DELETE, dn, null);
     }
 
     public void addGroupMember(UUID directoryId, AuthPrincipal principal,
@@ -220,6 +213,8 @@ public class LdapOperationService {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireBranchAccess(principal, directoryId, groupDn);
         groupService.addMember(dc, groupDn, memberAttribute, memberValue);
+        auditService.record(principal, directoryId, AuditAction.GROUP_MEMBER_ADD, groupDn,
+                Map.of("attribute", memberAttribute, "member", memberValue));
     }
 
     public void removeGroupMember(UUID directoryId, AuthPrincipal principal,
@@ -227,14 +222,12 @@ public class LdapOperationService {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireBranchAccess(principal, directoryId, groupDn);
         groupService.removeMember(dc, groupDn, memberAttribute, memberValue);
+        auditService.record(principal, directoryId, AuditAction.GROUP_MEMBER_REMOVE, groupDn,
+                Map.of("attribute", memberAttribute, "member", memberValue));
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    /**
-     * Loads the {@link DirectoryConnection}, scoping by tenant for admin principals.
-     * Verifies the connection is enabled.
-     */
     private DirectoryConnection loadDirectory(UUID directoryId, AuthPrincipal principal) {
         DirectoryConnection dc;
         if (principal.isSuperadmin()) {
