@@ -4,17 +4,17 @@ services:
 
   db:
     image: postgres:16-alpine
-    container_name: ldap-portal-db
+    container_name: ldap-admin-db
     environment:
-      POSTGRES_DB:       ${POSTGRES_DB:-ldapportal}
-      POSTGRES_USER:     ${POSTGRES_USER:-ldapportal}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ldapportal}
+      POSTGRES_DB:       ${POSTGRES_DB:-ldapadmin}
+      POSTGRES_USER:     ${POSTGRES_USER:-ldapadmin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ldapadmin}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ldapportal} -d ${POSTGRES_DB:-ldapportal}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ldapadmin} -d ${POSTGRES_DB:-ldapadmin}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,15 +24,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ldap-portal-app
+    container_name: ldap-admin-app
     depends_on:
       db:
         condition: service_healthy
     environment:
       # Database
-      DB_URL:      jdbc:postgresql://db:5432/${POSTGRES_DB:-ldapportal}
-      DB_USERNAME: ${POSTGRES_USER:-ldapportal}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-ldapportal}
+      DB_URL:      jdbc:postgresql://db:5432/${POSTGRES_DB:-ldapadmin}
+      DB_USERNAME: ${POSTGRES_USER:-ldapadmin}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ldapadmin}
       # Security — these MUST be supplied; no defaults for secrets
       ENCRYPTION_KEY:                  ${ENCRYPTION_KEY}
       JWT_SECRET:                      ${JWT_SECRET}

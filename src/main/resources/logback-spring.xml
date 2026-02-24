@@ -7,7 +7,7 @@
 -->
 <configuration>
 
-    <springProperty scope="context" name="appName"  source="spring.application.name" defaultValue="ldap-portal"/>
+    <springProperty scope="context" name="appName"  source="spring.application.name" defaultValue="ldap-admin"/>
     <springProperty scope="context" name="logLevel" source="logging.level.root"       defaultValue="INFO"/>
 
     <appender name="JSON_STDOUT" class="ch.qos.logback.core.ConsoleAppender">
