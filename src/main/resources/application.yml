@@ -1,18 +1,18 @@
 spring:
   application:
-    name: ldap-portal
+    name: ldap-admin
 
   datasource:
-    url:                   ${DB_URL:jdbc:postgresql://localhost:5432/ldapportal}
-    username:              ${DB_USERNAME:ldapportal}
-    password:              ${DB_PASSWORD:ldapportal}
+    url:                   ${DB_URL:jdbc:postgresql://localhost:5432/ldapadmin}
+    username:              ${DB_USERNAME:ldapadmin}
+    password:              ${DB_PASSWORD:ldapadmin}
     driver-class-name:     org.postgresql.Driver
     hikari:
       minimum-idle:        ${DB_POOL_MIN:2}
       maximum-pool-size:   ${DB_POOL_MAX:20}
       connection-timeout:  ${DB_POOL_CONNECT_TIMEOUT_MS:30000}
       idle-timeout:        ${DB_POOL_IDLE_TIMEOUT_MS:600000}
-      pool-name:           LdapPortalHikariPool
+      pool-name:           LDAPAdminHikariPool
 
   jpa:
     hibernate:
@@ -58,7 +58,7 @@ app:
 logging:
   level:
     root:             ${LOG_LEVEL:INFO}
-    com.ldapportal:   ${APP_LOG_LEVEL:INFO}
+    com.ldapadmin:    ${APP_LOG_LEVEL:INFO}
     # Suppress Hibernate SQL noise in non-debug environments
     org.hibernate.SQL: ${HIBERNATE_LOG_LEVEL:WARN}
 
