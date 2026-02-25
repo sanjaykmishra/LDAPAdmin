@@ -96,7 +96,9 @@ goto error
 @SET MAVEN_JAVA_EXE="%JAVA_HOME%\bin\java.exe"
 @SET MAVEN_JAVA_EXE=%MAVEN_JAVA_EXE:"=%
 
-SET MAVEN_OPTS="%MAVEN_PROJECTBASEDIR%\.mvn\jvm.config" %MAVEN_OPTS%
+@IF EXIST "%MAVEN_PROJECTBASEDIR%\.mvn\jvm.config" (
+  FOR /F "usebackq delims=" %%a IN ("%MAVEN_PROJECTBASEDIR%\.mvn\jvm.config") DO @SET "MAVEN_OPTS=%%a %MAVEN_OPTS%"
+)
 
 @SET MAVEN_CMD_LINE_ARGS=%*
 
