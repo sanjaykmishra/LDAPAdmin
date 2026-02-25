@@ -27,7 +27,7 @@ spring:
           time_zone:         UTC
         # Enable JSONB support via Hibernate 6 native JSON type mapping.
         type:
-          preferred_uuid_jdbc_type: OTHER
+          preferred_uuid_jdbc_type: UUID
 
   flyway:
     enabled:              true
