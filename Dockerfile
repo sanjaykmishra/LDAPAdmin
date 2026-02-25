@@ -2,4 +2,9 @@ FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY target/ldap-portal-*.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD wget -qO- http://localhost:8080/actuator/health || exit 1
+ENTRYPOINT ["java", \
+    "-Xms256m", "-Xmx512m", \
+    "-XX:+UseContainerSupport", \
+    "-jar", "app.jar"]

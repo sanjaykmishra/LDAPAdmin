@@ -103,8 +103,10 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
+  // Restore session from httpOnly cookie on first navigation after page load
+  await auth.init()
   if (!to.meta.public && !auth.isLoggedIn) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }

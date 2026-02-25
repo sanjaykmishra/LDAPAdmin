@@ -8,6 +8,7 @@ import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.ldap.model.LdapUser;
 import com.ldapadmin.repository.AuditEventRepository;
 import com.ldapadmin.util.CsvUtils;
+import com.unboundid.ldap.sdk.Filter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -166,7 +167,8 @@ public class ReportExecutionService {
 
     private String buildGroupFilter(Map<String, Object> params) {
         String groupDn = requireString(params, "groupDn");
-        return "(memberOf=" + groupDn + ")";
+        // Escape the DN so LDAP special characters (*, \, (, ), \0) can't corrupt the filter
+        return "(memberOf=" + Filter.encodeValue(groupDn) + ")";
     }
 
     private String lookbackTimestamp(Map<String, Object> params) {

@@ -75,53 +75,63 @@ public class AuthenticationService {
     // ── Superadmin ────────────────────────────────────────────────────────────
 
     private LoginResponse loginSuperadmin(String username, String password) {
-        SuperadminAccount account = superadminRepo.findByUsernameAndActiveTrue(username)
-                .orElseThrow(() -> new BadCredentialsException("Bad credentials"));
+        try {
+            SuperadminAccount account = superadminRepo.findByUsernameAndActiveTrue(username)
+                    .orElseThrow(() -> new BadCredentialsException("Bad credentials"));
 
-        if (account.getAccountType() == AccountType.LOCAL) {
-            if (!passwordEncoder.matches(password, account.getPasswordHash())) {
-                throw new BadCredentialsException("Bad credentials");
+            if (account.getAccountType() == AccountType.LOCAL) {
+                if (!passwordEncoder.matches(password, account.getPasswordHash())) {
+                    throw new BadCredentialsException("Bad credentials");
+                }
+            } else {
+                // LDAP-sourced superadmin — verify via bind against source directory
+                ldapBind(account.getLdapSourceDirectory(), account.getLdapDn(), password);
             }
-        } else {
-            // LDAP-sourced superadmin — verify via bind against source directory
-            ldapBind(account.getLdapSourceDirectory(), account.getLdapDn(), password);
+
+            account.setLastLoginAt(OffsetDateTime.now());
+
+            AuthPrincipal principal = new AuthPrincipal(
+                    PrincipalType.SUPERADMIN, account.getId(), null, account.getUsername());
+            return buildResponse(principal);
+        } catch (BadCredentialsException e) {
+            log.warn("Failed superadmin login attempt for username '{}'", username);
+            throw e;
         }
-
-        account.setLastLoginAt(OffsetDateTime.now());
-
-        AuthPrincipal principal = new AuthPrincipal(
-                PrincipalType.SUPERADMIN, account.getId(), null, account.getUsername());
-        return buildResponse(principal);
     }
 
     // ── Admin ─────────────────────────────────────────────────────────────────
 
     private LoginResponse loginAdmin(String username, String password, String tenantSlug) {
-        Tenant tenant = tenantRepo.findBySlugAndEnabledTrue(tenantSlug)
-                .orElseThrow(() -> new BadCredentialsException("Bad credentials"));
+        try {
+            Tenant tenant = tenantRepo.findBySlugAndEnabledTrue(tenantSlug)
+                    .orElseThrow(() -> new BadCredentialsException("Bad credentials"));
 
-        AdminAccount account = adminRepo
-                .findByTenantIdAndUsernameAndActiveTrue(tenant.getId(), username)
-                .orElseThrow(() -> new BadCredentialsException("Bad credentials"));
+            AdminAccount account = adminRepo
+                    .findByTenantIdAndUsernameAndActiveTrue(tenant.getId(), username)
+                    .orElseThrow(() -> new BadCredentialsException("Bad credentials"));
 
-        TenantAuthConfig authConfig = authConfigRepo.findByTenantId(tenant.getId())
-                .orElseThrow(() -> new BadCredentialsException("Bad credentials"));
+            TenantAuthConfig authConfig = authConfigRepo.findByTenantId(tenant.getId())
+                    .orElseThrow(() -> new BadCredentialsException("Bad credentials"));
 
-        if (authConfig.getAuthType() == AuthType.LDAP_BIND) {
-            String bindDn = authConfig.getLdapBindDnPattern()
-                    .replace("{username}", username);
-            ldapBind(authConfig.getLdapDirectory(), bindDn, password);
-        } else {
-            // SAML tenants must use the SSO flow; password login is not supported
-            throw new BadCredentialsException(
-                    "Password login is not available for this tenant; please use SSO");
+            if (authConfig.getAuthType() == AuthType.LDAP_BIND) {
+                String bindDn = authConfig.getLdapBindDnPattern()
+                        .replace("{username}", username);
+                ldapBind(authConfig.getLdapDirectory(), bindDn, password);
+            } else {
+                // SAML tenants must use the SSO flow; password login is not supported
+                throw new BadCredentialsException(
+                        "Password login is not available for this tenant; please use SSO");
+            }
+
+            account.setLastLoginAt(OffsetDateTime.now());
+
+            AuthPrincipal principal = new AuthPrincipal(
+                    PrincipalType.ADMIN, account.getId(), tenant.getId(), account.getUsername());
+            return buildResponse(principal);
+        } catch (BadCredentialsException e) {
+            log.warn("Failed admin login attempt for username '{}' in tenant '{}'", username, tenantSlug);
+            throw e;
         }
-
-        account.setLastLoginAt(OffsetDateTime.now());
-
-        AuthPrincipal principal = new AuthPrincipal(
-                PrincipalType.ADMIN, account.getId(), tenant.getId(), account.getUsername());
-        return buildResponse(principal);
     }
 
     // ── LDAP bind helper ──────────────────────────────────────────────────────
@@ -156,6 +166,11 @@ public class AuthenticationService {
 
     private LoginResponse buildResponse(AuthPrincipal principal) {
         String token = jwtTokenService.issue(principal);
-        return new LoginResponse(token, principal.username(), principal.type().name());
+        return new LoginResponse(
+                token,
+                principal.username(),
+                principal.type().name(),
+                principal.id().toString(),
+                principal.tenantId() != null ? principal.tenantId().toString() : null);
     }
 }

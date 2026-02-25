@@ -1,10 +1,18 @@
 package com.ldapadmin.auth.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 /**
- * Successful login response carrying the signed JWT and basic principal info.
+ * Successful login response.
+ *
+ * <p>The JWT {@code token} is also written as an {@code HttpOnly} cookie by
+ * {@link com.ldapadmin.controller.AuthController} and is excluded from the
+ * JSON body so it is never accessible to JavaScript.</p>
  */
 public record LoginResponse(
-        String token,
+        @JsonIgnore String token,
         String username,
-        String accountType) {
+        String accountType,
+        String id,
+        String tenantId) {
 }

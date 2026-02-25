@@ -35,6 +35,11 @@ spring:
     baseline-on-migrate:  false
     validate-on-migrate:  true
 
+  servlet:
+    multipart:
+      max-file-size:    ${UPLOAD_MAX_FILE_SIZE:10MB}
+      max-request-size: ${UPLOAD_MAX_REQUEST_SIZE:10MB}
+
 # ── Application-specific properties ──────────────────────────────────────────
 app:
   encryption:
@@ -51,6 +56,10 @@ app:
     # Long random secret, base64-encoded.  REQUIRED — no default.
     secret:          ${JWT_SECRET}
     expiry-minutes:  ${JWT_EXPIRY_MINUTES:60}
+
+  cookie:
+    # Set to false only in local development (plain HTTP).  Always true in production.
+    secure: ${COOKIE_SECURE:true}
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 # JSON format is configured in logback-spring.xml.

@@ -1,5 +1,6 @@
 package com.ldapadmin.exception;
 
+import com.ldapadmin.exception.TooManyRequestsException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -83,6 +84,11 @@ public class GlobalExceptionHandler {
         log.warn("LDAP operation error: {}", ex.getMessage());
         return ProblemDetail.forStatusAndDetail(
                 HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ProblemDetail handleTooManyRequests(TooManyRequestsException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

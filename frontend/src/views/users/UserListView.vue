@@ -15,14 +15,14 @@
         v-model="filterText"
         placeholder="LDAP filter, e.g. (cn=john*)"
         class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        @keyup.enter="load"
+        @keyup.enter="search"
       />
       <input
         v-model="baseDnOverride"
         placeholder="Base DN (optional)"
         class="w-64 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
-      <button @click="load" class="btn-primary">Search</button>
+      <button @click="search" class="btn-primary">Search</button>
     </div>
 
     <DataTable :columns="cols" :rows="users" :loading="loading" row-key="dn">
@@ -40,7 +40,7 @@
           <button
             @click="toggleEnabled(row)"
             class="btn-sm"
-            :class="row.enabled !== false ? 'btn-secondary' : 'btn-secondary'"
+            :class="row.enabled !== false ? 'btn-secondary' : 'btn-primary'"
           >{{ row.enabled !== false ? 'Disable' : 'Enable' }}</button>
           <button @click="openMove(row)" class="btn-sm btn-secondary">Move</button>
           <button @click="confirmDelete(row)" class="btn-sm btn-danger">Delete</button>
@@ -87,6 +87,8 @@ import FormField from '@/components/FormField.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import UserForm from './UserForm.vue'
 
+const PAGE_SIZE = 50
+
 const route  = useRoute()
 const notif  = useNotificationStore()
 const { loading, call } = useApi()
@@ -95,7 +97,7 @@ const dirId          = route.params.dirId
 const users          = ref([])
 const filterText     = ref('')
 const baseDnOverride = ref('')
-const limit          = ref(50)
+const limit          = ref(PAGE_SIZE)
 const showModal      = ref(false)
 const showMove       = ref(false)
 const showDelete     = ref(false)
@@ -114,6 +116,8 @@ const cols = [
 
 const emptyForm = () => ({ parentDn: '', rdnAttribute: 'uid', rdnValue: '', attributes: {} })
 const form = ref(emptyForm())
+
+function search() { limit.value = PAGE_SIZE; load() }
 
 async function load() {
   await call(async () => {
@@ -145,7 +149,7 @@ function openEdit(row) {
   editingDn.value = row.dn
   const attrs = row._raw?.attributes || {}
   form.value = { dn: row.dn, attributes: Object.fromEntries(
-    Object.entries(attrs).map(([k, v]) => [k, Array.isArray(v) ? v.join(', ') : v])
+    Object.entries(attrs).map(([k, v]) => [k, Array.isArray(v) ? v.join('\n') : v])
   )}
   showModal.value = true
 }
@@ -155,7 +159,7 @@ async function save() {
   try {
     if (editingDn.value) {
       const mods = Object.entries(form.value.attributes || {}).map(([attr, val]) => ({
-        attribute: attr, values: val.split(',').map(v => v.trim()),
+        attribute: attr, values: val.split('\n').map(v => v.trim()).filter(v => v.length > 0),
       }))
       await usersApi.updateUser(dirId, editingDn.value, { modifications: mods })
       notif.success('User updated')

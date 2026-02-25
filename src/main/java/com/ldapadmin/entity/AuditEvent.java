@@ -76,6 +76,7 @@ public class AuditEvent {
 
     // ── Event payload ─────────────────────────────────────────────────────────
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, updatable = false, length = 50)
     private AuditAction action;
 

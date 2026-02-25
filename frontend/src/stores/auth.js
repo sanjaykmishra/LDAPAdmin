@@ -1,36 +1,54 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { login as apiLogin } from '@/api/auth'
+import { login as apiLogin, logout as apiLogout, me } from '@/api/auth'
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref(localStorage.getItem('jwt') || null)
-  const principal = ref(
-    JSON.parse(localStorage.getItem('principal') || 'null')
-  )
+  const principal   = ref(null)
+  const initialized = ref(false)
 
-  const isLoggedIn = computed(() => !!token.value)
-  const isSuperadmin = computed(() => principal.value?.accountType === 'SUPERADMIN')
-  const username = computed(() => principal.value?.username || '')
+  const isLoggedIn    = computed(() => !!principal.value)
+  const isSuperadmin  = computed(() => principal.value?.accountType === 'SUPERADMIN')
+  const username      = computed(() => principal.value?.username || '')
+
+  /**
+   * Called once per page load (from the router guard) to restore the session
+   * from the httpOnly JWT cookie by hitting /api/auth/me.
+   */
+  async function init() {
+    if (initialized.value) return
+    initialized.value = true
+    try {
+      const { data } = await me()
+      principal.value = {
+        id:          data.id,
+        username:    data.username,
+        accountType: data.accountType,
+        tenantId:    data.tenantId || null,
+      }
+    } catch {
+      principal.value = null
+    }
+  }
 
   async function login(username, password) {
     const { data } = await apiLogin(username, password)
-    token.value = data.token
+    // Populate principal from login response body (token is in httpOnly cookie)
     principal.value = {
-      id: data.id,
-      username: data.username,
+      id:          data.id,
+      username:    data.username,
       accountType: data.accountType,
-      tenantId: data.tenantId,
+      tenantId:    data.tenantId || null,
     }
-    localStorage.setItem('jwt', data.token)
-    localStorage.setItem('principal', JSON.stringify(principal.value))
+    initialized.value = true
   }
 
-  function logout() {
-    token.value = null
-    principal.value = null
-    localStorage.removeItem('jwt')
-    localStorage.removeItem('principal')
+  async function logout() {
+    try {
+      await apiLogout()
+    } finally {
+      principal.value = null
+    }
   }
 
-  return { token, principal, isLoggedIn, isSuperadmin, username, login, logout }
+  return { principal, isLoggedIn, isSuperadmin, username, init, login, logout }
 })

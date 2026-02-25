@@ -123,8 +123,8 @@ watch(selectedDirId, (newId) => {
   router.push(`/directories/${newId}/${section}`)
 })
 
-function handleLogout() {
-  auth.logout()
+async function handleLogout() {
+  await auth.logout()
   router.push('/login')
 }
 </script>

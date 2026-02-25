@@ -53,12 +53,15 @@ public class AuditService {
                        String targetDn,
                        Map<String, Object> detail) {
         try {
-            String dirName = dirRepo.findById(directoryId)
-                    .map(DirectoryConnection::getDisplayName)
-                    .orElse(null);
+            // Single query: load the directory once and derive both displayName and tenantId
+            DirectoryConnection dir = dirRepo.findById(directoryId).orElse(null);
+            String dirName  = dir != null ? dir.getDisplayName() : null;
+            UUID   tenantId = principal.tenantId() != null
+                    ? principal.tenantId()
+                    : (dir != null ? dir.getTenant().getId() : null);
 
             AuditEvent event = AuditEvent.builder()
-                    .tenantId(resolveTenantId(principal, directoryId))
+                    .tenantId(tenantId)
                     .source(AuditSource.INTERNAL)
                     .actorId(principal.id())
                     .actorType(principal.type().name())
@@ -132,15 +135,4 @@ public class AuditService {
         return auditRepo.existsByDirectoryIdAndChangelogChangeNumber(directoryId, changeNumber);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private UUID resolveTenantId(AuthPrincipal principal, UUID directoryId) {
-        if (principal.tenantId() != null) {
-            return principal.tenantId();
-        }
-        // Superadmin: resolve from the directory
-        return dirRepo.findById(directoryId)
-                .map(dc -> dc.getTenant().getId())
-                .orElse(null);
-    }
 }
