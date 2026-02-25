@@ -93,6 +93,42 @@
         </table>
       </div>
 
+      <!-- ── Directories tab ───────────────────────────────────────────── -->
+      <div v-if="activeTab === 'directories'" class="p-4">
+        <div class="flex justify-between items-center mb-3">
+          <span class="text-sm font-semibold text-gray-700">LDAP Directories — {{ selectedTenant.name }}</span>
+          <button @click="openCreateDir" class="btn-sm-primary">+ Add Directory</button>
+        </div>
+        <div v-if="directoriesLoading" class="text-sm text-gray-400 text-center py-6">Loading…</div>
+        <div v-else-if="tenantDirectories.length === 0" class="text-sm text-gray-400 text-center py-6">No directories configured.</div>
+        <table v-else class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th class="px-3 py-2 text-left font-medium text-gray-500">Name</th>
+              <th class="px-3 py-2 text-left font-medium text-gray-500">Host</th>
+              <th class="px-3 py-2 text-left font-medium text-gray-500">Port</th>
+              <th class="px-3 py-2 text-left font-medium text-gray-500">SSL</th>
+              <th class="px-3 py-2 text-left font-medium text-gray-500">Base DN</th>
+              <th class="px-3 py-2"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            <tr v-for="d in tenantDirectories" :key="d.id" class="hover:bg-gray-50">
+              <td class="px-3 py-2 font-medium text-gray-900">{{ d.displayName }}</td>
+              <td class="px-3 py-2 text-gray-600 font-mono text-xs">{{ d.host }}</td>
+              <td class="px-3 py-2 text-gray-600">{{ d.port }}</td>
+              <td class="px-3 py-2 text-gray-600 text-xs">{{ d.sslMode }}</td>
+              <td class="px-3 py-2 text-gray-600 font-mono text-xs">{{ d.baseDn }}</td>
+              <td class="px-3 py-2 text-right whitespace-nowrap">
+                <button @click="doEvictPool(d)" class="text-amber-600 hover:text-amber-800 text-xs font-medium mr-2">Evict Pool</button>
+                <button @click="openEditDir(d)" class="text-blue-600 hover:text-blue-800 text-xs font-medium mr-2">Edit</button>
+                <button @click="confirmDeleteDir(d)" class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       <!-- ── Auth Config tab ────────────────────────────────────────────── -->
       <div v-if="activeTab === 'authConfig'" class="p-4">
         <div v-if="authConfigLoading" class="text-sm text-gray-400 text-center py-6">Loading…</div>
@@ -352,9 +388,51 @@
       </form>
     </AppModal>
 
+    <!-- ── Directory modal ──────────────────────────────────────────────── -->
+    <AppModal v-if="showDirModal" :title="editDir ? 'Edit Directory' : 'New Directory'" size="lg" @close="showDirModal = false">
+      <form @submit.prevent="saveDir" class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <FormField label="Display Name" v-model="dirForm.displayName" required />
+          <FormField label="Host" v-model="dirForm.host" required />
+          <FormField label="Port" v-model.number="dirForm.port" type="number" placeholder="389" />
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">SSL Mode</label>
+            <select v-model="dirForm.sslMode" class="input w-full">
+              <option value="NONE">None</option>
+              <option value="LDAPS">LDAPS</option>
+              <option value="STARTTLS">STARTTLS</option>
+            </select>
+          </div>
+          <FormField label="Bind DN" v-model="dirForm.bindDn" required placeholder="cn=admin,dc=example,dc=com" />
+          <FormField label="Bind Password" v-model="dirForm.bindPassword" type="password" :placeholder="editDir ? 'Leave blank to keep' : ''" />
+          <div class="col-span-2">
+            <FormField label="Base DN" v-model="dirForm.baseDn" required placeholder="dc=example,dc=com" />
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="checkbox" id="dirTrustCerts" v-model="dirForm.trustAllCerts" class="rounded" />
+          <label for="dirTrustCerts" class="text-sm text-gray-700">Trust all certificates (insecure)</label>
+        </div>
+        <!-- Test connection result -->
+        <div v-if="testDirResult" :class="testDirResult.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-700'" class="border rounded-lg px-3 py-2 text-sm">
+          {{ testDirResult.success ? '✓ ' : '✗ ' }}{{ testDirResult.message }}
+        </div>
+        <div class="flex justify-between items-center pt-2">
+          <button type="button" @click="doTestDir" :disabled="testDirLoading" class="btn-secondary text-sm">
+            {{ testDirLoading ? 'Testing…' : 'Test Connection' }}
+          </button>
+          <div class="flex gap-2">
+            <button type="button" @click="showDirModal = false" class="btn-secondary">Cancel</button>
+            <button type="submit" :disabled="dirSaving" class="btn-primary">{{ dirSaving ? 'Saving…' : 'Save' }}</button>
+          </div>
+        </div>
+      </form>
+    </AppModal>
+
     <!-- Delete confirms -->
     <ConfirmDialog v-if="deleteTenantTarget" :message="`Delete tenant '${deleteTenantTarget.name}'?`" @confirm="doDeleteTenant" @cancel="deleteTenantTarget = null" />
     <ConfirmDialog v-if="deleteAdminTarget" :message="`Remove admin '${deleteAdminTarget.username}'?`" @confirm="doDeleteAdmin" @cancel="deleteAdminTarget = null" />
+    <ConfirmDialog v-if="deleteDirTarget" :message="`Delete directory '${deleteDirTarget.displayName}'?`" @confirm="doDeleteDir" @cancel="deleteDirTarget = null" />
     <ConfirmDialog v-if="deleteSourceTarget" :message="`Delete source '${deleteSourceTarget.displayName}'?`" @confirm="doDeleteSource" @cancel="deleteSourceTarget = null" />
   </div>
 </template>
@@ -366,7 +444,8 @@ import {
   listTenants, createTenant, updateTenant, deleteTenant,
   listAdmins, createAdmin, updateAdmin, deleteAdmin,
   getTenantAuthConfig, updateTenantAuthConfig,
-  listTenantDirectories,
+  listTenantDirectories, createTenantDirectory, updateTenantDirectory,
+  deleteTenantDirectory, testTenantConnection, evictTenantPool,
 } from '@/api/superadmin'
 import {
   getPermissions, setDirectoryRole, removeDirectoryRole,
@@ -388,6 +467,7 @@ const activeTab      = ref('admins')
 
 const detailTabs = [
   { key: 'admins',       label: 'Admins' },
+  { key: 'directories',  label: 'Directories' },
   { key: 'authConfig',   label: 'Auth Config' },
   { key: 'auditSources', label: 'Audit Sources' },
 ]
@@ -461,16 +541,83 @@ async function selectTenant(t) {
 function onTabSwitch(tab) {
   if (tab === 'authConfig')   loadAuthConfig()
   if (tab === 'auditSources') loadAuditSources()
+  if (tab === 'directories')  loadTenantDirectories()
 }
 
-// ── Tenant Directories (for permissions & auth config) ────────────────────────
+// ── Tenant Directories ────────────────────────────────────────────────────────
 
-const tenantDirectories = ref([])
+const tenantDirectories    = ref([])
+const directoriesLoading   = ref(false)
+const showDirModal         = ref(false)
+const editDir              = ref(null)
+const dirSaving            = ref(false)
+const deleteDirTarget      = ref(null)
+const testDirLoading       = ref(false)
+const testDirResult        = ref(null)  // { success, message }
+const dirForm = ref({
+  displayName: '', host: '', port: 389, sslMode: 'NONE',
+  trustAllCerts: false, bindDn: '', bindPassword: '', baseDn: '',
+})
+
 async function loadTenantDirectories() {
+  directoriesLoading.value = true
   try {
     const { data } = await listTenantDirectories(selectedTenant.value.id)
     tenantDirectories.value = data
   } catch { tenantDirectories.value = [] }
+  finally { directoriesLoading.value = false }
+}
+
+function openCreateDir() {
+  editDir.value = null
+  dirForm.value = { displayName: '', host: '', port: 389, sslMode: 'NONE', trustAllCerts: false, bindDn: '', bindPassword: '', baseDn: '' }
+  testDirResult.value = null
+  showDirModal.value = true
+}
+function openEditDir(d) {
+  editDir.value = d
+  dirForm.value = { displayName: d.displayName, host: d.host, port: d.port, sslMode: d.sslMode, trustAllCerts: d.trustAllCerts ?? false, bindDn: d.bindDn, bindPassword: '', baseDn: d.baseDn ?? '' }
+  testDirResult.value = null
+  showDirModal.value = true
+}
+async function saveDir() {
+  dirSaving.value = true
+  try {
+    const payload = { ...dirForm.value }
+    if (editDir.value && !payload.bindPassword) delete payload.bindPassword
+    editDir.value
+      ? await updateTenantDirectory(selectedTenant.value.id, editDir.value.id, payload)
+      : await createTenantDirectory(selectedTenant.value.id, payload)
+    notif.success(editDir.value ? 'Directory updated' : 'Directory created')
+    showDirModal.value = false
+    await loadTenantDirectories()
+  } catch (e) { notif.error(e.response?.data?.detail || e.message) }
+  finally { dirSaving.value = false }
+}
+function confirmDeleteDir(d) { deleteDirTarget.value = d }
+async function doDeleteDir() {
+  try {
+    await deleteTenantDirectory(selectedTenant.value.id, deleteDirTarget.value.id)
+    notif.success('Directory deleted')
+    deleteDirTarget.value = null
+    await loadTenantDirectories()
+  } catch (e) { notif.error(e.response?.data?.detail || e.message); deleteDirTarget.value = null }
+}
+async function doTestDir() {
+  testDirLoading.value = true
+  testDirResult.value = null
+  try {
+    const { data } = await testTenantConnection(selectedTenant.value.id, dirForm.value)
+    testDirResult.value = data
+  } catch (e) {
+    testDirResult.value = { success: false, message: e.response?.data?.detail || e.message }
+  } finally { testDirLoading.value = false }
+}
+async function doEvictPool(d) {
+  try {
+    await evictTenantPool(selectedTenant.value.id, d.id)
+    notif.success('Connection pool evicted')
+  } catch (e) { notif.error(e.response?.data?.detail || e.message) }
 }
 
 // ── Admins ─────────────────────────────────────────────────────────────────────

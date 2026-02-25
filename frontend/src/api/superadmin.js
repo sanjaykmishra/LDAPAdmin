@@ -46,6 +46,10 @@ export const getTenantAuthConfig = (id) =>
 export const updateTenantAuthConfig = (id, data) =>
   client.put(`/superadmin/tenants/${id}/auth-config`, data)
 
-// ── Tenant directories (for permission assignment) ─────────────────────────
-export const listTenantDirectories = (tenantId) =>
-  client.get(`/superadmin/tenants/${tenantId}/directories`)
+// ── Tenant directories ────────────────────────────────────────────────────
+export const listTenantDirectories  = (tenantId)        => client.get(`/superadmin/tenants/${tenantId}/directories`)
+export const createTenantDirectory  = (tenantId, data)  => client.post(`/superadmin/tenants/${tenantId}/directories`, data)
+export const updateTenantDirectory  = (tenantId, id, data) => client.put(`/superadmin/tenants/${tenantId}/directories/${id}`, data)
+export const deleteTenantDirectory  = (tenantId, id)    => client.delete(`/superadmin/tenants/${tenantId}/directories/${id}`)
+export const testTenantConnection   = (tenantId, data)  => client.post(`/superadmin/tenants/${tenantId}/directories/test`, data)
+export const evictTenantPool        = (tenantId, id)    => client.post(`/superadmin/tenants/${tenantId}/directories/${id}/evict-pool`)
