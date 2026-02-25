@@ -25,9 +25,6 @@
         <logstash-logback.version>7.4</logstash-logback.version>
         <springdoc.version>2.6.0</springdoc.version>
         <unboundid-ldapsdk.version>7.0.1</unboundid-ldapsdk.version>
-        <!-- Pinned explicitly: ${lombok.version} from Spring Boot parent may not
-             resolve inside annotationProcessorPaths on all Maven installs.
-             1.18.34 is the minimum that supports Java 21 (TypeTag.UNKNOWN removed). -->
         <lombok.version>1.18.42</lombok.version>
     </properties>
 
