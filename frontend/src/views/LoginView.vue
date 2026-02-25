@@ -47,7 +47,7 @@ async function handleLogin() {
   try {
     await auth.login(form.value.username, form.value.password)
     const rawRedirect = route.query.redirect
-    const redirect = (typeof rawRedirect === 'string' && rawRedirect.startsWith('/') && rawRedirect \!== '/login')
+    const redirect = (typeof rawRedirect === 'string' && rawRedirect.startsWith('/') && rawRedirect !== '/login')
       ? rawRedirect
       : '/directories'
     router.push(redirect)
