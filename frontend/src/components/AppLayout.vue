@@ -41,6 +41,12 @@
           <RouterLink :to="`/directories/${selectedDirId}/reports`" class="nav-item">
             <span class="icon">📊</span> Reports
           </RouterLink>
+          <RouterLink :to="`/directories/${selectedDirId}/profiles`" class="nav-item">
+            <span class="icon">🎨</span> Attr Profiles
+          </RouterLink>
+          <RouterLink :to="`/directories/${selectedDirId}/schema`" class="nav-item">
+            <span class="icon">🔍</span> Schema
+          </RouterLink>
         </template>
 
         <div class="border-t border-gray-700 my-2" />
@@ -107,6 +113,14 @@ onMounted(async () => {
 // Keep dirId in sync with route params
 watch(() => route.params.dirId, id => {
   if (id) selectedDirId.value = id
+})
+
+// Navigate when user picks a different directory from the dropdown
+const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'profiles', 'schema']
+watch(selectedDirId, (newId) => {
+  if (!newId || newId === route.params.dirId) return
+  const section = dirSections.includes(route.name) ? route.name : 'users'
+  router.push(`/directories/${newId}/${section}`)
 })
 
 function handleLogout() {

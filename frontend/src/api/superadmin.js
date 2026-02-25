@@ -38,3 +38,14 @@ export const updateAdmin = (tenantId, adminId, data) =>
 
 export const deleteAdmin = (tenantId, adminId) =>
   client.delete(`/admin/tenants/${tenantId}/admins/${adminId}`)
+
+// ── Tenant auth config ─────────────────────────────────────────────────────
+export const getTenantAuthConfig = (id) =>
+  client.get(`/superadmin/tenants/${id}/auth-config`)
+
+export const updateTenantAuthConfig = (id, data) =>
+  client.put(`/superadmin/tenants/${id}/auth-config`, data)
+
+// ── Tenant directories (for permission assignment) ─────────────────────────
+export const listTenantDirectories = (tenantId) =>
+  client.get(`/superadmin/tenants/${tenantId}/directories`)

@@ -61,6 +61,20 @@ const router = createRouter({
           component: () => import('@/views/reports/ReportJobsView.vue'),
         },
 
+        // Attribute Profiles
+        {
+          path: 'directories/:dirId/profiles',
+          name: 'profiles',
+          component: () => import('@/views/profiles/AttributeProfilesView.vue'),
+        },
+
+        // Schema Browser
+        {
+          path: 'directories/:dirId/schema',
+          name: 'schema',
+          component: () => import('@/views/schema/SchemaView.vue'),
+        },
+
         // Settings
         {
           path: 'settings',
