@@ -91,6 +91,7 @@ const emptyForm = () => ({
 const form = ref(emptyForm())
 
 async function load() {
+  if (!tenantId()) return
   await call(async () => {
     const { data } = await client.get(`/admin/tenants/${tenantId()}/directories`)
     dirs.value = data
