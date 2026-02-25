@@ -28,6 +28,9 @@ public class AppProperties {
     @Valid
     private Jwt jwt = new Jwt();
 
+    @Valid
+    private Cookie cookie = new Cookie();
+
     // ── Nested config classes ─────────────────────────────────────────────────
 
     @Getter
@@ -63,5 +66,16 @@ public class AppProperties {
 
         @Positive
         private int expiryMinutes = 60;
+    }
+
+    @Getter
+    @Setter
+    public static class Cookie {
+        /**
+         * Whether the JWT cookie is sent with the {@code Secure} attribute.
+         * Set to {@code false} only in local development (plain HTTP).
+         * Defaults to {@code true}.
+         */
+        private boolean secure = true;
     }
 }

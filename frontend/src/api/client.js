@@ -3,22 +3,14 @@ import axios from 'axios'
 const client = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true, // send the httpOnly JWT cookie on every request
 })
 
-// Attach JWT on every request
-client.interceptors.request.use(config => {
-  const token = localStorage.getItem('jwt')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
-
-// On 401, clear token and redirect to login
+// On 401 redirect to login — the cookie has expired or is invalid
 client.interceptors.response.use(
   res => res,
   err => {
     if (err.response?.status === 401) {
-      localStorage.removeItem('jwt')
-      localStorage.removeItem('principal')
       window.location.href = '/login'
     }
     return Promise.reject(err)

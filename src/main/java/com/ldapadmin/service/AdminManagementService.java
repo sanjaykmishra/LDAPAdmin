@@ -42,9 +42,11 @@ public class AdminManagementService {
 
     // ── Admin account CRUD ────────────────────────────────────────────────────
 
+    private static final int MAX_ADMINS_PER_TENANT = 1_000;
+
     public List<AdminAccountResponse> listAdmins(UUID tenantId) {
         requireTenant(tenantId);
-        return adminRepo.findAllByTenantId(tenantId, Pageable.unpaged())
+        return adminRepo.findAllByTenantId(tenantId, Pageable.ofSize(MAX_ADMINS_PER_TENANT))
                 .getContent()
                 .stream()
                 .map(AdminAccountResponse::from)

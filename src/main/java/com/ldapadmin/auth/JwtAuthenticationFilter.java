@@ -3,6 +3,7 @@ package com.ldapadmin.auth;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -18,9 +19,10 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * Extracts the JWT bearer token from the {@code Authorization} header,
- * validates it, and populates {@link SecurityContextHolder} with the
- * authenticated {@link AuthPrincipal}.
+ * Extracts the JWT from the {@code Authorization: Bearer} header or, as a
+ * fallback, from the {@code jwt} httpOnly cookie.  Validates the token and
+ * populates {@link SecurityContextHolder} with the authenticated
+ * {@link AuthPrincipal}.
  *
  * <p>Requests without a valid token pass through with an anonymous context;
  * Spring Security's {@code authorizeHttpRequests} rules then decide whether
@@ -32,6 +34,7 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final String COOKIE_NAME   = "jwt";
 
     private final JwtTokenService jwtTokenService;
 
@@ -39,10 +42,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+        String token = extractToken(request);
 
-        if (header != null && header.startsWith(BEARER_PREFIX)) {
-            String token = header.substring(BEARER_PREFIX.length()).trim();
+        if (token != null) {
             try {
                 AuthPrincipal principal = jwtTokenService.parse(token);
                 String role = "ROLE_" + principal.type().name(); // ROLE_SUPERADMIN or ROLE_ADMIN
@@ -60,5 +62,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private String extractToken(HttpServletRequest request) {
+        // 1. Authorization header (preferred — used by API clients and tests)
+        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+        if (header != null && header.startsWith(BEARER_PREFIX)) {
+            return header.substring(BEARER_PREFIX.length()).trim();
+        }
+
+        // 2. httpOnly cookie fallback (used by the browser SPA)
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if (COOKIE_NAME.equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+
+        return null;
     }
 }

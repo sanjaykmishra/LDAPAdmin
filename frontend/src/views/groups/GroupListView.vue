@@ -98,6 +98,7 @@ async function load() {
       cn:          e.attributes?.cn?.[0] || '—',
       memberCount: (e.attributes?.member || e.attributes?.uniqueMember || []).length,
       _members:    e.attributes?.member || e.attributes?.uniqueMember || [],
+      _memberAttr: e.attributes?.member ? 'member' : e.attributes?.uniqueMember ? 'uniqueMember' : 'member',
     }))
   })
 }
@@ -128,7 +129,7 @@ function openMembers(row) {
 async function addMember() {
   if (!newMemberDn.value.trim()) return
   await call(
-    () => groupsApi.addGroupMember(dirId, selectedGroup.value.dn, { memberDn: newMemberDn.value }),
+    () => groupsApi.addGroupMember(dirId, selectedGroup.value.dn, { memberAttribute: selectedGroup.value._memberAttr, memberValue: newMemberDn.value }),
     { successMsg: 'Member added' }
   )
   members.value.push(newMemberDn.value)
@@ -137,7 +138,7 @@ async function addMember() {
 
 async function removeMember(dn) {
   await call(
-    () => groupsApi.removeGroupMember(dirId, selectedGroup.value.dn, dn),
+    () => groupsApi.removeGroupMember(dirId, selectedGroup.value.dn, { memberAttribute: selectedGroup.value._memberAttr, memberValue: dn }),
     { successMsg: 'Member removed' }
   )
   members.value = members.value.filter(m => m !== dn)

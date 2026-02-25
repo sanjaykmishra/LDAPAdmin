@@ -14,7 +14,7 @@
   <div v-else class="space-y-3">
     <p class="text-xs text-gray-500 mb-3">Editing: <code class="bg-gray-100 px-1 rounded">{{ local.dn }}</code></p>
     <template v-for="(_, key) in local.attributes" :key="key">
-      <FormField :label="key" v-model="local.attributes[key]" />
+      <FormField :label="key" v-model="local.attributes[key]" type="textarea" :rows="2" hint="One value per line" />
     </template>
   </div>
 </template>
