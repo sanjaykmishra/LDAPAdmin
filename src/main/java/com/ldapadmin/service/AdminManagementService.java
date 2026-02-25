@@ -110,17 +110,15 @@ public class AdminManagementService {
     @Transactional
     public DirectoryRoleResponse assignDirectoryRole(UUID tenantId, UUID adminId,
                                                      DirectoryRoleRequest req) {
-        requireAdmin(tenantId, adminId);
+        AdminAccount admin = requireAdmin(tenantId, adminId);
         DirectoryConnection dir = requireDirectory(tenantId, req.directoryId());
 
         AdminDirectoryRole role = roleRepo
                 .findByAdminAccountIdAndDirectoryId(adminId, req.directoryId())
                 .orElseGet(AdminDirectoryRole::new);
 
-        AdminAccount adminRef = new AdminAccount();
-        adminRef.setId(adminId);      // lightweight reference — already validated above
         if (role.getId() == null) {
-            role.setAdminAccount(adminRepo.getReferenceById(adminId));
+            role.setAdminAccount(admin);
             role.setDirectory(dir);
         }
         role.setBaseRole(req.baseRole());
@@ -138,18 +136,16 @@ public class AdminManagementService {
     @Transactional
     public void setBranchRestrictions(UUID tenantId, UUID adminId,
                                       BranchRestrictionsRequest req) {
-        requireAdmin(tenantId, adminId);
-        requireDirectory(tenantId, req.directoryId());
+        AdminAccount admin = requireAdmin(tenantId, adminId);
+        DirectoryConnection dir = requireDirectory(tenantId, req.directoryId());
 
         branchRepo.deleteAllByAdminAccountIdAndDirectoryId(adminId, req.directoryId());
 
         if (req.branchDns() != null) {
-            DirectoryConnection dirRef = dirRepo.getReferenceById(req.directoryId());
-            AdminAccount adminRef = adminRepo.getReferenceById(adminId);
             req.branchDns().forEach(dn -> {
                 AdminBranchRestriction br = new AdminBranchRestriction();
-                br.setAdminAccount(adminRef);
-                br.setDirectory(dirRef);
+                br.setAdminAccount(admin);
+                br.setDirectory(dir);
                 br.setBranchDn(dn);
                 branchRepo.save(br);
             });
@@ -161,8 +157,7 @@ public class AdminManagementService {
     @Transactional
     public void setFeaturePermissions(UUID tenantId, UUID adminId,
                                       List<FeaturePermissionRequest> permissions) {
-        requireAdmin(tenantId, adminId);
-        AdminAccount adminRef = adminRepo.getReferenceById(adminId);
+        AdminAccount admin = requireAdmin(tenantId, adminId);
 
         permissions.forEach(req -> {
             AdminFeaturePermission fp = featureRepo
@@ -170,7 +165,7 @@ public class AdminManagementService {
                     .orElseGet(AdminFeaturePermission::new);
 
             if (fp.getId() == null) {
-                fp.setAdminAccount(adminRef);
+                fp.setAdminAccount(admin);
                 fp.setFeatureKey(req.featureKey());
             }
             fp.setEnabled(req.enabled());

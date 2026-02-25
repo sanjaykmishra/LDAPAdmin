@@ -42,6 +42,11 @@ public class LoginRateLimiter {
             }
             times.addLast(now);
         }
+        // Remove the entry entirely when it is empty so the map doesn't grow
+        // indefinitely with one entry per unique IP that has ever visited.
+        if (times.isEmpty()) {
+            attempts.remove(ip, times);
+        }
     }
 
     private String resolveIp(HttpServletRequest request) {

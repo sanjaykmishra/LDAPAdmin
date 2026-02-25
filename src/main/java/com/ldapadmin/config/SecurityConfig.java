@@ -2,6 +2,7 @@ package com.ldapadmin.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ldapadmin.auth.JwtAuthenticationFilter;
+import com.ldapadmin.config.AppProperties;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,6 +17,11 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 /**
  * Production security configuration — stateless JWT authentication via
@@ -47,6 +53,7 @@ public class SecurityConfig {
                                            ObjectMapper objectMapper) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             // ── Security response headers ──────────────────────────────────────
             .headers(h -> h
@@ -58,10 +65,11 @@ public class SecurityConfig {
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
                 // ── Public ────────────────────────────────────────────────────
-                .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/logout").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/logout").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 // ── Superadmin-only management plane ──────────────────────────
-                .requestMatchers("/api/superadmin/**").hasRole("SUPERADMIN")
+                .requestMatchers("/api/v1/superadmin/**").hasRole("SUPERADMIN")
                 // ── Protected (any authenticated user) ────────────────────────
                 .anyRequest().authenticated()
             )
@@ -76,5 +84,34 @@ public class SecurityConfig {
                 }));
 
         return http.build();
+    }
+
+    /**
+     * CORS policy for the REST API.
+     *
+     * <p>In production the allowed origin should be set via the
+     * {@code CORS_ALLOWED_ORIGIN} environment variable (e.g.
+     * {@code https://ldapadmin.example.com}).  The default {@code *} is safe
+     * for same-origin deployments where the frontend is served by the same
+     * host, but must be tightened for split-origin setups.</p>
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        // Allow the configured frontend origin; falls back to same-origin ("*") if unset.
+        String allowedOrigin = System.getenv("CORS_ALLOWED_ORIGIN");
+        if (allowedOrigin != null && !allowedOrigin.isBlank()) {
+            config.setAllowedOrigins(List.of(allowedOrigin));
+            config.setAllowCredentials(true); // required for cookie-based auth
+        } else {
+            config.addAllowedOriginPattern("*");
+        }
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
+        config.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/v1/**", config);
+        return source;
     }
 }

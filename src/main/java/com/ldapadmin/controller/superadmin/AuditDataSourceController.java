@@ -25,7 +25,7 @@ import java.util.UUID;
  * </pre>
  */
 @RestController
-@RequestMapping("/api/superadmin/tenants/{tenantId}/audit-sources")
+@RequestMapping("/api/v1/superadmin/tenants/{tenantId}/audit-sources")
 @PreAuthorize("hasRole('SUPERADMIN')")
 @RequiredArgsConstructor
 public class AuditDataSourceController {

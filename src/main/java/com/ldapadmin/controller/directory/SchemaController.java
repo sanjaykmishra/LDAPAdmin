@@ -28,7 +28,7 @@ import java.util.UUID;
  * No specific feature permission is needed for schema discovery.</p>
  */
 @RestController
-@RequestMapping("/api/directories/{directoryId}/schema")
+@RequestMapping("/api/v1/directories/{directoryId}/schema")
 @RequiredArgsConstructor
 public class SchemaController {
 

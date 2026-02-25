@@ -36,7 +36,7 @@ import java.util.UUID;
  * </pre>
  */
 @RestController
-@RequestMapping("/api/superadmin/tenants")
+@RequestMapping("/api/v1/superadmin/tenants")
 @PreAuthorize("hasRole('SUPERADMIN')")
 @RequiredArgsConstructor
 public class TenantController {

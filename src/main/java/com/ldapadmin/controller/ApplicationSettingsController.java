@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Superadmin accounts do not have a tenant and will receive a 400 response.</p>
  */
 @RestController
-@RequestMapping("/api/settings")
+@RequestMapping("/api/v1/settings")
 @RequiredArgsConstructor
 public class ApplicationSettingsController {
 

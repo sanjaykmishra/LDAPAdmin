@@ -33,7 +33,7 @@ import java.util.UUID;
  * </pre>
  */
 @RestController
-@RequestMapping("/api/directories/{directoryId}/attribute-profiles")
+@RequestMapping("/api/v1/directories/{directoryId}/attribute-profiles")
 @RequiredArgsConstructor
 public class AttributeProfileController {
 

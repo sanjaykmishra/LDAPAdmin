@@ -49,7 +49,7 @@ import java.util.UUID;
  * are enforced inside {@link LdapOperationService}.</p>
  */
 @RestController
-@RequestMapping("/api/directories/{directoryId}/users")
+@RequestMapping("/api/v1/directories/{directoryId}/users")
 @RequiredArgsConstructor
 public class UserController {
 

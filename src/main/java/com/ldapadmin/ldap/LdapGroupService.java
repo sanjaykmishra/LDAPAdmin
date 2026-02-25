@@ -48,8 +48,29 @@ public class LdapGroupService {
                                         String filter,
                                         String baseDn,
                                         String... attributes) {
+        return searchGroups(dc, filter, baseDn, Integer.MAX_VALUE, attributes);
+    }
+
+    /**
+     * Searches for groups with an upper bound on the number of results returned.
+     *
+     * <p>Pagination stops as soon as {@code maxResults} entries have been
+     * collected, so the LDAP server is not asked to page beyond what the
+     * caller actually needs.</p>
+     *
+     * @param dc         directory connection
+     * @param filter     LDAP filter string
+     * @param baseDn     search base (null falls back to connection's base DN)
+     * @param maxResults maximum number of entries to return
+     * @param attributes attributes to retrieve; empty = all
+     */
+    public List<LdapGroup> searchGroups(DirectoryConnection dc,
+                                        String filter,
+                                        String baseDn,
+                                        int maxResults,
+                                        String... attributes) {
         String searchBase = baseDn != null ? baseDn : dc.getBaseDn();
-        int pageSize = dc.getPagingSize();
+        int pageSize = Math.min(dc.getPagingSize(), maxResults);
         List<LdapGroup> results = new ArrayList<>();
 
         return connectionFactory.withConnection(dc, conn -> {
@@ -66,6 +87,9 @@ public class LdapGroupService {
                 SearchResult searchResult = conn.search(request);
                 for (SearchResultEntry entry : searchResult.getSearchEntries()) {
                     results.add(LdapEntryMapper.toGroup(entry));
+                    if (results.size() >= maxResults) {
+                        return results;
+                    }
                 }
 
                 SimplePagedResultsControl pagingResponse =

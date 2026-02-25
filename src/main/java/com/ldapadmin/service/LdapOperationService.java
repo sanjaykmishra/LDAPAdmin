@@ -102,8 +102,8 @@ public class LdapOperationService {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
         String effectiveFilter = (filter == null || filter.isBlank()) ? "(objectClass=*)" : filter;
-        return userService.searchUsers(dc, effectiveFilter, baseDn, attributes)
-                .stream().limit(limit).map(LdapEntryResponse::from).toList();
+        return userService.searchUsers(dc, effectiveFilter, baseDn, limit, attributes)
+                .stream().map(LdapEntryResponse::from).toList();
     }
 
     public LdapEntryResponse getUser(UUID directoryId, AuthPrincipal principal,
@@ -179,8 +179,8 @@ public class LdapOperationService {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
         String effectiveFilter = (filter == null || filter.isBlank()) ? "(objectClass=*)" : filter;
-        return groupService.searchGroups(dc, effectiveFilter, baseDn, attributes)
-                .stream().limit(limit).map(LdapEntryResponse::from).toList();
+        return groupService.searchGroups(dc, effectiveFilter, baseDn, limit, attributes)
+                .stream().map(LdapEntryResponse::from).toList();
     }
 
     public LdapEntryResponse getGroup(UUID directoryId, AuthPrincipal principal,

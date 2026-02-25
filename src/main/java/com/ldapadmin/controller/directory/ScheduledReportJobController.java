@@ -1,5 +1,6 @@
 package com.ldapadmin.controller.directory;
 
+import com.ldapadmin.auth.ApiRateLimiter;
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.auth.RequiresFeature;
 import com.ldapadmin.dto.report.CreateScheduledReportJobRequest;
@@ -51,13 +52,14 @@ import java.util.UUID;
  * </pre>
  */
 @RestController
-@RequestMapping("/api/directories/{directoryId}")
+@RequestMapping("/api/v1/directories/{directoryId}")
 @RequiredArgsConstructor
 public class ScheduledReportJobController {
 
     private final ScheduledReportJobService     jobService;
     private final ReportExecutionService        executionService;
     private final DirectoryConnectionRepository dirRepo;
+    private final ApiRateLimiter                rateLimiter;
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
 
@@ -131,6 +133,7 @@ public class ScheduledReportJobController {
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody RunReportRequest req) throws IOException {
 
+        rateLimiter.check(principal.username(), "report-run");
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         OutputFormat format = req.outputFormat() != null ? req.outputFormat() : OutputFormat.CSV;
         UUID tenantId = principal.isSuperadmin()

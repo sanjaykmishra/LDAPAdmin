@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,6 +42,10 @@ public final class CsvUtils {
      * Parses a UTF-8 CSV {@link InputStream} into a list of row maps.
      * The first row is consumed as column headers.
      *
+     * <p>Fully RFC 4180-compliant: quoted fields may span multiple physical
+     * lines (newlines inside a quoted value are preserved), and embedded
+     * double-quotes are represented by two consecutive double-quotes ({@code ""}).</p>
+     *
      * @return ordered list of row maps; empty list if the stream has no data rows
      * @throws IOException on I/O errors
      */
@@ -49,11 +54,43 @@ public final class CsvUtils {
                 new InputStreamReader(input, StandardCharsets.UTF_8));
 
         List<String[]> rawRows = new ArrayList<>();
-        String line;
-        while ((line = reader.readLine()) != null) {
-            if (!line.isBlank()) {
-                rawRows.add(parseRow(line));
+        StringBuilder logical = new StringBuilder(); // accumulates a logical (possibly multi-line) row
+        boolean inQuote = false;
+
+        String physLine;
+        while ((physLine = reader.readLine()) != null) {
+            if (logical.length() > 0 || !physLine.isBlank()) {
+                if (logical.length() > 0) {
+                    // Re-insert the newline that readLine() stripped; the field spans lines.
+                    logical.append('\n');
+                }
+                logical.append(physLine);
+
+                // Scan the new physical line to track whether we are inside a quoted field.
+                // Two consecutive quotes ("") are an escape sequence, not a boundary toggle.
+                for (int i = 0; i < physLine.length(); i++) {
+                    if (physLine.charAt(i) == '"') {
+                        if (i + 1 < physLine.length() && physLine.charAt(i + 1) == '"') {
+                            i++; // skip the escaped quote
+                        } else {
+                            inQuote = !inQuote;
+                        }
+                    }
+                }
+
+                if (!inQuote) {
+                    // Logical row is complete — parse it and reset the buffer
+                    String logicalRow = logical.toString();
+                    logical.setLength(0);
+                    if (!logicalRow.isBlank()) {
+                        rawRows.add(parseRow(logicalRow));
+                    }
+                }
             }
+        }
+        // Lenient: handle unterminated quoted field at EOF
+        if (logical.length() > 0) {
+            rawRows.add(parseRow(logical.toString()));
         }
 
         if (rawRows.isEmpty()) {
@@ -95,10 +132,44 @@ public final class CsvUtils {
         return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 
+    /**
+     * Writes the CSV header row to {@code writer}.
+     * Use together with {@link #writeRow} for streaming exports where rows
+     * are produced incrementally rather than collected into a list first.
+     *
+     * @param writer  destination writer (caller manages flush/close)
+     * @param headers column names in the desired order
+     */
+    public static void writeHeader(Writer writer, List<String> headers) throws IOException {
+        writer.write(buildRow(headers));
+    }
+
+    /**
+     * Writes a single data row to {@code writer}.
+     *
+     * @param writer  destination writer
+     * @param headers column names that control which keys are written and in what order
+     * @param row     data map; missing keys produce empty cells
+     */
+    public static void writeRow(Writer writer, List<String> headers,
+                                Map<String, String> row) throws IOException {
+        List<String> values = new ArrayList<>(headers.size());
+        for (String h : headers) {
+            values.add(row.getOrDefault(h, ""));
+        }
+        writer.write(buildRow(values));
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /** Appends a single RFC 4180 CSV row (all fields quoted). */
     private static void appendRow(StringBuilder sb, List<String> values) {
+        sb.append(buildRow(values));
+    }
+
+    /** Builds a single RFC 4180 CSV row string (all fields quoted, CRLF terminated). */
+    private static String buildRow(List<String> values) {
+        StringBuilder sb = new StringBuilder();
         for (int i = 0; i < values.size(); i++) {
             if (i > 0) sb.append(',');
             String v = values.get(i) != null ? values.get(i) : "";
@@ -107,6 +178,7 @@ public final class CsvUtils {
             sb.append('"');
         }
         sb.append("\r\n");
+        return sb.toString();
     }
 
     /**

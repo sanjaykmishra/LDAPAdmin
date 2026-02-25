@@ -38,7 +38,7 @@ import java.util.UUID;
  * </pre>
  */
 @RestController
-@RequestMapping("/api/directories/{directoryId}/groups")
+@RequestMapping("/api/v1/directories/{directoryId}/groups")
 @RequiredArgsConstructor
 public class GroupController {
 
