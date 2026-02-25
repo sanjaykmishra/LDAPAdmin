@@ -33,7 +33,7 @@
     </div>
 
     <!-- Create modal -->
-    <AppModal v-if="showModal" title="Add Superadmin" size="sm" @close="showModal = false">
+    <AppModal v-model="showModal" title="Add Superadmin" size="sm">
       <form @submit.prevent="doCreate" class="space-y-4">
         <FormField label="Username" v-model="form.username" required />
         <FormField label="Email" v-model="form.email" placeholder="optional" />

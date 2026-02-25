@@ -222,7 +222,7 @@
     </div>
 
     <!-- ── Tenant modal ───────────────────────────────────────────────────── -->
-    <AppModal v-if="showTenantModal" :title="editTenant ? 'Edit Tenant' : 'New Tenant'" size="lg" @close="showTenantModal = false">
+    <AppModal v-model="showTenantModal" :title="editTenant ? 'Edit Tenant' : 'New Tenant'" size="lg">
       <form @submit.prevent="saveTenant" class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <FormField label="Name" v-model="tenantForm.name" required />
@@ -246,7 +246,7 @@
     </AppModal>
 
     <!-- ── Admin modal ───────────────────────────────────────────────────── -->
-    <AppModal v-if="showAdminModal" :title="editAdmin ? 'Edit Admin' : 'New Admin'" size="sm" @close="showAdminModal = false">
+    <AppModal v-model="showAdminModal" :title="editAdmin ? 'Edit Admin' : 'New Admin'" size="sm">
       <form @submit.prevent="saveAdmin" class="space-y-4">
         <FormField label="Username" v-model="adminForm.username" required />
         <FormField label="Email" v-model="adminForm.email" />
@@ -264,7 +264,7 @@
     </AppModal>
 
     <!-- ── Permissions modal ─────────────────────────────────────────────── -->
-    <AppModal v-if="showPermissionsModal" :title="`Permissions — ${permissionsAdmin?.username}`" size="xl" @close="showPermissionsModal = false">
+    <AppModal v-model="showPermissionsModal" :title="`Permissions — ${permissionsAdmin?.username}`" size="xl">
       <div v-if="permissionsLoading" class="text-sm text-gray-400 text-center py-6">Loading…</div>
       <div v-else class="space-y-6">
 
@@ -358,7 +358,7 @@
     </AppModal>
 
     <!-- ── Audit Source modal ────────────────────────────────────────────── -->
-    <AppModal v-if="showSourceModal" :title="editSource ? 'Edit Audit Source' : 'New Audit Source'" size="lg" @close="showSourceModal = false">
+    <AppModal v-model="showSourceModal" :title="editSource ? 'Edit Audit Source' : 'New Audit Source'" size="lg">
       <form @submit.prevent="saveSource" class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <FormField label="Display Name" v-model="sourceForm.displayName" required />
@@ -389,7 +389,7 @@
     </AppModal>
 
     <!-- ── Directory modal ──────────────────────────────────────────────── -->
-    <AppModal v-if="showDirModal" :title="editDir ? 'Edit Directory' : 'New Directory'" size="lg" @close="showDirModal = false">
+    <AppModal v-model="showDirModal" :title="editDir ? 'Edit Directory' : 'New Directory'" size="lg">
       <form @submit.prevent="saveDir" class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <FormField label="Display Name" v-model="dirForm.displayName" required />

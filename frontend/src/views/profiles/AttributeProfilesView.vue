@@ -38,7 +38,7 @@
     </div>
 
     <!-- Create/Edit modal -->
-    <AppModal v-if="showModal" :title="editProfile ? 'Edit Profile' : 'New Profile'" size="xl" @close="showModal = false">
+    <AppModal v-model="showModal" :title="editProfile ? 'Edit Profile' : 'New Profile'" size="xl">
       <form @submit.prevent="saveProfile" class="space-y-5">
         <div class="grid grid-cols-2 gap-4">
           <FormField label="Display Name" v-model="form.displayName" placeholder="Default Profile" />
