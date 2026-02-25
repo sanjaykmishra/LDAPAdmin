@@ -86,7 +86,7 @@
     </section>
 
     <!-- Template create/edit modal -->
-    <AppModal v-if="showTemplateModal" :title="editTemplate ? 'Edit Template' : 'New Template'" size="lg" @close="showTemplateModal = false">
+    <AppModal v-model="showTemplateModal" :title="editTemplate ? 'Edit Template' : 'New Template'" size="lg">
       <form @submit.prevent="saveTemplate" class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <FormField label="Template Name" v-model="templateForm.name" required />

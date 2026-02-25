@@ -77,7 +77,7 @@
     </section>
 
     <!-- Create / Edit modal -->
-    <AppModal v-if="showModal" :title="editJob ? 'Edit Scheduled Job' : 'New Scheduled Job'" size="lg" @close="showModal = false">
+    <AppModal v-model="showModal" :title="editJob ? 'Edit Scheduled Job' : 'New Scheduled Job'" size="lg">
       <form @submit.prevent="saveJob" class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <FormField label="Name" v-model="form.name" required />
