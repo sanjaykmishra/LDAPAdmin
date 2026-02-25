@@ -9,7 +9,7 @@ import com.ldapadmin.exception.LdapOperationException;
 import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.ldap.model.LdapUser;
 import com.ldapadmin.util.CsvUtils;
-import com.unboundid.ldap.sdk.DN;
+import com.unboundid.ldap.sdk.RDN;
 import com.unboundid.ldap.sdk.Modification;
 import com.unboundid.ldap.sdk.ModificationType;
 import com.unboundid.ldap.sdk.ResultCode;
@@ -265,7 +265,7 @@ public class BulkUserService {
      * backslash, double-quote, NUL) cannot corrupt or inject into the DN.
      */
     private String buildDn(String rdnAttr, String rdnValue, String parentDn) {
-        return rdnAttr + "=" + DN.escapeRDNValue(rdnValue) + "," + parentDn;
+        return new RDN(rdnAttr, rdnValue).toString() + "," + parentDn;
     }
 
     /**
