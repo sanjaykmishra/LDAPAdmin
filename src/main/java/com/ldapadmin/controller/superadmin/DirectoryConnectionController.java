@@ -36,7 +36,7 @@ import java.util.UUID;
  * </pre>
  */
 @RestController
-@RequestMapping("/api/superadmin/tenants/{tenantId}/directories")
+@RequestMapping("/api/v1/superadmin/tenants/{tenantId}/directories")
 @PreAuthorize("hasRole('SUPERADMIN')")
 @RequiredArgsConstructor
 public class DirectoryConnectionController {

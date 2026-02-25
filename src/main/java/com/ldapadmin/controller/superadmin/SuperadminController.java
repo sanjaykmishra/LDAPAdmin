@@ -35,7 +35,7 @@ import java.util.UUID;
  * </pre>
  */
 @RestController
-@RequestMapping("/api/superadmin/superadmins")
+@RequestMapping("/api/v1/superadmin/superadmins")
 @PreAuthorize("hasRole('SUPERADMIN')")
 @RequiredArgsConstructor
 public class SuperadminController {

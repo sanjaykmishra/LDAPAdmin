@@ -8,6 +8,7 @@ import com.unboundid.ldap.sdk.*;
 import com.unboundid.ldap.sdk.extensions.StartTLSExtendedRequest;
 import com.unboundid.util.ssl.SSLUtil;
 import com.unboundid.util.ssl.TrustAllTrustManager;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -18,8 +19,10 @@ import javax.net.ssl.TrustManagerFactory;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.Collection;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -66,8 +69,13 @@ public class LdapConnectionFactory {
 
     /**
      * Borrows a connection from the pool, executes the operation, then
-     * returns the connection.  On {@link LDAPException} the connection is
-     * replaced if it is no longer valid.
+     * returns the connection.
+     *
+     * <p>On {@link LDAPException}, only releases the connection as defunct when
+     * the result code indicates a broken connection (network failure, server
+     * closed the socket, etc.).  Operation-level errors (e.g.
+     * {@code NO_SUCH_OBJECT}, {@code INSUFFICIENT_ACCESS_RIGHTS}) return the
+     * connection to the pool normally so healthy connections aren't discarded.</p>
      */
     public <T> T withConnection(DirectoryConnection dc,
                                 LdapOperation<T> operation) {
@@ -78,7 +86,14 @@ public class LdapConnectionFactory {
             return operation.execute(conn);
         } catch (LDAPException e) {
             if (conn != null) {
-                pool.releaseDefunctConnection(conn);
+                // Only mark connection defunct for genuine connectivity failures;
+                // operation-level errors (result codes ≥ 1 that don't indicate
+                // a broken socket) should not shrink the pool.
+                if (!e.getResultCode().isConnectionUsable()) {
+                    pool.releaseDefunctConnection(conn);
+                } else {
+                    pool.releaseConnection(conn);
+                }
                 conn = null;
             }
             throw new LdapConnectionException(
@@ -151,8 +166,9 @@ public class LdapConnectionFactory {
     }
 
     /**
-     * Closes all pools.  Called on application shutdown.
+     * Closes all pools on application shutdown.
      */
+    @PreDestroy
     public void closeAll() {
         pools.forEach((id, pool) -> {
             try {
@@ -231,14 +247,23 @@ public class LdapConnectionFactory {
         return new SSLUtil();
     }
 
+    /**
+     * Builds trust managers from a PEM string that may contain one or more
+     * certificates (e.g. a root CA plus intermediate CAs).
+     * Previously only the first certificate was parsed; this now loads the
+     * full chain so intermediate-CA bundles work correctly.
+     */
     private TrustManager[] buildPemTrustManagers(String pem) throws Exception {
         CertificateFactory cf = CertificateFactory.getInstance("X.509");
-        X509Certificate cert = (X509Certificate) cf.generateCertificate(
+        Collection<? extends Certificate> certs = cf.generateCertificates(
             new ByteArrayInputStream(pem.getBytes(StandardCharsets.UTF_8)));
 
         KeyStore trustStore = KeyStore.getInstance("JKS");
         trustStore.load(null, null);
-        trustStore.setCertificateEntry("trusted-ca", cert);
+        int index = 0;
+        for (Certificate cert : certs) {
+            trustStore.setCertificateEntry("trusted-ca-" + index++, cert);
+        }
 
         TrustManagerFactory tmf = TrustManagerFactory.getInstance(
             TrustManagerFactory.getDefaultAlgorithm());

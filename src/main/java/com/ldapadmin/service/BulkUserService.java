@@ -5,18 +5,24 @@ import com.ldapadmin.dto.csv.BulkImportRowResult;
 import com.ldapadmin.dto.csv.CsvColumnMappingDto;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.enums.ConflictHandling;
-import com.ldapadmin.exception.ResourceNotFoundException;
+import com.ldapadmin.exception.LdapOperationException;
 import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.ldap.model.LdapUser;
 import com.ldapadmin.util.CsvUtils;
+import com.unboundid.ldap.sdk.DN;
 import com.unboundid.ldap.sdk.Modification;
 import com.unboundid.ldap.sdk.ModificationType;
+import com.unboundid.ldap.sdk.ResultCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -97,13 +103,17 @@ public class BulkUserService {
      *
      * <p>Column order: {@code dn} is always the first column, followed by the
      * requested attributes in the order provided.  When {@code attributes} is
-     * empty the column set is derived from all attribute names found across the
-     * returned entries.</p>
+     * empty the column set is derived from all attribute names found across
+     * the first page of results.</p>
+     *
+     * <p>Results are streamed page-by-page directly into the output buffer so
+     * the entire result set never has to reside in memory simultaneously.</p>
      *
      * @param dc         directory connection
      * @param filter     LDAP filter (null = {@code (objectClass=*)})
      * @param baseDn     search base (null = directory base DN)
-     * @param attributes LDAP attribute names to include as columns
+     * @param attributes LDAP attribute names to include as columns;
+     *                   empty = derive from first page of results
      */
     public byte[] exportCsv(DirectoryConnection dc,
                              String filter,
@@ -116,14 +126,37 @@ public class BulkUserService {
                 ? new String[0]
                 : attributes.toArray(new String[0]);
 
-        List<LdapUser> users = userService.searchUsers(dc, effectiveFilter, baseDn, attrArray);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        Writer writer = new OutputStreamWriter(baos, StandardCharsets.UTF_8);
 
-        List<String> columns = buildExportColumns(users, attributes);
-        List<Map<String, String>> rows = users.stream()
-                .map(u -> buildExportRow(u, columns))
-                .toList();
+        // When columns are known upfront (attributes provided), write header first and
+        // stream entries via processUsers — only one entry lives in memory at a time.
+        // When attributes is empty, columns are derived dynamically; we must do a full
+        // search to discover the union of all attribute names before writing the header.
+        if (!attributes.isEmpty()) {
+            List<String> columns = buildExportColumns(List.of(), attributes);
+            CsvUtils.writeHeader(writer, columns);
+            userService.processUsers(dc, effectiveFilter, baseDn,
+                    user -> {
+                        try {
+                            CsvUtils.writeRow(writer, columns, buildExportRow(user, columns));
+                        } catch (IOException e) {
+                            throw new RuntimeException("CSV write failed", e);
+                        }
+                    },
+                    attrArray);
+        } else {
+            // Fallback: load all entries to determine the dynamic column set, then write
+            List<LdapUser> users = userService.searchUsers(dc, effectiveFilter, baseDn, attrArray);
+            List<String> columns = buildExportColumns(users, attributes);
+            CsvUtils.writeHeader(writer, columns);
+            for (LdapUser user : users) {
+                CsvUtils.writeRow(writer, columns, buildExportRow(user, columns));
+            }
+        }
 
-        return CsvUtils.write(columns, rows);
+        writer.flush();
+        return baos.toByteArray();
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -169,15 +202,18 @@ public class BulkUserService {
         String dn = buildDn(targetKeyAttr, keyValue, parentDn);
 
         try {
-            boolean exists;
+            // Optimistic create: attempt the add first and handle the ENTRY_ALREADY_EXISTS
+            // result code inline.  This avoids a separate getUser() existence check per row
+            // (which would double the number of LDAP round-trips for large imports).
             try {
-                userService.getUser(dc, dn);
-                exists = true;
-            } catch (ResourceNotFoundException e) {
-                exists = false;
-            }
-
-            if (exists) {
+                userService.createUser(dc, dn, attrMap);
+                return BulkImportRowResult.created(rowNum, dn);
+            } catch (LdapOperationException ex) {
+                if (!ex.getMessage().contains(ResultCode.ENTRY_ALREADY_EXISTS.getName())
+                        && !ex.getMessage().contains(String.valueOf(ResultCode.ENTRY_ALREADY_EXISTS.intValue()))) {
+                    throw ex; // not a duplicate — propagate
+                }
+                // Entry exists — apply conflict strategy
                 if (conflictHandling == ConflictHandling.OVERWRITE) {
                     List<Modification> mods = attrMap.entrySet().stream()
                             .filter(e -> !e.getKey().equals(targetKeyAttr))
@@ -194,11 +230,7 @@ public class BulkUserService {
                     // SKIP or PROMPT — no action taken
                     return BulkImportRowResult.skipped(rowNum, dn, "Entry already exists");
                 }
-            } else {
-                userService.createUser(dc, dn, attrMap);
-                return BulkImportRowResult.created(rowNum, dn);
             }
-
         } catch (Exception ex) {
             log.warn("Row {} failed [dn={}]: {}", rowNum, dn, ex.getMessage());
             return BulkImportRowResult.error(rowNum, dn, ex.getMessage());
@@ -226,9 +258,14 @@ public class BulkUserService {
         return result;
     }
 
-    /** Constructs the full DN for a new entry: {@code rdnAttr=rdnValue,parentDn}. */
+    /**
+     * Constructs the full DN for a new entry.
+     * The RDN value is escaped per RFC 4514 so that special characters
+     * (comma, equals, plus, less-than, greater-than, hash, semicolon,
+     * backslash, double-quote, NUL) cannot corrupt or inject into the DN.
+     */
     private String buildDn(String rdnAttr, String rdnValue, String parentDn) {
-        return rdnAttr + "=" + rdnValue + "," + parentDn;
+        return rdnAttr + "=" + DN.escapeRDNValue(rdnValue) + "," + parentDn;
     }
 
     /**

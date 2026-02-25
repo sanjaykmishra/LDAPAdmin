@@ -35,7 +35,7 @@ import java.util.Map;
  * </pre>
  */
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
@@ -64,7 +64,7 @@ public class AuthController {
                 .httpOnly(true)
                 .secure(appProperties.getCookie().isSecure())
                 .sameSite("Strict")
-                .path("/api")
+                .path("/api/v1")
                 .maxAge(Duration.ofMinutes(appProperties.getJwt().getExpiryMinutes()))
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
@@ -82,7 +82,7 @@ public class AuthController {
                 .httpOnly(true)
                 .secure(appProperties.getCookie().isSecure())
                 .sameSite("Strict")
-                .path("/api")
+                .path("/api/v1")
                 .maxAge(0)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());

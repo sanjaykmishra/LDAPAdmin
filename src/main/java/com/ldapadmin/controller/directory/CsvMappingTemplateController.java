@@ -33,7 +33,7 @@ import java.util.UUID;
  * </pre>
  */
 @RestController
-@RequestMapping("/api/directories/{directoryId}/csv-templates")
+@RequestMapping("/api/v1/directories/{directoryId}/csv-templates")
 @RequiredArgsConstructor
 public class CsvMappingTemplateController {
 

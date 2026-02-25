@@ -44,7 +44,7 @@ public class AuditLogController {
      * @param page        zero-based page number (default 0)
      * @param size        page size, 1–200 (default 50)
      */
-    @GetMapping("/api/audit")
+    @GetMapping("/api/v1/audit")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
     public Page<AuditEventResponse> getForTenant(
             @AuthenticationPrincipal AuthPrincipal principal,
@@ -68,7 +68,7 @@ public class AuditLogController {
      * Returns audit events across all tenants (superadmin only).
      * {@code tenantId} can be supplied to scope to a specific tenant.
      */
-    @GetMapping("/api/superadmin/audit")
+    @GetMapping("/api/v1/superadmin/audit")
     @PreAuthorize("hasRole('SUPERADMIN')")
     public Page<AuditEventResponse> getAll(
             @RequestParam(required = false) UUID tenantId,

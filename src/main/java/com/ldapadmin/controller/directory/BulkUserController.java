@@ -1,5 +1,6 @@
 package com.ldapadmin.controller.directory;
 
+import com.ldapadmin.auth.ApiRateLimiter;
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.auth.RequiresFeature;
 import com.ldapadmin.dto.csv.BulkImportRequest;
@@ -48,11 +49,12 @@ import java.util.UUID;
  * strings within a single cell.</p>
  */
 @RestController
-@RequestMapping("/api/directories/{directoryId}/users")
+@RequestMapping("/api/v1/directories/{directoryId}/users")
 @RequiredArgsConstructor
 public class BulkUserController {
 
     private final LdapOperationService service;
+    private final ApiRateLimiter       rateLimiter;
 
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @RequiresFeature(FeatureKey.BULK_IMPORT)
@@ -62,6 +64,7 @@ public class BulkUserController {
             @RequestPart("file") MultipartFile file,
             @RequestPart("request") @Valid BulkImportRequest request) throws IOException {
 
+        rateLimiter.check(principal.username(), "bulk-import");
         BulkImportResult result = service.bulkImportUsers(
                 directoryId, principal, file.getInputStream(), request);
         return ResponseEntity.ok(result);
@@ -87,6 +90,7 @@ public class BulkUserController {
             @RequestParam(required = false, defaultValue = "") String attributes,
             @RequestParam(required = false) UUID templateId) throws IOException {
 
+        rateLimiter.check(principal.username(), "bulk-export");
         List<String> attrList = attributes.isBlank()
                 ? List.of()
                 : Arrays.stream(attributes.split(",")).map(String::trim).toList();

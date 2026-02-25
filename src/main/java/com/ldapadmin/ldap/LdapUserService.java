@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * LDAP user operations — search, read, create, update, delete,
@@ -46,8 +47,31 @@ public class LdapUserService {
                                       String filter,
                                       String baseDn,
                                       String... attributes) {
+        return searchUsers(dc, filter, baseDn, Integer.MAX_VALUE, attributes);
+    }
+
+    /**
+     * Searches for users with an upper bound on the number of results returned.
+     *
+     * <p>Pagination stops as soon as {@code maxResults} entries have been
+     * collected, so the LDAP server is not asked to page beyond what the
+     * caller actually needs.</p>
+     *
+     * @param dc         directory connection to query
+     * @param filter     LDAP filter
+     * @param baseDn     search base (null falls back to the connection's base DN)
+     * @param maxResults maximum number of entries to return
+     * @param attributes attributes to retrieve; empty array retrieves all user attributes
+     * @return up to {@code maxResults} matching users
+     */
+    public List<LdapUser> searchUsers(DirectoryConnection dc,
+                                      String filter,
+                                      String baseDn,
+                                      int maxResults,
+                                      String... attributes) {
         String searchBase = baseDn != null ? baseDn : dc.getBaseDn();
-        int pageSize = dc.getPagingSize();
+        // Clamp the page size: no point asking for more entries per page than the total limit
+        int pageSize = Math.min(dc.getPagingSize(), maxResults);
         List<LdapUser> results = new ArrayList<>();
 
         return connectionFactory.withConnection(dc, conn -> {
@@ -66,6 +90,9 @@ public class LdapUserService {
                 SearchResult searchResult = conn.search(request);
                 for (SearchResultEntry entry : searchResult.getSearchEntries()) {
                     results.add(LdapEntryMapper.toUser(entry));
+                    if (results.size() >= maxResults) {
+                        return results; // stop early — we have everything the caller needs
+                    }
                 }
 
                 SimplePagedResultsControl pagingResponse =
@@ -77,6 +104,49 @@ public class LdapUserService {
             } while (cookie != null && cookie.getValue().length > 0);
 
             return results;
+        });
+    }
+
+    /**
+     * Streams all matching users to {@code consumer} page by page, without
+     * accumulating the full result set in memory.  Use this for large exports
+     * where loading every entry at once would be too expensive.
+     *
+     * @param dc         directory connection
+     * @param filter     LDAP filter
+     * @param baseDn     search base (null falls back to the connection's base DN)
+     * @param consumer   called once per matching entry as results arrive
+     * @param attributes attributes to retrieve; empty array retrieves all
+     */
+    public void processUsers(DirectoryConnection dc,
+                             String filter,
+                             String baseDn,
+                             Consumer<LdapUser> consumer,
+                             String... attributes) {
+        String searchBase = baseDn != null ? baseDn : dc.getBaseDn();
+        int pageSize = dc.getPagingSize();
+
+        connectionFactory.withConnection(dc, conn -> {
+            ASN1OctetString cookie = null;
+            do {
+                SimplePagedResultsControl pagingRequest =
+                    new SimplePagedResultsControl(pageSize, cookie);
+                SearchRequest request = new SearchRequest(
+                    searchBase, SearchScope.SUB, Filter.create(filter), attributes);
+                request.addControl(pagingRequest);
+
+                SearchResult searchResult = conn.search(request);
+                for (SearchResultEntry entry : searchResult.getSearchEntries()) {
+                    consumer.accept(LdapEntryMapper.toUser(entry));
+                }
+
+                SimplePagedResultsControl pagingResponse =
+                    SimplePagedResultsControl.get(searchResult);
+                cookie = (pagingResponse != null && pagingResponse.moreResultsToReturn())
+                    ? pagingResponse.getCookie()
+                    : null;
+            } while (cookie != null && cookie.getValue().length > 0);
+            return null;
         });
     }
 
