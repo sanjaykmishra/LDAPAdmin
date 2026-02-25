@@ -89,7 +89,7 @@ erDiagram
 
     TENANT_AUTH_CONFIGS {
         uuid id PK
-        uuid tenant_id FK UK
+        uuid tenant_id FK
         string auth_type
         uuid ldap_directory_id FK
         string ldap_bind_dn_pattern
@@ -205,7 +205,7 @@ erDiagram
 
     APPLICATION_SETTINGS {
         uuid id PK
-        uuid tenant_id FK UK
+        uuid tenant_id FK
         string app_name
         string logo_url
         string primary_colour
