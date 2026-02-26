@@ -10,13 +10,13 @@ import java.util.UUID;
 @Repository
 public interface AdminBranchRestrictionRepository extends JpaRepository<AdminBranchRestriction, UUID> {
 
-    /** All branch restrictions for a given admin on a specific directory. */
-    List<AdminBranchRestriction> findAllByAdminAccountIdAndDirectoryId(UUID adminAccountId, UUID directoryId);
+    /** All branch restrictions for a given admin within a specific realm. */
+    List<AdminBranchRestriction> findAllByAdminAccountIdAndRealmId(UUID adminAccountId, UUID realmId);
 
-    /** All branch restrictions for a given admin across all directories. */
+    /** All branch restrictions for a given admin across all realms. */
     List<AdminBranchRestriction> findAllByAdminAccountId(UUID adminAccountId);
 
-    boolean existsByAdminAccountIdAndDirectoryIdAndBranchDn(UUID adminAccountId, UUID directoryId, String branchDn);
+    boolean existsByAdminAccountIdAndRealmIdAndBranchDn(UUID adminAccountId, UUID realmId, String branchDn);
 
-    void deleteAllByAdminAccountIdAndDirectoryId(UUID adminAccountId, UUID directoryId);
+    void deleteAllByAdminAccountIdAndRealmId(UUID adminAccountId, UUID realmId);
 }

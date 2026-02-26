@@ -1,6 +1,6 @@
-# Schema ERD — Post-Refactor (V1–V17)
+# Schema ERD — Post-Refactor (V1–V18)
 
-> Generated from migrations V1–V17.
+> Generated from migrations V1–V18.
 > `actor_id` and `directory_id` on `audit_events` are **denormalised** UUIDs
 > (no FK constraints) so audit records survive account/directory deletion.
 
@@ -43,9 +43,30 @@ erDiagram
         varchar     enable_value
         varchar     disable_value
         uuid        audit_data_source_id            FK "nullable"
+        boolean     is_user_repository                 "TRUE = authoritative store for application users"
+        varchar     user_creation_base_dn              "container DN for new application user entries; required when is_user_repository = TRUE"
         boolean     enabled
         timestamptz created_at
         timestamptz updated_at
+    }
+
+    realms {
+        uuid        id                          PK
+        uuid        directory_id                FK
+        varchar     name
+        varchar     user_base_dn                   "LDAP search base for user entries"
+        varchar     group_base_dn                  "LDAP search base for group entries"
+        varchar     primary_user_objectclass       "structural objectClass for new user entries"
+        integer     display_order
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    realm_auxiliary_objectclasses {
+        uuid    id                  PK
+        uuid    realm_id            FK
+        varchar objectclass_name
+        integer display_order
     }
 
     directory_user_base_dns {
@@ -80,9 +101,9 @@ erDiagram
         timestamptz updated_at
     }
 
-    directory_objectclasses {
+    realm_objectclasses {
         uuid    id                  PK
-        uuid    directory_id        FK
+        uuid    realm_id            FK
         varchar object_class_name
         varchar display_name
         integer display_order
@@ -100,10 +121,10 @@ erDiagram
         boolean visible_in_list
     }
 
-    admin_directory_roles {
+    admin_realm_roles {
         uuid        id                  PK
         uuid        admin_account_id    FK
-        uuid        directory_id        FK
+        uuid        realm_id            FK
         varchar     base_role              "ADMIN | READ_ONLY"
         timestamptz created_at
         timestamptz updated_at
@@ -112,7 +133,7 @@ erDiagram
     admin_branch_restrictions {
         uuid        id                  PK
         uuid        admin_account_id    FK
-        uuid        directory_id        FK
+        uuid        realm_id            FK
         varchar     branch_dn
         timestamptz created_at
     }
@@ -219,14 +240,16 @@ erDiagram
     audit_data_sources          ||--o{     directory_connections           : "polled by"
     directory_connections       ||--o{     directory_user_base_dns         : "user branches"
     directory_connections       ||--o{     directory_group_base_dns        : "group branches"
-    directory_connections       ||--o{     directory_objectclasses         : "objectclasses"
-    directory_objectclasses     ||--o{     objectclass_attribute_configs   : "attribute configs"
+    directory_connections       ||--o{     realms                          : "realms"
+    realms                      ||--o{     realm_auxiliary_objectclasses   : "auxiliary objectclasses"
+    realms                      ||--o{     realm_objectclasses             : "objectclass form"
+    realm_objectclasses         ||--o{     objectclass_attribute_configs   : "attribute configs"
 
     %% Account permissions (4-dimensional model)
-    accounts                    ||--o{     admin_directory_roles           : "directory roles"
-    directory_connections       ||--o{     admin_directory_roles           : "scopes"
+    accounts                    ||--o{     admin_realm_roles               : "realm roles"
+    realms                      ||--o{     admin_realm_roles               : "scopes"
     accounts                    ||--o{     admin_branch_restrictions       : "branch restrictions"
-    directory_connections       ||--o{     admin_branch_restrictions       : "scopes"
+    realms                      ||--o{     admin_branch_restrictions       : "scopes"
     accounts                    ||--o{     admin_feature_permissions       : "feature permissions"
 
     %% CSV templates
