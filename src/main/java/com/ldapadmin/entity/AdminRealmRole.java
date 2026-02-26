@@ -12,24 +12,27 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
- * Permission model Dimensions 1 + 2 (§3.2).
+ * Permission model Dimensions 1 + 2 — realm-scoped (§3.2).
  * <p>
- * Assigns a base role to an admin account for a specific directory connection.
- * An admin may have different roles on different directories.
- * Absence of a row for a given (admin, directory) pair = access denied.
+ * Assigns a base role to an admin account for a specific {@link Realm}.
+ * An admin may have different roles across different realms.
+ * Absence of a row for a given (admin, realm) pair = access denied to that realm.
+ * <p>
+ * Replaces the former {@code admin_directory_roles} relationship, re-scoping
+ * permissions from directory level to realm level.
  */
 @Entity
 @Table(
-    name = "admin_directory_roles",
+    name = "admin_realm_roles",
     uniqueConstraints = @UniqueConstraint(
-        name = "uq_admin_dir_role",
-        columnNames = {"admin_account_id", "directory_id"}
+        name = "uq_admin_realm_role",
+        columnNames = {"admin_account_id", "realm_id"}
     )
 )
 @Getter
 @Setter
 @NoArgsConstructor
-public class AdminDirectoryRole {
+public class AdminRealmRole {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -41,8 +44,8 @@ public class AdminDirectoryRole {
     private AdminAccount adminAccount;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "directory_id", nullable = false)
-    private DirectoryConnection directory;
+    @JoinColumn(name = "realm_id", nullable = false)
+    private Realm realm;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "base_role", nullable = false, length = 20)

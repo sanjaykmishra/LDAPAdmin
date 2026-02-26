@@ -96,6 +96,23 @@ public class DirectoryConnection {
     @Column(name = "disable_value")
     private String disableValue;
 
+    // ── Application user repository ───────────────────────────────────────────
+
+    /**
+     * When {@code true} this connection is the authoritative store for
+     * application user accounts (login accounts for the portal itself).
+     * At most one directory should be flagged as the user repository.
+     */
+    @Column(name = "is_user_repository", nullable = false)
+    private boolean userRepository = false;
+
+    /**
+     * DN of the LDAP container in which new application user entries are created.
+     * Required when {@code userRepository} is {@code true}.
+     */
+    @Column(name = "user_creation_base_dn")
+    private String userCreationBaseDn;
+
     // ── Audit / changelog source ──────────────────────────────────────────────
 
     /**
