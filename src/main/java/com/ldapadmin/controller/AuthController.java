@@ -90,8 +90,7 @@ public class AuthController {
     }
 
     /**
-     * Returns the username, account type, id, and (for admins) tenant id
-     * of the currently authenticated principal.
+     * Returns the username, account type, and id of the currently authenticated principal.
      */
     @GetMapping("/me")
     public ResponseEntity<Map<String, String>> me(
@@ -105,9 +104,6 @@ public class AuthController {
         body.put("username",    principal.username());
         body.put("accountType", principal.type().name());
         body.put("id",          principal.id().toString());
-        if (principal.tenantId() != null) {
-            body.put("tenantId", principal.tenantId().toString());
-        }
         return ResponseEntity.ok(body);
     }
 }

@@ -23,10 +23,6 @@ public class AuditDataSource {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "tenant_id", nullable = false)
-    private Tenant tenant;
-
     @Column(name = "display_name", nullable = false)
     private String displayName;
 

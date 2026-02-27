@@ -39,10 +39,6 @@ public class ScheduledReportJob {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "tenant_id", nullable = false)
-    private Tenant tenant;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "directory_id", nullable = false)
     private DirectoryConnection directory;
 
@@ -93,7 +89,7 @@ public class ScheduledReportJob {
     /** SET NULL if the creating admin is later deleted. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_admin_id")
-    private AdminAccount createdByAdmin;
+    private Account createdByAdmin;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

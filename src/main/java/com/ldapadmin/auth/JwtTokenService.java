@@ -2,7 +2,6 @@ package com.ldapadmin.auth;
 
 import com.ldapadmin.config.AppProperties;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -23,7 +22,6 @@ import java.util.UUID;
  *   <li>{@code sub}  — username</li>
  *   <li>{@code type} — {@link PrincipalType} name</li>
  *   <li>{@code aid}  — account UUID</li>
- *   <li>{@code tid}  — tenant UUID (absent for superadmins)</li>
  *   <li>{@code iat}, {@code exp} — standard issued-at / expiry</li>
  * </ul>
  * </p>
@@ -34,7 +32,6 @@ public class JwtTokenService {
 
     private static final String CLAIM_TYPE       = "type";
     private static final String CLAIM_ACCOUNT_ID = "aid";
-    private static final String CLAIM_TENANT_ID  = "tid";
 
     private final AppProperties appProperties;
 
@@ -45,19 +42,14 @@ public class JwtTokenService {
         Instant now    = Instant.now();
         Instant expiry = now.plusSeconds(appProperties.getJwt().getExpiryMinutes() * 60L);
 
-        JwtBuilder builder = Jwts.builder()
+        return Jwts.builder()
                 .subject(principal.username())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
                 .claim(CLAIM_TYPE, principal.type().name())
                 .claim(CLAIM_ACCOUNT_ID, principal.id().toString())
-                .signWith(signingKey());
-
-        if (principal.tenantId() != null) {
-            builder.claim(CLAIM_TENANT_ID, principal.tenantId().toString());
-        }
-
-        return builder.compact();
+                .signWith(signingKey())
+                .compact();
     }
 
     /**
@@ -72,12 +64,10 @@ public class JwtTokenService {
                 .parseSignedClaims(token)
                 .getPayload();
 
-        PrincipalType type     = PrincipalType.valueOf(claims.get(CLAIM_TYPE, String.class));
-        UUID          id       = UUID.fromString(claims.get(CLAIM_ACCOUNT_ID, String.class));
-        String        tidStr   = claims.get(CLAIM_TENANT_ID, String.class);
-        UUID          tenantId = tidStr != null ? UUID.fromString(tidStr) : null;
+        PrincipalType type = PrincipalType.valueOf(claims.get(CLAIM_TYPE, String.class));
+        UUID          id   = UUID.fromString(claims.get(CLAIM_ACCOUNT_ID, String.class));
 
-        return new AuthPrincipal(type, id, tenantId, claims.getSubject());
+        return new AuthPrincipal(type, id, claims.getSubject());
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

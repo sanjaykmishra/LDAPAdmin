@@ -1,9 +1,10 @@
 package com.ldapadmin.service;
 
 import com.ldapadmin.config.AppProperties;
-import com.ldapadmin.entity.SuperadminAccount;
+import com.ldapadmin.entity.Account;
+import com.ldapadmin.entity.enums.AccountRole;
 import com.ldapadmin.entity.enums.AccountType;
-import com.ldapadmin.repository.SuperadminAccountRepository;
+import com.ldapadmin.repository.AccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -26,15 +27,15 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class BootstrapService implements ApplicationRunner {
 
-    private final SuperadminAccountRepository superadminRepo;
-    private final AppProperties               appProperties;
-    private final PasswordEncoder             passwordEncoder;
+    private final AccountRepository accountRepo;
+    private final AppProperties     appProperties;
+    private final PasswordEncoder   passwordEncoder;
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        long existingCount = superadminRepo
-                .countByAccountTypeAndActiveTrue(AccountType.LOCAL);
+        long existingCount = accountRepo
+                .countByRoleAndAuthTypeAndActiveTrue(AccountRole.SUPERADMIN, AccountType.LOCAL);
 
         if (existingCount > 0) {
             log.debug("Bootstrap skipped — {} active LOCAL superadmin(s) already exist",
@@ -45,13 +46,14 @@ public class BootstrapService implements ApplicationRunner {
         AppProperties.Bootstrap.Superadmin cfg =
                 appProperties.getBootstrap().getSuperadmin();
 
-        SuperadminAccount account = new SuperadminAccount();
+        Account account = new Account();
         account.setUsername(cfg.getUsername());
-        account.setAccountType(AccountType.LOCAL);
+        account.setRole(AccountRole.SUPERADMIN);
+        account.setAuthType(AccountType.LOCAL);
         account.setPasswordHash(passwordEncoder.encode(cfg.getPassword()));
         account.setActive(true);
 
-        superadminRepo.save(account);
+        accountRepo.save(account);
         log.info("Bootstrap: created LOCAL superadmin [{}]", cfg.getUsername());
     }
 }

@@ -4,25 +4,26 @@ import com.ldapadmin.dto.admin.AdminAccountRequest;
 import com.ldapadmin.dto.admin.AdminAccountResponse;
 import com.ldapadmin.dto.admin.AdminPermissionsResponse;
 import com.ldapadmin.dto.admin.BranchRestrictionsRequest;
-import com.ldapadmin.dto.admin.DirectoryRoleRequest;
-import com.ldapadmin.dto.admin.DirectoryRoleResponse;
 import com.ldapadmin.dto.admin.FeaturePermissionRequest;
-import com.ldapadmin.entity.AdminAccount;
+import com.ldapadmin.dto.admin.RealmRoleRequest;
+import com.ldapadmin.dto.admin.RealmRoleResponse;
+import com.ldapadmin.entity.Account;
 import com.ldapadmin.entity.AdminBranchRestriction;
-import com.ldapadmin.entity.AdminDirectoryRole;
 import com.ldapadmin.entity.AdminFeaturePermission;
-import com.ldapadmin.entity.DirectoryConnection;
-import com.ldapadmin.entity.Tenant;
+import com.ldapadmin.entity.AdminRealmRole;
+import com.ldapadmin.entity.Realm;
+import com.ldapadmin.entity.enums.AccountRole;
+import com.ldapadmin.entity.enums.AccountType;
+import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.exception.ConflictException;
 import com.ldapadmin.exception.ResourceNotFoundException;
-import com.ldapadmin.repository.AdminAccountRepository;
+import com.ldapadmin.repository.AccountRepository;
 import com.ldapadmin.repository.AdminBranchRestrictionRepository;
-import com.ldapadmin.repository.AdminDirectoryRoleRepository;
 import com.ldapadmin.repository.AdminFeaturePermissionRepository;
-import com.ldapadmin.repository.DirectoryConnectionRepository;
-import com.ldapadmin.repository.TenantRepository;
+import com.ldapadmin.repository.AdminRealmRoleRepository;
+import com.ldapadmin.repository.RealmRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,119 +34,117 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AdminManagementService {
 
-    private final AdminAccountRepository          adminRepo;
-    private final TenantRepository                tenantRepo;
-    private final DirectoryConnectionRepository   dirRepo;
-    private final AdminDirectoryRoleRepository    roleRepo;
+    private final AccountRepository               accountRepo;
+    private final RealmRepository                 realmRepo;
+    private final AdminRealmRoleRepository        realmRoleRepo;
     private final AdminBranchRestrictionRepository branchRepo;
     private final AdminFeaturePermissionRepository featureRepo;
+    private final PasswordEncoder                 passwordEncoder;
 
     // ── Admin account CRUD ────────────────────────────────────────────────────
 
-    private static final int MAX_ADMINS_PER_TENANT = 1_000;
-
-    public List<AdminAccountResponse> listAdmins(UUID tenantId) {
-        requireTenant(tenantId);
-        return adminRepo.findAllByTenantId(tenantId, Pageable.ofSize(MAX_ADMINS_PER_TENANT))
-                .getContent()
-                .stream()
+    public List<AdminAccountResponse> listAdmins() {
+        return accountRepo.findAllByRole(AccountRole.ADMIN).stream()
                 .map(AdminAccountResponse::from)
                 .toList();
     }
 
-    public AdminAccountResponse getAdmin(UUID tenantId, UUID adminId) {
-        return AdminAccountResponse.from(requireAdmin(tenantId, adminId));
+    public AdminAccountResponse getAdmin(UUID adminId) {
+        return AdminAccountResponse.from(requireAdmin(adminId));
     }
 
     @Transactional
-    public AdminAccountResponse createAdmin(UUID tenantId, AdminAccountRequest req) {
-        Tenant tenant = requireTenant(tenantId);
-        if (adminRepo.existsByTenantIdAndUsername(tenantId, req.username())) {
-            throw new ConflictException(
-                    "Admin [" + req.username() + "] already exists in tenant " + tenantId);
+    public AdminAccountResponse createAdmin(AdminAccountRequest req) {
+        if (accountRepo.existsByUsername(req.username())) {
+            throw new ConflictException("Account [" + req.username() + "] already exists");
         }
-        AdminAccount a = new AdminAccount();
-        a.setTenant(tenant);
+        Account a = new Account();
         a.setUsername(req.username());
         a.setDisplayName(req.displayName());
         a.setEmail(req.email());
+        a.setRole(AccountRole.ADMIN);
+        a.setAuthType(AccountType.LOCAL);
         a.setActive(req.active());
-        return AdminAccountResponse.from(adminRepo.save(a));
+        return AdminAccountResponse.from(accountRepo.save(a));
     }
 
     @Transactional
-    public AdminAccountResponse updateAdmin(UUID tenantId, UUID adminId, AdminAccountRequest req) {
-        AdminAccount a = requireAdmin(tenantId, adminId);
-        // Reject slug conflicts with a different admin
-        if (!a.getUsername().equals(req.username())
-                && adminRepo.existsByTenantIdAndUsername(tenantId, req.username())) {
-            throw new ConflictException(
-                    "Admin [" + req.username() + "] already exists in tenant " + tenantId);
+    public AdminAccountResponse updateAdmin(UUID adminId, AdminAccountRequest req) {
+        Account a = requireAdmin(adminId);
+        if (!a.getUsername().equals(req.username()) && accountRepo.existsByUsername(req.username())) {
+            throw new ConflictException("Account [" + req.username() + "] already exists");
         }
         a.setUsername(req.username());
         a.setDisplayName(req.displayName());
         a.setEmail(req.email());
         a.setActive(req.active());
-        return AdminAccountResponse.from(adminRepo.save(a));
+        return AdminAccountResponse.from(accountRepo.save(a));
     }
 
     @Transactional
-    public void deleteAdmin(UUID tenantId, UUID adminId) {
-        AdminAccount a = requireAdmin(tenantId, adminId);
-        adminRepo.delete(a);
+    public void resetAdminPassword(UUID adminId, String newPassword) {
+        Account a = requireAdmin(adminId);
+        if (a.getAuthType() != AccountType.LOCAL) {
+            throw new IllegalArgumentException("Password reset is only supported for LOCAL accounts");
+        }
+        a.setPasswordHash(passwordEncoder.encode(newPassword));
+        accountRepo.save(a);
+    }
+
+    @Transactional
+    public void deleteAdmin(UUID adminId) {
+        accountRepo.delete(requireAdmin(adminId));
     }
 
     // ── Permission management — summary ───────────────────────────────────────
 
-    public AdminPermissionsResponse getPermissions(UUID tenantId, UUID adminId) {
-        requireAdmin(tenantId, adminId);
+    public AdminPermissionsResponse getPermissions(UUID adminId) {
+        requireAdmin(adminId);
         return AdminPermissionsResponse.from(
-                roleRepo.findAllByAdminAccountId(adminId),
+                realmRoleRepo.findAllByAdminAccountId(adminId),
                 branchRepo.findAllByAdminAccountId(adminId),
                 featureRepo.findAllByAdminAccountId(adminId));
     }
 
-    // ── Dimension 1+2: directory roles ────────────────────────────────────────
+    // ── Dimension 1+2: realm roles ────────────────────────────────────────────
 
     @Transactional
-    public DirectoryRoleResponse assignDirectoryRole(UUID tenantId, UUID adminId,
-                                                     DirectoryRoleRequest req) {
-        AdminAccount admin = requireAdmin(tenantId, adminId);
-        DirectoryConnection dir = requireDirectory(tenantId, req.directoryId());
+    public RealmRoleResponse assignRealmRole(UUID adminId, RealmRoleRequest req) {
+        Account admin = requireAdmin(adminId);
+        Realm   realm = requireRealm(req.realmId());
 
-        AdminDirectoryRole role = roleRepo
-                .findByAdminAccountIdAndDirectoryId(adminId, req.directoryId())
-                .orElseGet(AdminDirectoryRole::new);
+        AdminRealmRole role = realmRoleRepo
+                .findByAdminAccountIdAndRealmId(adminId, req.realmId())
+                .orElseGet(AdminRealmRole::new);
 
         if (role.getId() == null) {
             role.setAdminAccount(admin);
-            role.setDirectory(dir);
+            role.setRealm(realm);
         }
         role.setBaseRole(req.baseRole());
-        return DirectoryRoleResponse.from(roleRepo.save(role));
+        return RealmRoleResponse.from(realmRoleRepo.save(role));
     }
 
     @Transactional
-    public void removeDirectoryRole(UUID tenantId, UUID adminId, UUID directoryId) {
-        requireAdmin(tenantId, adminId);
-        roleRepo.deleteByAdminAccountIdAndDirectoryId(adminId, directoryId);
+    public void removeRealmRole(UUID adminId, UUID realmId) {
+        requireAdmin(adminId);
+        realmRoleRepo.deleteByAdminAccountIdAndRealmId(adminId, realmId);
     }
 
     // ── Dimension 3: branch restrictions ─────────────────────────────────────
 
     @Transactional
-    public void setBranchRestrictions(UUID tenantId, UUID adminId,
-                                      BranchRestrictionsRequest req) {
-        AdminAccount admin = requireAdmin(tenantId, adminId);
-        DirectoryConnection dir = requireDirectory(tenantId, req.directoryId());
+    public void setBranchRestrictions(UUID adminId, BranchRestrictionsRequest req) {
+        Account admin = requireAdmin(adminId);
+        Realm   realm = requireRealm(req.realmId());
 
-        branchRepo.deleteAllByAdminAccountIdAndDirectoryId(adminId, req.directoryId());
+        branchRepo.deleteAllByAdminAccountIdAndRealmId(adminId, req.realmId());
 
         if (req.branchDns() != null) {
             req.branchDns().forEach(dn -> {
                 AdminBranchRestriction br = new AdminBranchRestriction();
                 br.setAdminAccount(admin);
-                br.setDirectory(dir);
+                br.setRealm(realm);
                 br.setBranchDn(dn);
                 branchRepo.save(br);
             });
@@ -155,9 +154,8 @@ public class AdminManagementService {
     // ── Dimension 4: feature permissions ─────────────────────────────────────
 
     @Transactional
-    public void setFeaturePermissions(UUID tenantId, UUID adminId,
-                                      List<FeaturePermissionRequest> permissions) {
-        AdminAccount admin = requireAdmin(tenantId, adminId);
+    public void setFeaturePermissions(UUID adminId, List<FeaturePermissionRequest> permissions) {
+        Account admin = requireAdmin(adminId);
 
         permissions.forEach(req -> {
             AdminFeaturePermission fp = featureRepo
@@ -174,26 +172,24 @@ public class AdminManagementService {
     }
 
     @Transactional
-    public void clearFeaturePermission(UUID tenantId, UUID adminId,
-                                       com.ldapadmin.entity.enums.FeatureKey featureKey) {
-        requireAdmin(tenantId, adminId);
+    public void clearFeaturePermission(UUID adminId, FeatureKey featureKey) {
+        requireAdmin(adminId);
         featureRepo.deleteByAdminAccountIdAndFeatureKey(adminId, featureKey);
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private Tenant requireTenant(UUID tenantId) {
-        return tenantRepo.findById(tenantId)
-                .orElseThrow(() -> new ResourceNotFoundException("Tenant", tenantId));
+    private Account requireAdmin(UUID adminId) {
+        Account a = accountRepo.findById(adminId)
+                .orElseThrow(() -> new ResourceNotFoundException("Account", adminId));
+        if (a.getRole() != AccountRole.ADMIN) {
+            throw new ResourceNotFoundException("Account", adminId);
+        }
+        return a;
     }
 
-    private AdminAccount requireAdmin(UUID tenantId, UUID adminId) {
-        return adminRepo.findByIdAndTenantId(adminId, tenantId)
-                .orElseThrow(() -> new ResourceNotFoundException("AdminAccount", adminId));
-    }
-
-    private DirectoryConnection requireDirectory(UUID tenantId, UUID dirId) {
-        return dirRepo.findByIdAndTenantId(dirId, tenantId)
-                .orElseThrow(() -> new ResourceNotFoundException("DirectoryConnection", dirId));
+    private Realm requireRealm(UUID realmId) {
+        return realmRepo.findById(realmId)
+                .orElseThrow(() -> new ResourceNotFoundException("Realm", realmId));
     }
 }

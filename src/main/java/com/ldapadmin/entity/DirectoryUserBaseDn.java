@@ -28,4 +28,8 @@ public class DirectoryUserBaseDn {
 
     @Column(name = "display_order", nullable = false)
     private int displayOrder = 0;
+
+    /** When {@code false} the branch is read-only; write operations are rejected. */
+    @Column(nullable = false)
+    private boolean editable = false;
 }

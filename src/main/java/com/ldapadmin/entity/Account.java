@@ -1,5 +1,6 @@
 package com.ldapadmin.entity;
 
+import com.ldapadmin.entity.enums.AccountRole;
 import com.ldapadmin.entity.enums.AccountType;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -8,15 +9,19 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * Unified account entity for all application users (superadmins and admins).
+ * Maps to the {@code accounts} table introduced in V14.
+ */
 @Entity
-@Table(name = "superadmin_accounts")
+@Table(name = "accounts")
 @Getter
 @Setter
 @NoArgsConstructor
-public class SuperadminAccount {
+public class Account {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -29,43 +34,41 @@ public class SuperadminAccount {
     @Column(name = "display_name")
     private String displayName;
 
+    @Column
     private String email;
 
+    /** Application-level role: SUPERADMIN or ADMIN. */
     @Enumerated(EnumType.STRING)
-    @Column(name = "account_type", nullable = false, length = 10)
-    private AccountType accountType = AccountType.LOCAL;
+    @Column(nullable = false, length = 20)
+    private AccountRole role;
 
     /**
-     * bcrypt-hashed password. NULL for LDAP-sourced accounts.
-     * Never logged or exposed in API responses.
+     * Authentication mechanism: LOCAL (bcrypt password) or LDAP (bind against
+     * the LDAP auth server configured in application_settings).
      */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "auth_type", nullable = false, length = 10)
+    private AccountType authType = AccountType.LOCAL;
+
+    /** bcrypt hash; NULL for LDAP accounts or accounts pending first-login setup. */
     @Column(name = "password_hash")
     private String passwordHash;
 
-    /**
-     * Reference to the DirectoryConnection used as the LDAP authentication
-     * source for this superadmin. NULL for LOCAL accounts.
-     * FK constraint was added in V3 after directory_connections was created.
-     */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ldap_source_directory_id")
-    private DirectoryConnection ldapSourceDirectory;
-
-    /** Distinguished name in the source LDAP directory. NULL for LOCAL accounts. */
-    @Column(name = "ldap_dn")
+    /** Distinguished name in the LDAP directory (LDAP auth_type only). */
+    @Column(name = "ldap_dn", length = 1000)
     private String ldapDn;
 
     @Column(nullable = false)
     private boolean active = true;
 
     @Column(name = "last_login_at")
-    private OffsetDateTime lastLoginAt;
+    private Instant lastLoginAt;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt;
+    private Instant createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt;
+    private Instant updatedAt;
 }

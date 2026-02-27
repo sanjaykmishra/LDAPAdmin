@@ -10,7 +10,6 @@ import java.util.UUID;
 @Repository
 public interface ApplicationSettingsRepository extends JpaRepository<ApplicationSettings, UUID> {
 
-    Optional<ApplicationSettings> findByTenantId(UUID tenantId);
-
-    boolean existsByTenantId(UUID tenantId);
+    /** Returns the singleton settings row, if it exists. */
+    Optional<ApplicationSettings> findFirst();
 }

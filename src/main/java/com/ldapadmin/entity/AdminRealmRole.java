@@ -41,7 +41,7 @@ public class AdminRealmRole {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "admin_account_id", nullable = false)
-    private AdminAccount adminAccount;
+    private Account adminAccount;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "realm_id", nullable = false)

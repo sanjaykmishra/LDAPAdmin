@@ -4,9 +4,9 @@ import com.ldapadmin.dto.admin.AdminAccountRequest;
 import com.ldapadmin.dto.admin.AdminAccountResponse;
 import com.ldapadmin.dto.admin.AdminPermissionsResponse;
 import com.ldapadmin.dto.admin.BranchRestrictionsRequest;
-import com.ldapadmin.dto.admin.DirectoryRoleRequest;
-import com.ldapadmin.dto.admin.DirectoryRoleResponse;
 import com.ldapadmin.dto.admin.FeaturePermissionRequest;
+import com.ldapadmin.dto.admin.RealmRoleRequest;
+import com.ldapadmin.dto.admin.RealmRoleResponse;
 import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.service.AdminManagementService;
 import jakarta.validation.Valid;
@@ -30,21 +30,21 @@ import java.util.UUID;
  * Admin account management and four-dimensional permission assignment.
  *
  * <pre>
- *   GET    /api/superadmin/tenants/{tid}/admins                                    — list
- *   POST   /api/superadmin/tenants/{tid}/admins                                    — create
- *   GET    /api/superadmin/tenants/{tid}/admins/{id}                               — get
- *   PUT    /api/superadmin/tenants/{tid}/admins/{id}                               — update
- *   DELETE /api/superadmin/tenants/{tid}/admins/{id}                               — delete
- *   GET    /api/superadmin/tenants/{tid}/admins/{id}/permissions                   — all dims
- *   PUT    /api/superadmin/tenants/{tid}/admins/{id}/permissions/directory-roles   — dim 1+2
- *   DELETE /api/superadmin/tenants/{tid}/admins/{id}/permissions/directory-roles/{dirId}
- *   PUT    /api/superadmin/tenants/{tid}/admins/{id}/permissions/branch-restrictions — dim 3
- *   PUT    /api/superadmin/tenants/{tid}/admins/{id}/permissions/features          — dim 4
- *   DELETE /api/superadmin/tenants/{tid}/admins/{id}/permissions/features/{key}   — clear override
+ *   GET    /api/v1/superadmin/admins                                       — list
+ *   POST   /api/v1/superadmin/admins                                       — create
+ *   GET    /api/v1/superadmin/admins/{id}                                  — get
+ *   PUT    /api/v1/superadmin/admins/{id}                                  — update
+ *   DELETE /api/v1/superadmin/admins/{id}                                  — delete
+ *   GET    /api/v1/superadmin/admins/{id}/permissions                      — all dims
+ *   PUT    /api/v1/superadmin/admins/{id}/permissions/realm-roles          — dim 1+2
+ *   DELETE /api/v1/superadmin/admins/{id}/permissions/realm-roles/{realmId}
+ *   PUT    /api/v1/superadmin/admins/{id}/permissions/branch-restrictions  — dim 3
+ *   PUT    /api/v1/superadmin/admins/{id}/permissions/features             — dim 4
+ *   DELETE /api/v1/superadmin/admins/{id}/permissions/features/{key}       — clear override
  * </pre>
  */
 @RestController
-@RequestMapping("/api/v1/superadmin/tenants/{tenantId}/admins")
+@RequestMapping("/api/v1/superadmin/admins")
 @PreAuthorize("hasRole('SUPERADMIN')")
 @RequiredArgsConstructor
 public class AdminManagementController {
@@ -54,61 +54,52 @@ public class AdminManagementController {
     // ── Account CRUD ──────────────────────────────────────────────────────────
 
     @GetMapping
-    public List<AdminAccountResponse> list(@PathVariable UUID tenantId) {
-        return service.listAdmins(tenantId);
+    public List<AdminAccountResponse> list() {
+        return service.listAdmins();
     }
 
     @PostMapping
-    public ResponseEntity<AdminAccountResponse> create(
-            @PathVariable UUID tenantId,
-            @Valid @RequestBody AdminAccountRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(service.createAdmin(tenantId, req));
+    public ResponseEntity<AdminAccountResponse> create(@Valid @RequestBody AdminAccountRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.createAdmin(req));
     }
 
     @GetMapping("/{adminId}")
-    public AdminAccountResponse get(@PathVariable UUID tenantId,
-                                    @PathVariable UUID adminId) {
-        return service.getAdmin(tenantId, adminId);
+    public AdminAccountResponse get(@PathVariable UUID adminId) {
+        return service.getAdmin(adminId);
     }
 
     @PutMapping("/{adminId}")
-    public AdminAccountResponse update(@PathVariable UUID tenantId,
-                                       @PathVariable UUID adminId,
+    public AdminAccountResponse update(@PathVariable UUID adminId,
                                        @Valid @RequestBody AdminAccountRequest req) {
-        return service.updateAdmin(tenantId, adminId, req);
+        return service.updateAdmin(adminId, req);
     }
 
     @DeleteMapping("/{adminId}")
-    public ResponseEntity<Void> delete(@PathVariable UUID tenantId,
-                                       @PathVariable UUID adminId) {
-        service.deleteAdmin(tenantId, adminId);
+    public ResponseEntity<Void> delete(@PathVariable UUID adminId) {
+        service.deleteAdmin(adminId);
         return ResponseEntity.noContent().build();
     }
 
     // ── Permission summary ────────────────────────────────────────────────────
 
     @GetMapping("/{adminId}/permissions")
-    public AdminPermissionsResponse getPermissions(@PathVariable UUID tenantId,
-                                                   @PathVariable UUID adminId) {
-        return service.getPermissions(tenantId, adminId);
+    public AdminPermissionsResponse getPermissions(@PathVariable UUID adminId) {
+        return service.getPermissions(adminId);
     }
 
-    // ── Dimension 1+2: directory roles ────────────────────────────────────────
+    // ── Dimension 1+2: realm roles ────────────────────────────────────────────
 
-    @PutMapping("/{adminId}/permissions/directory-roles")
-    public DirectoryRoleResponse assignDirectoryRole(
-            @PathVariable UUID tenantId,
+    @PutMapping("/{adminId}/permissions/realm-roles")
+    public RealmRoleResponse assignRealmRole(
             @PathVariable UUID adminId,
-            @Valid @RequestBody DirectoryRoleRequest req) {
-        return service.assignDirectoryRole(tenantId, adminId, req);
+            @Valid @RequestBody RealmRoleRequest req) {
+        return service.assignRealmRole(adminId, req);
     }
 
-    @DeleteMapping("/{adminId}/permissions/directory-roles/{directoryId}")
-    public ResponseEntity<Void> removeDirectoryRole(@PathVariable UUID tenantId,
-                                                    @PathVariable UUID adminId,
-                                                    @PathVariable UUID directoryId) {
-        service.removeDirectoryRole(tenantId, adminId, directoryId);
+    @DeleteMapping("/{adminId}/permissions/realm-roles/{realmId}")
+    public ResponseEntity<Void> removeRealmRole(@PathVariable UUID adminId,
+                                                @PathVariable UUID realmId) {
+        service.removeRealmRole(adminId, realmId);
         return ResponseEntity.noContent().build();
     }
 
@@ -116,10 +107,9 @@ public class AdminManagementController {
 
     @PutMapping("/{adminId}/permissions/branch-restrictions")
     public ResponseEntity<Void> setBranchRestrictions(
-            @PathVariable UUID tenantId,
             @PathVariable UUID adminId,
             @Valid @RequestBody BranchRestrictionsRequest req) {
-        service.setBranchRestrictions(tenantId, adminId, req);
+        service.setBranchRestrictions(adminId, req);
         return ResponseEntity.noContent().build();
     }
 
@@ -127,19 +117,17 @@ public class AdminManagementController {
 
     @PutMapping("/{adminId}/permissions/features")
     public ResponseEntity<Void> setFeaturePermissions(
-            @PathVariable UUID tenantId,
             @PathVariable UUID adminId,
             @RequestBody List<@Valid FeaturePermissionRequest> permissions) {
-        service.setFeaturePermissions(tenantId, adminId, permissions);
+        service.setFeaturePermissions(adminId, permissions);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{adminId}/permissions/features/{featureKey}")
     public ResponseEntity<Void> clearFeaturePermission(
-            @PathVariable UUID tenantId,
             @PathVariable UUID adminId,
             @PathVariable FeatureKey featureKey) {
-        service.clearFeaturePermission(tenantId, adminId, featureKey);
+        service.clearFeaturePermission(adminId, featureKey);
         return ResponseEntity.noContent().build();
     }
 }

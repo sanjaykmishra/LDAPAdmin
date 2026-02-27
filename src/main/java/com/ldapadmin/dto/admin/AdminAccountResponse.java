@@ -1,28 +1,29 @@
 package com.ldapadmin.dto.admin;
 
-import com.ldapadmin.entity.AdminAccount;
+import com.ldapadmin.entity.Account;
+import com.ldapadmin.entity.enums.AccountType;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 public record AdminAccountResponse(
         UUID id,
-        UUID tenantId,
         String username,
         String displayName,
         String email,
+        AccountType authType,
         boolean active,
-        OffsetDateTime lastLoginAt,
-        OffsetDateTime createdAt,
-        OffsetDateTime updatedAt) {
+        Instant lastLoginAt,
+        Instant createdAt,
+        Instant updatedAt) {
 
-    public static AdminAccountResponse from(AdminAccount a) {
+    public static AdminAccountResponse from(Account a) {
         return new AdminAccountResponse(
                 a.getId(),
-                a.getTenant().getId(),
                 a.getUsername(),
                 a.getDisplayName(),
                 a.getEmail(),
+                a.getAuthType(),
                 a.isActive(),
                 a.getLastLoginAt(),
                 a.getCreatedAt(),

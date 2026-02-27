@@ -1,8 +1,8 @@
 package com.ldapadmin.dto.admin;
 
 import com.ldapadmin.entity.AdminBranchRestriction;
-import com.ldapadmin.entity.AdminDirectoryRole;
 import com.ldapadmin.entity.AdminFeaturePermission;
+import com.ldapadmin.entity.AdminRealmRole;
 import com.ldapadmin.entity.enums.FeatureKey;
 
 import java.util.List;
@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
  * Full permission summary for an admin account across all four dimensions.
  */
 public record AdminPermissionsResponse(
-        List<DirectoryRoleResponse> directoryRoles,
+        List<RealmRoleResponse> realmRoles,
         Map<UUID, List<String>> branchRestrictions,
         List<FeatureOverride> featurePermissions) {
 
@@ -25,16 +25,16 @@ public record AdminPermissionsResponse(
     }
 
     public static AdminPermissionsResponse from(
-            List<AdminDirectoryRole> roles,
+            List<AdminRealmRole> roles,
             List<AdminBranchRestriction> branches,
             List<AdminFeaturePermission> features) {
 
-        List<DirectoryRoleResponse> roleResponses =
-                roles.stream().map(DirectoryRoleResponse::from).toList();
+        List<RealmRoleResponse> roleResponses =
+                roles.stream().map(RealmRoleResponse::from).toList();
 
         Map<UUID, List<String>> branchMap = branches.stream()
                 .collect(Collectors.groupingBy(
-                        b -> b.getDirectory().getId(),
+                        b -> b.getRealm().getId(),
                         Collectors.mapping(AdminBranchRestriction::getBranchDn, Collectors.toList())));
 
         List<FeatureOverride> featureOverrides =

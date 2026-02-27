@@ -1,9 +1,9 @@
 package com.ldapadmin.dto.superadmin;
 
-import com.ldapadmin.entity.SuperadminAccount;
+import com.ldapadmin.entity.Account;
 import com.ldapadmin.entity.enums.AccountType;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 /** Superadmin response — password hash is never included. */
@@ -12,19 +12,19 @@ public record SuperadminResponse(
         String username,
         String displayName,
         String email,
-        AccountType accountType,
+        AccountType authType,
         boolean active,
-        OffsetDateTime lastLoginAt,
-        OffsetDateTime createdAt,
-        OffsetDateTime updatedAt) {
+        Instant lastLoginAt,
+        Instant createdAt,
+        Instant updatedAt) {
 
-    public static SuperadminResponse from(SuperadminAccount a) {
+    public static SuperadminResponse from(Account a) {
         return new SuperadminResponse(
                 a.getId(),
                 a.getUsername(),
                 a.getDisplayName(),
                 a.getEmail(),
-                a.getAccountType(),
+                a.getAuthType(),
                 a.isActive(),
                 a.getLastLoginAt(),
                 a.getCreatedAt(),

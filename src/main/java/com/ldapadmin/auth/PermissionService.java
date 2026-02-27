@@ -1,12 +1,12 @@
 package com.ldapadmin.auth;
 
 import com.ldapadmin.entity.AdminBranchRestriction;
-import com.ldapadmin.entity.AdminDirectoryRole;
+import com.ldapadmin.entity.AdminRealmRole;
 import com.ldapadmin.entity.enums.BaseRole;
 import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.repository.AdminBranchRestrictionRepository;
-import com.ldapadmin.repository.AdminDirectoryRoleRepository;
 import com.ldapadmin.repository.AdminFeaturePermissionRepository;
+import com.ldapadmin.repository.AdminRealmRoleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -17,16 +17,16 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Enforces the four-dimensional permission model (§3.2) for tenant admins.
+ * Enforces the four-dimensional permission model (§3.2) for admins.
  *
  * <h3>Dimensions</h3>
  * <ol>
- *   <li><b>Directory access</b> — admin must have a row in
- *       {@code admin_directory_roles} for the target directory.</li>
+ *   <li><b>Realm access</b> — admin must have a row in
+ *       {@code admin_realm_roles} for the target realm.</li>
  *   <li><b>Base role</b> — {@code ADMIN} grants all default capabilities;
  *       {@code READ_ONLY} grants only the read/export subset.</li>
  *   <li><b>Branch restriction</b> — if any rows exist in
- *       {@code admin_branch_restrictions} for (admin, directory), the target
+ *       {@code admin_branch_restrictions} for (admin, realm), the target
  *       entry's DN must be a descendant of one of those branch DNs.</li>
  *   <li><b>Feature override</b> — a row in {@code admin_feature_permissions}
  *       explicitly enables or disables a feature, overriding the base-role
@@ -49,43 +49,43 @@ public class PermissionService {
             FeatureKey.REPORTS_EXPORT
     );
 
-    private final AdminDirectoryRoleRepository     directoryRoleRepo;
+    private final AdminRealmRoleRepository         realmRoleRepo;
     private final AdminBranchRestrictionRepository branchRepo;
     private final AdminFeaturePermissionRepository featurePermissionRepo;
 
     // ── Public API ────────────────────────────────────────────────────────────
 
     /**
-     * Verifies that {@code principal} has access to {@code directoryId}
+     * Verifies that {@code principal} has access to {@code realmId}
      * (dimensions 1 + 2) and returns the resolved role.
      *
      * @throws AccessDeniedException if no role is assigned
      */
-    public AdminDirectoryRole requireDirectoryAccess(AuthPrincipal principal, UUID directoryId) {
+    public AdminRealmRole requireRealmAccess(AuthPrincipal principal, UUID realmId) {
         if (principal.isSuperadmin()) {
             return null; // superadmin — no role row required
         }
-        return directoryRoleRepo
-                .findByAdminAccountIdAndDirectoryId(principal.id(), directoryId)
+        return realmRoleRepo
+                .findByAdminAccountIdAndRealmId(principal.id(), realmId)
                 .orElseThrow(() -> new AccessDeniedException(
-                        "No access to directory [" + directoryId + "]"));
+                        "No access to realm [" + realmId + "]"));
     }
 
     /**
      * Verifies that the given {@code entryDn} falls within one of the admin's
-     * allowed branches for the directory (dimension 3).
+     * allowed branches for the realm (dimension 3).
      *
-     * <p>If no branch restrictions are configured for the (admin, directory) pair
+     * <p>If no branch restrictions are configured for the (admin, realm) pair
      * the admin has unrestricted branch access.</p>
      *
      * @param entryDn DN of the LDAP entry being accessed
      * @throws AccessDeniedException if the entry is outside all allowed branches
      */
-    public void requireBranchAccess(AuthPrincipal principal, UUID directoryId, String entryDn) {
+    public void requireBranchAccess(AuthPrincipal principal, UUID realmId, String entryDn) {
         if (principal.isSuperadmin()) return;
 
         List<AdminBranchRestriction> restrictions =
-                branchRepo.findAllByAdminAccountIdAndDirectoryId(principal.id(), directoryId);
+                branchRepo.findAllByAdminAccountIdAndRealmId(principal.id(), realmId);
 
         if (restrictions.isEmpty()) return; // unrestricted
 
@@ -99,11 +99,7 @@ public class PermissionService {
     }
 
     /**
-     * Checks all four dimensions:
-     * <ol>
-     *   <li>Directory access (dim 1+2)</li>
-     *   <li>Feature permission (dim 4 override or base-role default)</li>
-     * </ol>
+     * Checks realm access (dim 1+2) and feature permission (dim 4) in one call.
      *
      * <p>Branch access (dim 3) is checked separately via
      * {@link #requireBranchAccess} because the entry DN is only known at
@@ -111,10 +107,10 @@ public class PermissionService {
      *
      * @throws AccessDeniedException if any dimension denies access
      */
-    public void requireFeature(AuthPrincipal principal, UUID directoryId, FeatureKey feature) {
+    public void requireFeature(AuthPrincipal principal, UUID realmId, FeatureKey feature) {
         if (principal.isSuperadmin()) return;
 
-        AdminDirectoryRole role = requireDirectoryAccess(principal, directoryId);
+        AdminRealmRole role = requireRealmAccess(principal, realmId);
 
         // Dim 4: explicit override takes priority
         var override = featurePermissionRepo

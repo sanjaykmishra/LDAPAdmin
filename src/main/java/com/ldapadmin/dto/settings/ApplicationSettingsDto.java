@@ -4,13 +4,12 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
- * Read DTO for per-tenant application settings.
+ * Read DTO for global application settings.
  * Encrypted credential fields are never returned; instead boolean flags
  * indicate whether a password/secret has been configured.
  */
 public record ApplicationSettingsDto(
         UUID id,
-        UUID tenantId,
 
         // Branding
         String appName,
