@@ -34,6 +34,12 @@ spring:
     locations:            classpath:db/migration
     baseline-on-migrate:  false
     validate-on-migrate:  true
+    # After consolidating migration scripts the schema history table in an
+    # existing DB will have stale/missing entries.  Setting both vars below
+    # to true lets Flyway wipe and recreate the schema automatically.
+    # NEVER enable clean in a production environment that holds live data.
+    clean-disabled:                  ${FLYWAY_CLEAN_DISABLED:true}
+    clean-on-validation-error:       ${FLYWAY_CLEAN_ON_VALIDATION_ERROR:false}
 
   servlet:
     multipart:
