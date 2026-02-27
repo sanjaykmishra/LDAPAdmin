@@ -6,15 +6,13 @@ import com.ldapadmin.dto.report.CreateScheduledReportJobRequest;
 import com.ldapadmin.dto.report.ScheduledReportJobDto;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.ScheduledReportJob;
-import com.ldapadmin.entity.Tenant;
 import com.ldapadmin.entity.enums.DeliveryMethod;
 import com.ldapadmin.entity.enums.OutputFormat;
 import com.ldapadmin.entity.enums.ReportType;
 import com.ldapadmin.exception.ResourceNotFoundException;
-import com.ldapadmin.repository.AdminAccountRepository;
+import com.ldapadmin.repository.AccountRepository;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.repository.ScheduledReportJobRepository;
-import com.ldapadmin.repository.TenantRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,35 +37,28 @@ class ScheduledReportJobServiceTest {
 
     @Mock private ScheduledReportJobRepository  jobRepo;
     @Mock private DirectoryConnectionRepository dirRepo;
-    @Mock private TenantRepository              tenantRepo;
-    @Mock private AdminAccountRepository        adminRepo;
+    @Mock private AccountRepository             accountRepo;
 
     private ScheduledReportJobService service;
 
-    private final UUID tenantId = UUID.randomUUID();
-    private final UUID dirId    = UUID.randomUUID();
-    private final UUID jobId    = UUID.randomUUID();
+    private final UUID dirId = UUID.randomUUID();
+    private final UUID jobId = UUID.randomUUID();
 
     private AuthPrincipal adminPrincipal;
     private AuthPrincipal superadminPrincipal;
 
     @BeforeEach
     void setUp() {
-        service = new ScheduledReportJobService(jobRepo, dirRepo, tenantRepo, adminRepo);
-        adminPrincipal = new AuthPrincipal(
-                PrincipalType.ADMIN, UUID.randomUUID(), tenantId, "admin");
-        superadminPrincipal = new AuthPrincipal(
-                PrincipalType.SUPERADMIN, UUID.randomUUID(), null, "superadmin");
+        service = new ScheduledReportJobService(jobRepo, dirRepo, accountRepo);
+        adminPrincipal      = new AuthPrincipal(PrincipalType.ADMIN,      UUID.randomUUID(), "admin");
+        superadminPrincipal = new AuthPrincipal(PrincipalType.SUPERADMIN, UUID.randomUUID(), "superadmin");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private DirectoryConnection mockDirectory() {
-        Tenant tenant = new Tenant();
-        tenant.setId(tenantId);
         DirectoryConnection dir = new DirectoryConnection();
         dir.setId(dirId);
-        dir.setTenant(tenant);
         return dir;
     }
 
@@ -75,7 +66,6 @@ class ScheduledReportJobServiceTest {
         ScheduledReportJob j = new ScheduledReportJob();
         j.setId(jobId);
         j.setDirectory(dir);
-        j.setTenant(dir.getTenant());
         j.setName("Weekly Users Report");
         j.setReportType(ReportType.USERS_IN_BRANCH);
         j.setReportParams(Map.of("branchDn", "ou=people,dc=example,dc=com"));
@@ -107,8 +97,8 @@ class ScheduledReportJobServiceTest {
         DirectoryConnection dir = mockDirectory();
         ScheduledReportJob job = mockJob(dir);
 
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
-        when(jobRepo.findAllByTenantId(eq(tenantId), any(Pageable.class)))
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
+        when(jobRepo.findAllByDirectoryId(eq(dirId), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(job)));
 
         var result = service.listByDirectory(dirId, adminPrincipal, Pageable.unpaged());
@@ -119,23 +109,22 @@ class ScheduledReportJobServiceTest {
 
     @Test
     void listByDirectory_unknownDirectory_throwsNotFound() {
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.empty());
+        when(dirRepo.findById(dirId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.listByDirectory(dirId, adminPrincipal, Pageable.unpaged()))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
-    void listByDirectory_superadmin_usesUnfilteredDirRepo() {
+    void listByDirectory_superadmin_usesDirectoryRepo() {
         DirectoryConnection dir = mockDirectory();
         when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
-        when(jobRepo.findAllByTenantId(eq(tenantId), any(Pageable.class)))
+        when(jobRepo.findAllByDirectoryId(eq(dirId), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()));
 
         service.listByDirectory(dirId, superadminPrincipal, Pageable.unpaged());
 
-        verify(dirRepo, atLeastOnce()).findById(dirId);
-        verify(dirRepo, never()).findByIdAndTenantId(any(), any());
+        verify(dirRepo).findById(dirId);
     }
 
     // ── getById ───────────────────────────────────────────────────────────────
@@ -145,8 +134,8 @@ class ScheduledReportJobServiceTest {
         DirectoryConnection dir = mockDirectory();
         ScheduledReportJob job = mockJob(dir);
 
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
-        when(jobRepo.findByIdAndTenantId(jobId, tenantId)).thenReturn(Optional.of(job));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
+        when(jobRepo.findById(jobId)).thenReturn(Optional.of(job));
 
         ScheduledReportJobDto dto = service.getById(dirId, jobId, adminPrincipal);
 
@@ -157,8 +146,8 @@ class ScheduledReportJobServiceTest {
     @Test
     void getById_notFound_throwsNotFound() {
         DirectoryConnection dir = mockDirectory();
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
-        when(jobRepo.findByIdAndTenantId(jobId, tenantId)).thenReturn(Optional.empty());
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
+        when(jobRepo.findById(jobId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getById(dirId, jobId, adminPrincipal))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -169,9 +158,8 @@ class ScheduledReportJobServiceTest {
     @Test
     void create_savesJobWithAllFields() {
         DirectoryConnection dir = mockDirectory();
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
-        when(tenantRepo.findById(tenantId)).thenReturn(Optional.of(dir.getTenant()));
-        when(adminRepo.findByIdAndTenantId(any(), eq(tenantId))).thenReturn(Optional.empty());
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
+        when(accountRepo.findById(any())).thenReturn(Optional.empty());
         when(jobRepo.save(any(ScheduledReportJob.class))).thenAnswer(inv -> {
             ScheduledReportJob j = inv.getArgument(0);
             j.setId(jobId);
@@ -194,8 +182,8 @@ class ScheduledReportJobServiceTest {
         DirectoryConnection dir = mockDirectory();
         ScheduledReportJob job = mockJob(dir);
 
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
-        when(jobRepo.findByIdAndTenantId(jobId, tenantId)).thenReturn(Optional.of(job));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
+        when(jobRepo.findById(jobId)).thenReturn(Optional.of(job));
         when(jobRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         CreateScheduledReportJobRequest updated = new CreateScheduledReportJobRequest(
@@ -217,8 +205,8 @@ class ScheduledReportJobServiceTest {
         DirectoryConnection dir = mockDirectory();
         ScheduledReportJob job = mockJob(dir);
 
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
-        when(jobRepo.findByIdAndTenantId(jobId, tenantId)).thenReturn(Optional.of(job));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
+        when(jobRepo.findById(jobId)).thenReturn(Optional.of(job));
 
         service.delete(dirId, jobId, adminPrincipal);
 
@@ -228,8 +216,8 @@ class ScheduledReportJobServiceTest {
     @Test
     void delete_notFound_throwsNotFound() {
         DirectoryConnection dir = mockDirectory();
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
-        when(jobRepo.findByIdAndTenantId(jobId, tenantId)).thenReturn(Optional.empty());
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
+        when(jobRepo.findById(jobId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.delete(dirId, jobId, adminPrincipal))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -242,8 +230,8 @@ class ScheduledReportJobServiceTest {
         DirectoryConnection dir = mockDirectory();
         ScheduledReportJob job = mockJob(dir);
 
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
-        when(jobRepo.findByIdAndTenantId(jobId, tenantId)).thenReturn(Optional.of(job));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
+        when(jobRepo.findById(jobId)).thenReturn(Optional.of(job));
         when(jobRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ScheduledReportJobDto dto = service.setEnabled(dirId, jobId, false, adminPrincipal);
@@ -257,8 +245,8 @@ class ScheduledReportJobServiceTest {
         ScheduledReportJob job = mockJob(dir);
         job.setEnabled(false);
 
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
-        when(jobRepo.findByIdAndTenantId(jobId, tenantId)).thenReturn(Optional.of(job));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
+        when(jobRepo.findById(jobId)).thenReturn(Optional.of(job));
         when(jobRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ScheduledReportJobDto dto = service.setEnabled(dirId, jobId, true, adminPrincipal);

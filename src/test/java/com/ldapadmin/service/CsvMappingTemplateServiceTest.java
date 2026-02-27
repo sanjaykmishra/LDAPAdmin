@@ -8,7 +8,6 @@ import com.ldapadmin.dto.csv.CsvMappingTemplateDto;
 import com.ldapadmin.entity.CsvMappingTemplate;
 import com.ldapadmin.entity.CsvMappingTemplateEntry;
 import com.ldapadmin.entity.DirectoryConnection;
-import com.ldapadmin.entity.Tenant;
 import com.ldapadmin.entity.enums.ConflictHandling;
 import com.ldapadmin.exception.ConflictException;
 import com.ldapadmin.exception.ResourceNotFoundException;
@@ -40,7 +39,6 @@ class CsvMappingTemplateServiceTest {
 
     private CsvMappingTemplateService service;
 
-    private final UUID tenantId   = UUID.randomUUID();
     private final UUID dirId      = UUID.randomUUID();
     private final UUID templateId = UUID.randomUUID();
 
@@ -50,21 +48,15 @@ class CsvMappingTemplateServiceTest {
     @BeforeEach
     void setUp() {
         service = new CsvMappingTemplateService(templateRepo, entryRepo, dirRepo);
-        adminPrincipal = new AuthPrincipal(
-                PrincipalType.ADMIN, UUID.randomUUID(), tenantId, "admin");
-        superadminPrincipal = new AuthPrincipal(
-                PrincipalType.SUPERADMIN, UUID.randomUUID(), null, "superadmin");
+        adminPrincipal      = new AuthPrincipal(PrincipalType.ADMIN,      UUID.randomUUID(), "admin");
+        superadminPrincipal = new AuthPrincipal(PrincipalType.SUPERADMIN, UUID.randomUUID(), "superadmin");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private DirectoryConnection mockDirectory() {
-        Tenant tenant = new Tenant();
-        tenant.setId(tenantId);
-
         DirectoryConnection dir = new DirectoryConnection();
         dir.setId(dirId);
-        dir.setTenant(tenant);
         return dir;
     }
 
@@ -72,7 +64,6 @@ class CsvMappingTemplateServiceTest {
         CsvMappingTemplate t = new CsvMappingTemplate();
         t.setId(templateId);
         t.setDirectory(dir);
-        t.setTenant(dir.getTenant());
         t.setName("My Template");
         t.setTargetKeyAttribute("uid");
         t.setConflictHandling(ConflictHandling.SKIP);
@@ -84,7 +75,7 @@ class CsvMappingTemplateServiceTest {
     @Test
     void listByDirectory_returnsTemplatesForDirectory() {
         DirectoryConnection dir = mockDirectory();
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
         CsvMappingTemplate t = mockTemplate(dir);
         when(templateRepo.findAllByDirectoryId(dirId)).thenReturn(List.of(t));
         when(entryRepo.findAllByTemplateId(templateId)).thenReturn(List.of());
@@ -109,7 +100,7 @@ class CsvMappingTemplateServiceTest {
 
     @Test
     void listByDirectory_unknownDirectory_throwsNotFound() {
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.empty());
+        when(dirRepo.findById(dirId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.listByDirectory(dirId, adminPrincipal))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -120,9 +111,9 @@ class CsvMappingTemplateServiceTest {
     @Test
     void getById_returnsTemplateWithEntries() {
         DirectoryConnection dir = mockDirectory();
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
         CsvMappingTemplate t = mockTemplate(dir);
-        when(templateRepo.findByIdAndTenantId(templateId, tenantId)).thenReturn(Optional.of(t));
+        when(templateRepo.findById(templateId)).thenReturn(Optional.of(t));
         CsvMappingTemplateEntry entry = new CsvMappingTemplateEntry();
         entry.setId(UUID.randomUUID());
         entry.setCsvColumnName("First Name");
@@ -141,12 +132,12 @@ class CsvMappingTemplateServiceTest {
     @Test
     void getById_templateBelongsToDifferentDirectory_throwsNotFound() {
         DirectoryConnection dir = mockDirectory();
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
 
         CsvMappingTemplate t = mockTemplate(dir);
         UUID otherId = UUID.randomUUID();
         t.getDirectory().setId(otherId); // belongs to a different directory
-        when(templateRepo.findByIdAndTenantId(templateId, tenantId)).thenReturn(Optional.of(t));
+        when(templateRepo.findById(templateId)).thenReturn(Optional.of(t));
 
         assertThatThrownBy(() -> service.getById(dirId, templateId, adminPrincipal))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -157,7 +148,7 @@ class CsvMappingTemplateServiceTest {
     @Test
     void create_savesTemplateAndEntries() {
         DirectoryConnection dir = mockDirectory();
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
         when(templateRepo.existsByDirectoryIdAndName(dirId, "New Template")).thenReturn(false);
 
         CsvMappingTemplate saved = mockTemplate(dir);
@@ -190,7 +181,7 @@ class CsvMappingTemplateServiceTest {
     @Test
     void create_defaultsAppliedWhenFieldsNull() {
         DirectoryConnection dir = mockDirectory();
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
         when(templateRepo.existsByDirectoryIdAndName(dirId, "T")).thenReturn(false);
         CsvMappingTemplate saved = mockTemplate(dir);
         when(templateRepo.save(any())).thenReturn(saved);
@@ -210,7 +201,7 @@ class CsvMappingTemplateServiceTest {
     @Test
     void create_duplicateName_throwsConflict() {
         DirectoryConnection dir = mockDirectory();
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
         when(templateRepo.existsByDirectoryIdAndName(dirId, "Existing")).thenReturn(true);
 
         CreateCsvMappingTemplateRequest req = new CreateCsvMappingTemplateRequest(
@@ -226,10 +217,9 @@ class CsvMappingTemplateServiceTest {
     @Test
     void update_replacesEntriesAndUpdatesFields() {
         DirectoryConnection dir = mockDirectory();
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
         CsvMappingTemplate existing = mockTemplate(dir);
-        when(templateRepo.findByIdAndTenantId(templateId, tenantId))
-                .thenReturn(Optional.of(existing));
+        when(templateRepo.findById(templateId)).thenReturn(Optional.of(existing));
         when(templateRepo.existsByDirectoryIdAndName(dirId, "Renamed")).thenReturn(false);
         when(templateRepo.save(any())).thenReturn(existing);
 
@@ -253,10 +243,9 @@ class CsvMappingTemplateServiceTest {
     @Test
     void update_renameToDuplicateName_throwsConflict() {
         DirectoryConnection dir = mockDirectory();
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
         CsvMappingTemplate existing = mockTemplate(dir);
-        when(templateRepo.findByIdAndTenantId(templateId, tenantId))
-                .thenReturn(Optional.of(existing));
+        when(templateRepo.findById(templateId)).thenReturn(Optional.of(existing));
         when(templateRepo.existsByDirectoryIdAndName(dirId, "Other")).thenReturn(true);
 
         CreateCsvMappingTemplateRequest req = new CreateCsvMappingTemplateRequest(
@@ -271,9 +260,9 @@ class CsvMappingTemplateServiceTest {
     @Test
     void delete_removesEntriesAndTemplate() {
         DirectoryConnection dir = mockDirectory();
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
         CsvMappingTemplate t = mockTemplate(dir);
-        when(templateRepo.findByIdAndTenantId(templateId, tenantId)).thenReturn(Optional.of(t));
+        when(templateRepo.findById(templateId)).thenReturn(Optional.of(t));
 
         service.delete(dirId, templateId, adminPrincipal);
 
@@ -284,8 +273,8 @@ class CsvMappingTemplateServiceTest {
     @Test
     void delete_templateNotFound_throwsNotFound() {
         DirectoryConnection dir = mockDirectory();
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
-        when(templateRepo.findByIdAndTenantId(templateId, tenantId)).thenReturn(Optional.empty());
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
+        when(templateRepo.findById(templateId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.delete(dirId, templateId, adminPrincipal))
                 .isInstanceOf(ResourceNotFoundException.class);

@@ -3,32 +3,31 @@ package com.ldapadmin.service;
 import com.ldapadmin.dto.admin.AdminAccountRequest;
 import com.ldapadmin.dto.admin.AdminAccountResponse;
 import com.ldapadmin.dto.admin.BranchRestrictionsRequest;
-import com.ldapadmin.dto.admin.DirectoryRoleRequest;
-import com.ldapadmin.dto.admin.DirectoryRoleResponse;
 import com.ldapadmin.dto.admin.FeaturePermissionRequest;
-import com.ldapadmin.entity.AdminAccount;
-import com.ldapadmin.entity.AdminDirectoryRole;
+import com.ldapadmin.dto.admin.RealmRoleRequest;
+import com.ldapadmin.dto.admin.RealmRoleResponse;
+import com.ldapadmin.entity.Account;
 import com.ldapadmin.entity.AdminFeaturePermission;
-import com.ldapadmin.entity.DirectoryConnection;
-import com.ldapadmin.entity.Tenant;
+import com.ldapadmin.entity.AdminRealmRole;
+import com.ldapadmin.entity.Realm;
+import com.ldapadmin.entity.enums.AccountRole;
+import com.ldapadmin.entity.enums.AccountType;
 import com.ldapadmin.entity.enums.BaseRole;
 import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.exception.ConflictException;
 import com.ldapadmin.exception.ResourceNotFoundException;
-import com.ldapadmin.repository.AdminAccountRepository;
+import com.ldapadmin.repository.AccountRepository;
 import com.ldapadmin.repository.AdminBranchRestrictionRepository;
-import com.ldapadmin.repository.AdminDirectoryRoleRepository;
 import com.ldapadmin.repository.AdminFeaturePermissionRepository;
-import com.ldapadmin.repository.DirectoryConnectionRepository;
-import com.ldapadmin.repository.TenantRepository;
+import com.ldapadmin.repository.AdminRealmRoleRepository;
+import com.ldapadmin.repository.RealmRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 import java.util.Optional;
@@ -42,220 +41,206 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class AdminManagementServiceTest {
 
-    @Mock private AdminAccountRepository           adminRepo;
-    @Mock private TenantRepository                 tenantRepo;
-    @Mock private DirectoryConnectionRepository    dirRepo;
-    @Mock private AdminDirectoryRoleRepository     roleRepo;
+    @Mock private AccountRepository               accountRepo;
+    @Mock private RealmRepository                 realmRepo;
+    @Mock private AdminRealmRoleRepository        realmRoleRepo;
     @Mock private AdminBranchRestrictionRepository branchRepo;
     @Mock private AdminFeaturePermissionRepository featureRepo;
+    @Mock private PasswordEncoder                 passwordEncoder;
 
     private AdminManagementService service;
 
-    private final UUID tenantId = UUID.randomUUID();
-    private final UUID adminId  = UUID.randomUUID();
-    private final UUID dirId    = UUID.randomUUID();
+    private final UUID adminId = UUID.randomUUID();
+    private final UUID realmId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
         service = new AdminManagementService(
-                adminRepo, tenantRepo, dirRepo, roleRepo, branchRepo, featureRepo);
+                accountRepo, realmRepo, realmRoleRepo, branchRepo, featureRepo, passwordEncoder);
     }
 
     // ── listAdmins ────────────────────────────────────────────────────────────
 
     @Test
-    void listAdmins_tenantNotFound_throwsResourceNotFound() {
-        when(tenantRepo.findById(tenantId)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.listAdmins(tenantId))
-                .isInstanceOf(ResourceNotFoundException.class);
-    }
-
-    @Test
     void listAdmins_returnsMappedList() {
-        when(tenantRepo.findById(tenantId)).thenReturn(Optional.of(tenant()));
-        AdminAccount a = adminAccount("alice");
-        when(adminRepo.findAllByTenantId(eq(tenantId), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(a)));
+        Account a = adminAccount("alice");
+        when(accountRepo.findAllByRole(AccountRole.ADMIN)).thenReturn(List.of(a));
 
-        List<AdminAccountResponse> result = service.listAdmins(tenantId);
+        List<AdminAccountResponse> result = service.listAdmins();
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).username()).isEqualTo("alice");
     }
 
-    // ── createAdmin ───────────────────────────────────────────────────────────
+    // ── getAdmin ──────────────────────────────────────────────────────────────
 
     @Test
-    void createAdmin_tenantNotFound_throwsResourceNotFound() {
-        when(tenantRepo.findById(tenantId)).thenReturn(Optional.empty());
+    void getAdmin_notFound_throwsResourceNotFound() {
+        when(accountRepo.findById(adminId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.createAdmin(tenantId,
-                new AdminAccountRequest("bob", "Bob", "bob@e.com", true)))
+        assertThatThrownBy(() -> service.getAdmin(adminId))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
+    // ── createAdmin ───────────────────────────────────────────────────────────
+
     @Test
     void createAdmin_duplicateUsername_throwsConflict() {
-        when(tenantRepo.findById(tenantId)).thenReturn(Optional.of(tenant()));
-        when(adminRepo.existsByTenantIdAndUsername(tenantId, "bob")).thenReturn(true);
+        when(accountRepo.existsByUsername("bob")).thenReturn(true);
 
-        assertThatThrownBy(() -> service.createAdmin(tenantId,
+        assertThatThrownBy(() -> service.createAdmin(
                 new AdminAccountRequest("bob", "Bob", "bob@e.com", true)))
                 .isInstanceOf(ConflictException.class);
+
+        verify(accountRepo, never()).save(any());
     }
 
     @Test
     void createAdmin_success_savesAndReturns() {
-        Tenant t = tenant();
-        when(tenantRepo.findById(tenantId)).thenReturn(Optional.of(t));
-        when(adminRepo.existsByTenantIdAndUsername(tenantId, "alice")).thenReturn(false);
+        when(accountRepo.existsByUsername("alice")).thenReturn(false);
+        Account saved = adminAccount("alice");
+        when(accountRepo.save(any())).thenReturn(saved);
 
-        AdminAccount saved = adminAccount("alice");
-        when(adminRepo.save(any())).thenReturn(saved);
-
-        AdminAccountResponse resp = service.createAdmin(tenantId,
+        AdminAccountResponse resp = service.createAdmin(
                 new AdminAccountRequest("alice", "Alice", "a@e.com", true));
 
         assertThat(resp.username()).isEqualTo("alice");
-        ArgumentCaptor<AdminAccount> captor = ArgumentCaptor.forClass(AdminAccount.class);
-        verify(adminRepo).save(captor.capture());
-        assertThat(captor.getValue().getTenant()).isSameAs(t);
+        ArgumentCaptor<Account> captor = ArgumentCaptor.forClass(Account.class);
+        verify(accountRepo).save(captor.capture());
+        assertThat(captor.getValue().getRole()).isEqualTo(AccountRole.ADMIN);
+        assertThat(captor.getValue().getAuthType()).isEqualTo(AccountType.LOCAL);
     }
 
     // ── updateAdmin ───────────────────────────────────────────────────────────
 
     @Test
-    void updateAdmin_adminNotFound_throwsResourceNotFound() {
-        when(adminRepo.findByIdAndTenantId(adminId, tenantId)).thenReturn(Optional.empty());
+    void updateAdmin_notFound_throwsResourceNotFound() {
+        when(accountRepo.findById(adminId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.updateAdmin(tenantId, adminId,
+        assertThatThrownBy(() -> service.updateAdmin(adminId,
                 new AdminAccountRequest("alice", "Alice", "a@e.com", true)))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     void updateAdmin_usernameConflictWithDifferentAdmin_throwsConflict() {
-        AdminAccount existing = adminAccount("alice");
-        when(adminRepo.findByIdAndTenantId(adminId, tenantId)).thenReturn(Optional.of(existing));
-        when(adminRepo.existsByTenantIdAndUsername(tenantId, "bob")).thenReturn(true);
+        Account existing = adminAccount("alice");
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(existing));
+        when(accountRepo.existsByUsername("bob")).thenReturn(true);
 
-        assertThatThrownBy(() -> service.updateAdmin(tenantId, adminId,
+        assertThatThrownBy(() -> service.updateAdmin(adminId,
                 new AdminAccountRequest("bob", "Bob", "b@e.com", true)))
                 .isInstanceOf(ConflictException.class);
     }
 
     @Test
     void updateAdmin_sameUsername_noConflictCheck() {
-        AdminAccount existing = adminAccount("alice");
-        when(adminRepo.findByIdAndTenantId(adminId, tenantId)).thenReturn(Optional.of(existing));
-        when(adminRepo.save(any())).thenReturn(existing);
+        Account existing = adminAccount("alice");
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(existing));
+        when(accountRepo.save(any())).thenReturn(existing);
 
-        // same username → no existence check needed
-        service.updateAdmin(tenantId, adminId,
+        service.updateAdmin(adminId,
                 new AdminAccountRequest("alice", "Alice Renamed", "a@e.com", true));
 
-        verify(adminRepo, never()).existsByTenantIdAndUsername(any(), eq("alice"));
+        verify(accountRepo, never()).existsByUsername("alice");
     }
 
     // ── deleteAdmin ───────────────────────────────────────────────────────────
 
     @Test
     void deleteAdmin_success_callsDelete() {
-        AdminAccount a = adminAccount("alice");
-        when(adminRepo.findByIdAndTenantId(adminId, tenantId)).thenReturn(Optional.of(a));
+        Account a = adminAccount("alice");
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(a));
 
-        service.deleteAdmin(tenantId, adminId);
+        service.deleteAdmin(adminId);
 
-        verify(adminRepo).delete(a);
+        verify(accountRepo).delete(a);
     }
 
-    // ── assignDirectoryRole ───────────────────────────────────────────────────
+    // ── assignRealmRole ───────────────────────────────────────────────────────
 
     @Test
-    void assignDirectoryRole_directoryNotFound_throwsResourceNotFound() {
-        when(adminRepo.findByIdAndTenantId(adminId, tenantId)).thenReturn(Optional.of(adminAccount("alice")));
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.empty());
+    void assignRealmRole_realmNotFound_throwsResourceNotFound() {
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount("alice")));
+        when(realmRepo.findById(realmId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.assignDirectoryRole(tenantId, adminId,
-                new DirectoryRoleRequest(dirId, BaseRole.ADMIN)))
+        assertThatThrownBy(() -> service.assignRealmRole(adminId,
+                new RealmRoleRequest(realmId, BaseRole.ADMIN)))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
-    void assignDirectoryRole_newRole_savesRole() {
-        when(adminRepo.findByIdAndTenantId(adminId, tenantId)).thenReturn(Optional.of(adminAccount("alice")));
-        when(adminRepo.getReferenceById(adminId)).thenReturn(adminAccount("alice"));
-        DirectoryConnection dir = directory();
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
-        when(roleRepo.findByAdminAccountIdAndDirectoryId(adminId, dirId)).thenReturn(Optional.empty());
+    void assignRealmRole_newRole_savesRole() {
+        Account admin = adminAccount("alice");
+        Realm realm = realm();
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(admin));
+        when(realmRepo.findById(realmId)).thenReturn(Optional.of(realm));
+        when(realmRoleRepo.findByAdminAccountIdAndRealmId(adminId, realmId))
+                .thenReturn(Optional.empty());
 
-        AdminDirectoryRole saved = new AdminDirectoryRole();
+        AdminRealmRole saved = new AdminRealmRole();
         saved.setBaseRole(BaseRole.ADMIN);
-        saved.setDirectory(dir);       // needed by DirectoryRoleResponse.from()
-        when(roleRepo.save(any())).thenReturn(saved);
+        saved.setRealm(realm);
+        when(realmRoleRepo.save(any())).thenReturn(saved);
 
-        DirectoryRoleResponse resp = service.assignDirectoryRole(tenantId, adminId,
-                new DirectoryRoleRequest(dirId, BaseRole.ADMIN));
+        RealmRoleResponse resp = service.assignRealmRole(adminId,
+                new RealmRoleRequest(realmId, BaseRole.ADMIN));
 
         assertThat(resp.baseRole()).isEqualTo(BaseRole.ADMIN);
     }
 
     @Test
-    void assignDirectoryRole_existingRole_updatesBaseRole() {
-        when(adminRepo.findByIdAndTenantId(adminId, tenantId)).thenReturn(Optional.of(adminAccount("alice")));
-        DirectoryConnection dir = directory();
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dir));
+    void assignRealmRole_existingRole_updatesBaseRole() {
+        Account admin = adminAccount("alice");
+        Realm realm = realm();
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(admin));
+        when(realmRepo.findById(realmId)).thenReturn(Optional.of(realm));
 
-        AdminDirectoryRole existing = new AdminDirectoryRole();
+        AdminRealmRole existing = new AdminRealmRole();
         existing.setBaseRole(BaseRole.READ_ONLY);
-        existing.setDirectory(dir);    // needed by DirectoryRoleResponse.from()
-        when(roleRepo.findByAdminAccountIdAndDirectoryId(adminId, dirId))
+        existing.setRealm(realm);
+        when(realmRoleRepo.findByAdminAccountIdAndRealmId(adminId, realmId))
                 .thenReturn(Optional.of(existing));
-        when(roleRepo.save(any())).thenReturn(existing);
+        when(realmRoleRepo.save(any())).thenReturn(existing);
 
-        service.assignDirectoryRole(tenantId, adminId, new DirectoryRoleRequest(dirId, BaseRole.ADMIN));
+        service.assignRealmRole(adminId, new RealmRoleRequest(realmId, BaseRole.ADMIN));
 
         assertThat(existing.getBaseRole()).isEqualTo(BaseRole.ADMIN);
     }
 
-    // ── removeDirectoryRole ───────────────────────────────────────────────────
+    // ── removeRealmRole ───────────────────────────────────────────────────────
 
     @Test
-    void removeDirectoryRole_delegatesToRepo() {
-        when(adminRepo.findByIdAndTenantId(adminId, tenantId)).thenReturn(Optional.of(adminAccount("alice")));
+    void removeRealmRole_delegatesToRepo() {
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount("alice")));
 
-        service.removeDirectoryRole(tenantId, adminId, dirId);
+        service.removeRealmRole(adminId, realmId);
 
-        verify(roleRepo).deleteByAdminAccountIdAndDirectoryId(adminId, dirId);
+        verify(realmRoleRepo).deleteByAdminAccountIdAndRealmId(adminId, realmId);
     }
 
     // ── setBranchRestrictions ─────────────────────────────────────────────────
 
     @Test
     void setBranchRestrictions_clearsThenSetsNewOnes() {
-        when(adminRepo.findByIdAndTenantId(adminId, tenantId)).thenReturn(Optional.of(adminAccount("alice")));
-        when(adminRepo.getReferenceById(adminId)).thenReturn(adminAccount("alice"));
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(directory()));
-        when(dirRepo.getReferenceById(dirId)).thenReturn(directory());
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount("alice")));
+        when(realmRepo.findById(realmId)).thenReturn(Optional.of(realm()));
 
-        service.setBranchRestrictions(tenantId, adminId,
-                new BranchRestrictionsRequest(dirId,
-                        List.of("ou=Users,dc=example,dc=com", "ou=Groups,dc=example,dc=com")));
+        service.setBranchRestrictions(adminId, new BranchRestrictionsRequest(realmId,
+                List.of("ou=Users,dc=example,dc=com", "ou=Groups,dc=example,dc=com")));
 
-        verify(branchRepo).deleteAllByAdminAccountIdAndDirectoryId(adminId, dirId);
+        verify(branchRepo).deleteAllByAdminAccountIdAndRealmId(adminId, realmId);
         verify(branchRepo, times(2)).save(any());
     }
 
     @Test
     void setBranchRestrictions_nullBranchDns_onlyClears() {
-        when(adminRepo.findByIdAndTenantId(adminId, tenantId)).thenReturn(Optional.of(adminAccount("alice")));
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(directory()));
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount("alice")));
+        when(realmRepo.findById(realmId)).thenReturn(Optional.of(realm()));
 
-        service.setBranchRestrictions(tenantId, adminId,
-                new BranchRestrictionsRequest(dirId, null));
+        service.setBranchRestrictions(adminId, new BranchRestrictionsRequest(realmId, null));
 
-        verify(branchRepo).deleteAllByAdminAccountIdAndDirectoryId(adminId, dirId);
+        verify(branchRepo).deleteAllByAdminAccountIdAndRealmId(adminId, realmId);
         verify(branchRepo, never()).save(any());
     }
 
@@ -263,13 +248,12 @@ class AdminManagementServiceTest {
 
     @Test
     void setFeaturePermissions_createsNewPermissions() {
-        when(adminRepo.findByIdAndTenantId(adminId, tenantId)).thenReturn(Optional.of(adminAccount("alice")));
-        when(adminRepo.getReferenceById(adminId)).thenReturn(adminAccount("alice"));
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount("alice")));
         when(featureRepo.findByAdminAccountIdAndFeatureKey(adminId, FeatureKey.USER_CREATE))
                 .thenReturn(Optional.empty());
         when(featureRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        service.setFeaturePermissions(tenantId, adminId,
+        service.setFeaturePermissions(adminId,
                 List.of(new FeaturePermissionRequest(FeatureKey.USER_CREATE, true)));
 
         ArgumentCaptor<AdminFeaturePermission> captor =
@@ -281,19 +265,17 @@ class AdminManagementServiceTest {
 
     @Test
     void setFeaturePermissions_updatesExistingPermission() {
-        when(adminRepo.findByIdAndTenantId(adminId, tenantId)).thenReturn(Optional.of(adminAccount("alice")));
-        when(adminRepo.getReferenceById(adminId)).thenReturn(adminAccount("alice"));
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount("alice")));
 
         AdminFeaturePermission existing = new AdminFeaturePermission();
+        existing.setId(UUID.randomUUID());
         existing.setFeatureKey(FeatureKey.USER_DELETE);
         existing.setEnabled(true);
-        // give it a non-null id so the "new" branch is skipped
-        existing.setId(UUID.randomUUID());
         when(featureRepo.findByAdminAccountIdAndFeatureKey(adminId, FeatureKey.USER_DELETE))
                 .thenReturn(Optional.of(existing));
         when(featureRepo.save(any())).thenReturn(existing);
 
-        service.setFeaturePermissions(tenantId, adminId,
+        service.setFeaturePermissions(adminId,
                 List.of(new FeaturePermissionRequest(FeatureKey.USER_DELETE, false)));
 
         assertThat(existing.isEnabled()).isFalse();
@@ -301,28 +283,20 @@ class AdminManagementServiceTest {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private Tenant tenant() {
-        Tenant t = new Tenant();
-        t.setId(tenantId);
-        t.setName("Acme");
-        t.setSlug("acme");
-        t.setEnabled(true);
-        return t;
-    }
-
-    private AdminAccount adminAccount(String username) {
-        AdminAccount a = new AdminAccount();
+    private Account adminAccount(String username) {
+        Account a = new Account();
         a.setId(adminId);
-        a.setTenant(tenant());         // needed by AdminAccountResponse.from()
         a.setUsername(username);
+        a.setRole(AccountRole.ADMIN);
+        a.setAuthType(AccountType.LOCAL);
         a.setActive(true);
         return a;
     }
 
-    private DirectoryConnection directory() {
-        DirectoryConnection dc = new DirectoryConnection();
-        dc.setId(dirId);
-        dc.setDisplayName("test-dir");
-        return dc;
+    private Realm realm() {
+        Realm r = new Realm();
+        r.setId(realmId);
+        r.setName("test-realm");
+        return r;
     }
 }

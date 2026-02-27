@@ -55,13 +55,13 @@ public abstract class BaseControllerTest {
     // ── Auth helpers ──────────────────────────────────────────────────────────
 
     protected static UsernamePasswordAuthenticationToken superadminAuth() {
-        AuthPrincipal p = new AuthPrincipal(PrincipalType.SUPERADMIN, UUID.randomUUID(), null, "superadmin");
+        AuthPrincipal p = new AuthPrincipal(PrincipalType.SUPERADMIN, UUID.randomUUID(), "superadmin");
         return new UsernamePasswordAuthenticationToken(p, null,
                 List.of(new SimpleGrantedAuthority("ROLE_SUPERADMIN")));
     }
 
-    protected static UsernamePasswordAuthenticationToken adminAuth(UUID tenantId) {
-        AuthPrincipal p = new AuthPrincipal(PrincipalType.ADMIN, UUID.randomUUID(), tenantId, "admin");
+    protected static UsernamePasswordAuthenticationToken adminAuth() {
+        AuthPrincipal p = new AuthPrincipal(PrincipalType.ADMIN, UUID.randomUUID(), "admin");
         return new UsernamePasswordAuthenticationToken(p, null,
                 List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
     }

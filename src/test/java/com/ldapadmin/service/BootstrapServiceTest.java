@@ -1,9 +1,10 @@
 package com.ldapadmin.service;
 
 import com.ldapadmin.config.AppProperties;
-import com.ldapadmin.entity.SuperadminAccount;
+import com.ldapadmin.entity.Account;
+import com.ldapadmin.entity.enums.AccountRole;
 import com.ldapadmin.entity.enums.AccountType;
-import com.ldapadmin.repository.SuperadminAccountRepository;
+import com.ldapadmin.repository.AccountRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,7 +22,7 @@ import static org.mockito.Mockito.*;
 class BootstrapServiceTest {
 
     @Mock
-    private SuperadminAccountRepository superadminRepo;
+    private AccountRepository accountRepo;
 
     private AppProperties   appProperties;
     private PasswordEncoder passwordEncoder;
@@ -34,31 +35,34 @@ class BootstrapServiceTest {
         appProperties.getBootstrap().getSuperadmin().setPassword("s3cr3t!");
 
         passwordEncoder  = new BCryptPasswordEncoder();
-        bootstrapService = new BootstrapService(superadminRepo, appProperties, passwordEncoder);
+        bootstrapService = new BootstrapService(accountRepo, appProperties, passwordEncoder);
     }
 
     @Test
     void createsAccount_whenNoLocalSuperadminExists() throws Exception {
-        when(superadminRepo.countByAccountTypeAndActiveTrue(AccountType.LOCAL)).thenReturn(0L);
+        when(accountRepo.countByRoleAndAuthTypeAndActiveTrue(AccountRole.SUPERADMIN, AccountType.LOCAL))
+                .thenReturn(0L);
 
         bootstrapService.run(new DefaultApplicationArguments());
 
-        ArgumentCaptor<SuperadminAccount> captor = ArgumentCaptor.forClass(SuperadminAccount.class);
-        verify(superadminRepo).save(captor.capture());
+        ArgumentCaptor<Account> captor = ArgumentCaptor.forClass(Account.class);
+        verify(accountRepo).save(captor.capture());
 
-        SuperadminAccount saved = captor.getValue();
+        Account saved = captor.getValue();
         assertThat(saved.getUsername()).isEqualTo("superadmin");
-        assertThat(saved.getAccountType()).isEqualTo(AccountType.LOCAL);
+        assertThat(saved.getAuthType()).isEqualTo(AccountType.LOCAL);
+        assertThat(saved.getRole()).isEqualTo(AccountRole.SUPERADMIN);
         assertThat(saved.isActive()).isTrue();
         assertThat(passwordEncoder.matches("s3cr3t!", saved.getPasswordHash())).isTrue();
     }
 
     @Test
     void skipsBootstrap_whenLocalSuperadminAlreadyExists() throws Exception {
-        when(superadminRepo.countByAccountTypeAndActiveTrue(AccountType.LOCAL)).thenReturn(1L);
+        when(accountRepo.countByRoleAndAuthTypeAndActiveTrue(AccountRole.SUPERADMIN, AccountType.LOCAL))
+                .thenReturn(1L);
 
         bootstrapService.run(new DefaultApplicationArguments());
 
-        verify(superadminRepo, never()).save(any());
+        verify(accountRepo, never()).save(any());
     }
 }
