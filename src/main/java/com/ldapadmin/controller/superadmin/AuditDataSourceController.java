@@ -17,15 +17,15 @@ import java.util.UUID;
  * CRUD management of audit data sources (LDAP changelog reader connections).
  *
  * <pre>
- *   GET    /api/superadmin/tenants/{tid}/audit-sources        — list
- *   POST   /api/superadmin/tenants/{tid}/audit-sources        — create
- *   GET    /api/superadmin/tenants/{tid}/audit-sources/{id}   — get
- *   PUT    /api/superadmin/tenants/{tid}/audit-sources/{id}   — update
- *   DELETE /api/superadmin/tenants/{tid}/audit-sources/{id}   — delete
+ *   GET    /api/v1/superadmin/audit-sources        — list
+ *   POST   /api/v1/superadmin/audit-sources        — create
+ *   GET    /api/v1/superadmin/audit-sources/{id}   — get
+ *   PUT    /api/v1/superadmin/audit-sources/{id}   — update
+ *   DELETE /api/v1/superadmin/audit-sources/{id}   — delete
  * </pre>
  */
 @RestController
-@RequestMapping("/api/v1/superadmin/tenants/{tenantId}/audit-sources")
+@RequestMapping("/api/v1/superadmin/audit-sources")
 @PreAuthorize("hasRole('SUPERADMIN')")
 @RequiredArgsConstructor
 public class AuditDataSourceController {
@@ -33,35 +33,29 @@ public class AuditDataSourceController {
     private final AuditDataSourceService service;
 
     @GetMapping
-    public List<AuditSourceResponse> list(@PathVariable UUID tenantId) {
-        return service.list(tenantId);
+    public List<AuditSourceResponse> list() {
+        return service.list();
     }
 
     @PostMapping
-    public ResponseEntity<AuditSourceResponse> create(
-            @PathVariable UUID tenantId,
-            @Valid @RequestBody AuditSourceRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(service.create(tenantId, req));
+    public ResponseEntity<AuditSourceResponse> create(@Valid @RequestBody AuditSourceRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.create(req));
     }
 
     @GetMapping("/{id}")
-    public AuditSourceResponse get(@PathVariable UUID tenantId,
-                                   @PathVariable UUID id) {
-        return service.get(tenantId, id);
+    public AuditSourceResponse get(@PathVariable UUID id) {
+        return service.get(id);
     }
 
     @PutMapping("/{id}")
-    public AuditSourceResponse update(@PathVariable UUID tenantId,
-                                      @PathVariable UUID id,
+    public AuditSourceResponse update(@PathVariable UUID id,
                                       @Valid @RequestBody AuditSourceRequest req) {
-        return service.update(tenantId, id, req);
+        return service.update(id, req);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID tenantId,
-                                       @PathVariable UUID id) {
-        service.delete(tenantId, id);
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+        service.delete(id);
         return ResponseEntity.noContent().build();
     }
 }

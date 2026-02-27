@@ -26,9 +26,6 @@ import java.util.UUID;
  * <p>Templates are scoped per directory connection and store column-to-attribute
  * mappings that can be reused across import/export operations.</p>
  *
- * <p>Tenant isolation is enforced via {@link DirectoryConnectionRepository}:
- * non-superadmin principals can only access directories belonging to their own
- * tenant.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -71,7 +68,6 @@ public class CsvMappingTemplateService {
 
         CsvMappingTemplate template = new CsvMappingTemplate();
         template.setDirectory(dir);
-        template.setTenant(dir.getTenant());
         template.setName(req.name());
         template.setTargetKeyAttribute(
                 req.targetKeyAttribute() != null ? req.targetKeyAttribute() : "uid");
@@ -132,28 +128,16 @@ public class CsvMappingTemplateService {
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private DirectoryConnection loadDirectory(UUID directoryId, AuthPrincipal principal) {
-        if (principal.isSuperadmin()) {
-            return dirRepo.findById(directoryId)
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "DirectoryConnection", directoryId));
-        }
-        return dirRepo.findByIdAndTenantId(directoryId, principal.tenantId())
+        return dirRepo.findById(directoryId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "DirectoryConnection", directoryId));
     }
 
     private CsvMappingTemplate findTemplate(UUID templateId, UUID directoryId,
                                              AuthPrincipal principal) {
-        CsvMappingTemplate template;
-        if (principal.isSuperadmin()) {
-            template = templateRepo.findById(templateId)
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "CsvMappingTemplate", templateId));
-        } else {
-            template = templateRepo.findByIdAndTenantId(templateId, principal.tenantId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "CsvMappingTemplate", templateId));
-        }
+        CsvMappingTemplate template = templateRepo.findById(templateId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "CsvMappingTemplate", templateId));
         if (!template.getDirectory().getId().equals(directoryId)) {
             throw new ResourceNotFoundException("CsvMappingTemplate", templateId);
         }

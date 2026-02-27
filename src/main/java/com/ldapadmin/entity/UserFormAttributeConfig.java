@@ -9,21 +9,21 @@ import lombok.Setter;
 import java.util.UUID;
 
 /**
- * Specifies how a single LDAP attribute within a {@link RealmObjectclass} is
- * presented and validated in the user creation and edit forms.
+ * Specifies how a single LDAP attribute within a {@link UserForm} is presented
+ * and validated in the user creation and edit forms.
  */
 @Entity
 @Table(
-    name = "objectclass_attribute_configs",
+    name = "user_form_attribute_config",
     uniqueConstraints = @UniqueConstraint(
-        name = "uq_objectclass_attribute",
-        columnNames = {"objectclass_id", "attribute_name"}
+        name = "uq_user_form_attribute",
+        columnNames = {"user_form_id", "attribute_name"}
     )
 )
 @Getter
 @Setter
 @NoArgsConstructor
-public class ObjectclassAttributeConfig {
+public class UserFormAttributeConfig {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -31,8 +31,8 @@ public class ObjectclassAttributeConfig {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "objectclass_id", nullable = false)
-    private RealmObjectclass objectclass;
+    @JoinColumn(name = "user_form_id", nullable = false)
+    private UserForm userForm;
 
     /** LDAP attribute name as returned by schema discovery. */
     @Column(name = "attribute_name", nullable = false)
@@ -46,20 +46,12 @@ public class ObjectclassAttributeConfig {
     @Column(name = "required_on_create", nullable = false)
     private boolean requiredOnCreate = false;
 
-    /** When {@code false} the field is rendered read-only in the edit form. */
-    @Column(name = "editable_on_edit", nullable = false)
-    private boolean editableOnEdit = true;
+    /** When {@code false} the field is rendered read-only in the creation form. */
+    @Column(name = "editable_on_create", nullable = false)
+    private boolean editableOnCreate = true;
 
     /** Presentation hint that drives the input widget rendered by the frontend. */
     @Enumerated(EnumType.STRING)
     @Column(name = "input_type", nullable = false, length = 20)
     private InputType inputType = InputType.TEXT;
-
-    /** Controls the order of attributes within a form or list view. */
-    @Column(name = "display_order", nullable = false)
-    private int displayOrder = 0;
-
-    /** When {@code true} the attribute appears as a column in the user search results list. */
-    @Column(name = "visible_in_list", nullable = false)
-    private boolean visibleInList = false;
 }

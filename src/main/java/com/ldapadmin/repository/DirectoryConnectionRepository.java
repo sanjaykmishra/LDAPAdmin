@@ -11,15 +11,9 @@ import java.util.UUID;
 @Repository
 public interface DirectoryConnectionRepository extends JpaRepository<DirectoryConnection, UUID> {
 
-    List<DirectoryConnection> findAllByTenantId(UUID tenantId);
+    List<DirectoryConnection> findAllByEnabledTrue();
 
-    List<DirectoryConnection> findAllByTenantIdAndEnabledTrue(UUID tenantId);
-
-    Optional<DirectoryConnection> findByIdAndTenantId(UUID id, UUID tenantId);
-
-    boolean existsByIdAndTenantId(UUID id, UUID tenantId);
-
-    Optional<DirectoryConnection> findBySuperadminSourceTrue();
+    Optional<DirectoryConnection> findByUserRepositoryTrue();
 
     List<DirectoryConnection> findAllByAuditDataSourceId(UUID auditDataSourceId);
 }

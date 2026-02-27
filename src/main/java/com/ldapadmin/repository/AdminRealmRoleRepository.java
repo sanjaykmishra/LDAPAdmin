@@ -22,5 +22,8 @@ public interface AdminRealmRoleRepository extends JpaRepository<AdminRealmRole, 
 
     boolean existsByAdminAccountIdAndRealmId(UUID adminAccountId, UUID realmId);
 
+    /** Returns true if the admin has a role in any realm belonging to {@code directoryId}. */
+    boolean existsByAdminAccountIdAndRealmDirectoryId(UUID adminAccountId, UUID directoryId);
+
     void deleteByAdminAccountIdAndRealmId(UUID adminAccountId, UUID realmId);
 }

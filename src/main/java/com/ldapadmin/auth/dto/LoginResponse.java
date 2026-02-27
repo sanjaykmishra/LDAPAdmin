@@ -13,6 +13,5 @@ public record LoginResponse(
         @JsonIgnore String token,
         String username,
         String accountType,
-        String id,
-        String tenantId) {
+        String id) {
 }

@@ -44,9 +44,6 @@ public class AuditEvent {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @Column(name = "tenant_id", nullable = false, updatable = false)
-    private UUID tenantId;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, updatable = false, length = 20)
     private AuditSource source;

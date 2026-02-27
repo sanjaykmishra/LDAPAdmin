@@ -1,22 +1,9 @@
 import client from './client'
 
-const base = '/admin/tenants'
-
-// ── Directory connections scoped to a tenant ──────────────────────────────
-export const listDirectories = tenantId =>
-  client.get(`${base}/${tenantId}/directories`)
-
-export const getDirectory = (tenantId, dirId) =>
-  client.get(`${base}/${tenantId}/directories/${dirId}`)
-
-export const createDirectory = (tenantId, data) =>
-  client.post(`${base}/${tenantId}/directories`, data)
-
-export const updateDirectory = (tenantId, dirId, data) =>
-  client.put(`${base}/${tenantId}/directories/${dirId}`, data)
-
-export const deleteDirectory = (tenantId, dirId) =>
-  client.delete(`${base}/${tenantId}/directories/${dirId}`)
-
-export const testDirectory = (tenantId, dirId) =>
-  client.post(`${base}/${tenantId}/directories/${dirId}/test`)
+export const listDirectories  = ()              => client.get('/superadmin/directories')
+export const getDirectory     = (id)            => client.get(`/superadmin/directories/${id}`)
+export const createDirectory  = (data)          => client.post('/superadmin/directories', data)
+export const updateDirectory  = (id, data)      => client.put(`/superadmin/directories/${id}`, data)
+export const deleteDirectory  = (id)            => client.delete(`/superadmin/directories/${id}`)
+export const testDirectory    = (data)          => client.post('/superadmin/directories/test', data)
+export const evictPool        = (id)            => client.post(`/superadmin/directories/${id}/evict-pool`)

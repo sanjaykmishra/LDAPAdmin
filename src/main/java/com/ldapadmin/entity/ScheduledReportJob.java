@@ -39,10 +39,6 @@ public class ScheduledReportJob {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "tenant_id", nullable = false)
-    private Tenant tenant;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "directory_id", nullable = false)
     private DirectoryConnection directory;
 
@@ -74,7 +70,7 @@ public class ScheduledReportJob {
     @Column(name = "delivery_recipients", columnDefinition = "TEXT")
     private String deliveryRecipients;
 
-    /** Object-key prefix written to the tenant S3 bucket (used when deliveryMethod = S3). */
+    /** Object-key prefix for S3 object storage (used when deliveryMethod = S3). */
     @Column(name = "s3_key_prefix")
     private String s3KeyPrefix;
 
@@ -93,7 +89,7 @@ public class ScheduledReportJob {
     /** SET NULL if the creating admin is later deleted. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_admin_id")
-    private AdminAccount createdByAdmin;
+    private Account createdByAdmin;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

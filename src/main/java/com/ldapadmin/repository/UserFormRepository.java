@@ -1,6 +1,6 @@
 package com.ldapadmin.repository;
 
-import com.ldapadmin.entity.AuditDataSource;
+import com.ldapadmin.entity.UserForm;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface AuditDataSourceRepository extends JpaRepository<AuditDataSource, UUID> {
+public interface UserFormRepository extends JpaRepository<UserForm, UUID> {
 
-    List<AuditDataSource> findAllByEnabledTrue();
+    List<UserForm> findAllByObjectClassName(String objectClassName);
 }

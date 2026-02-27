@@ -6,10 +6,10 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Replaces all branch restrictions for an admin on a specific directory.
- * An empty list removes all restrictions (granting full branch access).
+ * Replaces all branch restrictions for an admin on a specific realm.
+ * An empty list removes all restrictions (granting full realm access).
  */
 public record BranchRestrictionsRequest(
-        @NotNull UUID directoryId,
+        @NotNull UUID realmId,
         List<String> branchDns) {
 }

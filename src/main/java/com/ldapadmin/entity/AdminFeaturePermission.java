@@ -38,7 +38,7 @@ public class AdminFeaturePermission {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "admin_account_id", nullable = false)
-    private AdminAccount adminAccount;
+    private Account adminAccount;
 
     /**
      * Stored as dot-notation string by {@link com.ldapadmin.entity.converter.FeatureKeyConverter},

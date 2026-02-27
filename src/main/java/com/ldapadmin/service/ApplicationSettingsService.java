@@ -1,26 +1,19 @@
 package com.ldapadmin.service;
 
-import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.dto.settings.ApplicationSettingsDto;
 import com.ldapadmin.dto.settings.UpdateApplicationSettingsRequest;
 import com.ldapadmin.entity.ApplicationSettings;
-import com.ldapadmin.entity.Tenant;
-import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.repository.ApplicationSettingsRepository;
-import com.ldapadmin.repository.TenantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.UUID;
-
 /**
- * CRUD for per-tenant application settings (§10.2).
+ * CRUD for global application settings (singleton row in {@code application_settings}).
  *
- * <h3>One-row-per-tenant invariant</h3>
- * <p>The DB enforces a unique constraint on {@code tenant_id}.  The service
- * performs an upsert: if no row exists for the tenant it inserts one;
- * otherwise it updates the existing row.</p>
+ * <h3>Single-row invariant</h3>
+ * <p>There is exactly one settings row for the entire installation.  The service
+ * performs an upsert: if no row exists it inserts one; otherwise it updates it.</p>
  *
  * <h3>Password handling</h3>
  * <p>SMTP and S3 credentials are stored AES-256 encrypted.  The read DTO
@@ -28,62 +21,40 @@ import java.util.UUID;
  * ({@code smtpPasswordConfigured}, {@code s3SecretKeyConfigured}).  On write,
  * a {@code null} password preserves the existing credential, an empty string
  * clears it, and any other value replaces it after encryption.</p>
- *
- * <h3>Tenant isolation</h3>
- * <p>Tenant admins operate on their own tenant's settings.  Superadmins
- * supply an explicit {@code tenantId} parameter.</p>
  */
 @Service
 @RequiredArgsConstructor
 public class ApplicationSettingsService {
 
     private final ApplicationSettingsRepository settingsRepo;
-    private final TenantRepository             tenantRepo;
-    private final EncryptionService            encryptionService;
+    private final EncryptionService             encryptionService;
 
     // ── Public API ────────────────────────────────────────────────────────────
 
     /**
-     * Returns the settings for the principal's tenant, or a DTO containing
-     * only the system defaults if no settings row has been persisted yet.
+     * Returns the global settings, or a DTO containing only the system defaults
+     * if no settings row has been persisted yet.
      */
     @Transactional(readOnly = true)
-    public ApplicationSettingsDto get(AuthPrincipal principal) {
-        UUID tenantId = resolveTenantId(principal);
-        return settingsRepo.findByTenantId(tenantId)
+    public ApplicationSettingsDto get() {
+        return settingsRepo.findFirst()
                 .map(this::toDto)
-                .orElseGet(() -> defaultDto(tenantId));
+                .orElseGet(this::defaultDto);
     }
 
     /**
-     * Creates or replaces the settings for the principal's tenant.
+     * Creates or replaces the global settings.
      */
     @Transactional
-    public ApplicationSettingsDto upsert(UpdateApplicationSettingsRequest req,
-                                         AuthPrincipal principal) {
-        UUID tenantId = resolveTenantId(principal);
-        ApplicationSettings settings = settingsRepo.findByTenantId(tenantId)
-                .orElseGet(() -> {
-                    Tenant tenant = tenantRepo.findById(tenantId)
-                            .orElseThrow(() -> new ResourceNotFoundException("Tenant", tenantId));
-                    ApplicationSettings s = new ApplicationSettings();
-                    s.setTenant(tenant);
-                    return s;
-                });
+    public ApplicationSettingsDto upsert(UpdateApplicationSettingsRequest req) {
+        ApplicationSettings settings = settingsRepo.findFirst()
+                .orElseGet(ApplicationSettings::new);
 
         applyRequest(settings, req);
         return toDto(settingsRepo.save(settings));
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
-
-    private UUID resolveTenantId(AuthPrincipal principal) {
-        if (principal.isSuperadmin()) {
-            throw new IllegalArgumentException(
-                    "Superadmins must supply an explicit tenantId");
-        }
-        return principal.tenantId();
-    }
 
     private void applyRequest(ApplicationSettings s, UpdateApplicationSettingsRequest req) {
         s.setAppName(req.appName());
@@ -132,7 +103,6 @@ public class ApplicationSettingsService {
     private ApplicationSettingsDto toDto(ApplicationSettings s) {
         return new ApplicationSettingsDto(
                 s.getId(),
-                s.getTenant().getId(),
                 s.getAppName(),
                 s.getLogoUrl(),
                 s.getPrimaryColour(),
@@ -154,9 +124,9 @@ public class ApplicationSettingsService {
                 s.getUpdatedAt());
     }
 
-    private ApplicationSettingsDto defaultDto(UUID tenantId) {
+    private ApplicationSettingsDto defaultDto() {
         return new ApplicationSettingsDto(
-                null, tenantId,
+                null,
                 "LDAP Portal", null, null, null,
                 60,
                 null, 587, null, null, false, true,

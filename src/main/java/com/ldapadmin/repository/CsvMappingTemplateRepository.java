@@ -13,11 +13,7 @@ public interface CsvMappingTemplateRepository extends JpaRepository<CsvMappingTe
 
     List<CsvMappingTemplate> findAllByDirectoryId(UUID directoryId);
 
-    List<CsvMappingTemplate> findAllByTenantId(UUID tenantId);
-
     Optional<CsvMappingTemplate> findByDirectoryIdAndName(UUID directoryId, String name);
-
-    Optional<CsvMappingTemplate> findByIdAndTenantId(UUID id, UUID tenantId);
 
     boolean existsByDirectoryIdAndName(UUID directoryId, String name);
 }

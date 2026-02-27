@@ -23,7 +23,6 @@ export const useAuthStore = defineStore('auth', () => {
         id:          data.id,
         username:    data.username,
         accountType: data.accountType,
-        tenantId:    data.tenantId || null,
       }
     } catch {
       principal.value = null
@@ -37,7 +36,6 @@ export const useAuthStore = defineStore('auth', () => {
       id:          data.id,
       username:    data.username,
       accountType: data.accountType,
-      tenantId:    data.tenantId || null,
     }
     initialized.value = true
   }

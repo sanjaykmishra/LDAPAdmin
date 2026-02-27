@@ -13,6 +13,9 @@ public interface AdminBranchRestrictionRepository extends JpaRepository<AdminBra
     /** All branch restrictions for a given admin within a specific realm. */
     List<AdminBranchRestriction> findAllByAdminAccountIdAndRealmId(UUID adminAccountId, UUID realmId);
 
+    /** All branch restrictions for a given admin across all realms in a directory. */
+    List<AdminBranchRestriction> findAllByAdminAccountIdAndRealmDirectoryId(UUID adminAccountId, UUID directoryId);
+
     /** All branch restrictions for a given admin across all realms. */
     List<AdminBranchRestriction> findAllByAdminAccountId(UUID adminAccountId);
 

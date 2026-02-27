@@ -13,7 +13,6 @@ import java.util.UUID;
 /** Directory connection response — bind password is never included. */
 public record DirectoryConnectionResponse(
         UUID id,
-        UUID tenantId,
         String displayName,
         String host,
         int port,
@@ -32,7 +31,6 @@ public record DirectoryConnectionResponse(
         String enableValue,
         String disableValue,
         UUID auditDataSourceId,
-        boolean superadminSource,
         boolean enabled,
         List<BaseDnItem> userBaseDns,
         List<BaseDnItem> groupBaseDns,
@@ -54,7 +52,6 @@ public record DirectoryConnectionResponse(
                                                    List<DirectoryGroupBaseDn> groupDns) {
         return new DirectoryConnectionResponse(
                 dc.getId(),
-                dc.getTenant().getId(),
                 dc.getDisplayName(),
                 dc.getHost(),
                 dc.getPort(),
@@ -73,7 +70,6 @@ public record DirectoryConnectionResponse(
                 dc.getEnableValue(),
                 dc.getDisableValue(),
                 dc.getAuditDataSource() != null ? dc.getAuditDataSource().getId() : null,
-                dc.isSuperadminSource(),
                 dc.isEnabled(),
                 userDns.stream().map(BaseDnItem::fromUser).toList(),
                 groupDns.stream().map(BaseDnItem::fromGroup).toList(),

@@ -8,16 +8,13 @@ import com.ldapadmin.entity.AuditDataSource;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.DirectoryGroupBaseDn;
 import com.ldapadmin.entity.DirectoryUserBaseDn;
-import com.ldapadmin.entity.Tenant;
 import com.ldapadmin.entity.enums.SslMode;
-import com.ldapadmin.exception.ConflictException;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.ldap.LdapConnectionFactory;
 import com.ldapadmin.repository.AuditDataSourceRepository;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.repository.DirectoryGroupBaseDnRepository;
 import com.ldapadmin.repository.DirectoryUserBaseDnRepository;
-import com.ldapadmin.repository.TenantRepository;
 import com.unboundid.ldap.sdk.BindResult;
 import com.unboundid.ldap.sdk.LDAPConnection;
 import com.unboundid.ldap.sdk.LDAPConnectionOptions;
@@ -46,38 +43,26 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DirectoryConnectionService {
 
-    private final DirectoryConnectionRepository dirRepo;
-    private final DirectoryUserBaseDnRepository userBaseDnRepo;
+    private final DirectoryConnectionRepository  dirRepo;
+    private final DirectoryUserBaseDnRepository  userBaseDnRepo;
     private final DirectoryGroupBaseDnRepository groupBaseDnRepo;
-    private final TenantRepository tenantRepo;
-    private final AuditDataSourceRepository auditSourceRepo;
-    private final EncryptionService encryptionService;
-    private final LdapConnectionFactory connectionFactory;
+    private final AuditDataSourceRepository      auditSourceRepo;
+    private final EncryptionService              encryptionService;
+    private final LdapConnectionFactory          connectionFactory;
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
 
-    public List<DirectoryConnectionResponse> listDirectories(UUID tenantId) {
-        requireTenant(tenantId);
-        return dirRepo.findAllByTenantId(tenantId).stream()
-                .map(this::toResponse)
-                .toList();
+    public List<DirectoryConnectionResponse> listDirectories() {
+        return dirRepo.findAll().stream().map(this::toResponse).toList();
     }
 
-    public DirectoryConnectionResponse getDirectory(UUID tenantId, UUID id) {
-        return toResponse(requireDirectory(tenantId, id));
+    public DirectoryConnectionResponse getDirectory(UUID id) {
+        return toResponse(require(id));
     }
 
     @Transactional
-    public DirectoryConnectionResponse createDirectory(UUID tenantId,
-                                                       DirectoryConnectionRequest req) {
-        Tenant tenant = requireTenant(tenantId);
-
-        if (req.superadminSource()) {
-            clearExistingSuperadminSource(tenantId);
-        }
-
+    public DirectoryConnectionResponse createDirectory(DirectoryConnectionRequest req) {
         DirectoryConnection dc = new DirectoryConnection();
-        dc.setTenant(tenant);
         applyRequest(dc, req);
 
         if (req.bindPassword() != null && !req.bindPassword().isBlank()) {
@@ -92,17 +77,10 @@ public class DirectoryConnectionService {
     }
 
     @Transactional
-    public DirectoryConnectionResponse updateDirectory(UUID tenantId, UUID id,
-                                                       DirectoryConnectionRequest req) {
-        DirectoryConnection dc = requireDirectory(tenantId, id);
-
-        if (req.superadminSource() && !dc.isSuperadminSource()) {
-            clearExistingSuperadminSource(tenantId);
-        }
-
+    public DirectoryConnectionResponse updateDirectory(UUID id, DirectoryConnectionRequest req) {
+        DirectoryConnection dc = require(id);
         applyRequest(dc, req);
 
-        // Only re-encrypt password if a new one was provided
         if (req.bindPassword() != null && !req.bindPassword().isBlank()) {
             dc.setBindPasswordEncrypted(encryptionService.encrypt(req.bindPassword()));
         }
@@ -114,23 +92,20 @@ public class DirectoryConnectionService {
     }
 
     @Transactional
-    public void deleteDirectory(UUID tenantId, UUID id) {
-        DirectoryConnection dc = requireDirectory(tenantId, id);
+    public void deleteDirectory(UUID id) {
+        DirectoryConnection dc = require(id);
         connectionFactory.evict(dc.getId());
         dirRepo.delete(dc);
     }
 
-    public void evictPool(UUID tenantId, UUID id) {
-        requireDirectory(tenantId, id);
+    public void evictPool(UUID id) {
+        require(id);
         connectionFactory.evict(id);
         log.info("Pool evicted for directory {}", id);
     }
 
     // ── Test connection ───────────────────────────────────────────────────────
 
-    /**
-     * Tests connectivity and bind without persisting anything.
-     */
     public TestConnectionResult testConnection(TestConnectionRequest req) {
         Instant start = Instant.now();
         try {
@@ -172,12 +147,10 @@ public class DirectoryConnectionService {
         dc.setEnableDisableValueType(req.enableDisableValueType());
         dc.setEnableValue(req.enableValue());
         dc.setDisableValue(req.disableValue());
-        dc.setSuperadminSource(req.superadminSource());
         dc.setEnabled(req.enabled());
 
         if (req.auditDataSourceId() != null) {
-            AuditDataSource auditSrc = auditSourceRepo
-                    .findByIdAndTenantId(req.auditDataSourceId(), dc.getTenant().getId())
+            AuditDataSource auditSrc = auditSourceRepo.findById(req.auditDataSourceId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "AuditDataSource", req.auditDataSourceId()));
             dc.setAuditDataSource(auditSrc);
@@ -210,28 +183,14 @@ public class DirectoryConnectionService {
         }
     }
 
-    /** Clears the superadmin-source flag from any other directory in the installation. */
-    private void clearExistingSuperadminSource(UUID currentTenantId) {
-        dirRepo.findBySuperadminSourceTrue().ifPresent(existing -> {
-            existing.setSuperadminSource(false);
-            dirRepo.save(existing);
-            connectionFactory.evict(existing.getId());
-        });
-    }
-
     private DirectoryConnectionResponse toResponse(DirectoryConnection dc) {
         List<DirectoryUserBaseDn>  users  = userBaseDnRepo.findAllByDirectoryIdOrderByDisplayOrderAsc(dc.getId());
         List<DirectoryGroupBaseDn> groups = groupBaseDnRepo.findAllByDirectoryIdOrderByDisplayOrderAsc(dc.getId());
         return DirectoryConnectionResponse.from(dc, users, groups);
     }
 
-    private Tenant requireTenant(UUID tenantId) {
-        return tenantRepo.findById(tenantId)
-                .orElseThrow(() -> new ResourceNotFoundException("Tenant", tenantId));
-    }
-
-    private DirectoryConnection requireDirectory(UUID tenantId, UUID id) {
-        return dirRepo.findByIdAndTenantId(id, tenantId)
+    private DirectoryConnection require(UUID id) {
+        return dirRepo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("DirectoryConnection", id));
     }
 

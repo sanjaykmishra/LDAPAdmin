@@ -24,10 +24,6 @@ public class DirectoryConnection {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "tenant_id", nullable = false)
-    private Tenant tenant;
-
     @Column(name = "display_name", nullable = false)
     private String displayName;
 
@@ -122,14 +118,6 @@ public class DirectoryConnection {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "audit_data_source_id")
     private AuditDataSource auditDataSource;
-
-    /**
-     * When TRUE this connection is used as the LDAP authentication source
-     * for LDAP-sourced superadmin accounts. At most one per installation
-     * (enforced by a partial unique index in V3).
-     */
-    @Column(name = "is_superadmin_source", nullable = false)
-    private boolean superadminSource = false;
 
     @Column(nullable = false)
     private boolean enabled = true;

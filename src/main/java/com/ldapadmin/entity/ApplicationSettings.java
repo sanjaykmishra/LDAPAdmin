@@ -1,5 +1,7 @@
 package com.ldapadmin.entity;
 
+import com.ldapadmin.entity.enums.AccountType;
+import com.ldapadmin.entity.enums.SslMode;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -11,9 +13,9 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
- * Per-tenant application settings (§10.2).
- * Covers branding, session timeout, SMTP mail relay, and S3-compatible storage.
- * Exactly one row per tenant.
+ * Global application settings (§10.2).
+ * Covers branding, session timeout, SMTP mail relay, S3-compatible storage,
+ * and admin authentication configuration.  Exactly one singleton row.
  */
 @Entity
 @Table(name = "application_settings")
@@ -26,10 +28,6 @@ public class ApplicationSettings {
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(nullable = false, updatable = false)
     private UUID id;
-
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "tenant_id", nullable = false, unique = true)
-    private Tenant tenant;
 
     // ── Branding ──────────────────────────────────────────────────────────────
 
@@ -92,6 +90,52 @@ public class ApplicationSettings {
     /** TTL for pre-signed download links in hours (default 24 h per §7.2). */
     @Column(name = "s3_presigned_url_ttl_hours", nullable = false)
     private int s3PresignedUrlTtlHours = 24;
+
+    // ── Admin authentication configuration (V17) ──────────────────────────────
+
+    /**
+     * Authentication method governing admin logins.
+     * LOCAL = bcrypt password in accounts.password_hash;
+     * LDAP = bind against the server described by ldap_auth_* columns.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "admin_auth_type", nullable = false, length = 10)
+    private AccountType adminAuthType = AccountType.LOCAL;
+
+    @Column(name = "ldap_auth_host")
+    private String ldapAuthHost;
+
+    @Column(name = "ldap_auth_port")
+    private Integer ldapAuthPort;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ldap_auth_ssl_mode", length = 10)
+    private SslMode ldapAuthSslMode;
+
+    @Column(name = "ldap_auth_trust_all_certs", nullable = false)
+    private boolean ldapAuthTrustAllCerts = false;
+
+    @Column(name = "ldap_auth_trusted_cert_pem", columnDefinition = "TEXT")
+    private String ldapAuthTrustedCertPem;
+
+    /** Optional service-account bind DN for user lookup (may be null). */
+    @Column(name = "ldap_auth_bind_dn", length = 500)
+    private String ldapAuthBindDn;
+
+    /** AES-256-GCM encrypted service-account bind password. */
+    @Column(name = "ldap_auth_bind_password_enc", columnDefinition = "TEXT")
+    private String ldapAuthBindPasswordEnc;
+
+    @Column(name = "ldap_auth_user_search_base", length = 500)
+    private String ldapAuthUserSearchBase;
+
+    /**
+     * Pattern used to construct the user bind DN at authentication time.
+     * {@code {username}} is substituted with the supplied username.
+     * Example: {@code uid={username},ou=people,dc=example,dc=com}
+     */
+    @Column(name = "ldap_auth_bind_dn_pattern", length = 500)
+    private String ldapAuthBindDnPattern;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

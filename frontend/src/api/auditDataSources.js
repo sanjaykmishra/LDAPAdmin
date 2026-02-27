@@ -1,9 +1,7 @@
 import client from './client'
 
-const base = (tenantId) => `/superadmin/tenants/${tenantId}/audit-sources`
-
-export const listAuditSources   = (tenantId)        => client.get(base(tenantId))
-export const createAuditSource  = (tenantId, data)  => client.post(base(tenantId), data)
-export const getAuditSource     = (tenantId, id)    => client.get(`${base(tenantId)}/${id}`)
-export const updateAuditSource  = (tenantId, id, data) => client.put(`${base(tenantId)}/${id}`, data)
-export const deleteAuditSource  = (tenantId, id)    => client.delete(`${base(tenantId)}/${id}`)
+export const listAuditSources   = ()            => client.get('/superadmin/audit-sources')
+export const createAuditSource  = (data)        => client.post('/superadmin/audit-sources', data)
+export const getAuditSource     = (id)          => client.get(`/superadmin/audit-sources/${id}`)
+export const updateAuditSource  = (id, data)    => client.put(`/superadmin/audit-sources/${id}`, data)
+export const deleteAuditSource  = (id)          => client.delete(`/superadmin/audit-sources/${id}`)

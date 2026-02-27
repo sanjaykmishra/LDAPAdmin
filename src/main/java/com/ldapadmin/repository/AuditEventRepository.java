@@ -16,35 +16,11 @@ import java.util.UUID;
 public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
 
     /**
-     * Paginated, multi-filter query for tenant-scoped audit log access.
-     * All filter params are optional (null = no filter on that dimension).
+     * Paginated, multi-filter query. All filter params are optional (null = no filter).
      */
     @Query("""
             SELECT e FROM AuditEvent e
-            WHERE e.tenantId = :tenantId
-              AND (:directoryId IS NULL OR e.directoryId = :directoryId)
-              AND (:actorId     IS NULL OR e.actorId     = :actorId)
-              AND (:action      IS NULL OR e.action      = :action)
-              AND (:from        IS NULL OR e.occurredAt >= :from)
-              AND (:to          IS NULL OR e.occurredAt <= :to)
-            ORDER BY e.occurredAt DESC
-            """)
-    Page<AuditEvent> findByTenant(
-            @Param("tenantId")    UUID tenantId,
-            @Param("directoryId") UUID directoryId,
-            @Param("actorId")     UUID actorId,
-            @Param("action")      AuditAction action,
-            @Param("from")        OffsetDateTime from,
-            @Param("to")          OffsetDateTime to,
-            Pageable pageable);
-
-    /**
-     * Cross-tenant query for superadmin audit log browsing.
-     */
-    @Query("""
-            SELECT e FROM AuditEvent e
-            WHERE (:tenantId    IS NULL OR e.tenantId    = :tenantId)
-              AND (:directoryId IS NULL OR e.directoryId = :directoryId)
+            WHERE (:directoryId IS NULL OR e.directoryId = :directoryId)
               AND (:actorId     IS NULL OR e.actorId     = :actorId)
               AND (:action      IS NULL OR e.action      = :action)
               AND (:from        IS NULL OR e.occurredAt >= :from)
@@ -52,7 +28,6 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
             ORDER BY e.occurredAt DESC
             """)
     Page<AuditEvent> findAll(
-            @Param("tenantId")    UUID tenantId,
             @Param("directoryId") UUID directoryId,
             @Param("actorId")     UUID actorId,
             @Param("action")      AuditAction action,

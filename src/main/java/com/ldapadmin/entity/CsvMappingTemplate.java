@@ -34,10 +34,6 @@ public class CsvMappingTemplate {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "tenant_id", nullable = false)
-    private Tenant tenant;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "directory_id", nullable = false)
     private DirectoryConnection directory;
 

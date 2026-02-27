@@ -23,20 +23,20 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Directory connection management for a tenant.
+ * Directory connection management.
  *
  * <pre>
- *   GET    /api/superadmin/tenants/{tid}/directories          — list
- *   POST   /api/superadmin/tenants/{tid}/directories          — create
- *   GET    /api/superadmin/tenants/{tid}/directories/{id}     — get
- *   PUT    /api/superadmin/tenants/{tid}/directories/{id}     — update
- *   DELETE /api/superadmin/tenants/{tid}/directories/{id}     — delete
- *   POST   /api/superadmin/tenants/{tid}/directories/{id}/evict-pool — evict pool
- *   POST   /api/superadmin/tenants/{tid}/directories/test     — test (not persisted)
+ *   GET    /api/v1/superadmin/directories          — list
+ *   POST   /api/v1/superadmin/directories          — create
+ *   GET    /api/v1/superadmin/directories/{id}     — get
+ *   PUT    /api/v1/superadmin/directories/{id}     — update
+ *   DELETE /api/v1/superadmin/directories/{id}     — delete
+ *   POST   /api/v1/superadmin/directories/{id}/evict-pool — evict LDAP pool
+ *   POST   /api/v1/superadmin/directories/test     — test (not persisted)
  * </pre>
  */
 @RestController
-@RequestMapping("/api/v1/superadmin/tenants/{tenantId}/directories")
+@RequestMapping("/api/v1/superadmin/directories")
 @PreAuthorize("hasRole('SUPERADMIN')")
 @RequiredArgsConstructor
 public class DirectoryConnectionController {
@@ -44,42 +44,36 @@ public class DirectoryConnectionController {
     private final DirectoryConnectionService service;
 
     @GetMapping
-    public List<DirectoryConnectionResponse> list(@PathVariable UUID tenantId) {
-        return service.listDirectories(tenantId);
+    public List<DirectoryConnectionResponse> list() {
+        return service.listDirectories();
     }
 
     @PostMapping
     public ResponseEntity<DirectoryConnectionResponse> create(
-            @PathVariable UUID tenantId,
             @Valid @RequestBody DirectoryConnectionRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(service.createDirectory(tenantId, req));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.createDirectory(req));
     }
 
     @GetMapping("/{id}")
-    public DirectoryConnectionResponse get(@PathVariable UUID tenantId,
-                                           @PathVariable UUID id) {
-        return service.getDirectory(tenantId, id);
+    public DirectoryConnectionResponse get(@PathVariable UUID id) {
+        return service.getDirectory(id);
     }
 
     @PutMapping("/{id}")
-    public DirectoryConnectionResponse update(@PathVariable UUID tenantId,
-                                              @PathVariable UUID id,
+    public DirectoryConnectionResponse update(@PathVariable UUID id,
                                               @Valid @RequestBody DirectoryConnectionRequest req) {
-        return service.updateDirectory(tenantId, id, req);
+        return service.updateDirectory(id, req);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID tenantId,
-                                       @PathVariable UUID id) {
-        service.deleteDirectory(tenantId, id);
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+        service.deleteDirectory(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/evict-pool")
-    public ResponseEntity<Void> evictPool(@PathVariable UUID tenantId,
-                                          @PathVariable UUID id) {
-        service.evictPool(tenantId, id);
+    public ResponseEntity<Void> evictPool(@PathVariable UUID id) {
+        service.evictPool(id);
         return ResponseEntity.noContent().build();
     }
 
