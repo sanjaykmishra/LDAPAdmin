@@ -1,6 +1,6 @@
-# Schema ERD — Post-Refactor (V1–V18)
+# Schema ERD — Post-Refactor (V1–V19)
 
-> Generated from migrations V1–V18.
+> Generated from migrations V1–V19.
 > `actor_id` and `directory_id` on `audit_events` are **denormalised** UUIDs
 > (no FK constraints) so audit records survive account/directory deletion.
 
@@ -101,24 +101,27 @@ erDiagram
         timestamptz updated_at
     }
 
-    realm_objectclasses {
+    user_form {
         uuid    id                  PK
-        uuid    realm_id            FK
         varchar object_class_name
-        varchar display_name
-        integer display_order
+        varchar form_name
     }
 
-    objectclass_attribute_configs {
+    user_form_attribute_config {
         uuid    id                  PK
-        uuid    objectclass_id      FK
+        uuid    user_form_id        FK
         varchar attribute_name
         varchar custom_label
         boolean required_on_create
-        boolean editable_on_edit
+        boolean editable_on_create
         varchar input_type             "TEXT | TEXTAREA | PASSWORD | BOOLEAN | DATE | DATETIME | MULTI_VALUE | DN_LOOKUP"
-        integer display_order
-        boolean visible_in_list
+    }
+
+    realm_objectclasses {
+        uuid    id                  PK
+        uuid    realm_id            FK
+        uuid    object_class_id        "opaque objectClass reference"
+        uuid    user_form_id        FK "nullable"
     }
 
     admin_realm_roles {
@@ -243,7 +246,8 @@ erDiagram
     directory_connections       ||--o{     realms                          : "realms"
     realms                      ||--o{     realm_auxiliary_objectclasses   : "auxiliary objectclasses"
     realms                      ||--o{     realm_objectclasses             : "objectclass form"
-    realm_objectclasses         ||--o{     objectclass_attribute_configs   : "attribute configs"
+    user_form                   ||--o{     user_form_attribute_config      : "attribute configs"
+    user_form                   |o--o{     realm_objectclasses             : "used by"
 
     %% Account permissions (4-dimensional model)
     accounts                    ||--o{     admin_realm_roles               : "realm roles"

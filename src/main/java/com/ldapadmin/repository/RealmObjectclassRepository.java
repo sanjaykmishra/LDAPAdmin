@@ -11,7 +11,7 @@ import java.util.UUID;
 @Repository
 public interface RealmObjectclassRepository extends JpaRepository<RealmObjectclass, UUID> {
 
-    List<RealmObjectclass> findAllByRealmIdOrderByDisplayOrderAsc(UUID realmId);
+    List<RealmObjectclass> findAllByRealmId(UUID realmId);
 
     Optional<RealmObjectclass> findByIdAndRealmId(UUID id, UUID realmId);
 
