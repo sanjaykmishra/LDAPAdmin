@@ -40,7 +40,6 @@ public record DirectoryConnectionRequest(
         String enableValue,
         String disableValue,
         UUID auditDataSourceId,
-        boolean superadminSource,
         boolean enabled,
         @Valid List<BaseDnRequest> userBaseDns,
         @Valid List<BaseDnRequest> groupBaseDns) {

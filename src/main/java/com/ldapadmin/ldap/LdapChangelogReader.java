@@ -160,7 +160,6 @@ public class LdapChangelogReader {
         OffsetDateTime occurredAt = parseGeneralizedTime(changeTime);
 
         auditService.recordChangelogEvent(
-                src.getTenant().getId(),
                 directoryId,
                 directoryName,
                 targetDn,

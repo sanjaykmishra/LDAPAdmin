@@ -8,7 +8,6 @@ import java.util.UUID;
 
 public record AuditSourceResponse(
         UUID id,
-        UUID tenantId,
         String displayName,
         String host,
         int port,
@@ -24,7 +23,6 @@ public record AuditSourceResponse(
     public static AuditSourceResponse from(AuditDataSource src) {
         return new AuditSourceResponse(
                 src.getId(),
-                src.getTenant().getId(),
                 src.getDisplayName(),
                 src.getHost(),
                 src.getPort(),

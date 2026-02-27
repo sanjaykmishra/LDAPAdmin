@@ -67,14 +67,12 @@ public class ReportExecutionService {
      * @param params     report-specific parameters (may be null/empty)
      * @param format     output format (only CSV is supported)
      * @param directoryId  UUID of the directory (used for audit queries)
-     * @param tenantId   UUID of the tenant (used for audit queries)
      */
     public byte[] run(DirectoryConnection dc,
                       ReportType reportType,
                       Map<String, Object> params,
                       OutputFormat format,
-                      UUID directoryId,
-                      UUID tenantId) throws IOException {
+                      UUID directoryId) throws IOException {
 
         if (format == OutputFormat.PDF) {
             throw new UnsupportedOperationException("PDF output is not yet supported");
@@ -92,7 +90,7 @@ public class ReportExecutionService {
                                                        "(createTimestamp>=" + lookbackTimestamp(safeParams) + ")", null);
             case RECENTLY_MODIFIED   -> runLdapReport(dc,
                                                        "(modifyTimestamp>=" + lookbackTimestamp(safeParams) + ")", null);
-            case RECENTLY_DELETED    -> runDeletedReport(directoryId, tenantId, safeParams);
+            case RECENTLY_DELETED    -> runDeletedReport(directoryId, safeParams);
             case DISABLED_ACCOUNTS   -> runLdapReport(dc,
                                                        "(|(pwdAccountLockedTime=*)(loginDisabled=TRUE))", null);
         };
@@ -141,13 +139,13 @@ public class ReportExecutionService {
      * Queries the internal audit events table for USER_DELETE actions.
      * Returns a CSV with columns: {@code dn}, {@code deletedBy}, {@code deletedAt}.
      */
-    private byte[] runDeletedReport(UUID directoryId, UUID tenantId,
+    private byte[] runDeletedReport(UUID directoryId,
                                      Map<String, Object> params) throws IOException {
         int lookbackDays = lookbackDays(params);
         OffsetDateTime from = OffsetDateTime.now().minusDays(lookbackDays);
 
-        var page = auditEventRepo.findByTenant(
-                tenantId, directoryId, null, AuditAction.USER_DELETE,
+        var page = auditEventRepo.findAll(
+                directoryId, null, AuditAction.USER_DELETE,
                 from, null, Pageable.unpaged());
 
         List<String> columns = List.of("dn", "deletedBy", "deletedAt");

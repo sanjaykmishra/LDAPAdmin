@@ -22,11 +22,10 @@ public class AuditQueryService {
     private final AuditEventRepository auditRepo;
 
     /**
-     * Tenant-scoped query — the tenantId is always enforced.
+     * Paginated, multi-filter query. All filter params are optional.
      */
     @Transactional(readOnly = true)
-    public Page<AuditEventResponse> queryForTenant(
-            UUID tenantId,
+    public Page<AuditEventResponse> query(
             UUID directoryId,
             UUID actorId,
             AuditAction action,
@@ -37,27 +36,7 @@ public class AuditQueryService {
 
         PageRequest pageable = PageRequest.of(page, clampSize(size),
                 Sort.by(Sort.Direction.DESC, "occurredAt"));
-        return auditRepo.findByTenant(tenantId, directoryId, actorId, action, from, to, pageable)
-                .map(AuditEventResponse::from);
-    }
-
-    /**
-     * Cross-tenant query for superadmins; tenantId is optional.
-     */
-    @Transactional(readOnly = true)
-    public Page<AuditEventResponse> queryAll(
-            UUID tenantId,
-            UUID directoryId,
-            UUID actorId,
-            AuditAction action,
-            OffsetDateTime from,
-            OffsetDateTime to,
-            int page,
-            int size) {
-
-        PageRequest pageable = PageRequest.of(page, clampSize(size),
-                Sort.by(Sort.Direction.DESC, "occurredAt"));
-        return auditRepo.findAll(tenantId, directoryId, actorId, action, from, to, pageable)
+        return auditRepo.findAll(directoryId, actorId, action, from, to, pageable)
                 .map(AuditEventResponse::from);
     }
 

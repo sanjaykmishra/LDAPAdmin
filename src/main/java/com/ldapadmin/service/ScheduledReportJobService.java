@@ -3,15 +3,13 @@ package com.ldapadmin.service;
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.dto.report.CreateScheduledReportJobRequest;
 import com.ldapadmin.dto.report.ScheduledReportJobDto;
-import com.ldapadmin.entity.AdminAccount;
+import com.ldapadmin.entity.Account;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.ScheduledReportJob;
-import com.ldapadmin.entity.Tenant;
 import com.ldapadmin.exception.ResourceNotFoundException;
-import com.ldapadmin.repository.AdminAccountRepository;
+import com.ldapadmin.repository.AccountRepository;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.repository.ScheduledReportJobRepository;
-import com.ldapadmin.repository.TenantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,22 +21,17 @@ import java.util.UUID;
 /**
  * CRUD for scheduled report job definitions (§9.2).
  *
- * <h3>Tenant isolation</h3>
- * <p>Non-superadmin principals can only access jobs belonging to their own
- * tenant and directories within that tenant.  Superadmins may access any
- * tenant's jobs.</p>
- *
- * <p>This service only manages job <em>definitions</em>; actual report execution
- * is handled by {@link ReportExecutionService}.</p>
+ * <p>Jobs are scoped per directory.  This service only manages job
+ * <em>definitions</em>; actual report execution is handled by
+ * {@link ReportExecutionService}.</p>
  */
 @Service
 @RequiredArgsConstructor
 public class ScheduledReportJobService {
 
-    private final ScheduledReportJobRepository jobRepo;
+    private final ScheduledReportJobRepository  jobRepo;
     private final DirectoryConnectionRepository dirRepo;
-    private final TenantRepository             tenantRepo;
-    private final AdminAccountRepository       adminRepo;
+    private final AccountRepository             accountRepo;
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -46,29 +39,28 @@ public class ScheduledReportJobService {
     public Page<ScheduledReportJobDto> listByDirectory(UUID directoryId,
                                                         AuthPrincipal principal,
                                                         Pageable pageable) {
-        loadDirectory(directoryId, principal);
-        return jobRepo.findAllByTenantId(resolveTenantId(principal, directoryId), pageable)
-                .map(this::toDto);
+        loadDirectory(directoryId);
+        return jobRepo.findAllByDirectoryId(directoryId, pageable).map(this::toDto);
     }
 
     @Transactional(readOnly = true)
     public ScheduledReportJobDto getById(UUID directoryId, UUID jobId,
                                           AuthPrincipal principal) {
-        loadDirectory(directoryId, principal);
-        return toDto(findJob(jobId, principal));
+        loadDirectory(directoryId);
+        return toDto(findJob(jobId, directoryId));
     }
 
     @Transactional
     public ScheduledReportJobDto create(UUID directoryId,
                                          CreateScheduledReportJobRequest req,
                                          AuthPrincipal principal) {
-        DirectoryConnection dir = loadDirectory(directoryId, principal);
-        Tenant tenant = loadTenant(principal, dir);
-        AdminAccount creator = resolveCreator(principal);
+        DirectoryConnection dir = loadDirectory(directoryId);
+        Account creator = principal.id() != null
+                ? accountRepo.findById(principal.id()).orElse(null)
+                : null;
 
         ScheduledReportJob job = new ScheduledReportJob();
         job.setDirectory(dir);
-        job.setTenant(tenant);
         job.setCreatedByAdmin(creator);
         applyRequest(job, req);
 
@@ -79,24 +71,24 @@ public class ScheduledReportJobService {
     public ScheduledReportJobDto update(UUID directoryId, UUID jobId,
                                          CreateScheduledReportJobRequest req,
                                          AuthPrincipal principal) {
-        loadDirectory(directoryId, principal);
-        ScheduledReportJob job = findJob(jobId, principal);
+        loadDirectory(directoryId);
+        ScheduledReportJob job = findJob(jobId, directoryId);
         applyRequest(job, req);
         return toDto(jobRepo.save(job));
     }
 
     @Transactional
     public void delete(UUID directoryId, UUID jobId, AuthPrincipal principal) {
-        loadDirectory(directoryId, principal);
-        findJob(jobId, principal); // validates access
+        loadDirectory(directoryId);
+        findJob(jobId, directoryId); // validates the job belongs to this directory
         jobRepo.deleteById(jobId);
     }
 
     @Transactional
     public ScheduledReportJobDto setEnabled(UUID directoryId, UUID jobId,
                                              boolean enabled, AuthPrincipal principal) {
-        loadDirectory(directoryId, principal);
-        ScheduledReportJob job = findJob(jobId, principal);
+        loadDirectory(directoryId);
+        ScheduledReportJob job = findJob(jobId, directoryId);
         job.setEnabled(enabled);
         return toDto(jobRepo.save(job));
     }
@@ -115,53 +107,20 @@ public class ScheduledReportJobService {
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private DirectoryConnection loadDirectory(UUID directoryId, AuthPrincipal principal) {
-        if (principal.isSuperadmin()) {
-            return dirRepo.findById(directoryId)
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "DirectoryConnection", directoryId));
-        }
-        return dirRepo.findByIdAndTenantId(directoryId, principal.tenantId())
+    private DirectoryConnection loadDirectory(UUID directoryId) {
+        return dirRepo.findById(directoryId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "DirectoryConnection", directoryId));
     }
 
-    private ScheduledReportJob findJob(UUID jobId, AuthPrincipal principal) {
-        if (principal.isSuperadmin()) {
-            return jobRepo.findById(jobId)
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "ScheduledReportJob", jobId));
-        }
-        return jobRepo.findByIdAndTenantId(jobId, principal.tenantId())
+    private ScheduledReportJob findJob(UUID jobId, UUID directoryId) {
+        ScheduledReportJob job = jobRepo.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "ScheduledReportJob", jobId));
-    }
-
-    private UUID resolveTenantId(AuthPrincipal principal, UUID directoryId) {
-        if (principal.isSuperadmin()) {
-            return dirRepo.findById(directoryId)
-                    .map(d -> d.getTenant().getId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "DirectoryConnection", directoryId));
+        if (!job.getDirectory().getId().equals(directoryId)) {
+            throw new ResourceNotFoundException("ScheduledReportJob", jobId);
         }
-        return principal.tenantId();
-    }
-
-    private Tenant loadTenant(AuthPrincipal principal, DirectoryConnection dir) {
-        if (principal.isSuperadmin()) {
-            return dir.getTenant();
-        }
-        return tenantRepo.findById(principal.tenantId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Tenant", principal.tenantId()));
-    }
-
-    private AdminAccount resolveCreator(AuthPrincipal principal) {
-        if (principal.isSuperadmin() || principal.id() == null) {
-            return null;
-        }
-        return adminRepo.findByIdAndTenantId(principal.id(), principal.tenantId())
-                .orElse(null);
+        return job;
     }
 
     private void applyRequest(ScheduledReportJob job, CreateScheduledReportJobRequest req) {

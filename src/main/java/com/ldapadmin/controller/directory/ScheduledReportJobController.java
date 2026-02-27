@@ -134,14 +134,11 @@ public class ScheduledReportJobController {
             @Valid @RequestBody RunReportRequest req) throws IOException {
 
         rateLimiter.check(principal.username(), "report-run");
-        DirectoryConnection dc = loadDirectory(directoryId, principal);
+        DirectoryConnection dc = dirRepo.findById(directoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("DirectoryConnection", directoryId));
         OutputFormat format = req.outputFormat() != null ? req.outputFormat() : OutputFormat.CSV;
-        UUID tenantId = principal.isSuperadmin()
-                ? dc.getTenant().getId()
-                : principal.tenantId();
 
-        byte[] data = executionService.run(
-                dc, req.reportType(), req.reportParams(), format, directoryId, tenantId);
+        byte[] data = executionService.run(dc, req.reportType(), req.reportParams(), format, directoryId);
 
         String filename = req.reportType().name().toLowerCase() + ".csv";
         HttpHeaders headers = new HttpHeaders();
@@ -150,18 +147,5 @@ public class ScheduledReportJobController {
                 ContentDisposition.attachment().filename(filename).build());
 
         return new ResponseEntity<>(data, headers, HttpStatus.OK);
-    }
-
-    // ── Helper ────────────────────────────────────────────────────────────────
-
-    private DirectoryConnection loadDirectory(UUID directoryId, AuthPrincipal principal) {
-        if (principal.isSuperadmin()) {
-            return dirRepo.findById(directoryId)
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "DirectoryConnection", directoryId));
-        }
-        return dirRepo.findByIdAndTenantId(directoryId, principal.tenantId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "DirectoryConnection", directoryId));
     }
 }

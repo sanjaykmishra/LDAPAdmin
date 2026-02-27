@@ -34,6 +34,12 @@ import java.util.UUID;
  * </ol>
  *
  * <p>Superadmins bypass all checks and are always granted access.</p>
+ *
+ * <h3>Directory vs realm</h3>
+ * <p>A directory can host multiple realms.  The controller layer passes a
+ * {@code directoryId} (the LDAP connection identifier).  Directory-level
+ * access is granted when the admin has a role in <em>any</em> realm that
+ * belongs to that directory.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -72,6 +78,22 @@ public class PermissionService {
     }
 
     /**
+     * Verifies that {@code principal} has access to at least one realm in
+     * the given directory (dimensions 1 + 2).
+     *
+     * @throws AccessDeniedException if the admin has no realm roles for this directory
+     */
+    public void requireDirectoryAccess(AuthPrincipal principal, UUID directoryId) {
+        if (principal.isSuperadmin()) return;
+
+        boolean hasAccess = realmRoleRepo
+                .existsByAdminAccountIdAndRealmDirectoryId(principal.id(), directoryId);
+        if (!hasAccess) {
+            throw new AccessDeniedException("No access to directory [" + directoryId + "]");
+        }
+    }
+
+    /**
      * Verifies that the given {@code entryDn} falls within one of the admin's
      * allowed branches for the realm (dimension 3).
      *
@@ -99,18 +121,46 @@ public class PermissionService {
     }
 
     /**
-     * Checks realm access (dim 1+2) and feature permission (dim 4) in one call.
+     * Directory-scoped branch access check.  Aggregates branch restrictions
+     * across all realms in the directory.  If no restrictions exist the admin
+     * has unrestricted branch access.
+     *
+     * @param entryDn DN of the LDAP entry being accessed
+     * @throws AccessDeniedException if the entry is outside all allowed branches
+     */
+    public void requireBranchAccessForDirectory(AuthPrincipal principal, UUID directoryId,
+                                                String entryDn) {
+        if (principal.isSuperadmin()) return;
+
+        List<AdminBranchRestriction> restrictions =
+                branchRepo.findAllByAdminAccountIdAndRealmDirectoryId(principal.id(), directoryId);
+
+        if (restrictions.isEmpty()) return; // unrestricted
+
+        boolean allowed = restrictions.stream()
+                .anyMatch(r -> isDnUnderBranch(entryDn, r.getBranchDn()));
+
+        if (!allowed) {
+            throw new AccessDeniedException(
+                    "Entry [" + entryDn + "] is not within any allowed branch for this admin");
+        }
+    }
+
+    /**
+     * Checks directory access (dim 1+2) and feature permission (dim 4) in one call.
+     * Called from {@link FeaturePermissionAspect} with the {@code directoryId}
+     * extracted from the controller method parameter.
      *
      * <p>Branch access (dim 3) is checked separately via
-     * {@link #requireBranchAccess} because the entry DN is only known at
+     * {@link #requireBranchAccessForDirectory} because the entry DN is only known at
      * operation time, not at the controller layer.</p>
      *
      * @throws AccessDeniedException if any dimension denies access
      */
-    public void requireFeature(AuthPrincipal principal, UUID realmId, FeatureKey feature) {
+    public void requireFeature(AuthPrincipal principal, UUID directoryId, FeatureKey feature) {
         if (principal.isSuperadmin()) return;
 
-        AdminRealmRole role = requireRealmAccess(principal, realmId);
+        requireDirectoryAccess(principal, directoryId);
 
         // Dim 4: explicit override takes priority
         var override = featurePermissionRepo
@@ -124,9 +174,12 @@ public class PermissionService {
             return; // explicitly enabled
         }
 
-        // Fall back to base-role defaults (dim 2)
-        if (role.getBaseRole() == BaseRole.READ_ONLY
-                && !READONLY_DEFAULT_FEATURES.contains(feature)) {
+        // Fall back to base-role defaults (dim 2) — use the most permissive role across realms
+        List<AdminRealmRole> roles = realmRoleRepo.findAllByAdminAccountId(principal.id());
+        boolean hasAdminRole = roles.stream()
+                .anyMatch(r -> r.getBaseRole() == BaseRole.ADMIN);
+
+        if (!hasAdminRole && !READONLY_DEFAULT_FEATURES.contains(feature)) {
             throw new AccessDeniedException(
                     "READ_ONLY role does not grant feature [" + feature.getDbValue() + "]");
         }

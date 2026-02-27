@@ -31,7 +31,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuditService {
 
-    private final AuditEventRepository    auditRepo;
+    private final AuditEventRepository         auditRepo;
     private final DirectoryConnectionRepository dirRepo;
 
     // ── Internal-event recording ──────────────────────────────────────────────
@@ -53,15 +53,10 @@ public class AuditService {
                        String targetDn,
                        Map<String, Object> detail) {
         try {
-            // Single query: load the directory once and derive both displayName and tenantId
             DirectoryConnection dir = dirRepo.findById(directoryId).orElse(null);
-            String dirName  = dir != null ? dir.getDisplayName() : null;
-            UUID   tenantId = principal.tenantId() != null
-                    ? principal.tenantId()
-                    : (dir != null ? dir.getTenant().getId() : null);
+            String dirName = dir != null ? dir.getDisplayName() : null;
 
             AuditEvent event = AuditEvent.builder()
-                    .tenantId(tenantId)
                     .source(AuditSource.INTERNAL)
                     .actorId(principal.id())
                     .actorType(principal.type().name())
@@ -88,7 +83,6 @@ public class AuditService {
      * Persists a single changelog-sourced audit event.
      * Called synchronously from within the poller's own transaction.
      *
-     * @param tenantId        tenant that owns the {@code AuditDataSource}
      * @param directoryId     target directory (may be {@code null})
      * @param directoryName   denormalised name (may be {@code null})
      * @param targetDn        the entry's DN from the changelog
@@ -97,8 +91,7 @@ public class AuditService {
      * @param occurredAt      timestamp of the change
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordChangelogEvent(UUID tenantId,
-                                     UUID directoryId,
+    public void recordChangelogEvent(UUID directoryId,
                                      String directoryName,
                                      String targetDn,
                                      String changeNumber,
@@ -110,7 +103,6 @@ public class AuditService {
             }
 
             AuditEvent event = AuditEvent.builder()
-                    .tenantId(tenantId)
                     .source(AuditSource.LDAP_CHANGELOG)
                     .directoryId(directoryId)
                     .directoryName(directoryName)
@@ -134,5 +126,4 @@ public class AuditService {
     public boolean isChangelogEventRecorded(UUID directoryId, String changeNumber) {
         return auditRepo.existsByDirectoryIdAndChangelogChangeNumber(directoryId, changeNumber);
     }
-
 }

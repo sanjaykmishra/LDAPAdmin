@@ -8,23 +8,16 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface ScheduledReportJobRepository extends JpaRepository<ScheduledReportJob, UUID> {
 
-    Page<ScheduledReportJob> findAllByTenantId(UUID tenantId, Pageable pageable);
-
-    List<ScheduledReportJob> findAllByTenantIdAndEnabledTrue(UUID tenantId);
+    Page<ScheduledReportJob> findAllByDirectoryId(UUID directoryId, Pageable pageable);
 
     List<ScheduledReportJob> findAllByDirectoryId(UUID directoryId);
 
-    List<ScheduledReportJob> findAllByTenantIdAndDirectoryId(UUID tenantId, UUID directoryId);
-
-    Optional<ScheduledReportJob> findByIdAndTenantId(UUID id, UUID tenantId);
-
     List<ScheduledReportJob> findAllByEnabledTrue();
 
-    List<ScheduledReportJob> findAllByTenantIdAndReportType(UUID tenantId, ReportType reportType);
+    List<ScheduledReportJob> findAllByDirectoryIdAndReportType(UUID directoryId, ReportType reportType);
 }
