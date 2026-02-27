@@ -37,7 +37,7 @@ public class ApplicationSettingsService {
      */
     @Transactional(readOnly = true)
     public ApplicationSettingsDto get() {
-        return settingsRepo.findFirst()
+        return settingsRepo.findFirstBy()
                 .map(this::toDto)
                 .orElseGet(this::defaultDto);
     }
@@ -47,7 +47,7 @@ public class ApplicationSettingsService {
      */
     @Transactional
     public ApplicationSettingsDto upsert(UpdateApplicationSettingsRequest req) {
-        ApplicationSettings settings = settingsRepo.findFirst()
+        ApplicationSettings settings = settingsRepo.findFirstBy()
                 .orElseGet(ApplicationSettings::new);
 
         applyRequest(settings, req);

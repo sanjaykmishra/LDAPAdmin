@@ -74,7 +74,7 @@ public class AuthenticationService {
                 }
             } else {
                 // LDAP auth — bind against the server in application_settings
-                ApplicationSettings settings = settingsRepo.findFirst()
+                ApplicationSettings settings = settingsRepo.findFirstBy()
                         .orElseThrow(() -> new BadCredentialsException("Bad credentials"));
                 String pattern = settings.getLdapAuthBindDnPattern();
                 if (pattern == null || pattern.isBlank()) {
