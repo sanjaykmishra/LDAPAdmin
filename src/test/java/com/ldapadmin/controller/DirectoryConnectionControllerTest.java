@@ -58,7 +58,6 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
                 false,                              // trustAllCerts
                 "cn=admin,dc=example,dc=com",       // bindDn
                 "dc=example,dc=com",                // baseDn
-                null,                               // objectClasses
                 500,                                // pagingSize
                 1,                                  // poolMinSize
                 10,                                 // poolMaxSize
@@ -80,7 +79,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
         return new DirectoryConnectionRequest(
                 "Corp LDAP", "ldap.example.com", 389, SslMode.NONE,
                 false, null, "cn=admin,dc=example,dc=com", "secret",
-                "dc=example,dc=com", null, 500, 1, 10, 5, 30,
+                "dc=example,dc=com", 500, 1, 10, 5, 30,
                 null, null, null, null, null, true,
                 List.of(), List.of());
     }
@@ -130,7 +129,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
         DirectoryConnectionRequest bad = new DirectoryConnectionRequest(
                 "Corp LDAP", "", 389, SslMode.NONE,
                 false, null, "cn=admin,dc=example,dc=com", "secret",
-                "dc=example,dc=com", null, 500, 1, 10, 5, 30,
+                "dc=example,dc=com", 500, 1, 10, 5, 30,
                 null, null, null, null, null, true,
                 List.of(), List.of());
 
@@ -146,7 +145,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
         DirectoryConnectionRequest bad = new DirectoryConnectionRequest(
                 "Corp LDAP", "ldap.example.com", 99999, SslMode.NONE,
                 false, null, "cn=admin,dc=example,dc=com", "secret",
-                "dc=example,dc=com", null, 500, 1, 10, 5, 30,
+                "dc=example,dc=com", 500, 1, 10, 5, 30,
                 null, null, null, null, null, true,
                 List.of(), List.of());
 

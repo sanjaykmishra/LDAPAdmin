@@ -137,7 +137,6 @@ public class DirectoryConnectionService {
         dc.setTrustedCertificatePem(req.trustedCertificatePem());
         dc.setBindDn(req.bindDn());
         dc.setBaseDn(req.baseDn());
-        dc.setObjectClasses(req.objectClasses());
         dc.setPagingSize(req.pagingSize());
         dc.setPoolMinSize(req.poolMinSize());
         dc.setPoolMaxSize(req.poolMaxSize());

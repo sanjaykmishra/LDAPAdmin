@@ -29,7 +29,6 @@ public record DirectoryConnectionRequest(
         @NotBlank String bindDn,
         String bindPassword,       // plaintext; null on update = keep existing
         @NotBlank String baseDn,
-        String objectClasses,
         @Min(1) @Max(5000) int pagingSize,
         @Min(1) int poolMinSize,
         @Min(1) int poolMaxSize,
