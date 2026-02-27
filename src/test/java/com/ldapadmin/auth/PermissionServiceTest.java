@@ -1,13 +1,13 @@
 package com.ldapadmin.auth;
 
 import com.ldapadmin.entity.AdminBranchRestriction;
-import com.ldapadmin.entity.AdminDirectoryRole;
 import com.ldapadmin.entity.AdminFeaturePermission;
+import com.ldapadmin.entity.AdminRealmRole;
 import com.ldapadmin.entity.enums.BaseRole;
 import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.repository.AdminBranchRestrictionRepository;
-import com.ldapadmin.repository.AdminDirectoryRoleRepository;
 import com.ldapadmin.repository.AdminFeaturePermissionRepository;
+import com.ldapadmin.repository.AdminRealmRoleRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,127 +26,152 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PermissionServiceTest {
 
-    @Mock private AdminDirectoryRoleRepository     directoryRoleRepo;
+    @Mock private AdminRealmRoleRepository         realmRoleRepo;
     @Mock private AdminBranchRestrictionRepository branchRepo;
     @Mock private AdminFeaturePermissionRepository featurePermissionRepo;
 
     private PermissionService permissionService;
 
     private final UUID adminId = UUID.randomUUID();
+    private final UUID realmId = UUID.randomUUID();
     private final UUID dirId   = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        permissionService = new PermissionService(directoryRoleRepo, branchRepo, featurePermissionRepo);
+        permissionService = new PermissionService(realmRoleRepo, branchRepo, featurePermissionRepo);
     }
 
     // ── Superadmin bypass ─────────────────────────────────────────────────────
 
     @Test
-    void requireDirectoryAccess_superadmin_returnsNullWithoutHittingRepo() {
-        assertThat(permissionService.requireDirectoryAccess(superadmin(), dirId)).isNull();
-        verifyNoInteractions(directoryRoleRepo);
+    void requireRealmAccess_superadmin_returnsNullWithoutHittingRepo() {
+        assertThat(permissionService.requireRealmAccess(superadmin(), realmId)).isNull();
+        verifyNoInteractions(realmRoleRepo);
+    }
+
+    @Test
+    void requireDirectoryAccess_superadmin_neverHitsRepo() {
+        permissionService.requireDirectoryAccess(superadmin(), dirId);
+        verifyNoInteractions(realmRoleRepo);
     }
 
     @Test
     void requireBranchAccess_superadmin_neverHitsRepo() {
-        permissionService.requireBranchAccess(superadmin(), dirId, "cn=X,dc=example,dc=com");
+        permissionService.requireBranchAccess(superadmin(), realmId, "cn=X,dc=example,dc=com");
         verifyNoInteractions(branchRepo);
     }
 
     @Test
     void requireFeature_superadmin_neverHitsAnyRepo() {
         permissionService.requireFeature(superadmin(), dirId, FeatureKey.USER_CREATE);
-        verifyNoInteractions(directoryRoleRepo, branchRepo, featurePermissionRepo);
+        verifyNoInteractions(realmRoleRepo, branchRepo, featurePermissionRepo);
     }
 
-    // ── Dimension 1: directory access ─────────────────────────────────────────
+    // ── Dimension 1+2: realm access ───────────────────────────────────────────
 
     @Test
-    void requireDirectoryAccess_noRoleRow_throwsAccessDenied() {
-        when(directoryRoleRepo.findByAdminAccountIdAndDirectoryId(adminId, dirId))
+    void requireRealmAccess_noRoleRow_throwsAccessDenied() {
+        when(realmRoleRepo.findByAdminAccountIdAndRealmId(adminId, realmId))
                 .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> permissionService.requireRealmAccess(admin(), realmId))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void requireRealmAccess_roleExists_returnsRole() {
+        AdminRealmRole role = roleFor(BaseRole.ADMIN);
+        when(realmRoleRepo.findByAdminAccountIdAndRealmId(adminId, realmId))
+                .thenReturn(Optional.of(role));
+
+        assertThat(permissionService.requireRealmAccess(admin(), realmId)).isSameAs(role);
+    }
+
+    @Test
+    void requireDirectoryAccess_noRoleInDirectory_throwsAccessDenied() {
+        when(realmRoleRepo.existsByAdminAccountIdAndRealmDirectoryId(adminId, dirId))
+                .thenReturn(false);
 
         assertThatThrownBy(() -> permissionService.requireDirectoryAccess(admin(), dirId))
                 .isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
-    void requireDirectoryAccess_roleExists_returnsRole() {
-        AdminDirectoryRole role = roleFor(BaseRole.ADMIN);
-        when(directoryRoleRepo.findByAdminAccountIdAndDirectoryId(adminId, dirId))
-                .thenReturn(Optional.of(role));
+    void requireDirectoryAccess_roleExistsInDirectory_succeeds() {
+        when(realmRoleRepo.existsByAdminAccountIdAndRealmDirectoryId(adminId, dirId))
+                .thenReturn(true);
 
-        assertThat(permissionService.requireDirectoryAccess(admin(), dirId)).isSameAs(role);
+        // must not throw
+        permissionService.requireDirectoryAccess(admin(), dirId);
     }
 
     // ── Dimension 3: branch restrictions ─────────────────────────────────────
 
     @Test
     void requireBranchAccess_noRestrictions_unrestricted() {
-        when(branchRepo.findAllByAdminAccountIdAndDirectoryId(adminId, dirId))
+        when(branchRepo.findAllByAdminAccountIdAndRealmId(adminId, realmId))
                 .thenReturn(List.of());
 
         // any DN is allowed when there are no restrictions
-        permissionService.requireBranchAccess(admin(), dirId, "cn=Restricted,ou=System,dc=corp,dc=com");
+        permissionService.requireBranchAccess(admin(), realmId, "cn=Restricted,ou=System,dc=corp,dc=com");
     }
 
     @Test
     void requireBranchAccess_entryUnderAllowedBranch_allowed() {
-        when(branchRepo.findAllByAdminAccountIdAndDirectoryId(adminId, dirId))
+        when(branchRepo.findAllByAdminAccountIdAndRealmId(adminId, realmId))
                 .thenReturn(List.of(branch("ou=Users,dc=example,dc=com")));
 
-        permissionService.requireBranchAccess(admin(), dirId, "cn=Alice,ou=Users,dc=example,dc=com");
+        permissionService.requireBranchAccess(admin(), realmId, "cn=Alice,ou=Users,dc=example,dc=com");
     }
 
     @Test
     void requireBranchAccess_entryExactlyBranchDn_allowed() {
         String branchDn = "ou=Users,dc=example,dc=com";
-        when(branchRepo.findAllByAdminAccountIdAndDirectoryId(adminId, dirId))
+        when(branchRepo.findAllByAdminAccountIdAndRealmId(adminId, realmId))
                 .thenReturn(List.of(branch(branchDn)));
 
-        permissionService.requireBranchAccess(admin(), dirId, branchDn);
+        permissionService.requireBranchAccess(admin(), realmId, branchDn);
     }
 
     @Test
     void requireBranchAccess_entryOutsideAllBranches_throwsAccessDenied() {
-        when(branchRepo.findAllByAdminAccountIdAndDirectoryId(adminId, dirId))
+        when(branchRepo.findAllByAdminAccountIdAndRealmId(adminId, realmId))
                 .thenReturn(List.of(branch("ou=Users,dc=example,dc=com")));
 
         assertThatThrownBy(() -> permissionService.requireBranchAccess(
-                admin(), dirId, "cn=Admin,ou=System,dc=example,dc=com"))
+                admin(), realmId, "cn=Admin,ou=System,dc=example,dc=com"))
                 .isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
     void requireBranchAccess_caseInsensitiveMatch() {
-        when(branchRepo.findAllByAdminAccountIdAndDirectoryId(adminId, dirId))
+        when(branchRepo.findAllByAdminAccountIdAndRealmId(adminId, realmId))
                 .thenReturn(List.of(branch("OU=Users,DC=EXAMPLE,DC=COM")));
 
         // lower-case entry should still match
-        permissionService.requireBranchAccess(admin(), dirId, "cn=alice,ou=users,dc=example,dc=com");
+        permissionService.requireBranchAccess(admin(), realmId, "cn=alice,ou=users,dc=example,dc=com");
     }
 
     @Test
     void requireBranchAccess_partialSuffixNotMatched() {
         // "ou=usersextra" must NOT match "ou=users" branch
-        when(branchRepo.findAllByAdminAccountIdAndDirectoryId(adminId, dirId))
+        when(branchRepo.findAllByAdminAccountIdAndRealmId(adminId, realmId))
                 .thenReturn(List.of(branch("ou=users,dc=com")));
 
         assertThatThrownBy(() -> permissionService.requireBranchAccess(
-                admin(), dirId, "cn=alice,ou=usersextra,dc=com"))
+                admin(), realmId, "cn=alice,ou=usersextra,dc=com"))
                 .isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
     void requireBranchAccess_allowedByOneOfMultipleBranches() {
-        when(branchRepo.findAllByAdminAccountIdAndDirectoryId(adminId, dirId))
+        when(branchRepo.findAllByAdminAccountIdAndRealmId(adminId, realmId))
                 .thenReturn(List.of(
                         branch("ou=Users,dc=example,dc=com"),
                         branch("ou=Groups,dc=example,dc=com")));
 
         // entry falls under the second branch
-        permissionService.requireBranchAccess(admin(), dirId,
+        permissionService.requireBranchAccess(admin(), realmId,
                 "cn=Staff,ou=Groups,dc=example,dc=com");
     }
 
@@ -154,20 +179,22 @@ class PermissionServiceTest {
 
     @Test
     void requireFeature_adminRole_noOverride_writeFeatureGranted() {
-        when(directoryRoleRepo.findByAdminAccountIdAndDirectoryId(adminId, dirId))
-                .thenReturn(Optional.of(roleFor(BaseRole.ADMIN)));
+        when(realmRoleRepo.existsByAdminAccountIdAndRealmDirectoryId(adminId, dirId)).thenReturn(true);
         when(featurePermissionRepo.findByAdminAccountIdAndFeatureKey(adminId, FeatureKey.USER_CREATE))
                 .thenReturn(Optional.empty());
+        when(realmRoleRepo.findAllByAdminAccountId(adminId))
+                .thenReturn(List.of(roleFor(BaseRole.ADMIN)));
 
         permissionService.requireFeature(admin(), dirId, FeatureKey.USER_CREATE);
     }
 
     @Test
     void requireFeature_readOnlyRole_writeFeature_denied() {
-        when(directoryRoleRepo.findByAdminAccountIdAndDirectoryId(adminId, dirId))
-                .thenReturn(Optional.of(roleFor(BaseRole.READ_ONLY)));
+        when(realmRoleRepo.existsByAdminAccountIdAndRealmDirectoryId(adminId, dirId)).thenReturn(true);
         when(featurePermissionRepo.findByAdminAccountIdAndFeatureKey(adminId, FeatureKey.USER_DELETE))
                 .thenReturn(Optional.empty());
+        when(realmRoleRepo.findAllByAdminAccountId(adminId))
+                .thenReturn(List.of(roleFor(BaseRole.READ_ONLY)));
 
         assertThatThrownBy(() -> permissionService.requireFeature(admin(), dirId, FeatureKey.USER_DELETE))
                 .isInstanceOf(AccessDeniedException.class);
@@ -175,10 +202,11 @@ class PermissionServiceTest {
 
     @Test
     void requireFeature_readOnlyRole_defaultReadFeature_granted() {
-        when(directoryRoleRepo.findByAdminAccountIdAndDirectoryId(adminId, dirId))
-                .thenReturn(Optional.of(roleFor(BaseRole.READ_ONLY)));
+        when(realmRoleRepo.existsByAdminAccountIdAndRealmDirectoryId(adminId, dirId)).thenReturn(true);
         when(featurePermissionRepo.findByAdminAccountIdAndFeatureKey(adminId, FeatureKey.BULK_EXPORT))
                 .thenReturn(Optional.empty());
+        when(realmRoleRepo.findAllByAdminAccountId(adminId))
+                .thenReturn(List.of(roleFor(BaseRole.READ_ONLY)));
 
         // BULK_EXPORT is in READONLY_DEFAULT_FEATURES — must not throw
         permissionService.requireFeature(admin(), dirId, FeatureKey.BULK_EXPORT);
@@ -186,8 +214,7 @@ class PermissionServiceTest {
 
     @Test
     void requireFeature_explicitEnableOverride_grantsAccessEvenForReadOnly() {
-        when(directoryRoleRepo.findByAdminAccountIdAndDirectoryId(adminId, dirId))
-                .thenReturn(Optional.of(roleFor(BaseRole.READ_ONLY)));
+        when(realmRoleRepo.existsByAdminAccountIdAndRealmDirectoryId(adminId, dirId)).thenReturn(true);
         when(featurePermissionRepo.findByAdminAccountIdAndFeatureKey(adminId, FeatureKey.USER_CREATE))
                 .thenReturn(Optional.of(featureOverride(true)));
 
@@ -196,8 +223,7 @@ class PermissionServiceTest {
 
     @Test
     void requireFeature_explicitDisableOverride_deniesEvenForAdmin() {
-        when(directoryRoleRepo.findByAdminAccountIdAndDirectoryId(adminId, dirId))
-                .thenReturn(Optional.of(roleFor(BaseRole.ADMIN)));
+        when(realmRoleRepo.existsByAdminAccountIdAndRealmDirectoryId(adminId, dirId)).thenReturn(true);
         when(featurePermissionRepo.findByAdminAccountIdAndFeatureKey(adminId, FeatureKey.USER_DELETE))
                 .thenReturn(Optional.of(featureOverride(false)));
 
@@ -207,8 +233,8 @@ class PermissionServiceTest {
 
     @Test
     void requireFeature_noDirectoryRole_throwsAccessDenied() {
-        when(directoryRoleRepo.findByAdminAccountIdAndDirectoryId(adminId, dirId))
-                .thenReturn(Optional.empty());
+        when(realmRoleRepo.existsByAdminAccountIdAndRealmDirectoryId(adminId, dirId))
+                .thenReturn(false);
 
         assertThatThrownBy(() -> permissionService.requireFeature(admin(), dirId, FeatureKey.USER_CREATE))
                 .isInstanceOf(AccessDeniedException.class);
@@ -217,15 +243,15 @@ class PermissionServiceTest {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private AuthPrincipal admin() {
-        return new AuthPrincipal(PrincipalType.ADMIN, adminId, UUID.randomUUID(), "alice");
+        return new AuthPrincipal(PrincipalType.ADMIN, adminId, "alice");
     }
 
     private AuthPrincipal superadmin() {
-        return new AuthPrincipal(PrincipalType.SUPERADMIN, UUID.randomUUID(), null, "root");
+        return new AuthPrincipal(PrincipalType.SUPERADMIN, UUID.randomUUID(), "root");
     }
 
-    private AdminDirectoryRole roleFor(BaseRole baseRole) {
-        AdminDirectoryRole r = new AdminDirectoryRole();
+    private AdminRealmRole roleFor(BaseRole baseRole) {
+        AdminRealmRole r = new AdminRealmRole();
         r.setBaseRole(baseRole);
         return r;
     }

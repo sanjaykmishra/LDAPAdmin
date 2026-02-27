@@ -1,7 +1,6 @@
 package com.ldapadmin.ldap;
 
 import com.ldapadmin.entity.DirectoryConnection;
-import com.ldapadmin.entity.Tenant;
 import com.ldapadmin.entity.enums.SslMode;
 import com.ldapadmin.exception.LdapConnectionException;
 import com.ldapadmin.service.EncryptionService;
@@ -112,11 +111,8 @@ class LdapConnectionFactoryTest {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private DirectoryConnection buildDirectoryConnection(SslMode sslMode) {
-        Tenant tenant = new Tenant();
-
         DirectoryConnection dc = new DirectoryConnection();
         dc.setId(UUID.randomUUID());
-        dc.setTenant(tenant);
         dc.setDisplayName("Test Directory");
         dc.setHost("localhost");
         dc.setPort(inMemoryServer.getListenPort());

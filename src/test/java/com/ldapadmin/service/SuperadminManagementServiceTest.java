@@ -2,12 +2,12 @@ package com.ldapadmin.service;
 
 import com.ldapadmin.dto.superadmin.CreateSuperadminRequest;
 import com.ldapadmin.dto.superadmin.ResetPasswordRequest;
-import com.ldapadmin.dto.superadmin.UpdateSuperadminRequest;
-import com.ldapadmin.entity.SuperadminAccount;
+import com.ldapadmin.entity.Account;
+import com.ldapadmin.entity.enums.AccountRole;
 import com.ldapadmin.entity.enums.AccountType;
 import com.ldapadmin.exception.ConflictException;
 import com.ldapadmin.exception.ResourceNotFoundException;
-import com.ldapadmin.repository.SuperadminAccountRepository;
+import com.ldapadmin.repository.AccountRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,10 +30,10 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class SuperadminManagementServiceTest {
 
-    @Mock private SuperadminAccountRepository repo;
+    @Mock private AccountRepository repo;
 
-    private PasswordEncoder              encoder = new BCryptPasswordEncoder();
-    private SuperadminManagementService  service;
+    private PasswordEncoder             encoder = new BCryptPasswordEncoder();
+    private SuperadminManagementService service;
 
     @BeforeEach
     void setUp() {
@@ -42,25 +42,25 @@ class SuperadminManagementServiceTest {
 
     @Test
     void createSuperadmin_encodesPassword() {
-        when(repo.findByUsername("alice")).thenReturn(Optional.empty());
-        when(repo.save(any(SuperadminAccount.class))).thenAnswer(inv -> {
-            SuperadminAccount a = inv.getArgument(0);
+        when(repo.existsByUsername("alice")).thenReturn(false);
+        when(repo.save(any(Account.class))).thenAnswer(inv -> {
+            Account a = inv.getArgument(0);
             a.setId(UUID.randomUUID());
             return a;
         });
 
         service.createSuperadmin(new CreateSuperadminRequest("alice", "p@ssw0rd!", null, null));
 
-        ArgumentCaptor<SuperadminAccount> captor = ArgumentCaptor.forClass(SuperadminAccount.class);
+        ArgumentCaptor<Account> captor = ArgumentCaptor.forClass(Account.class);
         verify(repo).save(captor.capture());
         assertThat(encoder.matches("p@ssw0rd!", captor.getValue().getPasswordHash())).isTrue();
-        assertThat(captor.getValue().getAccountType()).isEqualTo(AccountType.LOCAL);
+        assertThat(captor.getValue().getAuthType()).isEqualTo(AccountType.LOCAL);
+        assertThat(captor.getValue().getRole()).isEqualTo(AccountRole.SUPERADMIN);
     }
 
     @Test
     void createSuperadmin_duplicateUsername_throwsConflict() {
-        SuperadminAccount existing = new SuperadminAccount();
-        when(repo.findByUsername("alice")).thenReturn(Optional.of(existing));
+        when(repo.existsByUsername("alice")).thenReturn(true);
 
         assertThatThrownBy(() ->
                 service.createSuperadmin(new CreateSuperadminRequest("alice", "pass1234", null, null)))
@@ -72,9 +72,10 @@ class SuperadminManagementServiceTest {
     @Test
     void deleteSuperadmin_lastLocalActive_throws() {
         UUID id = UUID.randomUUID();
-        SuperadminAccount a = localAccount(id, true);
+        Account a = localAccount(id, true);
         when(repo.findById(id)).thenReturn(Optional.of(a));
-        when(repo.countByAccountTypeAndActiveTrueAndIdNot(AccountType.LOCAL, id)).thenReturn(0L);
+        when(repo.countByRoleAndAuthTypeAndActiveTrueAndIdNot(AccountRole.SUPERADMIN, AccountType.LOCAL, id))
+                .thenReturn(0L);
 
         assertThatThrownBy(() -> service.deleteSuperadmin(id))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -84,9 +85,10 @@ class SuperadminManagementServiceTest {
     @Test
     void resetPassword_ldapAccount_throws() {
         UUID id = UUID.randomUUID();
-        SuperadminAccount a = new SuperadminAccount();
+        Account a = new Account();
         a.setId(id);
-        a.setAccountType(AccountType.LDAP);
+        a.setRole(AccountRole.SUPERADMIN);
+        a.setAuthType(AccountType.LDAP);
         when(repo.findById(id)).thenReturn(Optional.of(a));
 
         assertThatThrownBy(() -> service.resetPassword(id, new ResetPasswordRequest("newpass1")))
@@ -104,11 +106,12 @@ class SuperadminManagementServiceTest {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private SuperadminAccount localAccount(UUID id, boolean active) {
-        SuperadminAccount a = new SuperadminAccount();
+    private Account localAccount(UUID id, boolean active) {
+        Account a = new Account();
         a.setId(id);
         a.setUsername("admin");
-        a.setAccountType(AccountType.LOCAL);
+        a.setRole(AccountRole.SUPERADMIN);
+        a.setAuthType(AccountType.LOCAL);
         a.setPasswordHash(encoder.encode("secret"));
         a.setActive(active);
         return a;

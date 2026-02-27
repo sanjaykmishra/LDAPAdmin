@@ -1,7 +1,6 @@
 package com.ldapadmin.ldap;
 
 import com.ldapadmin.entity.DirectoryConnection;
-import com.ldapadmin.entity.Tenant;
 import com.ldapadmin.entity.enums.SslMode;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.ldap.model.LdapGroup;
@@ -255,7 +254,6 @@ class LdapGroupServiceTest {
     private DirectoryConnection buildDc() {
         DirectoryConnection d = new DirectoryConnection();
         d.setId(UUID.randomUUID());
-        d.setTenant(new Tenant());
         d.setDisplayName("test-ldap");
         d.setHost("localhost");
         d.setPort(inMemoryServer.getListenPort());

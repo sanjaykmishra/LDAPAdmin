@@ -4,7 +4,6 @@ import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.auth.PrincipalType;
 import com.ldapadmin.entity.AuditEvent;
 import com.ldapadmin.entity.DirectoryConnection;
-import com.ldapadmin.entity.Tenant;
 import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.entity.enums.AuditSource;
 import com.ldapadmin.repository.AuditEventRepository;
@@ -27,14 +26,13 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class AuditServiceTest {
 
-    @Mock private AuditEventRepository        auditRepo;
+    @Mock private AuditEventRepository         auditRepo;
     @Mock private DirectoryConnectionRepository dirRepo;
 
     private AuditService auditService;
 
-    private final UUID tenantId     = UUID.randomUUID();
-    private final UUID adminId      = UUID.randomUUID();
-    private final UUID directoryId  = UUID.randomUUID();
+    private final UUID adminId     = UUID.randomUUID();
+    private final UUID directoryId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
@@ -45,8 +43,7 @@ class AuditServiceTest {
 
     @Test
     void record_savesInternalEvent_forAdminPrincipal() {
-        AuthPrincipal principal = new AuthPrincipal(
-                PrincipalType.ADMIN, adminId, tenantId, "alice");
+        AuthPrincipal principal = new AuthPrincipal(PrincipalType.ADMIN, adminId, "alice");
 
         DirectoryConnection dc = mockDirectory("corp-ldap");
         when(dirRepo.findById(directoryId)).thenReturn(Optional.of(dc));
@@ -60,7 +57,6 @@ class AuditServiceTest {
 
         AuditEvent saved = captor.getValue();
         assertThat(saved.getSource()).isEqualTo(AuditSource.INTERNAL);
-        assertThat(saved.getTenantId()).isEqualTo(tenantId);
         assertThat(saved.getActorId()).isEqualTo(adminId);
         assertThat(saved.getActorType()).isEqualTo("ADMIN");
         assertThat(saved.getActorUsername()).isEqualTo("alice");
@@ -74,8 +70,7 @@ class AuditServiceTest {
 
     @Test
     void record_doesNotThrow_whenDirLookupFails() {
-        AuthPrincipal principal = new AuthPrincipal(
-                PrincipalType.ADMIN, adminId, tenantId, "bob");
+        AuthPrincipal principal = new AuthPrincipal(PrincipalType.ADMIN, adminId, "bob");
         when(dirRepo.findById(directoryId)).thenReturn(Optional.empty());
 
         // Should silently swallow the missing-directory case
@@ -87,8 +82,7 @@ class AuditServiceTest {
 
     @Test
     void record_doesNotPropagateException_whenSaveFails() {
-        AuthPrincipal principal = new AuthPrincipal(
-                PrincipalType.ADMIN, adminId, tenantId, "carol");
+        AuthPrincipal principal = new AuthPrincipal(PrincipalType.ADMIN, adminId, "carol");
         DirectoryConnection dc = mockDirectory("dir");
         when(dirRepo.findById(directoryId)).thenReturn(Optional.of(dc));
         doThrow(new RuntimeException("DB down")).when(auditRepo).save(any());
@@ -107,7 +101,7 @@ class AuditServiceTest {
                 .thenReturn(false);
 
         auditService.recordChangelogEvent(
-                tenantId, directoryId, "corp-ldap",
+                directoryId, "corp-ldap",
                 "uid=dave,dc=corp", changeNumber,
                 Map.of("changeType", "modify"),
                 OffsetDateTime.now());
@@ -128,7 +122,7 @@ class AuditServiceTest {
                 .thenReturn(true);
 
         auditService.recordChangelogEvent(
-                tenantId, directoryId, "corp-ldap",
+                directoryId, "corp-ldap",
                 "uid=eve,dc=corp", changeNumber,
                 Map.of("changeType", "add"),
                 OffsetDateTime.now());
