@@ -38,7 +38,7 @@ class JwtTokenServiceTest {
     @Test
     void issueAndParse_superadmin() {
         UUID id = UUID.randomUUID();
-        AuthPrincipal original = new AuthPrincipal(PrincipalType.SUPERADMIN, id, null, "admin");
+        AuthPrincipal original = new AuthPrincipal(PrincipalType.SUPERADMIN, id, "admin");
 
         String token = jwtTokenService.issue(original);
 
@@ -47,22 +47,19 @@ class JwtTokenServiceTest {
         AuthPrincipal parsed = jwtTokenService.parse(token);
         assertThat(parsed.type()).isEqualTo(PrincipalType.SUPERADMIN);
         assertThat(parsed.id()).isEqualTo(id);
-        assertThat(parsed.tenantId()).isNull();
         assertThat(parsed.username()).isEqualTo("admin");
     }
 
     @Test
     void issueAndParse_admin() {
         UUID accountId = UUID.randomUUID();
-        UUID tenantId  = UUID.randomUUID();
-        AuthPrincipal original = new AuthPrincipal(PrincipalType.ADMIN, accountId, tenantId, "jdoe");
+        AuthPrincipal original = new AuthPrincipal(PrincipalType.ADMIN, accountId, "jdoe");
 
         String token = jwtTokenService.issue(original);
 
         AuthPrincipal parsed = jwtTokenService.parse(token);
         assertThat(parsed.type()).isEqualTo(PrincipalType.ADMIN);
         assertThat(parsed.id()).isEqualTo(accountId);
-        assertThat(parsed.tenantId()).isEqualTo(tenantId);
         assertThat(parsed.username()).isEqualTo("jdoe");
     }
 
@@ -76,7 +73,7 @@ class JwtTokenServiceTest {
     void parse_tamperedToken_throwsJwtException() {
         UUID id = UUID.randomUUID();
         String token = jwtTokenService.issue(
-                new AuthPrincipal(PrincipalType.SUPERADMIN, id, null, "admin"));
+                new AuthPrincipal(PrincipalType.SUPERADMIN, id, "admin"));
 
         // Flip one character in the signature segment
         String[] parts = token.split("\\.");
@@ -90,8 +87,8 @@ class JwtTokenServiceTest {
 
     @Test
     void isSuperadmin_returnsCorrectly() {
-        AuthPrincipal sa   = new AuthPrincipal(PrincipalType.SUPERADMIN, UUID.randomUUID(), null, "sa");
-        AuthPrincipal admin = new AuthPrincipal(PrincipalType.ADMIN, UUID.randomUUID(), UUID.randomUUID(), "a");
+        AuthPrincipal sa   = new AuthPrincipal(PrincipalType.SUPERADMIN, UUID.randomUUID(), "sa");
+        AuthPrincipal admin = new AuthPrincipal(PrincipalType.ADMIN, UUID.randomUUID(), "a");
 
         assertThat(sa.isSuperadmin()).isTrue();
         assertThat(admin.isSuperadmin()).isFalse();

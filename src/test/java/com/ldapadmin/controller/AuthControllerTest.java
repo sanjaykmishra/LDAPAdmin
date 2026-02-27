@@ -41,8 +41,8 @@ class AuthControllerTest extends BaseControllerTest {
 
     @Test
     void login_validCredentials_returns200WithToken() throws Exception {
-        LoginRequest req  = new LoginRequest("admin", "secret", null);
-        LoginResponse res = new LoginResponse("jwt-token", "admin", "SUPERADMIN", null, null);
+        LoginRequest req  = new LoginRequest("admin", "secret");
+        LoginResponse res = new LoginResponse("jwt-token", "admin", "SUPERADMIN", null);
         given(authenticationService.login(any())).willReturn(res);
 
         mockMvc.perform(post("/api/auth/login")
@@ -55,7 +55,7 @@ class AuthControllerTest extends BaseControllerTest {
 
     @Test
     void login_badCredentials_returns401() throws Exception {
-        LoginRequest req = new LoginRequest("admin", "wrong", null);
+        LoginRequest req = new LoginRequest("admin", "wrong");
         given(authenticationService.login(any())).willThrow(new BadCredentialsException("Bad credentials"));
 
         mockMvc.perform(post("/api/auth/login")
@@ -74,8 +74,8 @@ class AuthControllerTest extends BaseControllerTest {
 
     @Test
     void login_isPublic_noAuthRequired() throws Exception {
-        LoginRequest req  = new LoginRequest("admin", "secret", null);
-        LoginResponse res = new LoginResponse("tok", "admin", "SUPERADMIN", null, null);
+        LoginRequest req  = new LoginRequest("admin", "secret");
+        LoginResponse res = new LoginResponse("tok", "admin", "SUPERADMIN", null);
         given(authenticationService.login(any())).willReturn(res);
 
         // No authentication() post-processor — endpoint must be accessible anonymously
@@ -89,7 +89,7 @@ class AuthControllerTest extends BaseControllerTest {
 
     @Test
     void me_authenticated_returnsUsernameAndType() throws Exception {
-        AuthPrincipal principal = new AuthPrincipal(PrincipalType.SUPERADMIN, ACCOUNT_ID, null, "alice");
+        AuthPrincipal principal = new AuthPrincipal(PrincipalType.SUPERADMIN, ACCOUNT_ID, "alice");
         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                 principal, null, List.of(new SimpleGrantedAuthority("ROLE_SUPERADMIN")));
 

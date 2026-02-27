@@ -52,9 +52,8 @@ class LdapOperationServiceTest {
 
     private LdapOperationService service;
 
-    private final UUID dirId    = UUID.randomUUID();
-    private final UUID tenantId = UUID.randomUUID();
-    private final UUID adminId  = UUID.randomUUID();
+    private final UUID dirId   = UUID.randomUUID();
+    private final UUID adminId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
@@ -67,7 +66,7 @@ class LdapOperationServiceTest {
 
     @Test
     void searchUsers_directoryNotFound_throws() {
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.empty());
+        when(dirRepo.findById(dirId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.searchUsers(dirId, adminPrincipal(), null, null, 100, new String[0]))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -76,7 +75,7 @@ class LdapOperationServiceTest {
     @Test
     void searchUsers_disabledDirectory_throws() {
         DirectoryConnection dc = enabledDir(false);
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dc));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dc));
 
         assertThatThrownBy(() -> service.searchUsers(dirId, adminPrincipal(), null, null, 100, new String[0]))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -92,7 +91,6 @@ class LdapOperationServiceTest {
                 "(cn=*)", null, 100, new String[0]);
 
         assertThat(result).isEmpty();
-        verify(dirRepo, never()).findByIdAndTenantId(any(), any());
     }
 
     // ── User operations ───────────────────────────────────────────────────────
@@ -100,7 +98,7 @@ class LdapOperationServiceTest {
     @Test
     void getUser_callsBranchAccessCheck() {
         DirectoryConnection dc = enabledDir(true);
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dc));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dc));
         LdapUser user = new LdapUser("cn=Alice,ou=Users,dc=example,dc=com",
                 Map.of("cn", List.of("Alice")));
         when(userService.getUser(eq(dc), anyString())).thenReturn(user);
@@ -108,17 +106,17 @@ class LdapOperationServiceTest {
         AuthPrincipal principal = adminPrincipal();
         service.getUser(dirId, principal, "cn=Alice,ou=Users,dc=example,dc=com", new String[0]);
 
-        verify(permissionService).requireBranchAccess(
+        verify(permissionService).requireBranchAccessForDirectory(
                 principal, dirId, "cn=Alice,ou=Users,dc=example,dc=com");
     }
 
     @Test
     void createUser_branchDenied_doesNotCallLdap() {
         DirectoryConnection dc = enabledDir(true);
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dc));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dc));
         AuthPrincipal principal = adminPrincipal();
         doThrow(new AccessDeniedException("branch denied"))
-                .when(permissionService).requireBranchAccess(principal, dirId, "cn=X,ou=Restricted");
+                .when(permissionService).requireBranchAccessForDirectory(principal, dirId, "cn=X,ou=Restricted");
 
         CreateEntryRequest req = new CreateEntryRequest(
                 "cn=X,ou=Restricted", Map.of("cn", List.of("X")));
@@ -133,7 +131,7 @@ class LdapOperationServiceTest {
     void deleteUser_callsUserService() {
         String dn = "cn=Bob,ou=Users,dc=example,dc=com";
         DirectoryConnection dc = enabledDir(true);
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dc));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dc));
 
         service.deleteUser(dirId, adminPrincipal(), dn);
 
@@ -145,13 +143,13 @@ class LdapOperationServiceTest {
         String dn        = "cn=Carol,ou=Old,dc=example,dc=com";
         String newParent = "ou=New,dc=example,dc=com";
         DirectoryConnection dc = enabledDir(true);
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dc));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dc));
         AuthPrincipal principal = adminPrincipal();
 
         service.moveUser(dirId, principal, dn, new MoveUserRequest(newParent));
 
-        verify(permissionService).requireBranchAccess(principal, dirId, dn);
-        verify(permissionService).requireBranchAccess(principal, dirId, newParent);
+        verify(permissionService).requireBranchAccessForDirectory(principal, dirId, dn);
+        verify(permissionService).requireBranchAccessForDirectory(principal, dirId, newParent);
         verify(userService).moveUser(dc, dn, newParent);
     }
 
@@ -159,7 +157,7 @@ class LdapOperationServiceTest {
     void updateUser_convertsModificationsToUnboundId() {
         String dn = "cn=Dave,ou=Users,dc=example,dc=com";
         DirectoryConnection dc = enabledDir(true);
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dc));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dc));
         LdapUser user = new LdapUser(dn, Map.of("mail", List.of("d@example.com")));
         when(userService.getUser(dc, dn)).thenReturn(user);
 
@@ -179,7 +177,7 @@ class LdapOperationServiceTest {
     void addGroupMember_callsGroupService() {
         String groupDn = "cn=Staff,ou=Groups,dc=example,dc=com";
         DirectoryConnection dc = enabledDir(true);
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dc));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dc));
 
         service.addGroupMember(dirId, adminPrincipal(), groupDn, "member", "cn=Alice,ou=Users");
 
@@ -189,7 +187,7 @@ class LdapOperationServiceTest {
     @Test
     void searchUsers_limitIsRespected() {
         DirectoryConnection dc = enabledDir(true);
-        when(dirRepo.findByIdAndTenantId(dirId, tenantId)).thenReturn(Optional.of(dc));
+        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dc));
 
         List<LdapUser> bigList = List.of(
                 new LdapUser("cn=A,dc=example,dc=com", Map.of()),
@@ -206,11 +204,11 @@ class LdapOperationServiceTest {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private AuthPrincipal adminPrincipal() {
-        return new AuthPrincipal(PrincipalType.ADMIN, adminId, tenantId, "alice");
+        return new AuthPrincipal(PrincipalType.ADMIN, adminId, "alice");
     }
 
     private AuthPrincipal superadminPrincipal() {
-        return new AuthPrincipal(PrincipalType.SUPERADMIN, UUID.randomUUID(), null, "superadmin");
+        return new AuthPrincipal(PrincipalType.SUPERADMIN, UUID.randomUUID(), "superadmin");
     }
 
     private DirectoryConnection enabledDir(boolean enabled) {

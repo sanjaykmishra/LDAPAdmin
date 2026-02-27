@@ -44,14 +44,13 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
 
     @MockBean DirectoryConnectionService directoryService;
 
-    static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
     static final UUID DIR_ID    = UUID.fromString("20000000-0000-0000-0000-000000000002");
 
-    static final String BASE_URL = "/api/superadmin/tenants/" + TENANT_ID + "/directories";
+    static final String BASE_URL = "/api/v1/superadmin/directories";
 
     DirectoryConnectionResponse sampleResponse() {
         return new DirectoryConnectionResponse(
-                DIR_ID, TENANT_ID,
+                DIR_ID,
                 "Corp LDAP",                        // displayName
                 "ldap.example.com",                 // host
                 389,                                // port
@@ -70,7 +69,6 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
                 null,                               // enableValue
                 null,                               // disableValue
                 null,                               // auditDataSourceId
-                false,                              // superadminSource
                 true,                               // enabled
                 List.of(),                          // userBaseDns
                 List.of(),                          // groupBaseDns
@@ -83,7 +81,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
                 "Corp LDAP", "ldap.example.com", 389, SslMode.NONE,
                 false, null, "cn=admin,dc=example,dc=com", "secret",
                 "dc=example,dc=com", null, 500, 1, 10, 5, 30,
-                null, null, null, null, null, false, true,
+                null, null, null, null, null, true,
                 List.of(), List.of());
     }
 
@@ -91,7 +89,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
 
     @Test
     void listDirectories_superadmin_returns200() throws Exception {
-        given(directoryService.listDirectories(TENANT_ID)).willReturn(List.of(sampleResponse()));
+        given(directoryService.listDirectories()).willReturn(List.of(sampleResponse()));
 
         mockMvc.perform(get(BASE_URL).with(authentication(superadminAuth())))
                 .andExpect(status().isOk())
@@ -102,7 +100,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
 
     @Test
     void listDirectories_adminRole_returns403() throws Exception {
-        mockMvc.perform(get(BASE_URL).with(authentication(adminAuth(TENANT_ID))))
+        mockMvc.perform(get(BASE_URL).with(authentication(adminAuth())))
                 .andExpect(status().isForbidden());
     }
 
@@ -116,7 +114,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
 
     @Test
     void createDirectory_superadmin_returns201() throws Exception {
-        given(directoryService.createDirectory(eq(TENANT_ID), any())).willReturn(sampleResponse());
+        given(directoryService.createDirectory(any())).willReturn(sampleResponse());
 
         mockMvc.perform(post(BASE_URL)
                         .with(authentication(superadminAuth()))
@@ -133,7 +131,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
                 "Corp LDAP", "", 389, SslMode.NONE,
                 false, null, "cn=admin,dc=example,dc=com", "secret",
                 "dc=example,dc=com", null, 500, 1, 10, 5, 30,
-                null, null, null, null, null, false, true,
+                null, null, null, null, null, true,
                 List.of(), List.of());
 
         mockMvc.perform(post(BASE_URL)
@@ -149,7 +147,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
                 "Corp LDAP", "ldap.example.com", 99999, SslMode.NONE,
                 false, null, "cn=admin,dc=example,dc=com", "secret",
                 "dc=example,dc=com", null, 500, 1, 10, 5, 30,
-                null, null, null, null, null, false, true,
+                null, null, null, null, null, true,
                 List.of(), List.of());
 
         mockMvc.perform(post(BASE_URL)
@@ -163,7 +161,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
 
     @Test
     void getDirectory_superadmin_returns200() throws Exception {
-        given(directoryService.getDirectory(TENANT_ID, DIR_ID)).willReturn(sampleResponse());
+        given(directoryService.getDirectory(DIR_ID)).willReturn(sampleResponse());
 
         mockMvc.perform(get(BASE_URL + "/" + DIR_ID).with(authentication(superadminAuth())))
                 .andExpect(status().isOk())
@@ -172,7 +170,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
 
     @Test
     void getDirectory_notFound_returns404() throws Exception {
-        given(directoryService.getDirectory(TENANT_ID, DIR_ID))
+        given(directoryService.getDirectory(DIR_ID))
                 .willThrow(new ResourceNotFoundException("Directory not found"));
 
         mockMvc.perform(get(BASE_URL + "/" + DIR_ID).with(authentication(superadminAuth())))
@@ -183,7 +181,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
 
     @Test
     void updateDirectory_superadmin_returns200() throws Exception {
-        given(directoryService.updateDirectory(eq(TENANT_ID), eq(DIR_ID), any()))
+        given(directoryService.updateDirectory(eq(DIR_ID), any()))
                 .willReturn(sampleResponse());
 
         mockMvc.perform(put(BASE_URL + "/" + DIR_ID)
@@ -198,7 +196,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
 
     @Test
     void deleteDirectory_superadmin_returns204() throws Exception {
-        willDoNothing().given(directoryService).deleteDirectory(TENANT_ID, DIR_ID);
+        willDoNothing().given(directoryService).deleteDirectory(DIR_ID);
 
         mockMvc.perform(delete(BASE_URL + "/" + DIR_ID).with(authentication(superadminAuth())))
                 .andExpect(status().isNoContent());
@@ -207,7 +205,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
     @Test
     void deleteDirectory_notFound_returns404() throws Exception {
         willThrow(new ResourceNotFoundException("Directory not found"))
-                .given(directoryService).deleteDirectory(TENANT_ID, DIR_ID);
+                .given(directoryService).deleteDirectory(DIR_ID);
 
         mockMvc.perform(delete(BASE_URL + "/" + DIR_ID).with(authentication(superadminAuth())))
                 .andExpect(status().isNotFound());
@@ -217,7 +215,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
 
     @Test
     void evictPool_superadmin_returns204() throws Exception {
-        willDoNothing().given(directoryService).evictPool(TENANT_ID, DIR_ID);
+        willDoNothing().given(directoryService).evictPool(DIR_ID);
 
         mockMvc.perform(post(BASE_URL + "/" + DIR_ID + "/evict-pool")
                         .with(authentication(superadminAuth())))

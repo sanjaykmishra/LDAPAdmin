@@ -43,7 +43,6 @@ class UserControllerTest extends BaseControllerTest {
 
     @MockBean LdapOperationService ldapService;
 
-    static final UUID TENANT_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
     static final UUID DIR_ID    = UUID.fromString("20000000-0000-0000-0000-000000000002");
     static final String BASE_URL = "/api/directories/" + DIR_ID + "/users";
     static final String ENTRY_DN = "uid=alice,ou=people,dc=example,dc=com";
@@ -61,7 +60,7 @@ class UserControllerTest extends BaseControllerTest {
         given(ldapService.searchUsers(eq(DIR_ID), any(), isNull(), isNull(), anyInt(), any()))
                 .willReturn(List.of(sampleEntry()));
 
-        mockMvc.perform(get(BASE_URL).with(authentication(adminAuth(TENANT_ID))))
+        mockMvc.perform(get(BASE_URL).with(authentication(adminAuth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].dn").value(ENTRY_DN));
@@ -74,7 +73,7 @@ class UserControllerTest extends BaseControllerTest {
 
         mockMvc.perform(get(BASE_URL)
                         .param("filter", "(cn=alice)")
-                        .with(authentication(adminAuth(TENANT_ID))))
+                        .with(authentication(adminAuth())))
                 .andExpect(status().isOk());
     }
 
@@ -93,7 +92,7 @@ class UserControllerTest extends BaseControllerTest {
         given(ldapService.createUser(eq(DIR_ID), any(), any())).willReturn(sampleEntry());
 
         mockMvc.perform(post(BASE_URL)
-                        .with(authentication(adminAuth(TENANT_ID)))
+                        .with(authentication(adminAuth()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isCreated())
@@ -109,7 +108,7 @@ class UserControllerTest extends BaseControllerTest {
 
         mockMvc.perform(get(BASE_URL + "/entry")
                         .param("dn", ENTRY_DN)
-                        .with(authentication(adminAuth(TENANT_ID))))
+                        .with(authentication(adminAuth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.dn").value(ENTRY_DN))
                 .andExpect(jsonPath("$.attributes.cn[0]").value("Alice"));
@@ -122,7 +121,7 @@ class UserControllerTest extends BaseControllerTest {
 
         mockMvc.perform(get(BASE_URL + "/entry")
                         .param("dn", ENTRY_DN)
-                        .with(authentication(adminAuth(TENANT_ID))))
+                        .with(authentication(adminAuth())))
                 .andExpect(status().isNotFound());
     }
 
@@ -138,7 +137,7 @@ class UserControllerTest extends BaseControllerTest {
 
         mockMvc.perform(put(BASE_URL + "/entry")
                         .param("dn", ENTRY_DN)
-                        .with(authentication(adminAuth(TENANT_ID)))
+                        .with(authentication(adminAuth()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk());
@@ -152,7 +151,7 @@ class UserControllerTest extends BaseControllerTest {
 
         mockMvc.perform(delete(BASE_URL + "/entry")
                         .param("dn", ENTRY_DN)
-                        .with(authentication(adminAuth(TENANT_ID))))
+                        .with(authentication(adminAuth())))
                 .andExpect(status().isNoContent());
     }
 
@@ -164,7 +163,7 @@ class UserControllerTest extends BaseControllerTest {
 
         mockMvc.perform(post(BASE_URL + "/enable")
                         .param("dn", ENTRY_DN)
-                        .with(authentication(adminAuth(TENANT_ID))))
+                        .with(authentication(adminAuth())))
                 .andExpect(status().isNoContent());
     }
 
@@ -174,7 +173,7 @@ class UserControllerTest extends BaseControllerTest {
 
         mockMvc.perform(post(BASE_URL + "/disable")
                         .param("dn", ENTRY_DN)
-                        .with(authentication(adminAuth(TENANT_ID))))
+                        .with(authentication(adminAuth())))
                 .andExpect(status().isNoContent());
     }
 
@@ -187,7 +186,7 @@ class UserControllerTest extends BaseControllerTest {
 
         mockMvc.perform(post(BASE_URL + "/move")
                         .param("dn", ENTRY_DN)
-                        .with(authentication(adminAuth(TENANT_ID)))
+                        .with(authentication(adminAuth()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isNoContent());
