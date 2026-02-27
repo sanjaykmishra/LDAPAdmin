@@ -36,7 +36,7 @@ class ApplicationSettingsServiceTest {
     @Test
     void get_existingSettings_returnsDto() {
         ApplicationSettings settings = existingSettings();
-        when(settingsRepo.findFirst()).thenReturn(Optional.of(settings));
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.of(settings));
 
         ApplicationSettingsDto dto = service.get();
 
@@ -48,7 +48,7 @@ class ApplicationSettingsServiceTest {
 
     @Test
     void get_noSettingsExist_returnsDefaults() {
-        when(settingsRepo.findFirst()).thenReturn(Optional.empty());
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.empty());
 
         ApplicationSettingsDto dto = service.get();
 
@@ -62,7 +62,7 @@ class ApplicationSettingsServiceTest {
 
     @Test
     void upsert_noExistingSettings_createsNew() {
-        when(settingsRepo.findFirst()).thenReturn(Optional.empty());
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.empty());
         when(encryptionService.encrypt("secret123")).thenReturn("enc-secret");
         when(settingsRepo.save(any(ApplicationSettings.class)))
                 .thenAnswer(inv -> {
@@ -89,7 +89,7 @@ class ApplicationSettingsServiceTest {
     @Test
     void upsert_existingSettings_updatesRow() {
         ApplicationSettings existing = existingSettings();
-        when(settingsRepo.findFirst()).thenReturn(Optional.of(existing));
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.of(existing));
         when(settingsRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ApplicationSettingsDto dto = service.upsert(basicRequest());
@@ -108,7 +108,7 @@ class ApplicationSettingsServiceTest {
     @Test
     void upsert_emptyPassword_clearsEncryptedValue() {
         ApplicationSettings existing = existingSettings();
-        when(settingsRepo.findFirst()).thenReturn(Optional.of(existing));
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.of(existing));
         when(settingsRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateApplicationSettingsRequest req = new UpdateApplicationSettingsRequest(
@@ -127,7 +127,7 @@ class ApplicationSettingsServiceTest {
     @Test
     void upsert_nonEmptyPassword_encryptsAndStores() {
         ApplicationSettings existing = existingSettings();
-        when(settingsRepo.findFirst()).thenReturn(Optional.of(existing));
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.of(existing));
         when(encryptionService.encrypt("newpass")).thenReturn("enc-newpass");
         when(settingsRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 

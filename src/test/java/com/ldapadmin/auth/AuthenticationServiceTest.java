@@ -133,7 +133,7 @@ class AuthenticationServiceTest {
     void login_ldapAccount_correctPassword_returnsJwt() {
         Account account = ldapAccount(LDAP_USER, AccountRole.ADMIN);
         when(accountRepo.findByUsernameAndActiveTrue(LDAP_USER)).thenReturn(Optional.of(account));
-        when(settingsRepo.findFirst()).thenReturn(Optional.of(ldapSettings(
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.of(ldapSettings(
                 "uid={username},dc=example,dc=com")));
 
         LoginResponse resp = authService.login(new LoginRequest(LDAP_USER, LDAP_PASSWORD));
@@ -146,7 +146,7 @@ class AuthenticationServiceTest {
     void login_ldapAccount_wrongPassword_throwsBadCredentials() {
         Account account = ldapAccount(LDAP_USER, AccountRole.ADMIN);
         when(accountRepo.findByUsernameAndActiveTrue(LDAP_USER)).thenReturn(Optional.of(account));
-        when(settingsRepo.findFirst()).thenReturn(Optional.of(ldapSettings(
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.of(ldapSettings(
                 "uid={username},dc=example,dc=com")));
 
         assertThatThrownBy(() -> authService.login(new LoginRequest(LDAP_USER, "wrong-pw")))
@@ -157,7 +157,7 @@ class AuthenticationServiceTest {
     void login_ldapAccount_noSettings_throwsBadCredentials() {
         Account account = ldapAccount(LDAP_USER, AccountRole.ADMIN);
         when(accountRepo.findByUsernameAndActiveTrue(LDAP_USER)).thenReturn(Optional.of(account));
-        when(settingsRepo.findFirst()).thenReturn(Optional.empty());
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> authService.login(new LoginRequest(LDAP_USER, LDAP_PASSWORD)))
                 .isInstanceOf(BadCredentialsException.class);
@@ -167,7 +167,7 @@ class AuthenticationServiceTest {
     void login_ldapAccount_noBindDnPattern_throwsBadCredentials() {
         Account account = ldapAccount(LDAP_USER, AccountRole.ADMIN);
         when(accountRepo.findByUsernameAndActiveTrue(LDAP_USER)).thenReturn(Optional.of(account));
-        when(settingsRepo.findFirst()).thenReturn(Optional.of(ldapSettings(null)));
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.of(ldapSettings(null)));
 
         assertThatThrownBy(() -> authService.login(new LoginRequest(LDAP_USER, LDAP_PASSWORD)))
                 .isInstanceOf(BadCredentialsException.class);
