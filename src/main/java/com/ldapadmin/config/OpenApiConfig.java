@@ -29,7 +29,7 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("LDAP Admin Portal API")
                         .version("v1")
-                        .description("REST API for multi-tenant LDAP/Active Directory administration"))
+                        .description("REST API for LDAP/Active Directory administration"))
                 .addSecurityItem(new SecurityRequirement()
                         .addList("cookieAuth")
                         .addList("bearerAuth"))

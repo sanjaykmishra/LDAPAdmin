@@ -40,8 +40,7 @@ import java.util.UUID;
  * <p>This service is the single entry-point for all LDAP directory operations
  * in the REST layer.  Each method:</p>
  * <ol>
- *   <li>Loads the {@link DirectoryConnection}, scoped to the principal's tenant
- *       (or unscoped for superadmins).</li>
+ *   <li>Loads the {@link DirectoryConnection} and verifies it is enabled.</li>
  *   <li>Enforces branch access (dimension 3) for entry-level operations.</li>
  *   <li>Delegates to the underlying LDAP service.</li>
  *   <li>Fires an async audit event via {@link AuditService} for write ops.</li>

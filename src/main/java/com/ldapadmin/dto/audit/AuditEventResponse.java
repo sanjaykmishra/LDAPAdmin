@@ -10,7 +10,6 @@ import java.util.UUID;
 
 public record AuditEventResponse(
         UUID id,
-        UUID tenantId,
         AuditSource source,
         UUID actorId,
         String actorType,
@@ -27,7 +26,6 @@ public record AuditEventResponse(
     public static AuditEventResponse from(AuditEvent e) {
         return new AuditEventResponse(
                 e.getId(),
-                e.getTenantId(),
                 e.getSource(),
                 e.getActorId(),
                 e.getActorType(),

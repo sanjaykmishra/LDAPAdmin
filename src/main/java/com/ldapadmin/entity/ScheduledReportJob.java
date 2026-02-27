@@ -70,7 +70,7 @@ public class ScheduledReportJob {
     @Column(name = "delivery_recipients", columnDefinition = "TEXT")
     private String deliveryRecipients;
 
-    /** Object-key prefix written to the tenant S3 bucket (used when deliveryMethod = S3). */
+    /** Object-key prefix for S3 object storage (used when deliveryMethod = S3). */
     @Column(name = "s3_key_prefix")
     private String s3KeyPrefix;
 
