@@ -54,10 +54,6 @@ public class DirectoryConnection {
     @Column(name = "base_dn", nullable = false)
     private String baseDn;
 
-    /** Comma-separated objectClass names used for schema discovery (§4.2). */
-    @Column(name = "object_classes")
-    private String objectClasses;
-
     @Column(name = "paging_size", nullable = false)
     private int pagingSize = 500;
 
