@@ -59,8 +59,8 @@
           <RouterLink to="/superadmin" class="nav-item">
             <span class="icon">🛡</span> Superadmins
           </RouterLink>
-          <RouterLink to="/superadmin/tenants" class="nav-item">
-            <span class="icon">🏢</span> Tenants
+          <RouterLink to="/superadmin/admins" class="nav-item">
+            <span class="icon">👤</span> Admin Users
           </RouterLink>
         </template>
       </nav>
@@ -86,7 +86,6 @@
 import { ref, watch, onMounted } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { listTenants } from '@/api/superadmin'
 import client from '@/api/client'
 
 const auth   = useAuthStore()
@@ -96,13 +95,11 @@ const route  = useRoute()
 const dirs          = ref([])
 const selectedDirId = ref(route.params.dirId || '')
 
-// Load directories for the current tenant (admins only)
+// Load directories for the sidebar picker (admins only)
 onMounted(async () => {
   if (auth.isSuperadmin) return
   try {
-    const tenantId = auth.principal?.tenantId
-    if (!tenantId) return
-    const { data } = await client.get(`/admin/tenants/${tenantId}/directories`)
+    const { data } = await client.get('/superadmin/directories')
     dirs.value = data
     if (!selectedDirId.value && data.length) {
       selectedDirId.value = data[0].id

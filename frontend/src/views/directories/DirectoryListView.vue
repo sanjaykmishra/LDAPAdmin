@@ -22,7 +22,7 @@
         <div class="flex gap-2 justify-end">
           <RouterLink :to="`/directories/${row.id}/users`" class="btn-sm btn-secondary">Users</RouterLink>
           <button @click="openEdit(row)" class="btn-sm btn-secondary">Edit</button>
-          <button @click="testConn(row)" class="btn-sm btn-secondary">Test</button>
+          <button @click="evictPool(row)" class="btn-sm btn-secondary">Evict Pool</button>
           <button @click="confirmDelete(row)" class="btn-sm btn-danger">Delete</button>
         </div>
       </template>
@@ -53,7 +53,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notifications'
 import { useApi } from '@/composables/useApi'
 import client from '@/api/client'
@@ -62,7 +61,6 @@ import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import DirectoryForm from './DirectoryForm.vue'
 
-const auth  = useAuthStore()
 const notif = useNotificationStore()
 const { loading, call } = useApi()
 
@@ -79,9 +77,6 @@ const cols = [
   { key: 'baseDn', label: 'Base DN' },
 ]
 
-function tenantId() {
-  return auth.principal?.tenantId
-}
 
 const emptyForm = () => ({
   name: '', host: 'localhost', port: 389, bindDn: '', bindPassword: '',
@@ -91,9 +86,8 @@ const emptyForm = () => ({
 const form = ref(emptyForm())
 
 async function load() {
-  if (!tenantId()) return
   await call(async () => {
-    const { data } = await client.get(`/admin/tenants/${tenantId()}/directories`)
+    const { data } = await client.get('/superadmin/directories')
     dirs.value = data
   })
 }
@@ -114,10 +108,10 @@ async function save() {
   saving.value = true
   try {
     if (editing.value) {
-      await client.put(`/admin/tenants/${tenantId()}/directories/${editing.value}`, form.value)
+      await client.put(`/superadmin/directories/${editing.value}`, form.value)
       notif.success('Directory updated')
     } else {
-      await client.post(`/admin/tenants/${tenantId()}/directories`, form.value)
+      await client.post('/superadmin/directories', form.value)
       notif.success('Directory created')
     }
     showModal.value = false
@@ -136,18 +130,18 @@ function confirmDelete(row) {
 
 async function doDelete() {
   await call(
-    () => client.delete(`/admin/tenants/${tenantId()}/directories/${deleteTarget.value.id}`),
+    () => client.delete(`/superadmin/directories/${deleteTarget.value.id}`),
     { successMsg: 'Directory deleted' }
   )
   await load()
 }
 
-async function testConn(row) {
+async function evictPool(row) {
   try {
-    await client.post(`/admin/tenants/${tenantId()}/directories/${row.id}/test`)
-    notif.success('Connection successful')
+    await client.post(`/superadmin/directories/${row.id}/evict-pool`)
+    notif.success('Connection pool evicted')
   } catch (e) {
-    notif.error(e.response?.data?.detail || 'Connection failed')
+    notif.error(e.response?.data?.detail || e.message)
   }
 }
 

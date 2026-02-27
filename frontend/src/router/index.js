@@ -90,9 +90,9 @@ const router = createRouter({
           meta: { requiresSuperadmin: true },
         },
         {
-          path: 'superadmin/tenants',
-          name: 'tenants',
-          component: () => import('@/views/superadmin/TenantsView.vue'),
+          path: 'superadmin/admins',
+          name: 'adminUsers',
+          component: () => import('@/views/superadmin/AdminUsersView.vue'),
           meta: { requiresSuperadmin: true },
         },
       ],

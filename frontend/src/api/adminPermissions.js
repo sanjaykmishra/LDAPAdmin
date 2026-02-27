@@ -1,22 +1,10 @@
 import client from './client'
 
-const base = (tenantId, adminId) =>
-  `/superadmin/tenants/${tenantId}/admins/${adminId}/permissions`
+const base = (adminId) => `/superadmin/admins/${adminId}/permissions`
 
-export const getPermissions = (tenantId, adminId) =>
-  client.get(base(tenantId, adminId))
-
-export const setDirectoryRole = (tenantId, adminId, data) =>
-  client.put(`${base(tenantId, adminId)}/directory-roles`, data)
-
-export const removeDirectoryRole = (tenantId, adminId, directoryId) =>
-  client.delete(`${base(tenantId, adminId)}/directory-roles/${directoryId}`)
-
-export const setBranchRestrictions = (tenantId, adminId, data) =>
-  client.put(`${base(tenantId, adminId)}/branch-restrictions`, data)
-
-export const setFeaturePermissions = (tenantId, adminId, features) =>
-  client.put(`${base(tenantId, adminId)}/features`, features)
-
-export const clearFeaturePermission = (tenantId, adminId, featureKey) =>
-  client.delete(`${base(tenantId, adminId)}/features/${featureKey}`)
+export const getPermissions         = (adminId)             => client.get(base(adminId))
+export const setRealmRole           = (adminId, data)       => client.put(`${base(adminId)}/realm-roles`, data)
+export const removeRealmRole        = (adminId, realmId)    => client.delete(`${base(adminId)}/realm-roles/${realmId}`)
+export const setBranchRestrictions  = (adminId, data)       => client.put(`${base(adminId)}/branch-restrictions`, data)
+export const setFeaturePermissions  = (adminId, features)   => client.put(`${base(adminId)}/features`, features)
+export const clearFeaturePermission = (adminId, featureKey) => client.delete(`${base(adminId)}/features/${featureKey}`)
