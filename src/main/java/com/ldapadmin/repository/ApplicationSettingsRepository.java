@@ -11,5 +11,5 @@ import java.util.UUID;
 public interface ApplicationSettingsRepository extends JpaRepository<ApplicationSettings, UUID> {
 
     /** Returns the singleton settings row, if it exists. */
-    Optional<ApplicationSettings> findFirst();
+    Optional<ApplicationSettings> findFirstBy();
 }
