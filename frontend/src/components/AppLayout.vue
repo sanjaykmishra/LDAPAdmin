@@ -95,7 +95,7 @@
 import { ref, watch, onMounted } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import client from '@/api/client'
+import { listDirectories } from '@/api/directories'
 
 const auth   = useAuthStore()
 const router = useRouter()
@@ -108,7 +108,7 @@ const selectedDirId = ref(route.params.dirId || '')
 onMounted(async () => {
   if (auth.isSuperadmin) return
   try {
-    const { data } = await client.get('/superadmin/directories')
+    const { data } = await listDirectories()
     dirs.value = data
     if (!selectedDirId.value && data.length) {
       selectedDirId.value = data[0].id
