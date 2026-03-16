@@ -21,10 +21,6 @@
 
       <!-- Navigation -->
       <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        <RouterLink to="/directories" class="nav-item">
-          <span class="icon">🗂</span> Directories
-        </RouterLink>
-
         <template v-if="selectedDirId">
           <RouterLink :to="`/directories/${selectedDirId}/users`" class="nav-item">
             <span class="icon">👤</span> Users

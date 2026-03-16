@@ -17,14 +17,7 @@ const router = createRouter({
       path: '/',
       component: () => import('@/components/AppLayout.vue'),
       children: [
-        { path: '', redirect: '/directories' },
-
-        // Directories
-        {
-          path: 'directories',
-          name: 'directories',
-          component: () => import('@/views/directories/DirectoryListView.vue'),
-        },
+        { path: '', redirect: '/superadmin/directories' },
 
         // Users
         {
@@ -123,7 +116,7 @@ router.beforeEach(async (to) => {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
   if (to.meta.requiresSuperadmin && !auth.isSuperadmin) {
-    return { path: '/directories' }
+    return { path: '/superadmin/directories' }
   }
 })
 
