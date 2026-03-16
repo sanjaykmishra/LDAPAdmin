@@ -59,6 +59,7 @@ const router = createRouter({
           path: 'directories/:dirId/realms',
           name: 'realms',
           component: () => import('@/views/realms/RealmsView.vue'),
+          meta: { requiresSuperadmin: true },
         },
 
         // Schema Browser

@@ -7,40 +7,44 @@
         <span class="text-lg font-bold tracking-tight">LDAP Admin</span>
       </div>
 
-      <!-- Directory picker -->
+      <!-- Realm picker -->
       <div class="px-3 py-3 border-b border-gray-700">
-        <label class="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Directory</label>
+        <label class="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Realm</label>
         <select
-          v-model="selectedDirId"
+          v-model="selectedRealmId"
           class="w-full bg-gray-800 border border-gray-600 text-white rounded px-2 py-1 text-sm"
         >
           <option value="">— select —</option>
-          <option v-for="d in dirs" :key="d.id" :value="d.id">{{ d.displayName }}</option>
+          <optgroup v-for="dir in dirs" :key="dir.id" :label="dir.displayName">
+            <option v-for="realm in dir.realms" :key="realm.id" :value="realm.id">
+              {{ realm.name }}
+            </option>
+          </optgroup>
         </select>
       </div>
 
       <!-- Navigation -->
       <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        <template v-if="selectedDirId">
-          <RouterLink :to="`/directories/${selectedDirId}/users`" class="nav-item">
+        <template v-if="currentDirId">
+          <RouterLink :to="`/directories/${currentDirId}/users`" class="nav-item">
             <span class="icon">👤</span> Users
           </RouterLink>
-          <RouterLink :to="`/directories/${selectedDirId}/groups`" class="nav-item">
+          <RouterLink :to="`/directories/${currentDirId}/groups`" class="nav-item">
             <span class="icon">👥</span> Groups
           </RouterLink>
-          <RouterLink :to="`/directories/${selectedDirId}/audit`" class="nav-item">
+          <RouterLink :to="`/directories/${currentDirId}/audit`" class="nav-item">
             <span class="icon">📋</span> Audit Log
           </RouterLink>
-          <RouterLink :to="`/directories/${selectedDirId}/bulk`" class="nav-item">
+          <RouterLink :to="`/directories/${currentDirId}/bulk`" class="nav-item">
             <span class="icon">📤</span> Bulk Import/Export
           </RouterLink>
-          <RouterLink :to="`/directories/${selectedDirId}/reports`" class="nav-item">
+          <RouterLink :to="`/directories/${currentDirId}/reports`" class="nav-item">
             <span class="icon">📊</span> Reports
           </RouterLink>
-          <RouterLink :to="`/directories/${selectedDirId}/realms`" class="nav-item">
+          <RouterLink v-if="auth.isSuperadmin" :to="`/directories/${currentDirId}/realms`" class="nav-item">
             <span class="icon">🏛</span> Realms
           </RouterLink>
-          <RouterLink :to="`/directories/${selectedDirId}/schema`" class="nav-item">
+          <RouterLink :to="`/directories/${currentDirId}/schema`" class="nav-item">
             <span class="icon">🔍</span> Schema
           </RouterLink>
         </template>
@@ -91,40 +95,76 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { listDirectories } from '@/api/directories'
+import { listRealms } from '@/api/realms'
 
 const auth   = useAuthStore()
 const router = useRouter()
 const route  = useRoute()
 
-const dirs          = ref([])
-const selectedDirId = ref(route.params.dirId || '')
+const dirs            = ref([])   // directories with nested .realms arrays
+const selectedRealmId = ref('')
 
-// Load directories for the sidebar picker
+// Derive the directoryId from the currently selected realm
+const currentDirId = computed(() => {
+  for (const dir of dirs.value) {
+    if (dir.realms?.some(r => r.id === selectedRealmId.value)) return dir.id
+  }
+  return ''
+})
+
+// Load directories and their realms for the sidebar picker
 onMounted(async () => {
   try {
-    const { data } = await listDirectories()
-    dirs.value = data
-    if (!selectedDirId.value && data.length) {
-      selectedDirId.value = data[0].id
+    const { data: directories } = await listDirectories()
+    const results = await Promise.all(
+      directories.map(async (dir) => {
+        try {
+          const { data: realms } = await listRealms(dir.id)
+          return { ...dir, realms }
+        } catch {
+          return { ...dir, realms: [] }
+        }
+      })
+    )
+    dirs.value = results
+
+    // If currently on a directory-scoped route, select its first realm
+    const routeDirId = route.params.dirId
+    if (routeDirId) {
+      const dir = results.find(d => d.id === routeDirId)
+      if (dir?.realms?.length) {
+        selectedRealmId.value = dir.realms[0].id
+      }
+    } else {
+      // Auto-select first available realm
+      const firstRealm = results.flatMap(d => d.realms)[0]
+      if (firstRealm) selectedRealmId.value = firstRealm.id
     }
   } catch { /* silently ignore */ }
 })
 
-// Keep dirId in sync with route params
-watch(() => route.params.dirId, id => {
-  if (id) selectedDirId.value = id
+// Keep realm selection in sync when route dirId changes externally
+watch(() => route.params.dirId, (dirId) => {
+  if (!dirId) return
+  // If current realm already belongs to this directory, keep it
+  if (currentDirId.value === dirId) return
+  // Otherwise select the first realm of the new directory
+  const dir = dirs.value.find(d => d.id === dirId)
+  if (dir?.realms?.length) {
+    selectedRealmId.value = dir.realms[0].id
+  }
 })
 
-// Navigate when user picks a different directory from the dropdown
+// Navigate when user picks a different realm from the dropdown
 const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'realms', 'schema']
-watch(selectedDirId, (newId) => {
-  if (!newId || newId === route.params.dirId) return
+watch(currentDirId, (newDirId, oldDirId) => {
+  if (!newDirId || newDirId === route.params.dirId) return
   const section = dirSections.includes(route.name) ? route.name : 'users'
-  router.push(`/directories/${newId}/${section}`)
+  router.push(`/directories/${newDirId}/${section}`)
 })
 
 async function handleLogout() {
