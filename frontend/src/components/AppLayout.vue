@@ -7,8 +7,8 @@
         <span class="text-lg font-bold tracking-tight">LDAP Admin</span>
       </div>
 
-      <!-- Directory picker (non-superadmin) -->
-      <div v-if="!auth.isSuperadmin" class="px-3 py-3 border-b border-gray-700">
+      <!-- Directory picker -->
+      <div class="px-3 py-3 border-b border-gray-700">
         <label class="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Directory</label>
         <select
           v-model="selectedDirId"
@@ -100,9 +100,8 @@ const route  = useRoute()
 const dirs          = ref([])
 const selectedDirId = ref(route.params.dirId || '')
 
-// Load directories for the sidebar picker (admins only)
+// Load directories for the sidebar picker
 onMounted(async () => {
-  if (auth.isSuperadmin) return
   try {
     const { data } = await listDirectories()
     dirs.value = data
