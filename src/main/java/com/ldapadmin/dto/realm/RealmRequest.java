@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Create / update request for a realm.
@@ -14,6 +15,7 @@ public record RealmRequest(
         @NotBlank String groupBaseDn,
         @NotBlank String primaryUserObjectclass,
         int displayOrder,
+        UUID userFormId,
         List<AuxEntry> auxiliaryObjectclasses) {
 
     /** An auxiliary objectClass entry within a realm. */

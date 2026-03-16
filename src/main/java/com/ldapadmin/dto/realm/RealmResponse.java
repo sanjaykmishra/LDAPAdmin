@@ -2,6 +2,7 @@ package com.ldapadmin.dto.realm;
 
 import com.ldapadmin.entity.Realm;
 import com.ldapadmin.entity.RealmAuxiliaryObjectclass;
+import com.ldapadmin.entity.RealmObjectclass;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -16,6 +17,7 @@ public record RealmResponse(
         String groupBaseDn,
         String primaryUserObjectclass,
         int displayOrder,
+        UUID userFormId,
         List<AuxEntry> auxiliaryObjectclasses,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
@@ -26,7 +28,13 @@ public record RealmResponse(
         }
     }
 
-    public static RealmResponse from(Realm r) {
+    public static RealmResponse from(Realm r, List<RealmObjectclass> realmOcs) {
+        UUID formId = realmOcs.stream()
+                .filter(oc -> oc.getUserForm() != null)
+                .map(oc -> oc.getUserForm().getId())
+                .findFirst()
+                .orElse(null);
+
         return new RealmResponse(
                 r.getId(),
                 r.getDirectory().getId(),
@@ -35,6 +43,7 @@ public record RealmResponse(
                 r.getGroupBaseDn(),
                 r.getPrimaryUserObjectclass(),
                 r.getDisplayOrder(),
+                formId,
                 r.getAuxiliaryObjectclasses().stream().map(AuxEntry::from).toList(),
                 r.getCreatedAt(),
                 r.getUpdatedAt());

@@ -100,6 +100,12 @@ const router = createRouter({
           component: () => import('@/views/superadmin/AuditSourcesView.vue'),
           meta: { requiresSuperadmin: true },
         },
+        {
+          path: 'superadmin/user-forms',
+          name: 'userForms',
+          component: () => import('@/views/userForms/UserFormsView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
       ],
     },
 
