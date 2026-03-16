@@ -11,12 +11,13 @@
       <div class="px-3 py-3 border-b border-gray-700">
         <label class="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Realm</label>
         <select
-          v-model="selectedRealmId"
+          v-model="pickerValue"
           class="w-full bg-gray-800 border border-gray-600 text-white rounded px-2 py-1 text-sm"
         >
           <option value="">— select —</option>
           <optgroup v-for="dir in dirs" :key="dir.id" :label="dir.displayName">
-            <option v-for="realm in dir.realms" :key="realm.id" :value="realm.id">
+            <option v-if="!dir.realms.length" :value="`dir:${dir.id}`">(no realms)</option>
+            <option v-for="realm in dir.realms" :key="realm.id" :value="`realm:${realm.id}`">
               {{ realm.name }}
             </option>
           </optgroup>
@@ -105,16 +106,27 @@ const auth   = useAuthStore()
 const router = useRouter()
 const route  = useRoute()
 
-const dirs            = ref([])   // directories with nested .realms arrays
-const selectedRealmId = ref('')
+const dirs        = ref([])   // directories with nested .realms arrays
+const pickerValue = ref('')   // "realm:<id>" or "dir:<id>"
 
-// Derive the directoryId from the currently selected realm
+// Parse the picker value into a directoryId
 const currentDirId = computed(() => {
-  for (const dir of dirs.value) {
-    if (dir.realms?.some(r => r.id === selectedRealmId.value)) return dir.id
+  const v = pickerValue.value
+  if (!v) return ''
+  if (v.startsWith('dir:')) return v.slice(4)
+  if (v.startsWith('realm:')) {
+    const realmId = v.slice(6)
+    for (const dir of dirs.value) {
+      if (dir.realms?.some(r => r.id === realmId)) return dir.id
+    }
   }
   return ''
 })
+
+// Build a picker value for a given directory (prefer first realm, fallback to dir)
+function pickerValueForDir(dir) {
+  return dir.realms?.length ? `realm:${dir.realms[0].id}` : `dir:${dir.id}`
+}
 
 // Load directories and their realms for the sidebar picker
 onMounted(async () => {
@@ -132,36 +144,29 @@ onMounted(async () => {
     )
     dirs.value = results
 
-    // If currently on a directory-scoped route, select its first realm
+    // If currently on a directory-scoped route, select matching entry
     const routeDirId = route.params.dirId
     if (routeDirId) {
       const dir = results.find(d => d.id === routeDirId)
-      if (dir?.realms?.length) {
-        selectedRealmId.value = dir.realms[0].id
-      }
-    } else {
-      // Auto-select first available realm
-      const firstRealm = results.flatMap(d => d.realms)[0]
-      if (firstRealm) selectedRealmId.value = firstRealm.id
+      if (dir) pickerValue.value = pickerValueForDir(dir)
+    } else if (results.length) {
+      // Auto-select first directory/realm
+      pickerValue.value = pickerValueForDir(results[0])
     }
   } catch { /* silently ignore */ }
 })
 
-// Keep realm selection in sync when route dirId changes externally
+// Keep picker in sync when route dirId changes externally
 watch(() => route.params.dirId, (dirId) => {
   if (!dirId) return
-  // If current realm already belongs to this directory, keep it
   if (currentDirId.value === dirId) return
-  // Otherwise select the first realm of the new directory
   const dir = dirs.value.find(d => d.id === dirId)
-  if (dir?.realms?.length) {
-    selectedRealmId.value = dir.realms[0].id
-  }
+  if (dir) pickerValue.value = pickerValueForDir(dir)
 })
 
-// Navigate when user picks a different realm from the dropdown
+// Navigate when user picks a different entry from the dropdown
 const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'realms', 'schema']
-watch(currentDirId, (newDirId, oldDirId) => {
+watch(currentDirId, (newDirId) => {
   if (!newDirId || newDirId === route.params.dirId) return
   const section = dirSections.includes(route.name) ? route.name : 'users'
   router.push(`/directories/${newDirId}/${section}`)
