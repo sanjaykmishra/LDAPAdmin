@@ -55,7 +55,7 @@ import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useNotificationStore } from '@/stores/notifications'
 import { useApi } from '@/composables/useApi'
-import client from '@/api/client'
+import { listDirectories, createDirectory, updateDirectory, deleteDirectory, evictPool as evictDirectoryPool } from '@/api/directories'
 import DataTable from '@/components/DataTable.vue'
 import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -87,7 +87,7 @@ const form = ref(emptyForm())
 
 async function load() {
   await call(async () => {
-    const { data } = await client.get('/superadmin/directories')
+    const { data } = await listDirectories()
     dirs.value = data
   })
 }
@@ -108,10 +108,10 @@ async function save() {
   saving.value = true
   try {
     if (editing.value) {
-      await client.put(`/superadmin/directories/${editing.value}`, form.value)
+      await updateDirectory(editing.value, form.value)
       notif.success('Directory updated')
     } else {
-      await client.post('/superadmin/directories', form.value)
+      await createDirectory(form.value)
       notif.success('Directory created')
     }
     showModal.value = false
@@ -130,7 +130,7 @@ function confirmDelete(row) {
 
 async function doDelete() {
   await call(
-    () => client.delete(`/superadmin/directories/${deleteTarget.value.id}`),
+    () => deleteDirectory(deleteTarget.value.id),
     { successMsg: 'Directory deleted' }
   )
   await load()
@@ -138,7 +138,7 @@ async function doDelete() {
 
 async function evictPool(row) {
   try {
-    await client.post(`/superadmin/directories/${row.id}/evict-pool`)
+    await evictDirectoryPool(row.id)
     notif.success('Connection pool evicted')
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)

@@ -5,9 +5,10 @@ import com.ldapadmin.dto.csv.BulkImportRowResult;
 import com.ldapadmin.dto.csv.CsvColumnMappingDto;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.enums.ConflictHandling;
-import com.ldapadmin.exception.ResourceNotFoundException;
+import com.ldapadmin.exception.LdapOperationException;
 import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.ldap.model.LdapUser;
+import com.unboundid.ldap.sdk.ResultCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -56,14 +58,19 @@ class BulkUserServiceTest {
         return new LdapUser(dn, attrs);
     }
 
+    /** Creates a LdapOperationException that looks like ENTRY_ALREADY_EXISTS. */
+    private LdapOperationException entryAlreadyExists(String dn) {
+        return new LdapOperationException(
+                "createUser failed for [" + dn + "]: "
+                + ResultCode.ENTRY_ALREADY_EXISTS.getName());
+    }
+
     // ── Import — create ───────────────────────────────────────────────────────
 
     @Test
     void importCsv_createsNewEntries() throws IOException {
         String csvContent = "uid,cn,mail\njsmith,John Smith,jsmith@example.com\n";
-        // No existing entry → ResourceNotFoundException
-        when(userService.getUser(eq(dc), eq("uid=jsmith,ou=people,dc=example,dc=com")))
-                .thenThrow(new ResourceNotFoundException("LDAP user", "uid=jsmith,..."));
+        // createUser succeeds (default void mock behaviour) → entry created
 
         BulkImportResult result = service.importCsv(
                 dc, csv(csvContent),
@@ -90,8 +97,9 @@ class BulkUserServiceTest {
     @Test
     void importCsv_skipsExistingEntry_whenConflictHandlingSkip() throws IOException {
         String csvContent = "uid,cn\nexisting,Existing User\n";
-        when(userService.getUser(eq(dc), anyString()))
-                .thenReturn(ldapUser("uid=existing,ou=people,dc=example,dc=com", Map.of()));
+        // createUser throws ENTRY_ALREADY_EXISTS → triggers conflict handling
+        doThrow(entryAlreadyExists("uid=existing,ou=people,dc=example,dc=com"))
+                .when(userService).createUser(eq(dc), anyString(), any());
 
         BulkImportResult result = service.importCsv(
                 dc, csv(csvContent),
@@ -103,15 +111,15 @@ class BulkUserServiceTest {
         assertThat(result.skipped()).isEqualTo(1);
         assertThat(result.created()).isEqualTo(0);
         assertThat(result.rows().get(0).status()).isEqualTo(BulkImportRowResult.Status.SKIPPED);
-        verify(userService, never()).createUser(any(), anyString(), any());
         verify(userService, never()).updateUser(any(), anyString(), any());
     }
 
     @Test
     void importCsv_updatesExistingEntry_whenConflictHandlingOverwrite() throws IOException {
         String csvContent = "uid,cn,mail\nexisting,Updated Name,new@example.com\n";
-        when(userService.getUser(eq(dc), anyString()))
-                .thenReturn(ldapUser("uid=existing,ou=people,dc=example,dc=com", Map.of()));
+        // createUser throws ENTRY_ALREADY_EXISTS → triggers OVERWRITE path
+        doThrow(entryAlreadyExists("uid=existing,ou=people,dc=example,dc=com"))
+                .when(userService).createUser(eq(dc), anyString(), any());
 
         BulkImportResult result = service.importCsv(
                 dc, csv(csvContent),
@@ -123,7 +131,6 @@ class BulkUserServiceTest {
         assertThat(result.updated()).isEqualTo(1);
         assertThat(result.rows().get(0).status()).isEqualTo(BulkImportRowResult.Status.UPDATED);
         verify(userService).updateUser(eq(dc), anyString(), any());
-        verify(userService, never()).createUser(any(), anyString(), any());
     }
 
     @Test
@@ -148,13 +155,14 @@ class BulkUserServiceTest {
     void importCsv_multipleRows_countsCorrectly() throws IOException {
         String csvContent = "uid,cn\nnew1,New One\nnew2,New Two\nexist,Existing\n";
 
-        // new1, new2 → not found; exist → found
-        when(userService.getUser(eq(dc), eq("uid=new1,ou=p,dc=example,dc=com")))
-                .thenThrow(new ResourceNotFoundException("u", "uid=new1,..."));
-        when(userService.getUser(eq(dc), eq("uid=new2,ou=p,dc=example,dc=com")))
-                .thenThrow(new ResourceNotFoundException("u", "uid=new2,..."));
-        when(userService.getUser(eq(dc), eq("uid=exist,ou=p,dc=example,dc=com")))
-                .thenReturn(ldapUser("uid=exist,ou=p,dc=example,dc=com", Map.of()));
+        // new1, new2 → createUser succeeds; exist → ENTRY_ALREADY_EXISTS
+        doNothing().when(userService).createUser(eq(dc),
+                eq("uid=new1,ou=p,dc=example,dc=com"), any());
+        doNothing().when(userService).createUser(eq(dc),
+                eq("uid=new2,ou=p,dc=example,dc=com"), any());
+        doThrow(entryAlreadyExists("uid=exist,ou=p,dc=example,dc=com"))
+                .when(userService).createUser(eq(dc),
+                        eq("uid=exist,ou=p,dc=example,dc=com"), any());
 
         BulkImportResult result = service.importCsv(
                 dc, csv(csvContent),
@@ -174,8 +182,7 @@ class BulkUserServiceTest {
     @Test
     void importCsv_columnMappings_mapsHeadersToLdapAttributes() throws IOException {
         String csvContent = "User Login,Full Name\njsmith,John Smith\n";
-        when(userService.getUser(eq(dc), anyString()))
-                .thenThrow(new ResourceNotFoundException("u", "d"));
+        // createUser succeeds (default void mock behaviour)
 
         List<CsvColumnMappingDto> mappings = List.of(
                 new CsvColumnMappingDto("User Login", "uid", false),
@@ -195,8 +202,7 @@ class BulkUserServiceTest {
     @Test
     void importCsv_ignoredColumn_notIncludedInAttributes() throws IOException {
         String csvContent = "uid,password,cn\njsmith,secret,John\n";
-        when(userService.getUser(eq(dc), anyString()))
-                .thenThrow(new ResourceNotFoundException("u", "d"));
+        // createUser succeeds (default void mock behaviour)
 
         List<CsvColumnMappingDto> mappings = List.of(
                 new CsvColumnMappingDto("uid",      "uid",  false),
@@ -220,8 +226,14 @@ class BulkUserServiceTest {
         LdapUser user = ldapUser("uid=jsmith,ou=people,dc=example,dc=com",
                 Map.of("cn",   List.of("John Smith"),
                        "mail", List.of("jsmith@example.com")));
-        when(userService.searchUsers(eq(dc), anyString(), isNull(), eq("cn"), eq("mail")))
-                .thenReturn(List.of(user));
+
+        // When attributes are specified, exportCsv uses processUsers (streaming)
+        doAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Consumer<LdapUser> consumer = invocation.getArgument(3);
+            consumer.accept(user);
+            return null;
+        }).when(userService).processUsers(eq(dc), anyString(), isNull(), any(), eq("cn"), eq("mail"));
 
         byte[] csv = service.exportCsv(dc, null, null, List.of("cn", "mail"));
 
@@ -237,8 +249,13 @@ class BulkUserServiceTest {
         LdapUser user = ldapUser("uid=jsmith,ou=people,dc=example,dc=com",
                 Map.of("memberof", List.of("cn=admins,dc=example,dc=com",
                                            "cn=users,dc=example,dc=com")));
-        when(userService.searchUsers(eq(dc), anyString(), isNull(), eq("memberof")))
-                .thenReturn(List.of(user));
+
+        doAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Consumer<LdapUser> consumer = invocation.getArgument(3);
+            consumer.accept(user);
+            return null;
+        }).when(userService).processUsers(eq(dc), anyString(), isNull(), any(), eq("memberof"));
 
         byte[] csv = service.exportCsv(dc, null, null, List.of("memberof"));
 
@@ -248,8 +265,9 @@ class BulkUserServiceTest {
 
     @Test
     void exportCsv_emptyResult_returnsHeaderOnly() throws IOException {
-        when(userService.searchUsers(eq(dc), anyString(), isNull(), eq("cn"), eq("mail")))
-                .thenReturn(List.of());
+        // When attributes are specified, exportCsv uses processUsers (streaming)
+        // processUsers does nothing (no entries) → only header is written
+        doNothing().when(userService).processUsers(eq(dc), anyString(), isNull(), any(), eq("cn"), eq("mail"));
 
         byte[] csv = service.exportCsv(dc, null, null, List.of("cn", "mail"));
 
@@ -261,11 +279,11 @@ class BulkUserServiceTest {
 
     @Test
     void exportCsv_defaultFilter_usedWhenFilterNull() throws IOException {
-        when(userService.searchUsers(eq(dc), eq("(objectClass=*)"), isNull(), eq("cn")))
-                .thenReturn(List.of());
+        // When attributes are specified, exportCsv uses processUsers (streaming)
+        doNothing().when(userService).processUsers(eq(dc), eq("(objectClass=*)"), isNull(), any(), eq("cn"));
 
         service.exportCsv(dc, null, null, List.of("cn"));
 
-        verify(userService).searchUsers(eq(dc), eq("(objectClass=*)"), isNull(), eq("cn"));
+        verify(userService).processUsers(eq(dc), eq("(objectClass=*)"), isNull(), any(), eq("cn"));
     }
 }

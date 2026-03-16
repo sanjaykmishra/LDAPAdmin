@@ -36,6 +36,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -85,7 +86,7 @@ class LdapOperationServiceTest {
     void searchUsers_superadmin_noTenantScope() {
         DirectoryConnection dc = enabledDir(true);
         when(dirRepo.findById(dirId)).thenReturn(Optional.of(dc));
-        when(userService.searchUsers(eq(dc), anyString(), any())).thenReturn(List.of());
+        when(userService.searchUsers(eq(dc), anyString(), any(), anyInt(), any(String[].class))).thenReturn(List.of());
 
         List<LdapEntryResponse> result = service.searchUsers(dirId, superadminPrincipal(),
                 "(cn=*)", null, 100, new String[0]);
@@ -185,20 +186,20 @@ class LdapOperationServiceTest {
     }
 
     @Test
-    void searchUsers_limitIsRespected() {
+    void searchUsers_limitIsPassedToUserService() {
         DirectoryConnection dc = enabledDir(true);
         when(dirRepo.findById(dirId)).thenReturn(Optional.of(dc));
 
-        List<LdapUser> bigList = List.of(
-                new LdapUser("cn=A,dc=example,dc=com", Map.of()),
-                new LdapUser("cn=B,dc=example,dc=com", Map.of()),
-                new LdapUser("cn=C,dc=example,dc=com", Map.of()));
-        when(userService.searchUsers(eq(dc), anyString(), any())).thenReturn(bigList);
+        when(userService.searchUsers(eq(dc), anyString(), any(), eq(2), any(String[].class)))
+                .thenReturn(List.of(
+                        new LdapUser("cn=A,dc=example,dc=com", Map.of()),
+                        new LdapUser("cn=B,dc=example,dc=com", Map.of())));
 
         List<LdapEntryResponse> result = service.searchUsers(
                 dirId, adminPrincipal(), null, null, 2, new String[0]);
 
         assertThat(result).hasSize(2);
+        verify(userService).searchUsers(eq(dc), anyString(), any(), eq(2), any(String[].class));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

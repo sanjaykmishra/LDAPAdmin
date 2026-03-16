@@ -3,6 +3,7 @@ package com.ldapadmin.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.auth.AuthenticationService;
+import com.ldapadmin.auth.LoginRateLimiter;
 import com.ldapadmin.auth.PrincipalType;
 import com.ldapadmin.auth.dto.LoginRequest;
 import com.ldapadmin.auth.dto.LoginResponse;
@@ -34,6 +35,7 @@ class AuthControllerTest extends BaseControllerTest {
     @Autowired ObjectMapper  objectMapper;
 
     @MockBean AuthenticationService authenticationService;
+    @MockBean LoginRateLimiter      loginRateLimiter;
 
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
@@ -45,7 +47,7 @@ class AuthControllerTest extends BaseControllerTest {
         LoginResponse res = new LoginResponse("jwt-token", "admin", "SUPERADMIN", null);
         given(authenticationService.login(any())).willReturn(res);
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
@@ -58,7 +60,7 @@ class AuthControllerTest extends BaseControllerTest {
         LoginRequest req = new LoginRequest("admin", "wrong");
         given(authenticationService.login(any())).willThrow(new BadCredentialsException("Bad credentials"));
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isUnauthorized());
@@ -66,7 +68,7 @@ class AuthControllerTest extends BaseControllerTest {
 
     @Test
     void login_missingUsername_returns400() throws Exception {
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"password\":\"secret\"}"))
                 .andExpect(status().isBadRequest());
@@ -79,7 +81,7 @@ class AuthControllerTest extends BaseControllerTest {
         given(authenticationService.login(any())).willReturn(res);
 
         // No authentication() post-processor — endpoint must be accessible anonymously
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk());
@@ -93,7 +95,7 @@ class AuthControllerTest extends BaseControllerTest {
         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                 principal, null, List.of(new SimpleGrantedAuthority("ROLE_SUPERADMIN")));
 
-        mockMvc.perform(get("/api/auth/me").with(authentication(auth)))
+        mockMvc.perform(get("/api/v1/auth/me").with(authentication(auth)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("alice"))
                 .andExpect(jsonPath("$.accountType").value("SUPERADMIN"))
@@ -102,7 +104,7 @@ class AuthControllerTest extends BaseControllerTest {
 
     @Test
     void me_unauthenticated_returns401() throws Exception {
-        mockMvc.perform(get("/api/auth/me"))
+        mockMvc.perform(get("/api/v1/auth/me"))
                 .andExpect(status().isUnauthorized());
     }
 }

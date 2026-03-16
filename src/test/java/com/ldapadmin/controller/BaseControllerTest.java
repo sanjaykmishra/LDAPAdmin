@@ -4,7 +4,9 @@ import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.auth.JwtTokenService;
 import com.ldapadmin.auth.PermissionService;
 import com.ldapadmin.auth.PrincipalType;
+import com.ldapadmin.config.AppProperties;
 import com.ldapadmin.config.SecurityConfig;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
@@ -32,6 +34,7 @@ import java.util.UUID;
  * </p>
  */
 @Import(SecurityConfig.class)
+@EnableConfigurationProperties(AppProperties.class)
 @TestPropertySource(properties = {
         "app.jwt.secret=dGVzdHNlY3JldHRlc3RzZWNyZXR0ZXN0c2VjcmV0dGVzdHNlY3JldHRlc3Q=",
         "app.encryption.key=dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleTA=",
