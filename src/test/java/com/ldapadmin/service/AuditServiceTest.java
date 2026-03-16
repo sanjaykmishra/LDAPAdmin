@@ -143,8 +143,8 @@ class AuditServiceTest {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private DirectoryConnection mockDirectory(String name) {
-        DirectoryConnection dc = mock(DirectoryConnection.class);
-        when(dc.getDisplayName()).thenReturn(name);
+        DirectoryConnection dc = new DirectoryConnection();
+        dc.setDisplayName(name);
         return dc;
     }
 }
