@@ -64,6 +64,9 @@
           <RouterLink to="/superadmin/audit-sources" class="nav-item">
             <span class="icon">📋</span> Audit Sources
           </RouterLink>
+          <RouterLink to="/superadmin/user-forms" class="nav-item">
+            <span class="icon">📝</span> User Forms
+          </RouterLink>
           <RouterLink to="/settings" class="nav-item">
             <span class="icon">⚙️</span> Settings
           </RouterLink>

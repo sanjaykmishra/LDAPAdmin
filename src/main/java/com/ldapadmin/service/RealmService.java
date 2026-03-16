@@ -5,9 +5,13 @@ import com.ldapadmin.dto.realm.RealmResponse;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.Realm;
 import com.ldapadmin.entity.RealmAuxiliaryObjectclass;
+import com.ldapadmin.entity.RealmObjectclass;
+import com.ldapadmin.entity.UserForm;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
+import com.ldapadmin.repository.RealmObjectclassRepository;
 import com.ldapadmin.repository.RealmRepository;
+import com.ldapadmin.repository.UserFormRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +32,8 @@ public class RealmService {
 
     private final RealmRepository               realmRepo;
     private final DirectoryConnectionRepository dirRepo;
+    private final RealmObjectclassRepository    realmOcRepo;
+    private final UserFormRepository            userFormRepo;
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -35,12 +41,12 @@ public class RealmService {
     public List<RealmResponse> listByDirectory(UUID directoryId) {
         requireDirectory(directoryId);
         return realmRepo.findAllByDirectoryIdOrderByDisplayOrderAsc(directoryId)
-                .stream().map(RealmResponse::from).toList();
+                .stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public RealmResponse get(UUID directoryId, UUID realmId) {
-        return RealmResponse.from(requireRealm(directoryId, realmId));
+        return toResponse(requireRealm(directoryId, realmId));
     }
 
     @Transactional
@@ -49,7 +55,9 @@ public class RealmService {
         Realm realm = new Realm();
         realm.setDirectory(dir);
         applyRequest(realm, req);
-        return RealmResponse.from(realmRepo.save(realm));
+        realm = realmRepo.save(realm);
+        syncUserForm(realm, req.userFormId());
+        return toResponse(realm);
     }
 
     @Transactional
@@ -57,7 +65,9 @@ public class RealmService {
         Realm realm = requireRealm(directoryId, realmId);
         realm.getAuxiliaryObjectclasses().clear();
         applyRequest(realm, req);
-        return RealmResponse.from(realmRepo.save(realm));
+        realm = realmRepo.save(realm);
+        syncUserForm(realm, req.userFormId());
+        return toResponse(realm);
     }
 
     @Transactional
@@ -67,6 +77,11 @@ public class RealmService {
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    private RealmResponse toResponse(Realm realm) {
+        List<RealmObjectclass> ocs = realmOcRepo.findAllByRealmId(realm.getId());
+        return RealmResponse.from(realm, ocs);
+    }
 
     private DirectoryConnection requireDirectory(UUID directoryId) {
         return dirRepo.findById(directoryId)
@@ -94,5 +109,37 @@ public class RealmService {
                 realm.getAuxiliaryObjectclasses().add(entry);
             });
         }
+    }
+
+    /**
+     * Syncs the realm_objectclasses entry that links a realm to a user form.
+     * If userFormId is null, any existing link is removed.
+     */
+    private void syncUserForm(Realm realm, UUID userFormId) {
+        List<RealmObjectclass> existing = realmOcRepo.findAllByRealmId(realm.getId());
+
+        if (userFormId == null) {
+            // Remove any existing objectclass entries that have a user form
+            existing.stream()
+                    .filter(oc -> oc.getUserForm() != null)
+                    .forEach(realmOcRepo::delete);
+            return;
+        }
+
+        UserForm form = userFormRepo.findById(userFormId)
+                .orElseThrow(() -> new ResourceNotFoundException("UserForm", userFormId));
+
+        // Find an existing entry to update, or create a new one
+        RealmObjectclass oc = existing.stream()
+                .filter(e -> e.getUserForm() != null)
+                .findFirst()
+                .orElseGet(() -> {
+                    RealmObjectclass newOc = new RealmObjectclass();
+                    newOc.setRealm(realm);
+                    return newOc;
+                });
+
+        oc.setUserForm(form);
+        realmOcRepo.save(oc);
     }
 }
