@@ -44,7 +44,7 @@ class UserControllerTest extends BaseControllerTest {
     @MockBean LdapOperationService ldapService;
 
     static final UUID DIR_ID    = UUID.fromString("20000000-0000-0000-0000-000000000002");
-    static final String BASE_URL = "/api/directories/" + DIR_ID + "/users";
+    static final String BASE_URL = "/api/v1/directories/" + DIR_ID + "/users";
     static final String ENTRY_DN = "uid=alice,ou=people,dc=example,dc=com";
 
     LdapEntryResponse sampleEntry() {
