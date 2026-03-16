@@ -27,8 +27,8 @@
         <unboundid-ldapsdk.version>7.0.1</unboundid-ldapsdk.version>
         <lombok.version>1.18.42</lombok.version>
         <!-- Override byte-buddy + mockito for Java 25 compatibility -->
-        <byte-buddy.version>1.17.5</byte-buddy.version>
-        <mockito.version>5.17.0</mockito.version>
+        <byte-buddy.version>1.18.7</byte-buddy.version>
+        <mockito.version>5.23.0</mockito.version>
     </properties>
 
     <dependencies>
