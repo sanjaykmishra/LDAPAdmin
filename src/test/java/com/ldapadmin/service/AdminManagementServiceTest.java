@@ -89,7 +89,7 @@ class AdminManagementServiceTest {
         when(accountRepo.existsByUsername("bob")).thenReturn(true);
 
         assertThatThrownBy(() -> service.createAdmin(
-                new AdminAccountRequest("bob", "Bob", "bob@e.com", true)))
+                new AdminAccountRequest("bob", "Bob", "bob@e.com", AccountType.LOCAL, null, null, true)))
                 .isInstanceOf(ConflictException.class);
 
         verify(accountRepo, never()).save(any());
@@ -102,7 +102,7 @@ class AdminManagementServiceTest {
         when(accountRepo.save(any())).thenReturn(saved);
 
         AdminAccountResponse resp = service.createAdmin(
-                new AdminAccountRequest("alice", "Alice", "a@e.com", true));
+                new AdminAccountRequest("alice", "Alice", "a@e.com", AccountType.LOCAL, null, null, true));
 
         assertThat(resp.username()).isEqualTo("alice");
         ArgumentCaptor<Account> captor = ArgumentCaptor.forClass(Account.class);
@@ -118,7 +118,7 @@ class AdminManagementServiceTest {
         when(accountRepo.findById(adminId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.updateAdmin(adminId,
-                new AdminAccountRequest("alice", "Alice", "a@e.com", true)))
+                new AdminAccountRequest("alice", "Alice", "a@e.com", AccountType.LOCAL, null, null, true)))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -129,7 +129,7 @@ class AdminManagementServiceTest {
         when(accountRepo.existsByUsername("bob")).thenReturn(true);
 
         assertThatThrownBy(() -> service.updateAdmin(adminId,
-                new AdminAccountRequest("bob", "Bob", "b@e.com", true)))
+                new AdminAccountRequest("bob", "Bob", "b@e.com", AccountType.LOCAL, null, null, true)))
                 .isInstanceOf(ConflictException.class);
     }
 
@@ -140,7 +140,7 @@ class AdminManagementServiceTest {
         when(accountRepo.save(any())).thenReturn(existing);
 
         service.updateAdmin(adminId,
-                new AdminAccountRequest("alice", "Alice Renamed", "a@e.com", true));
+                new AdminAccountRequest("alice", "Alice Renamed", "a@e.com", AccountType.LOCAL, null, null, true));
 
         verify(accountRepo, never()).existsByUsername("alice");
     }
