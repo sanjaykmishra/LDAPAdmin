@@ -186,20 +186,20 @@ class LdapOperationServiceTest {
     }
 
     @Test
-    void searchUsers_limitIsRespected() {
+    void searchUsers_limitIsPassedToUserService() {
         DirectoryConnection dc = enabledDir(true);
         when(dirRepo.findById(dirId)).thenReturn(Optional.of(dc));
 
-        List<LdapUser> bigList = List.of(
-                new LdapUser("cn=A,dc=example,dc=com", Map.of()),
-                new LdapUser("cn=B,dc=example,dc=com", Map.of()),
-                new LdapUser("cn=C,dc=example,dc=com", Map.of()));
-        when(userService.searchUsers(eq(dc), anyString(), any(), anyInt(), any(String[].class))).thenReturn(bigList);
+        when(userService.searchUsers(eq(dc), anyString(), any(), eq(2), any(String[].class)))
+                .thenReturn(List.of(
+                        new LdapUser("cn=A,dc=example,dc=com", Map.of()),
+                        new LdapUser("cn=B,dc=example,dc=com", Map.of())));
 
         List<LdapEntryResponse> result = service.searchUsers(
                 dirId, adminPrincipal(), null, null, 2, new String[0]);
 
         assertThat(result).hasSize(2);
+        verify(userService).searchUsers(eq(dc), anyString(), any(), eq(2), any(String[].class));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
