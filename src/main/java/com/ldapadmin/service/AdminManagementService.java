@@ -63,8 +63,14 @@ public class AdminManagementService {
         a.setDisplayName(req.displayName());
         a.setEmail(req.email());
         a.setRole(AccountRole.ADMIN);
-        a.setAuthType(AccountType.LOCAL);
+        a.setAuthType(req.authType());
         a.setActive(req.active());
+        if (req.authType() == AccountType.LOCAL && req.password() != null && !req.password().isBlank()) {
+            a.setPasswordHash(passwordEncoder.encode(req.password()));
+        }
+        if (req.authType() == AccountType.LDAP) {
+            a.setLdapDn(req.ldapDn());
+        }
         return AdminAccountResponse.from(accountRepo.save(a));
     }
 
@@ -77,7 +83,16 @@ public class AdminManagementService {
         a.setUsername(req.username());
         a.setDisplayName(req.displayName());
         a.setEmail(req.email());
+        a.setAuthType(req.authType());
         a.setActive(req.active());
+        if (req.authType() == AccountType.LOCAL && req.password() != null && !req.password().isBlank()) {
+            a.setPasswordHash(passwordEncoder.encode(req.password()));
+        }
+        if (req.authType() == AccountType.LDAP) {
+            a.setLdapDn(req.ldapDn());
+        } else {
+            a.setLdapDn(null);
+        }
         return AdminAccountResponse.from(accountRepo.save(a));
     }
 

@@ -44,6 +44,15 @@
           hint="Used to log in. Cannot be changed after creation." />
         <FormField label="Display name" v-model="form.displayName" placeholder="Optional" />
         <FormField label="Email" v-model="form.email" type="email" placeholder="Optional" />
+        <FormField label="Auth type" v-model="form.authType" type="select" required
+          :options="[{ value: 'LOCAL', label: 'Local' }, { value: 'LDAP', label: 'LDAP' }]"
+          hint="LOCAL uses a portal password. LDAP authenticates against the configured LDAP directory." />
+        <FormField v-if="form.authType === 'LOCAL'" label="Password" v-model="form.password" type="password"
+          :placeholder="editing ? 'Leave blank to keep current' : 'Enter password'"
+          :hint="editing ? 'Only fill in to change the password.' : 'Set the initial password for this account.'" />
+        <FormField v-if="form.authType === 'LDAP'" label="LDAP DN" v-model="form.ldapDn"
+          placeholder="e.g. uid=jdoe,ou=People,dc=example,dc=com"
+          hint="Distinguished name used to bind against the LDAP auth directory." />
         <div class="flex items-center gap-2 py-2">
           <input id="active-toggle" type="checkbox" v-model="form.active"
             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
@@ -156,7 +165,7 @@ const cols = [
 ]
 
 function emptyForm() {
-  return { username: '', displayName: '', email: '', active: true }
+  return { username: '', displayName: '', email: '', authType: 'LOCAL', password: '', ldapDn: '', active: true }
 }
 
 async function load() {
@@ -181,7 +190,7 @@ function openCreate() {
 
 function openEdit(row) {
   editing.value = row.id
-  form.value = { username: row.username, displayName: row.displayName || '', email: row.email || '', active: row.active }
+  form.value = { username: row.username, displayName: row.displayName || '', email: row.email || '', authType: row.authType || 'LOCAL', password: '', ldapDn: row.ldapDn || '', active: row.active }
   showForm.value = true
 }
 
