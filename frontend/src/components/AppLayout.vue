@@ -15,7 +15,7 @@
           class="w-full bg-gray-800 border border-gray-600 text-white rounded px-2 py-1 text-sm"
         >
           <option value="">— select —</option>
-          <option v-for="d in dirs" :key="d.id" :value="d.id">{{ d.name }}</option>
+          <option v-for="d in dirs" :key="d.id" :value="d.id">{{ d.displayName }}</option>
         </select>
       </div>
 

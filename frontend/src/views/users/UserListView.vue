@@ -159,12 +159,22 @@ async function save() {
   try {
     if (editingDn.value) {
       const mods = Object.entries(form.value.attributes || {}).map(([attr, val]) => ({
-        attribute: attr, values: val.split('\n').map(v => v.trim()).filter(v => v.length > 0),
+        operation: 'REPLACE',
+        attribute: attr,
+        values: val.split('\n').map(v => v.trim()).filter(v => v.length > 0),
       }))
       await usersApi.updateUser(dirId, editingDn.value, { modifications: mods })
       notif.success('User updated')
     } else {
-      await usersApi.createUser(dirId, form.value)
+      const f = form.value
+      const dn = `${f.rdnAttribute}=${f.rdnValue},${f.parentDn}`
+      const attributes = {}
+      for (const [k, v] of Object.entries(f.attributes || {})) {
+        if (v) attributes[k] = [v]
+      }
+      // Include the RDN attribute in the attributes map
+      attributes[f.rdnAttribute] = [f.rdnValue]
+      await usersApi.createUser(dirId, { dn, attributes })
       notif.success('User created')
     }
     showModal.value = false

@@ -9,9 +9,9 @@
     </div>
 
     <DataTable :columns="cols" :rows="dirs" :loading="loading" row-key="id">
-      <template #cell-name="{ row }">
+      <template #cell-displayName="{ row }">
         <div>
-          <p class="font-medium text-gray-900">{{ row.name }}</p>
+          <p class="font-medium text-gray-900">{{ row.displayName }}</p>
           <p class="text-xs text-gray-400">{{ row.host }}:{{ row.port }}</p>
         </div>
       </template>
@@ -42,7 +42,7 @@
     <ConfirmDialog
       v-model="showDelete"
       title="Delete Directory"
-      :message="`Delete '${deleteTarget?.name}'? This cannot be undone.`"
+      :message="`Delete '${deleteTarget?.displayName}'? This cannot be undone.`"
       confirm-label="Delete"
       danger
       @confirm="doDelete"
@@ -72,15 +72,15 @@ const saving      = ref(false)
 const deleteTarget = ref(null)
 
 const cols = [
-  { key: 'name',   label: 'Name' },
-  { key: 'bindDn', label: 'Bind DN' },
-  { key: 'baseDn', label: 'Base DN' },
+  { key: 'displayName', label: 'Name' },
+  { key: 'bindDn',      label: 'Bind DN' },
+  { key: 'baseDn',      label: 'Base DN' },
 ]
 
 
 const emptyForm = () => ({
-  name: '', host: 'localhost', port: 389, bindDn: '', bindPassword: '',
-  baseDn: '', useTls: false, pagingSize: 500,
+  displayName: '', host: 'localhost', port: 389, bindDn: '', bindPassword: '',
+  baseDn: '', sslMode: 'NONE', trustAllCerts: false, pagingSize: 500,
 })
 
 const form = ref(emptyForm())

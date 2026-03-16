@@ -7,8 +7,6 @@
       <FormField label="From" type="datetime-local" v-model="filters.from" />
       <FormField label="To"   type="datetime-local" v-model="filters.to" />
       <FormField label="Action" type="select" v-model="filters.action" :options="actionOptions" />
-      <FormField label="Actor Username" v-model="filters.actorUsername" />
-      <FormField label="Target DN" v-model="filters.targetDn" class="col-span-2" />
     </div>
     <div class="flex gap-3 mb-4">
       <button @click="load(0)" class="btn-primary">Filter</button>
@@ -49,12 +47,12 @@ const page       = ref(0)
 const totalPages = ref(1)
 const pageSize   = 20
 
-const filters = ref({ from: '', to: '', action: '', actorUsername: '', targetDn: '' })
+const filters = ref({ from: '', to: '', action: '' })
 
 const actionOptions = [
   { value: '', label: 'All actions' },
-  ...['user.create','user.update','user.delete','user.enable','user.disable','user.move',
-      'group.create','group.delete','group.member_add','group.member_remove','ldap.change']
+  ...['USER_CREATE','USER_UPDATE','USER_DELETE','USER_ENABLE','USER_DISABLE','USER_MOVE',
+      'GROUP_CREATE','GROUP_DELETE','GROUP_MEMBER_ADD','GROUP_MEMBER_REMOVE','LDAP_CHANGE']
      .map(v => ({ value: v, label: v }))
 ]
 
@@ -71,21 +69,20 @@ function fmtDate(v) {
 }
 
 function clearFilters() {
-  filters.value = { from: '', to: '', action: '', actorUsername: '', targetDn: '' }
+  filters.value = { from: '', to: '', action: '' }
 }
 
 async function load(p = 0) {
   page.value = p
   await call(async () => {
     const params = {
-      page, size: pageSize,
+      page: p, size: pageSize,
+      directoryId:   dirId || undefined,
       from:          filters.value.from  || undefined,
       to:            filters.value.to    || undefined,
       action:        filters.value.action || undefined,
-      actorUsername: filters.value.actorUsername || undefined,
-      targetDn:      filters.value.targetDn || undefined,
     }
-    const { data } = await getAuditLog(dirId, params)
+    const { data } = await getAuditLog(params)
     const paged = data.content ? data : { content: data, totalPages: 1 }
     events.value     = paged.content
     totalPages.value = paged.totalPages || 1
