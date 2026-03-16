@@ -41,8 +41,8 @@
           <RouterLink :to="`/directories/${selectedDirId}/reports`" class="nav-item">
             <span class="icon">📊</span> Reports
           </RouterLink>
-          <RouterLink :to="`/directories/${selectedDirId}/profiles`" class="nav-item">
-            <span class="icon">🎨</span> Attr Profiles
+          <RouterLink :to="`/directories/${selectedDirId}/realms`" class="nav-item">
+            <span class="icon">🏛</span> Realms
           </RouterLink>
           <RouterLink :to="`/directories/${selectedDirId}/schema`" class="nav-item">
             <span class="icon">🔍</span> Schema
@@ -61,6 +61,15 @@
           </RouterLink>
           <RouterLink to="/superadmin/admins" class="nav-item">
             <span class="icon">👤</span> Admin Users
+          </RouterLink>
+          <RouterLink to="/superadmin/directories" class="nav-item">
+            <span class="icon">🗄</span> Directories
+          </RouterLink>
+          <RouterLink to="/superadmin/audit-sources" class="nav-item">
+            <span class="icon">📋</span> Audit Sources
+          </RouterLink>
+          <RouterLink to="/settings" class="nav-item">
+            <span class="icon">⚙️</span> Settings
           </RouterLink>
         </template>
       </nav>
@@ -113,7 +122,7 @@ watch(() => route.params.dirId, id => {
 })
 
 // Navigate when user picks a different directory from the dropdown
-const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'profiles', 'schema']
+const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'realms', 'schema']
 watch(selectedDirId, (newId) => {
   if (!newId || newId === route.params.dirId) return
   const section = dirSections.includes(route.name) ? route.name : 'users'

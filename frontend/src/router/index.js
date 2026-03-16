@@ -61,11 +61,11 @@ const router = createRouter({
           component: () => import('@/views/reports/ReportJobsView.vue'),
         },
 
-        // Attribute Profiles
+        // Realms
         {
-          path: 'directories/:dirId/profiles',
-          name: 'profiles',
-          component: () => import('@/views/profiles/AttributeProfilesView.vue'),
+          path: 'directories/:dirId/realms',
+          name: 'realms',
+          component: () => import('@/views/realms/RealmsView.vue'),
         },
 
         // Schema Browser
@@ -93,6 +93,18 @@ const router = createRouter({
           path: 'superadmin/admins',
           name: 'adminUsers',
           component: () => import('@/views/superadmin/AdminUsersView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
+        {
+          path: 'superadmin/directories',
+          name: 'manageDirectories',
+          component: () => import('@/views/superadmin/DirectoriesManageView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
+        {
+          path: 'superadmin/audit-sources',
+          name: 'auditSources',
+          component: () => import('@/views/superadmin/AuditSourcesView.vue'),
           meta: { requiresSuperadmin: true },
         },
       ],
