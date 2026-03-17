@@ -146,27 +146,44 @@
       </form>
     </AppModal>
 
-    <!-- Add missing attributes confirm -->
+    <!-- Confirm object class change -->
     <Teleport to="body">
-      <div v-if="showMissingAttrs" class="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+      <div v-if="showOcChangeConfirm" class="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
         <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">Add Missing Attributes</h3>
-          <p class="text-sm text-gray-600 mb-3">
-            The selected object class has {{ pendingMissingAttrs.length }} attribute(s) not in the current form:
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">Change Object Class</h3>
+          <p class="text-sm text-gray-600 mb-6">
+            Changing the object class will clear all existing attributes and repopulate the form with attributes from the new object class. Do you want to continue?
           </p>
-          <div class="max-h-48 overflow-y-auto mb-4">
-            <div class="flex flex-wrap gap-1">
-              <span
-                v-for="attr in pendingMissingAttrs"
-                :key="attr.attributeName"
-                class="text-xs bg-blue-50 text-blue-700 rounded px-1.5 py-0.5 font-mono"
-              >{{ attr.attributeName }}</span>
-            </div>
-          </div>
-          <p class="text-sm text-gray-600 mb-6">Would you like to add them?</p>
           <div class="flex justify-end gap-3">
-            <button @click="showMissingAttrs = false" class="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">No</button>
-            <button @click="appendMissingAttrs(); showMissingAttrs = false" class="px-4 py-2 text-sm rounded-lg text-white font-medium bg-blue-600 hover:bg-blue-700">Add Attributes</button>
+            <button @click="cancelOcChange" class="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">Cancel</button>
+            <button @click="confirmOcChange" class="px-4 py-2 text-sm rounded-lg text-white font-medium bg-blue-600 hover:bg-blue-700">Continue</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Add Attribute picker -->
+    <Teleport to="body">
+      <div v-if="showAddAttrPicker" class="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">Add Attributes</h3>
+          <p class="text-sm text-gray-600 mb-3">Select attributes to add to the form:</p>
+          <div v-if="availableAttrsForPicker.length === 0" class="text-sm text-gray-400 mb-4">All object class attributes are already in the form.</div>
+          <div v-else class="max-h-64 overflow-y-auto mb-4 border border-gray-200 rounded-lg divide-y divide-gray-100">
+            <label
+              v-for="attr in availableAttrsForPicker"
+              :key="attr.attributeName"
+              class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer"
+            >
+              <input type="checkbox" v-model="pickerSelected" :value="attr.attributeName" class="rounded" />
+              <span class="text-sm font-mono">{{ attr.attributeName }}</span>
+              <span v-if="attr.requiredOnCreate" class="text-xs text-red-500 ml-auto">required</span>
+              <span v-else class="text-xs text-gray-400 ml-auto">optional</span>
+            </label>
+          </div>
+          <div class="flex justify-end gap-3">
+            <button @click="showAddAttrPicker = false" class="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">Cancel</button>
+            <button @click="addSelectedAttributes" :disabled="pickerSelected.length === 0" class="px-4 py-2 text-sm rounded-lg text-white font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50">OK</button>
           </div>
         </div>
       </div>
@@ -229,59 +246,91 @@ watch(selectedDirId, async (dirId) => {
   }
 })
 
-// When object class changes, fetch its attributes and compare with the form
-const showMissingAttrs    = ref(false)
-const pendingMissingAttrs = ref([])
+// Track whether this is the initial object class value (set when dialog opens)
+const initialOcLoad = ref(true)
 
-watch(() => form.value.objectClassName, async (ocName) => {
+// Object class change confirmation
+const showOcChangeConfirm = ref(false)
+const pendingOcName       = ref('')
+const previousOcName      = ref('')
+const revertingOc         = ref(false)
+
+// Cached schema attributes for the current object class (used by Add Attribute picker)
+const cachedSchemaAttrs = ref([])
+
+// Add Attribute picker state
+const showAddAttrPicker       = ref(false)
+const availableAttrsForPicker = ref([])
+const pickerSelected          = ref([])
+
+watch(() => form.value.objectClassName, async (ocName, oldVal) => {
   if (!ocName || !selectedDirId.value) return
+
+  // Skip if we're reverting from a cancelled change
+  if (revertingOc.value) {
+    revertingOc.value = false
+    return
+  }
+
+  // On initial load (when dialog first opens), just fetch and cache — no confirmation, no clearing
+  if (initialOcLoad.value) {
+    initialOcLoad.value = false
+    await fetchAndPopulateAttributes(ocName, false)
+    return
+  }
+
+  // If the form already has attributes, confirm before clearing
+  if (form.value.attributeConfigs.length > 0) {
+    pendingOcName.value = ocName
+    previousOcName.value = oldVal || ''
+    showOcChangeConfirm.value = true
+    return
+  }
+
+  // No existing attributes — just populate directly
+  await fetchAndPopulateAttributes(ocName, true)
+})
+
+function cancelOcChange() {
+  showOcChangeConfirm.value = false
+  // Revert the object class selection without re-triggering the watcher
+  revertingOc.value = true
+  form.value.objectClassName = previousOcName.value
+  pendingOcName.value = ''
+}
+
+async function confirmOcChange() {
+  showOcChangeConfirm.value = false
+  // Clear existing attributes and repopulate
+  await fetchAndPopulateAttributes(pendingOcName.value, true)
+  pendingOcName.value = ''
+}
+
+async function fetchAndPopulateAttributes(ocName, replaceAll) {
   loadingAttrs.value = true
   try {
     const { data } = await getObjectClass(selectedDirId.value, ocName)
-    const existing = new Set(
-      form.value.attributeConfigs.map(a => a.attributeName.toLowerCase())
-    )
 
-    // If the form has no attributes yet, populate directly
-    if (existing.size === 0) {
-      const attrs = []
-      for (const name of (data.required || [])) {
-        attrs.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: true, editableOnCreate: true })
-      }
-      for (const name of (data.optional || [])) {
-        attrs.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: false, editableOnCreate: true })
-      }
-      form.value.attributeConfigs = attrs
-      return
-    }
-
-    // Build list of attributes in the object class but not in the form
-    const missing = []
+    // Build full attribute list from the object class schema
+    const allAttrs = []
     for (const name of (data.required || [])) {
-      if (!existing.has(name.toLowerCase())) {
-        missing.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: true, editableOnCreate: true })
-      }
+      allAttrs.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: true, editableOnCreate: true })
     }
     for (const name of (data.optional || [])) {
-      if (!existing.has(name.toLowerCase())) {
-        missing.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: false, editableOnCreate: true })
-      }
+      allAttrs.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: false, editableOnCreate: true })
     }
 
-    if (missing.length) {
-      pendingMissingAttrs.value = missing
-      showMissingAttrs.value = true
+    // Cache for the Add Attribute picker
+    cachedSchemaAttrs.value = allAttrs
+
+    if (replaceAll) {
+      form.value.attributeConfigs = allAttrs
     }
   } catch (e) {
     notif.error('Failed to load attributes: ' + (e.response?.data?.detail || e.message))
   } finally {
     loadingAttrs.value = false
   }
-})
-
-function appendMissingAttrs() {
-  form.value.attributeConfigs.push(...pendingMissingAttrs.value)
-  pendingMissingAttrs.value = []
 }
 
 function emptyForm() {
@@ -310,7 +359,24 @@ function dirName(dirId) {
 }
 
 function addAttribute() {
-  form.value.attributeConfigs.push(emptyAttribute())
+  const existing = new Set(
+    form.value.attributeConfigs.map(a => a.attributeName.toLowerCase())
+  )
+  availableAttrsForPicker.value = cachedSchemaAttrs.value.filter(
+    a => !existing.has(a.attributeName.toLowerCase())
+  )
+  pickerSelected.value = []
+  showAddAttrPicker.value = true
+}
+
+function addSelectedAttributes() {
+  for (const name of pickerSelected.value) {
+    const attr = availableAttrsForPicker.value.find(a => a.attributeName === name)
+    if (attr) {
+      form.value.attributeConfigs.push({ ...attr })
+    }
+  }
+  showAddAttrPicker.value = false
 }
 
 function moveAttribute(idx, direction) {
@@ -340,6 +406,8 @@ function openCreate() {
   editing.value = null
   selectedDirId.value = ''
   objectClasses.value = []
+  cachedSchemaAttrs.value = []
+  initialOcLoad.value = false
   form.value = emptyForm()
   showModal.value = true
 }
@@ -349,6 +417,8 @@ function openEdit(f) {
   // Pre-seed with the current value so the <select> has a matching option
   // while the full list loads asynchronously — prevents v-model reset.
   objectClasses.value = f.objectClassName ? [f.objectClassName] : []
+  cachedSchemaAttrs.value = []
+  initialOcLoad.value = true
   selectedDirId.value = f.directoryId || ''
   form.value = {
     directoryId: f.directoryId || null,
