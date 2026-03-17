@@ -42,9 +42,6 @@
           <RouterLink :to="`/directories/${currentDirId}/reports`" class="nav-item">
             <span class="icon">📊</span> Reports
           </RouterLink>
-          <RouterLink v-if="auth.isSuperadmin" :to="`/directories/${currentDirId}/realms`" class="nav-item">
-            <span class="icon">🏛</span> Realms
-          </RouterLink>
           <RouterLink :to="`/directories/${currentDirId}/schema`" class="nav-item">
             <span class="icon">🔍</span> Schema
           </RouterLink>
@@ -65,6 +62,9 @@
           </RouterLink>
           <RouterLink to="/superadmin/directories" class="nav-item">
             <span class="icon">🗄</span> Directories
+          </RouterLink>
+          <RouterLink v-if="currentDirId" :to="`/directories/${currentDirId}/realms`" class="nav-item">
+            <span class="icon">🏛</span> Realms
           </RouterLink>
           <RouterLink to="/superadmin/audit-sources" class="nav-item">
             <span class="icon">📋</span> Audit Sources

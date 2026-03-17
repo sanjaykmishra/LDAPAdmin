@@ -53,6 +53,18 @@
     <!-- Create/Edit modal -->
     <AppModal v-model="showModal" :title="editing ? 'Edit Realm' : 'New Realm'" size="lg">
       <form @submit.prevent="save" class="space-y-4">
+        <!-- Directory picker -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
+          <select v-model="form.directoryId" class="input w-full" required>
+            <option value="" disabled>— Select directory —</option>
+            <option v-for="d in directories" :key="d.id" :value="d.id">
+              {{ d.displayName }}
+            </option>
+          </select>
+          <p class="text-xs text-gray-400 mt-1">The directory connection this realm belongs to</p>
+        </div>
+
         <FormField label="Name" v-model="form.name" required placeholder="e.g. People, Service Accounts" />
         <div class="grid grid-cols-2 gap-4">
           <FormField label="User Base DN" v-model="form.userBaseDn" required placeholder="ou=people,dc=example,dc=com" />
@@ -122,6 +134,7 @@ import { useRoute } from 'vue-router'
 import { useNotificationStore } from '@/stores/notifications'
 import { listRealms, createRealm, updateRealm, deleteRealm } from '@/api/realms'
 import { listUserForms } from '@/api/userForms'
+import { listDirectories } from '@/api/directories'
 import FormField from '@/components/FormField.vue'
 import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -133,6 +146,7 @@ const loading      = ref(false)
 const saving       = ref(false)
 const realms       = ref([])
 const userForms    = ref([])
+const directories  = ref([])
 const showModal    = ref(false)
 const editing      = ref(null)
 const deleteTarget = ref(null)
@@ -141,6 +155,7 @@ const form = ref(emptyForm())
 
 function emptyForm() {
   return {
+    directoryId: dirId(),
     name: '',
     userBaseDn: '',
     groupBaseDn: '',
@@ -162,12 +177,14 @@ const dirId = () => route.params.dirId
 async function load() {
   loading.value = true
   try {
-    const [realmsRes, formsRes] = await Promise.all([
+    const [realmsRes, formsRes, dirsRes] = await Promise.all([
       listRealms(dirId()),
       listUserForms(),
+      listDirectories(),
     ])
     realms.value = realmsRes.data
     userForms.value = formsRes.data
+    directories.value = dirsRes.data
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
   } finally {
@@ -187,6 +204,7 @@ function openCreate() {
 function openEdit(r) {
   editing.value = r.id
   form.value = {
+    directoryId: r.directoryId || dirId(),
     name: r.name,
     userBaseDn: r.userBaseDn,
     groupBaseDn: r.groupBaseDn,
@@ -204,11 +222,12 @@ function openEdit(r) {
 async function save() {
   saving.value = true
   try {
+    const targetDirId = form.value.directoryId
     if (editing.value) {
-      await updateRealm(dirId(), editing.value, form.value)
+      await updateRealm(targetDirId, editing.value, form.value)
       notif.success('Realm updated')
     } else {
-      await createRealm(dirId(), form.value)
+      await createRealm(targetDirId, form.value)
       notif.success('Realm created')
     }
     showModal.value = false
