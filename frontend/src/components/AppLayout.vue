@@ -42,9 +42,6 @@
           <RouterLink :to="`/directories/${currentDirId}/reports`" class="nav-item">
             <span class="icon">📊</span> Reports
           </RouterLink>
-          <RouterLink :to="`/directories/${currentDirId}/schema`" class="nav-item">
-            <span class="icon">🔍</span> Schema
-          </RouterLink>
         </template>
 
         <div class="border-t border-gray-700 my-2" />
@@ -68,6 +65,9 @@
           </RouterLink>
           <RouterLink to="/superadmin/user-forms" class="nav-item">
             <span class="icon">📝</span> User Forms
+          </RouterLink>
+          <RouterLink to="/superadmin/schema" class="nav-item">
+            <span class="icon">🔍</span> Schema Browser
           </RouterLink>
           <RouterLink to="/settings" class="nav-item">
             <span class="icon">⚙️</span> Settings
@@ -162,7 +162,7 @@ watch(() => route.params.dirId, (dirId) => {
 })
 
 // Navigate when user picks a different entry from the dropdown
-const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'realms', 'schema']
+const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'realms']
 watch(currentDirId, (newDirId) => {
   if (!newDirId || newDirId === route.params.dirId) return
   const section = dirSections.includes(route.name) ? route.name : 'users'

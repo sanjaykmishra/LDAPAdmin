@@ -62,11 +62,12 @@ const router = createRouter({
           meta: { requiresSuperadmin: true },
         },
 
-        // Schema Browser
+        // Schema Browser (superadmin)
         {
-          path: 'directories/:dirId/schema',
+          path: 'superadmin/schema',
           name: 'schema',
           component: () => import('@/views/schema/SchemaView.vue'),
+          meta: { requiresSuperadmin: true },
         },
 
         // Settings
