@@ -1,11 +1,10 @@
 package com.ldapadmin.auth;
 
-import com.ldapadmin.entity.AdminBranchRestriction;
 import com.ldapadmin.entity.AdminFeaturePermission;
 import com.ldapadmin.entity.AdminRealmRole;
 import com.ldapadmin.entity.enums.BaseRole;
 import com.ldapadmin.entity.enums.FeatureKey;
-import com.ldapadmin.repository.AdminBranchRestrictionRepository;
+
 import com.ldapadmin.repository.AdminFeaturePermissionRepository;
 import com.ldapadmin.repository.AdminRealmRoleRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,7 +26,6 @@ import static org.mockito.Mockito.*;
 class PermissionServiceTest {
 
     @Mock private AdminRealmRoleRepository         realmRoleRepo;
-    @Mock private AdminBranchRestrictionRepository branchRepo;
     @Mock private AdminFeaturePermissionRepository featurePermissionRepo;
 
     private PermissionService permissionService;
@@ -38,7 +36,7 @@ class PermissionServiceTest {
 
     @BeforeEach
     void setUp() {
-        permissionService = new PermissionService(realmRoleRepo, branchRepo, featurePermissionRepo);
+        permissionService = new PermissionService(realmRoleRepo, featurePermissionRepo);
     }
 
     // ── Superadmin bypass ─────────────────────────────────────────────────────
@@ -56,15 +54,9 @@ class PermissionServiceTest {
     }
 
     @Test
-    void requireBranchAccess_superadmin_neverHitsRepo() {
-        permissionService.requireBranchAccess(superadmin(), realmId, "cn=X,dc=example,dc=com");
-        verifyNoInteractions(branchRepo);
-    }
-
-    @Test
     void requireFeature_superadmin_neverHitsAnyRepo() {
         permissionService.requireFeature(superadmin(), dirId, FeatureKey.USER_CREATE);
-        verifyNoInteractions(realmRoleRepo, branchRepo, featurePermissionRepo);
+        verifyNoInteractions(realmRoleRepo, featurePermissionRepo);
     }
 
     // ── Dimension 1+2: realm access ───────────────────────────────────────────
@@ -105,77 +97,7 @@ class PermissionServiceTest {
         permissionService.requireDirectoryAccess(admin(), dirId);
     }
 
-    // ── Dimension 3: branch restrictions ─────────────────────────────────────
-
-    @Test
-    void requireBranchAccess_noRestrictions_unrestricted() {
-        when(branchRepo.findAllByAdminAccountIdAndRealmId(adminId, realmId))
-                .thenReturn(List.of());
-
-        // any DN is allowed when there are no restrictions
-        permissionService.requireBranchAccess(admin(), realmId, "cn=Restricted,ou=System,dc=corp,dc=com");
-    }
-
-    @Test
-    void requireBranchAccess_entryUnderAllowedBranch_allowed() {
-        when(branchRepo.findAllByAdminAccountIdAndRealmId(adminId, realmId))
-                .thenReturn(List.of(branch("ou=Users,dc=example,dc=com")));
-
-        permissionService.requireBranchAccess(admin(), realmId, "cn=Alice,ou=Users,dc=example,dc=com");
-    }
-
-    @Test
-    void requireBranchAccess_entryExactlyBranchDn_allowed() {
-        String branchDn = "ou=Users,dc=example,dc=com";
-        when(branchRepo.findAllByAdminAccountIdAndRealmId(adminId, realmId))
-                .thenReturn(List.of(branch(branchDn)));
-
-        permissionService.requireBranchAccess(admin(), realmId, branchDn);
-    }
-
-    @Test
-    void requireBranchAccess_entryOutsideAllBranches_throwsAccessDenied() {
-        when(branchRepo.findAllByAdminAccountIdAndRealmId(adminId, realmId))
-                .thenReturn(List.of(branch("ou=Users,dc=example,dc=com")));
-
-        assertThatThrownBy(() -> permissionService.requireBranchAccess(
-                admin(), realmId, "cn=Admin,ou=System,dc=example,dc=com"))
-                .isInstanceOf(AccessDeniedException.class);
-    }
-
-    @Test
-    void requireBranchAccess_caseInsensitiveMatch() {
-        when(branchRepo.findAllByAdminAccountIdAndRealmId(adminId, realmId))
-                .thenReturn(List.of(branch("OU=Users,DC=EXAMPLE,DC=COM")));
-
-        // lower-case entry should still match
-        permissionService.requireBranchAccess(admin(), realmId, "cn=alice,ou=users,dc=example,dc=com");
-    }
-
-    @Test
-    void requireBranchAccess_partialSuffixNotMatched() {
-        // "ou=usersextra" must NOT match "ou=users" branch
-        when(branchRepo.findAllByAdminAccountIdAndRealmId(adminId, realmId))
-                .thenReturn(List.of(branch("ou=users,dc=com")));
-
-        assertThatThrownBy(() -> permissionService.requireBranchAccess(
-                admin(), realmId, "cn=alice,ou=usersextra,dc=com"))
-                .isInstanceOf(AccessDeniedException.class);
-    }
-
-    @Test
-    void requireBranchAccess_allowedByOneOfMultipleBranches() {
-        when(branchRepo.findAllByAdminAccountIdAndRealmId(adminId, realmId))
-                .thenReturn(List.of(
-                        branch("ou=Users,dc=example,dc=com"),
-                        branch("ou=Groups,dc=example,dc=com")));
-
-        // entry falls under the second branch
-        permissionService.requireBranchAccess(admin(), realmId,
-                "cn=Staff,ou=Groups,dc=example,dc=com");
-    }
-
-    // ── Dimension 4: feature overrides ───────────────────────────────────────
+    // ── Dimension 3: feature overrides ─────────────────────────────────────
 
     @Test
     void requireFeature_adminRole_noOverride_writeFeatureGranted() {
@@ -253,12 +175,6 @@ class PermissionServiceTest {
     private AdminRealmRole roleFor(BaseRole baseRole) {
         AdminRealmRole r = new AdminRealmRole();
         r.setBaseRole(baseRole);
-        return r;
-    }
-
-    private AdminBranchRestriction branch(String branchDn) {
-        AdminBranchRestriction r = new AdminBranchRestriction();
-        r.setBranchDn(branchDn);
         return r;
     }
 

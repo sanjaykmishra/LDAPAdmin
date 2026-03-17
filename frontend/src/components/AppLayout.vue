@@ -11,7 +11,8 @@
           <div class="flex justify-end">
             <button
               @click="handleNoRealmsOk"
-              class="px-4 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium"
+              class="px-4 py-2 text-sm rounded-lg text-white font-medium"
+              :style="{ backgroundColor: settings.primaryColour }"
             >OK</button>
           </div>
         </div>
@@ -19,18 +20,18 @@
     </Teleport>
 
     <!-- Sidebar -->
-    <aside class="w-60 bg-gray-900 text-white flex flex-col shrink-0">
+    <aside class="w-60 text-white flex flex-col shrink-0" :style="{ backgroundColor: settings.secondaryColour }">
       <!-- Logo -->
-      <div class="px-5 py-4 border-b border-gray-700">
-        <span class="text-lg font-bold tracking-tight">LDAP Admin</span>
+      <div class="px-5 py-4 border-b border-white/15">
+        <span class="text-lg font-bold tracking-tight">{{ settings.appName }}</span>
       </div>
 
       <!-- Realm picker (admin users only) -->
-      <div v-if="!auth.isSuperadmin" class="px-3 py-3 border-b border-gray-700">
+      <div v-if="!auth.isSuperadmin" class="px-3 py-3 border-b border-white/15">
         <label class="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Realm</label>
         <select
           v-model="pickerValue"
-          class="w-full bg-gray-800 border border-gray-600 text-white rounded px-2 py-1 text-sm"
+          class="w-full bg-white/10 border border-white/20 text-white rounded px-2 py-1 text-sm"
         >
           <option value="">— select —</option>
           <option v-for="realm in realms" :key="realm.id" :value="realm.id">
@@ -66,7 +67,7 @@
             </RouterLink>
           </template>
 
-          <div class="border-t border-gray-700 my-2" />
+          <div class="border-t border-white/15 my-2" />
 
           <RouterLink to="/settings" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.5"/><path d="M10 1.5v2M10 16.5v2M18.5 10h-2M3.5 10h-2M16 4l-1.4 1.4M5.4 14.6 4 16M16 16l-1.4-1.4M5.4 5.4 4 4"/></svg>
@@ -108,7 +109,7 @@
       </nav>
 
       <!-- User info / logout -->
-      <div class="px-4 py-3 border-t border-gray-700 flex items-center justify-between">
+      <div class="px-4 py-3 border-t border-white/15 flex items-center justify-between">
         <div class="text-sm truncate">
           <p class="font-medium">{{ auth.username }}</p>
           <p class="text-xs text-gray-400">{{ auth.isSuperadmin ? 'Superadmin' : 'Admin' }}</p>
@@ -128,9 +129,13 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useSettingsStore } from '@/stores/settings'
 import { myRealms } from '@/api/auth'
 
-const auth   = useAuthStore()
+const auth     = useAuthStore()
+const settings = useSettingsStore()
+
+onMounted(() => settings.init())
 const router = useRouter()
 const route  = useRoute()
 
@@ -203,10 +208,10 @@ async function handleLogout() {
 <style scoped>
 @reference "tailwindcss";
 .nav-item {
-  @apply flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors;
+  @apply flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-white/70 hover:bg-white/10 hover:text-white transition-colors;
 }
 .nav-item.router-link-active {
-  @apply bg-gray-800 text-white;
+  @apply bg-white/10 text-white;
 }
 .nav-icon { @apply w-5 h-5 shrink-0; }
 </style>

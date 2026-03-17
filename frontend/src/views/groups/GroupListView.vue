@@ -18,9 +18,9 @@
         <span class="badge-blue">{{ value }} members</span>
       </template>
       <template #actions="{ row }">
-        <div class="flex gap-2 justify-end">
-          <button @click="openMembers(row)" class="btn-sm btn-secondary">Members</button>
-          <button @click="confirmDelete(row)" class="btn-sm btn-danger">Delete</button>
+        <div class="flex gap-3 justify-end whitespace-nowrap">
+          <button @click="openMembers(row)" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Members</button>
+          <button @click="confirmDelete(row)" class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
         </div>
       </template>
     </DataTable>

@@ -3,7 +3,7 @@ package com.ldapadmin.controller.superadmin;
 import com.ldapadmin.dto.admin.AdminAccountRequest;
 import com.ldapadmin.dto.admin.AdminAccountResponse;
 import com.ldapadmin.dto.admin.AdminPermissionsResponse;
-import com.ldapadmin.dto.admin.BranchRestrictionsRequest;
+
 import com.ldapadmin.dto.admin.FeaturePermissionRequest;
 import com.ldapadmin.dto.admin.RealmRoleRequest;
 import com.ldapadmin.dto.admin.RealmRoleResponse;
@@ -38,8 +38,7 @@ import java.util.UUID;
  *   GET    /api/v1/superadmin/admins/{id}/permissions                      — all dims
  *   PUT    /api/v1/superadmin/admins/{id}/permissions/realm-roles          — dim 1+2
  *   DELETE /api/v1/superadmin/admins/{id}/permissions/realm-roles/{realmId}
- *   PUT    /api/v1/superadmin/admins/{id}/permissions/branch-restrictions  — dim 3
- *   PUT    /api/v1/superadmin/admins/{id}/permissions/features             — dim 4
+ *   PUT    /api/v1/superadmin/admins/{id}/permissions/features             — dim 3
  *   DELETE /api/v1/superadmin/admins/{id}/permissions/features/{key}       — clear override
  * </pre>
  */
@@ -103,17 +102,7 @@ public class AdminManagementController {
         return ResponseEntity.noContent().build();
     }
 
-    // ── Dimension 3: branch restrictions ─────────────────────────────────────
-
-    @PutMapping("/{adminId}/permissions/branch-restrictions")
-    public ResponseEntity<Void> setBranchRestrictions(
-            @PathVariable UUID adminId,
-            @Valid @RequestBody BranchRestrictionsRequest req) {
-        service.setBranchRestrictions(adminId, req);
-        return ResponseEntity.noContent().build();
-    }
-
-    // ── Dimension 4: feature permissions ─────────────────────────────────────
+    // ── Dimension 3: feature permissions ─────────────────────────────────────
 
     @PutMapping("/{adminId}/permissions/features")
     public ResponseEntity<Void> setFeaturePermissions(

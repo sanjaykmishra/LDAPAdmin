@@ -2,7 +2,7 @@ package com.ldapadmin.service;
 
 import com.ldapadmin.dto.admin.AdminAccountRequest;
 import com.ldapadmin.dto.admin.AdminAccountResponse;
-import com.ldapadmin.dto.admin.BranchRestrictionsRequest;
+
 import com.ldapadmin.dto.admin.FeaturePermissionRequest;
 import com.ldapadmin.dto.admin.RealmRoleRequest;
 import com.ldapadmin.dto.admin.RealmRoleResponse;
@@ -17,7 +17,7 @@ import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.exception.ConflictException;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.repository.AccountRepository;
-import com.ldapadmin.repository.AdminBranchRestrictionRepository;
+
 import com.ldapadmin.repository.AdminFeaturePermissionRepository;
 import com.ldapadmin.repository.AdminRealmRoleRepository;
 import com.ldapadmin.repository.RealmRepository;
@@ -44,7 +44,7 @@ class AdminManagementServiceTest {
     @Mock private AccountRepository               accountRepo;
     @Mock private RealmRepository                 realmRepo;
     @Mock private AdminRealmRoleRepository        realmRoleRepo;
-    @Mock private AdminBranchRestrictionRepository branchRepo;
+
     @Mock private AdminFeaturePermissionRepository featureRepo;
     @Mock private PasswordEncoder                 passwordEncoder;
 
@@ -56,7 +56,7 @@ class AdminManagementServiceTest {
     @BeforeEach
     void setUp() {
         service = new AdminManagementService(
-                accountRepo, realmRepo, realmRoleRepo, branchRepo, featureRepo, passwordEncoder);
+                accountRepo, realmRepo, realmRoleRepo, featureRepo, passwordEncoder);
     }
 
     // ── listAdmins ────────────────────────────────────────────────────────────
@@ -232,31 +232,6 @@ class AdminManagementServiceTest {
         service.removeRealmRole(adminId, realmId);
 
         verify(realmRoleRepo).deleteByAdminAccountIdAndRealmId(adminId, realmId);
-    }
-
-    // ── setBranchRestrictions ─────────────────────────────────────────────────
-
-    @Test
-    void setBranchRestrictions_clearsThenSetsNewOnes() {
-        when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount("alice")));
-        when(realmRepo.findById(realmId)).thenReturn(Optional.of(realm()));
-
-        service.setBranchRestrictions(adminId, new BranchRestrictionsRequest(realmId,
-                List.of("ou=Users,dc=example,dc=com", "ou=Groups,dc=example,dc=com")));
-
-        verify(branchRepo).deleteAllByAdminAccountIdAndRealmId(adminId, realmId);
-        verify(branchRepo, times(2)).save(any());
-    }
-
-    @Test
-    void setBranchRestrictions_nullBranchDns_onlyClears() {
-        when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount("alice")));
-        when(realmRepo.findById(realmId)).thenReturn(Optional.of(realm()));
-
-        service.setBranchRestrictions(adminId, new BranchRestrictionsRequest(realmId, null));
-
-        verify(branchRepo).deleteAllByAdminAccountIdAndRealmId(adminId, realmId);
-        verify(branchRepo, never()).save(any());
     }
 
     // ── setFeaturePermissions ─────────────────────────────────────────────────

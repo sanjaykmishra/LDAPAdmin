@@ -1,6 +1,7 @@
 package com.ldapadmin.controller;
 
 import com.ldapadmin.dto.settings.ApplicationSettingsDto;
+import com.ldapadmin.dto.settings.BrandingDto;
 import com.ldapadmin.dto.settings.UpdateApplicationSettingsRequest;
 import com.ldapadmin.service.ApplicationSettingsService;
 import jakarta.validation.Valid;
@@ -26,9 +27,16 @@ public class ApplicationSettingsController {
 
     private final ApplicationSettingsService service;
 
+    /** Returns current settings (authenticated). */
     @GetMapping
     public ApplicationSettingsDto get() {
         return service.get();
+    }
+
+    /** Returns only branding fields (public — no auth required). */
+    @GetMapping("/branding")
+    public BrandingDto getBranding() {
+        return service.getBranding();
     }
 
     @PutMapping
