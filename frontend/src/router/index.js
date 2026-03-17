@@ -79,9 +79,7 @@ const router = createRouter({
         // Superadmin
         {
           path: 'superadmin',
-          name: 'superadmin',
-          component: () => import('@/views/superadmin/SuperadminView.vue'),
-          meta: { requiresSuperadmin: true },
+          redirect: '/superadmin/admins',
         },
         {
           path: 'superadmin/admins',

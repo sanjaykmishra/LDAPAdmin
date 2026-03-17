@@ -44,13 +44,13 @@ public class AdminManagementService {
     // ── Admin account CRUD ────────────────────────────────────────────────────
 
     public List<AdminAccountResponse> listAdmins() {
-        return accountRepo.findAllByRole(AccountRole.ADMIN).stream()
+        return accountRepo.findAll().stream()
                 .map(AdminAccountResponse::from)
                 .toList();
     }
 
     public AdminAccountResponse getAdmin(UUID adminId) {
-        return AdminAccountResponse.from(requireAdmin(adminId));
+        return AdminAccountResponse.from(requireAccount(adminId));
     }
 
     @Transactional
@@ -62,7 +62,7 @@ public class AdminManagementService {
         a.setUsername(req.username());
         a.setDisplayName(req.displayName());
         a.setEmail(req.email());
-        a.setRole(AccountRole.ADMIN);
+        a.setRole(req.role());
         a.setAuthType(req.authType());
         a.setActive(req.active());
         if (req.authType() == AccountType.LOCAL && req.password() != null && !req.password().isBlank()) {
@@ -76,13 +76,14 @@ public class AdminManagementService {
 
     @Transactional
     public AdminAccountResponse updateAdmin(UUID adminId, AdminAccountRequest req) {
-        Account a = requireAdmin(adminId);
+        Account a = requireAccount(adminId);
         if (!a.getUsername().equals(req.username()) && accountRepo.existsByUsername(req.username())) {
             throw new ConflictException("Account [" + req.username() + "] already exists");
         }
         a.setUsername(req.username());
         a.setDisplayName(req.displayName());
         a.setEmail(req.email());
+        a.setRole(req.role());
         a.setAuthType(req.authType());
         a.setActive(req.active());
         if (req.authType() == AccountType.LOCAL && req.password() != null && !req.password().isBlank()) {
@@ -98,7 +99,7 @@ public class AdminManagementService {
 
     @Transactional
     public void resetAdminPassword(UUID adminId, String newPassword) {
-        Account a = requireAdmin(adminId);
+        Account a = requireAccount(adminId);
         if (a.getAuthType() != AccountType.LOCAL) {
             throw new IllegalArgumentException("Password reset is only supported for LOCAL accounts");
         }
@@ -108,13 +109,13 @@ public class AdminManagementService {
 
     @Transactional
     public void deleteAdmin(UUID adminId) {
-        accountRepo.delete(requireAdmin(adminId));
+        accountRepo.delete(requireAccount(adminId));
     }
 
     // ── Permission management — summary ───────────────────────────────────────
 
     public AdminPermissionsResponse getPermissions(UUID adminId) {
-        requireAdmin(adminId);
+        requireAccount(adminId);
         return AdminPermissionsResponse.from(
                 realmRoleRepo.findAllByAdminAccountId(adminId),
                 branchRepo.findAllByAdminAccountId(adminId),
@@ -125,7 +126,7 @@ public class AdminManagementService {
 
     @Transactional
     public RealmRoleResponse assignRealmRole(UUID adminId, RealmRoleRequest req) {
-        Account admin = requireAdmin(adminId);
+        Account admin = requireAccount(adminId);
         Realm   realm = requireRealm(req.realmId());
 
         AdminRealmRole role = realmRoleRepo
@@ -142,7 +143,7 @@ public class AdminManagementService {
 
     @Transactional
     public void removeRealmRole(UUID adminId, UUID realmId) {
-        requireAdmin(adminId);
+        requireAccount(adminId);
         realmRoleRepo.deleteByAdminAccountIdAndRealmId(adminId, realmId);
     }
 
@@ -150,7 +151,7 @@ public class AdminManagementService {
 
     @Transactional
     public void setBranchRestrictions(UUID adminId, BranchRestrictionsRequest req) {
-        Account admin = requireAdmin(adminId);
+        Account admin = requireAccount(adminId);
         Realm   realm = requireRealm(req.realmId());
 
         branchRepo.deleteAllByAdminAccountIdAndRealmId(adminId, req.realmId());
@@ -170,7 +171,7 @@ public class AdminManagementService {
 
     @Transactional
     public void setFeaturePermissions(UUID adminId, List<FeaturePermissionRequest> permissions) {
-        Account admin = requireAdmin(adminId);
+        Account admin = requireAccount(adminId);
 
         permissions.forEach(req -> {
             AdminFeaturePermission fp = featureRepo
@@ -188,19 +189,15 @@ public class AdminManagementService {
 
     @Transactional
     public void clearFeaturePermission(UUID adminId, FeatureKey featureKey) {
-        requireAdmin(adminId);
+        requireAccount(adminId);
         featureRepo.deleteByAdminAccountIdAndFeatureKey(adminId, featureKey);
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private Account requireAdmin(UUID adminId) {
-        Account a = accountRepo.findById(adminId)
+    private Account requireAccount(UUID adminId) {
+        return accountRepo.findById(adminId)
                 .orElseThrow(() -> new ResourceNotFoundException("Account", adminId));
-        if (a.getRole() != AccountRole.ADMIN) {
-            throw new ResourceNotFoundException("Account", adminId);
-        }
-        return a;
     }
 
     private Realm requireRealm(UUID realmId) {
