@@ -126,7 +126,14 @@
                     <input type="checkbox" v-model="attr.editableOnCreate" />
                   </td>
                   <td class="px-3 py-2 text-right">
-                    <button type="button" @click="form.attributeConfigs.splice(idx, 1)" class="text-red-500 hover:text-red-700 text-xs font-medium">Remove</button>
+                    <button
+                      type="button"
+                      @click="form.attributeConfigs.splice(idx, 1)"
+                      :disabled="attr.requiredOnCreate"
+                      :class="attr.requiredOnCreate ? 'text-gray-300 cursor-not-allowed' : 'text-red-500 hover:text-red-700'"
+                      class="text-xs font-medium"
+                      :title="attr.requiredOnCreate ? 'Required attributes cannot be removed' : 'Remove attribute'"
+                    >Remove</button>
                   </td>
                 </tr>
               </tbody>
