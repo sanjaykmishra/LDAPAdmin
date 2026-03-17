@@ -17,6 +17,7 @@
         <thead class="bg-gray-50 border-b border-gray-100">
           <tr>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Form Name</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-500">Directory</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Object Class</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Attributes</th>
             <th class="px-4 py-3"></th>
@@ -25,6 +26,7 @@
         <tbody class="divide-y divide-gray-50">
           <tr v-for="f in forms" :key="f.id" class="hover:bg-gray-50">
             <td class="px-4 py-3 font-medium text-gray-900">{{ f.formName }}</td>
+            <td class="px-4 py-3 text-gray-600 text-xs">{{ dirName(f.directoryId) }}</td>
             <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ f.objectClassName }}</td>
             <td class="px-4 py-3">
               <div class="flex flex-wrap gap-1">
@@ -48,10 +50,29 @@
     <!-- Create/Edit modal -->
     <AppModal v-model="showModal" :title="editing ? 'Edit User Form' : 'New User Form'" size="xl">
       <form @submit.prevent="save" class="space-y-4">
+        <!-- Directory picker (not persisted — used to look up schema) -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
+          <select v-model="selectedDirId" class="input w-full">
+            <option value="">— Select directory —</option>
+            <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
+          </select>
+        </div>
+
         <div class="grid grid-cols-2 gap-4">
           <FormField label="Form Name" v-model="form.formName" required placeholder="e.g. Standard User Form" />
-          <FormField label="Object Class" v-model="form.objectClassName" required placeholder="e.g. inetOrgPerson" />
+          <!-- Object class picker or freetext depending on whether a directory is selected -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Object Class <span class="text-red-500">*</span></label>
+            <select v-if="selectedDirId" v-model="form.objectClassName" class="input w-full" required>
+              <option value="" disabled>{{ loadingOCs ? 'Loading…' : '— Select object class —' }}</option>
+              <option v-for="oc in objectClasses" :key="oc" :value="oc">{{ oc }}</option>
+            </select>
+            <input v-else v-model="form.objectClassName" class="input w-full" required placeholder="e.g. inetOrgPerson" />
+          </div>
         </div>
+
+        <div v-if="loadingAttrs" class="text-sm text-gray-500">Loading attributes…</div>
 
         <!-- Attribute configs -->
         <div>
@@ -119,9 +140,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
 import { listUserForms, createUserForm, updateUserForm, deleteUserForm } from '@/api/userForms'
+import { listDirectories } from '@/api/directories'
+import { listObjectClasses, getObjectClass } from '@/api/schema'
 import FormField from '@/components/FormField.vue'
 import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -130,17 +153,60 @@ const notif = useNotificationStore()
 
 const inputTypes = ['TEXT', 'TEXTAREA', 'PASSWORD', 'BOOLEAN', 'DATE', 'DATETIME', 'MULTI_VALUE', 'DN_LOOKUP']
 
-const loading      = ref(false)
-const saving       = ref(false)
-const forms        = ref([])
-const showModal    = ref(false)
-const editing      = ref(null)
-const deleteTarget = ref(null)
+const loading        = ref(false)
+const saving         = ref(false)
+const forms          = ref([])
+const directories    = ref([])
+const objectClasses  = ref([])
+const loadingOCs     = ref(false)
+const loadingAttrs   = ref(false)
+const showModal      = ref(false)
+const editing        = ref(null)
+const deleteTarget   = ref(null)
+const selectedDirId  = ref('')
 
 const form = ref(emptyForm())
 
+// When selected directory changes, sync to form and fetch object classes
+watch(selectedDirId, async (dirId) => {
+  form.value.directoryId = dirId || null
+  objectClasses.value = []
+  if (!dirId) return
+  loadingOCs.value = true
+  try {
+    const { data } = await listObjectClasses(dirId)
+    objectClasses.value = data
+  } catch (e) {
+    notif.error('Failed to load object classes: ' + (e.response?.data?.detail || e.message))
+  } finally {
+    loadingOCs.value = false
+  }
+})
+
+// When object class changes, fetch its attributes and populate the form
+watch(() => form.value.objectClassName, async (ocName) => {
+  if (!ocName || !selectedDirId.value) return
+  loadingAttrs.value = true
+  try {
+    const { data } = await getObjectClass(selectedDirId.value, ocName)
+    const attrs = []
+    for (const name of (data.required || [])) {
+      attrs.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: true, editableOnCreate: true })
+    }
+    for (const name of (data.optional || [])) {
+      attrs.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: false, editableOnCreate: true })
+    }
+    form.value.attributeConfigs = attrs
+  } catch (e) {
+    notif.error('Failed to load attributes: ' + (e.response?.data?.detail || e.message))
+  } finally {
+    loadingAttrs.value = false
+  }
+})
+
 function emptyForm() {
   return {
+    directoryId: null,
     formName: '',
     objectClassName: '',
     attributeConfigs: [],
@@ -157,6 +223,12 @@ function emptyAttribute() {
   }
 }
 
+function dirName(dirId) {
+  if (!dirId) return '—'
+  const d = directories.value.find(d => d.id === dirId)
+  return d ? d.displayName : dirId
+}
+
 function addAttribute() {
   form.value.attributeConfigs.push(emptyAttribute())
 }
@@ -164,8 +236,9 @@ function addAttribute() {
 async function load() {
   loading.value = true
   try {
-    const { data } = await listUserForms()
-    forms.value = data
+    const [formsRes, dirsRes] = await Promise.all([listUserForms(), listDirectories()])
+    forms.value = formsRes.data
+    directories.value = dirsRes.data
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
   } finally {
@@ -177,13 +250,18 @@ onMounted(load)
 
 function openCreate() {
   editing.value = null
+  selectedDirId.value = ''
+  objectClasses.value = []
   form.value = emptyForm()
   showModal.value = true
 }
 
 function openEdit(f) {
   editing.value = f.id
+  objectClasses.value = []
+  selectedDirId.value = f.directoryId || ''
   form.value = {
+    directoryId: f.directoryId || null,
     formName: f.formName,
     objectClassName: f.objectClassName,
     attributeConfigs: (f.attributeConfigs || []).map(a => ({

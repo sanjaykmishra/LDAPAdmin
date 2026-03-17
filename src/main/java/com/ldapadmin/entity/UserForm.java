@@ -29,6 +29,11 @@ public class UserForm {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
+    /** Optional directory connection this form is scoped to. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "directory_id")
+    private DirectoryConnection directoryConnection;
+
     /** LDAP objectClass this form is designed for. */
     @Column(name = "object_class_name", nullable = false)
     private String objectClassName;
