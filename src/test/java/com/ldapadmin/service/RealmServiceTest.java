@@ -6,7 +6,9 @@ import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.Realm;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
+import com.ldapadmin.repository.RealmObjectclassRepository;
 import com.ldapadmin.repository.RealmRepository;
+import com.ldapadmin.repository.UserFormRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +30,8 @@ class RealmServiceTest {
 
     @Mock private RealmRepository               realmRepo;
     @Mock private DirectoryConnectionRepository dirRepo;
+    @Mock private RealmObjectclassRepository    realmOcRepo;
+    @Mock private UserFormRepository            userFormRepo;
 
     private RealmService service;
 
@@ -36,7 +40,8 @@ class RealmServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new RealmService(realmRepo, dirRepo);
+        service = new RealmService(realmRepo, dirRepo, realmOcRepo, userFormRepo);
+        lenient().when(realmOcRepo.findAllByRealmId(any())).thenReturn(List.of());
     }
 
     // ── listByDirectory ───────────────────────────────────────────────────────
@@ -118,7 +123,7 @@ class RealmServiceTest {
 
         RealmRequest req = new RealmRequest(
                 "employees", "ou=people,dc=corp,dc=com", "ou=groups,dc=corp,dc=com",
-                "inetOrgPerson", 1,
+                "inetOrgPerson", 1, null,
                 List.of(new RealmRequest.AuxEntry("shadowAccount", 1)));
 
         RealmResponse resp = service.create(dirId, req);
@@ -146,7 +151,7 @@ class RealmServiceTest {
 
         RealmRequest req = new RealmRequest(
                 "renamed", "ou=staff,dc=corp,dc=com", "ou=teams,dc=corp,dc=com",
-                "organizationalPerson", 2, List.of());
+                "organizationalPerson", 2, null, List.of());
 
         RealmResponse resp = service.update(dirId, realmId, req);
 
@@ -210,6 +215,7 @@ class RealmServiceTest {
                 "ou=groups,dc=corp,dc=com",
                 "inetOrgPerson",
                 0,
+                null,
                 null);
     }
 }

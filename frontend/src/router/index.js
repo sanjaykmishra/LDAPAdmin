@@ -17,14 +17,7 @@ const router = createRouter({
       path: '/',
       component: () => import('@/components/AppLayout.vue'),
       children: [
-        { path: '', redirect: '/directories' },
-
-        // Directories
-        {
-          path: 'directories',
-          name: 'directories',
-          component: () => import('@/views/directories/DirectoryListView.vue'),
-        },
+        { path: '', redirect: '/superadmin/directories' },
 
         // Users
         {
@@ -66,6 +59,7 @@ const router = createRouter({
           path: 'directories/:dirId/realms',
           name: 'realms',
           component: () => import('@/views/realms/RealmsView.vue'),
+          meta: { requiresSuperadmin: true },
         },
 
         // Schema Browser
@@ -85,9 +79,7 @@ const router = createRouter({
         // Superadmin
         {
           path: 'superadmin',
-          name: 'superadmin',
-          component: () => import('@/views/superadmin/SuperadminView.vue'),
-          meta: { requiresSuperadmin: true },
+          redirect: '/superadmin/admins',
         },
         {
           path: 'superadmin/admins',
@@ -107,6 +99,12 @@ const router = createRouter({
           component: () => import('@/views/superadmin/AuditSourcesView.vue'),
           meta: { requiresSuperadmin: true },
         },
+        {
+          path: 'superadmin/user-forms',
+          name: 'userForms',
+          component: () => import('@/views/userForms/UserFormsView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
       ],
     },
 
@@ -123,7 +121,7 @@ router.beforeEach(async (to) => {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
   if (to.meta.requiresSuperadmin && !auth.isSuperadmin) {
-    return { path: '/directories' }
+    return { path: '/superadmin/directories' }
   }
 })
 

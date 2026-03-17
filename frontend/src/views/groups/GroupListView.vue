@@ -106,7 +106,13 @@ async function load() {
 async function doCreate() {
   saving.value = true
   try {
-    await groupsApi.createGroup(dirId, createForm.value)
+    const f = createForm.value
+    const dn = `cn=${f.cn},${f.parentDn}`
+    const attributes = {
+      cn: [f.cn],
+      objectClass: [f.objectClass],
+    }
+    await groupsApi.createGroup(dirId, { dn, attributes })
     notif.success('Group created')
     showCreate.value = false
     await load()

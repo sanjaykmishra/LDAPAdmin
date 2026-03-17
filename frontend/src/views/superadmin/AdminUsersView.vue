@@ -2,8 +2,8 @@
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">Manage Admin Users</h1>
-        <p class="text-sm text-gray-500 mt-1">Create and manage portal administrator accounts</p>
+        <h1 class="text-2xl font-bold text-gray-900">Manage Accounts</h1>
+        <p class="text-sm text-gray-500 mt-1">Create and manage superadmin and admin accounts</p>
       </div>
       <button @click="openCreate" class="btn-primary">+ New Admin</button>
     </div>
@@ -18,6 +18,9 @@
       <template #cell-active="{ value }">
         <span :class="value ? 'badge-green' : 'badge-gray'">{{ value ? 'Active' : 'Inactive' }}</span>
       </template>
+      <template #cell-role="{ value }">
+        <span :class="value === 'SUPERADMIN' ? 'badge-blue' : 'badge-gray'">{{ value }}</span>
+      </template>
       <template #cell-authType="{ value }">
         <span class="text-xs text-gray-500 uppercase">{{ value }}</span>
       </template>
@@ -27,7 +30,7 @@
       <template #actions="{ row }">
         <div class="flex gap-2 justify-end">
           <button @click="openEdit(row)" class="btn-sm btn-secondary">Edit</button>
-          <button @click="openPermissions(row)" class="btn-sm btn-secondary">Permissions</button>
+          <button v-if="row.role === 'ADMIN'" @click="openPermissions(row)" class="btn-sm btn-secondary">Permissions</button>
           <button
             v-if="row.id !== auth.principal?.id"
             @click="confirmDelete(row)"
@@ -44,6 +47,18 @@
           hint="Used to log in. Cannot be changed after creation." />
         <FormField label="Display name" v-model="form.displayName" placeholder="Optional" />
         <FormField label="Email" v-model="form.email" type="email" placeholder="Optional" />
+        <FormField label="Role" v-model="form.role" type="select" required
+          :options="[{ value: 'ADMIN', label: 'Admin' }, { value: 'SUPERADMIN', label: 'Superadmin' }]"
+          hint="Superadmins have full platform access. Admins have realm-scoped permissions." />
+        <FormField label="Auth type" v-model="form.authType" type="select" required
+          :options="[{ value: 'LOCAL', label: 'Local' }, { value: 'LDAP', label: 'LDAP' }]"
+          hint="LOCAL uses a portal password. LDAP authenticates against the configured LDAP directory." />
+        <FormField v-if="form.authType === 'LOCAL'" label="Password" v-model="form.password" type="password"
+          :placeholder="editing ? 'Leave blank to keep current' : 'Enter password'"
+          :hint="editing ? 'Only fill in to change the password.' : 'Set the initial password for this account.'" />
+        <FormField v-if="form.authType === 'LDAP'" label="LDAP DN" v-model="form.ldapDn"
+          placeholder="e.g. uid=jdoe,ou=People,dc=example,dc=com"
+          hint="Distinguished name used to bind against the LDAP auth directory." />
         <div class="flex items-center gap-2 py-2">
           <input id="active-toggle" type="checkbox" v-model="form.active"
             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
@@ -150,13 +165,14 @@ const perms       = ref(null)
 const cols = [
   { key: 'displayName', label: 'Name / Username' },
   { key: 'email',       label: 'Email' },
+  { key: 'role',        label: 'Role' },
   { key: 'authType',    label: 'Auth type' },
   { key: 'active',      label: 'Status' },
   { key: 'lastLoginAt', label: 'Last login' },
 ]
 
 function emptyForm() {
-  return { username: '', displayName: '', email: '', active: true }
+  return { username: '', displayName: '', email: '', role: 'ADMIN', authType: 'LOCAL', password: '', ldapDn: '', active: true }
 }
 
 async function load() {
@@ -181,7 +197,7 @@ function openCreate() {
 
 function openEdit(row) {
   editing.value = row.id
-  form.value = { username: row.username, displayName: row.displayName || '', email: row.email || '', active: row.active }
+  form.value = { username: row.username, displayName: row.displayName || '', email: row.email || '', role: row.role || 'ADMIN', authType: row.authType || 'LOCAL', password: '', ldapDn: row.ldapDn || '', active: row.active }
   showForm.value = true
 }
 
@@ -247,5 +263,6 @@ async function openPermissions(row) {
 .btn-sm        { @apply text-xs; }
 .badge-green   { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800; }
 .badge-gray    { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600; }
+.badge-blue    { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800; }
 .badge-red     { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700; }
 </style>

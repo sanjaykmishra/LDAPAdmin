@@ -7,44 +7,42 @@
         <span class="text-lg font-bold tracking-tight">LDAP Admin</span>
       </div>
 
-      <!-- Directory picker (non-superadmin) -->
-      <div v-if="!auth.isSuperadmin" class="px-3 py-3 border-b border-gray-700">
-        <label class="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Directory</label>
+      <!-- Realm picker -->
+      <div class="px-3 py-3 border-b border-gray-700">
+        <label class="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Realm</label>
         <select
-          v-model="selectedDirId"
+          v-model="pickerValue"
           class="w-full bg-gray-800 border border-gray-600 text-white rounded px-2 py-1 text-sm"
         >
           <option value="">— select —</option>
-          <option v-for="d in dirs" :key="d.id" :value="d.id">{{ d.name }}</option>
+          <optgroup v-for="dir in dirs" :key="dir.id" :label="dir.displayName">
+            <option v-if="!dir.realms.length" :value="`dir:${dir.id}`">(no realms)</option>
+            <option v-for="realm in dir.realms" :key="realm.id" :value="`realm:${realm.id}`">
+              {{ realm.name }}
+            </option>
+          </optgroup>
         </select>
       </div>
 
       <!-- Navigation -->
       <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        <RouterLink to="/directories" class="nav-item">
-          <span class="icon">🗂</span> Directories
-        </RouterLink>
-
-        <template v-if="selectedDirId">
-          <RouterLink :to="`/directories/${selectedDirId}/users`" class="nav-item">
+        <template v-if="currentDirId">
+          <RouterLink :to="`/directories/${currentDirId}/users`" class="nav-item">
             <span class="icon">👤</span> Users
           </RouterLink>
-          <RouterLink :to="`/directories/${selectedDirId}/groups`" class="nav-item">
+          <RouterLink :to="`/directories/${currentDirId}/groups`" class="nav-item">
             <span class="icon">👥</span> Groups
           </RouterLink>
-          <RouterLink :to="`/directories/${selectedDirId}/audit`" class="nav-item">
+          <RouterLink :to="`/directories/${currentDirId}/audit`" class="nav-item">
             <span class="icon">📋</span> Audit Log
           </RouterLink>
-          <RouterLink :to="`/directories/${selectedDirId}/bulk`" class="nav-item">
+          <RouterLink :to="`/directories/${currentDirId}/bulk`" class="nav-item">
             <span class="icon">📤</span> Bulk Import/Export
           </RouterLink>
-          <RouterLink :to="`/directories/${selectedDirId}/reports`" class="nav-item">
+          <RouterLink :to="`/directories/${currentDirId}/reports`" class="nav-item">
             <span class="icon">📊</span> Reports
           </RouterLink>
-          <RouterLink :to="`/directories/${selectedDirId}/realms`" class="nav-item">
-            <span class="icon">🏛</span> Realms
-          </RouterLink>
-          <RouterLink :to="`/directories/${selectedDirId}/schema`" class="nav-item">
+          <RouterLink :to="`/directories/${currentDirId}/schema`" class="nav-item">
             <span class="icon">🔍</span> Schema
           </RouterLink>
         </template>
@@ -56,17 +54,20 @@
         </RouterLink>
 
         <template v-if="auth.isSuperadmin">
-          <RouterLink to="/superadmin" class="nav-item">
-            <span class="icon">🛡</span> Superadmins
-          </RouterLink>
           <RouterLink to="/superadmin/admins" class="nav-item">
-            <span class="icon">👤</span> Admin Users
+            <span class="icon">👤</span> Accounts
           </RouterLink>
           <RouterLink to="/superadmin/directories" class="nav-item">
             <span class="icon">🗄</span> Directories
           </RouterLink>
+          <RouterLink v-if="currentDirId" :to="`/directories/${currentDirId}/realms`" class="nav-item">
+            <span class="icon">🏛</span> Realms
+          </RouterLink>
           <RouterLink to="/superadmin/audit-sources" class="nav-item">
             <span class="icon">📋</span> Audit Sources
+          </RouterLink>
+          <RouterLink to="/superadmin/user-forms" class="nav-item">
+            <span class="icon">📝</span> User Forms
           </RouterLink>
           <RouterLink to="/settings" class="nav-item">
             <span class="icon">⚙️</span> Settings
@@ -92,41 +93,80 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { listDirectories } from '@/api/directories'
+import { listRealms } from '@/api/realms'
 
 const auth   = useAuthStore()
 const router = useRouter()
 const route  = useRoute()
 
-const dirs          = ref([])
-const selectedDirId = ref(route.params.dirId || '')
+const dirs        = ref([])   // directories with nested .realms arrays
+const pickerValue = ref('')   // "realm:<id>" or "dir:<id>"
 
-// Load directories for the sidebar picker (admins only)
+// Parse the picker value into a directoryId
+const currentDirId = computed(() => {
+  const v = pickerValue.value
+  if (!v) return ''
+  if (v.startsWith('dir:')) return v.slice(4)
+  if (v.startsWith('realm:')) {
+    const realmId = v.slice(6)
+    for (const dir of dirs.value) {
+      if (dir.realms?.some(r => r.id === realmId)) return dir.id
+    }
+  }
+  return ''
+})
+
+// Build a picker value for a given directory (prefer first realm, fallback to dir)
+function pickerValueForDir(dir) {
+  return dir.realms?.length ? `realm:${dir.realms[0].id}` : `dir:${dir.id}`
+}
+
+// Load directories and their realms for the sidebar picker
 onMounted(async () => {
-  if (auth.isSuperadmin) return
   try {
-    const { data } = await listDirectories()
-    dirs.value = data
-    if (!selectedDirId.value && data.length) {
-      selectedDirId.value = data[0].id
+    const { data: directories } = await listDirectories()
+    const results = await Promise.all(
+      directories.map(async (dir) => {
+        try {
+          const { data: realms } = await listRealms(dir.id)
+          return { ...dir, realms }
+        } catch {
+          return { ...dir, realms: [] }
+        }
+      })
+    )
+    dirs.value = results
+
+    // If currently on a directory-scoped route, select matching entry
+    const routeDirId = route.params.dirId
+    if (routeDirId) {
+      const dir = results.find(d => d.id === routeDirId)
+      if (dir) pickerValue.value = pickerValueForDir(dir)
+    } else if (results.length) {
+      // Auto-select first directory/realm
+      pickerValue.value = pickerValueForDir(results[0])
     }
   } catch { /* silently ignore */ }
 })
 
-// Keep dirId in sync with route params
-watch(() => route.params.dirId, id => {
-  if (id) selectedDirId.value = id
+// Keep picker in sync when route dirId changes externally
+watch(() => route.params.dirId, (dirId) => {
+  if (!dirId) return
+  if (currentDirId.value === dirId) return
+  const dir = dirs.value.find(d => d.id === dirId)
+  if (dir) pickerValue.value = pickerValueForDir(dir)
 })
 
-// Navigate when user picks a different directory from the dropdown
+// Navigate when user picks a different entry from the dropdown
 const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'realms', 'schema']
-watch(selectedDirId, (newId) => {
-  if (!newId || newId === route.params.dirId) return
+watch(currentDirId, (newDirId) => {
+  if (!newDirId || newDirId === route.params.dirId) return
   const section = dirSections.includes(route.name) ? route.name : 'users'
-  router.push(`/directories/${newId}/${section}`)
+  router.push(`/directories/${newDirId}/${section}`)
 })
 
 async function handleLogout() {

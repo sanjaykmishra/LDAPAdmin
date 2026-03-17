@@ -20,6 +20,7 @@
             <th class="px-4 py-3 text-left font-medium text-gray-500">User Base DN</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Group Base DN</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Primary Objectclass</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-500">User Form</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Aux Classes</th>
             <th class="px-4 py-3"></th>
           </tr>
@@ -30,6 +31,7 @@
             <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ r.userBaseDn }}</td>
             <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ r.groupBaseDn }}</td>
             <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ r.primaryUserObjectclass }}</td>
+            <td class="px-4 py-3 text-gray-600 text-xs">{{ userFormLabel(r.userFormId) }}</td>
             <td class="px-4 py-3">
               <div class="flex flex-wrap gap-1">
                 <span
@@ -51,6 +53,18 @@
     <!-- Create/Edit modal -->
     <AppModal v-model="showModal" :title="editing ? 'Edit Realm' : 'New Realm'" size="lg">
       <form @submit.prevent="save" class="space-y-4">
+        <!-- Directory picker -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
+          <select v-model="form.directoryId" class="input w-full" required>
+            <option value="" disabled>— Select directory —</option>
+            <option v-for="d in directories" :key="d.id" :value="d.id">
+              {{ d.displayName }}
+            </option>
+          </select>
+          <p class="text-xs text-gray-400 mt-1">The directory connection this realm belongs to</p>
+        </div>
+
         <FormField label="Name" v-model="form.name" required placeholder="e.g. People, Service Accounts" />
         <div class="grid grid-cols-2 gap-4">
           <FormField label="User Base DN" v-model="form.userBaseDn" required placeholder="ou=people,dc=example,dc=com" />
@@ -59,6 +73,18 @@
         <div class="grid grid-cols-2 gap-4">
           <FormField label="Primary User Objectclass" v-model="form.primaryUserObjectclass" required placeholder="inetOrgPerson" />
           <FormField label="Display Order" v-model.number="form.displayOrder" type="number" placeholder="0" />
+        </div>
+
+        <!-- User Form picker -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">User Form</label>
+          <select v-model="form.userFormId" class="input w-full">
+            <option :value="null">— None —</option>
+            <option v-for="uf in userForms" :key="uf.id" :value="uf.id">
+              {{ uf.formName }} ({{ uf.objectClassName }})
+            </option>
+          </select>
+          <p class="text-xs text-gray-400 mt-1">The form definition used to render user create/edit fields in this realm</p>
         </div>
 
         <!-- Auxiliary objectclasses -->
@@ -107,6 +133,8 @@ import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useNotificationStore } from '@/stores/notifications'
 import { listRealms, createRealm, updateRealm, deleteRealm } from '@/api/realms'
+import { listUserForms } from '@/api/userForms'
+import { listDirectories } from '@/api/directories'
 import FormField from '@/components/FormField.vue'
 import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -117,6 +145,8 @@ const notif = useNotificationStore()
 const loading      = ref(false)
 const saving       = ref(false)
 const realms       = ref([])
+const userForms    = ref([])
+const directories  = ref([])
 const showModal    = ref(false)
 const editing      = ref(null)
 const deleteTarget = ref(null)
@@ -125,13 +155,21 @@ const form = ref(emptyForm())
 
 function emptyForm() {
   return {
+    directoryId: dirId(),
     name: '',
     userBaseDn: '',
     groupBaseDn: '',
     primaryUserObjectclass: 'inetOrgPerson',
     displayOrder: 0,
+    userFormId: null,
     auxiliaryObjectclasses: [],
   }
+}
+
+function userFormLabel(formId) {
+  if (!formId) return '—'
+  const uf = userForms.value.find(f => f.id === formId)
+  return uf ? `${uf.formName} (${uf.objectClassName})` : formId
 }
 
 const dirId = () => route.params.dirId
@@ -139,8 +177,14 @@ const dirId = () => route.params.dirId
 async function load() {
   loading.value = true
   try {
-    const { data } = await listRealms(dirId())
-    realms.value = data
+    const [realmsRes, formsRes, dirsRes] = await Promise.all([
+      listRealms(dirId()),
+      listUserForms(),
+      listDirectories(),
+    ])
+    realms.value = realmsRes.data
+    userForms.value = formsRes.data
+    directories.value = dirsRes.data
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
   } finally {
@@ -160,11 +204,13 @@ function openCreate() {
 function openEdit(r) {
   editing.value = r.id
   form.value = {
+    directoryId: r.directoryId || dirId(),
     name: r.name,
     userBaseDn: r.userBaseDn,
     groupBaseDn: r.groupBaseDn,
     primaryUserObjectclass: r.primaryUserObjectclass,
     displayOrder: r.displayOrder,
+    userFormId: r.userFormId || null,
     auxiliaryObjectclasses: (r.auxiliaryObjectclasses || []).map(a => ({
       objectclassName: a.objectclassName,
       displayOrder: a.displayOrder,
@@ -176,11 +222,12 @@ function openEdit(r) {
 async function save() {
   saving.value = true
   try {
+    const targetDirId = form.value.directoryId
     if (editing.value) {
-      await updateRealm(dirId(), editing.value, form.value)
+      await updateRealm(targetDirId, editing.value, form.value)
       notif.success('Realm updated')
     } else {
-      await createRealm(dirId(), form.value)
+      await createRealm(targetDirId, form.value)
       notif.success('Realm created')
     }
     showModal.value = false

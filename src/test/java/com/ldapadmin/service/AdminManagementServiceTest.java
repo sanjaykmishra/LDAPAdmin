@@ -64,7 +64,7 @@ class AdminManagementServiceTest {
     @Test
     void listAdmins_returnsMappedList() {
         Account a = adminAccount("alice");
-        when(accountRepo.findAllByRole(AccountRole.ADMIN)).thenReturn(List.of(a));
+        when(accountRepo.findAll()).thenReturn(List.of(a));
 
         List<AdminAccountResponse> result = service.listAdmins();
 
@@ -89,7 +89,7 @@ class AdminManagementServiceTest {
         when(accountRepo.existsByUsername("bob")).thenReturn(true);
 
         assertThatThrownBy(() -> service.createAdmin(
-                new AdminAccountRequest("bob", "Bob", "bob@e.com", true)))
+                new AdminAccountRequest("bob", "Bob", "bob@e.com", AccountRole.ADMIN, AccountType.LOCAL, null, null, true)))
                 .isInstanceOf(ConflictException.class);
 
         verify(accountRepo, never()).save(any());
@@ -102,13 +102,28 @@ class AdminManagementServiceTest {
         when(accountRepo.save(any())).thenReturn(saved);
 
         AdminAccountResponse resp = service.createAdmin(
-                new AdminAccountRequest("alice", "Alice", "a@e.com", true));
+                new AdminAccountRequest("alice", "Alice", "a@e.com", AccountRole.ADMIN, AccountType.LOCAL, null, null, true));
 
         assertThat(resp.username()).isEqualTo("alice");
         ArgumentCaptor<Account> captor = ArgumentCaptor.forClass(Account.class);
         verify(accountRepo).save(captor.capture());
         assertThat(captor.getValue().getRole()).isEqualTo(AccountRole.ADMIN);
         assertThat(captor.getValue().getAuthType()).isEqualTo(AccountType.LOCAL);
+    }
+
+    @Test
+    void createAdmin_superadminRole_savesWithSuperadminRole() {
+        when(accountRepo.existsByUsername("super")).thenReturn(false);
+        Account saved = adminAccount("super");
+        saved.setRole(AccountRole.SUPERADMIN);
+        when(accountRepo.save(any())).thenReturn(saved);
+
+        service.createAdmin(
+                new AdminAccountRequest("super", "Super", "s@e.com", AccountRole.SUPERADMIN, AccountType.LOCAL, "pass", null, true));
+
+        ArgumentCaptor<Account> captor = ArgumentCaptor.forClass(Account.class);
+        verify(accountRepo).save(captor.capture());
+        assertThat(captor.getValue().getRole()).isEqualTo(AccountRole.SUPERADMIN);
     }
 
     // ── updateAdmin ───────────────────────────────────────────────────────────
@@ -118,7 +133,7 @@ class AdminManagementServiceTest {
         when(accountRepo.findById(adminId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.updateAdmin(adminId,
-                new AdminAccountRequest("alice", "Alice", "a@e.com", true)))
+                new AdminAccountRequest("alice", "Alice", "a@e.com", AccountRole.ADMIN, AccountType.LOCAL, null, null, true)))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -129,7 +144,7 @@ class AdminManagementServiceTest {
         when(accountRepo.existsByUsername("bob")).thenReturn(true);
 
         assertThatThrownBy(() -> service.updateAdmin(adminId,
-                new AdminAccountRequest("bob", "Bob", "b@e.com", true)))
+                new AdminAccountRequest("bob", "Bob", "b@e.com", AccountRole.ADMIN, AccountType.LOCAL, null, null, true)))
                 .isInstanceOf(ConflictException.class);
     }
 
@@ -140,7 +155,7 @@ class AdminManagementServiceTest {
         when(accountRepo.save(any())).thenReturn(existing);
 
         service.updateAdmin(adminId,
-                new AdminAccountRequest("alice", "Alice Renamed", "a@e.com", true));
+                new AdminAccountRequest("alice", "Alice Renamed", "a@e.com", AccountRole.ADMIN, AccountType.LOCAL, null, null, true));
 
         verify(accountRepo, never()).existsByUsername("alice");
     }

@@ -1,6 +1,7 @@
 package com.ldapadmin.dto.admin;
 
 import com.ldapadmin.entity.Account;
+import com.ldapadmin.entity.enums.AccountRole;
 import com.ldapadmin.entity.enums.AccountType;
 
 import java.time.Instant;
@@ -11,7 +12,9 @@ public record AdminAccountResponse(
         String username,
         String displayName,
         String email,
+        AccountRole role,
         AccountType authType,
+        String ldapDn,
         boolean active,
         Instant lastLoginAt,
         Instant createdAt,
@@ -23,7 +26,9 @@ public record AdminAccountResponse(
                 a.getUsername(),
                 a.getDisplayName(),
                 a.getEmail(),
+                a.getRole(),
                 a.getAuthType(),
+                a.getLdapDn(),
                 a.isActive(),
                 a.getLastLoginAt(),
                 a.getCreatedAt(),
