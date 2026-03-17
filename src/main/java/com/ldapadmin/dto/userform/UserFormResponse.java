@@ -20,7 +20,8 @@ public record UserFormResponse(
             String customLabel,
             boolean requiredOnCreate,
             boolean editableOnCreate,
-            String inputType) {
+            String inputType,
+            boolean rdn) {
 
         public static AttributeConfigEntry from(UserFormAttributeConfig c) {
             return new AttributeConfigEntry(
@@ -29,7 +30,8 @@ public record UserFormResponse(
                     c.getCustomLabel(),
                     c.isRequiredOnCreate(),
                     c.isEditableOnCreate(),
-                    c.getInputType().name());
+                    c.getInputType().name(),
+                    c.isRdn());
         }
     }
 

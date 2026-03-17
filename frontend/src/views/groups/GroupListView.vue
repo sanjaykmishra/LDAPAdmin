@@ -27,9 +27,11 @@
 
     <!-- Create group -->
     <AppModal v-model="showCreate" title="New Group" size="md">
-      <FormField label="Parent DN" v-model="createForm.parentDn" required />
+      <FormField label="Parent DN" v-model="createForm.parentDn" required :disabled="!!realmData?.groupBaseDn" />
       <FormField label="Group Name (cn)" v-model="createForm.cn" required />
       <FormField label="Object Class" v-model="createForm.objectClass" />
+      <FormField label="Owner" v-model="createForm.owner" placeholder="DN of the group owner" />
+      <FormField label="Description" v-model="createForm.description" placeholder="Group description" />
       <template #footer>
         <button @click="showCreate = false" class="btn-secondary">Cancel</button>
         <button @click="doCreate" :disabled="saving" class="btn-primary">Create</button>
@@ -62,6 +64,7 @@ import { useRoute } from 'vue-router'
 import { useNotificationStore } from '@/stores/notifications'
 import { useApi } from '@/composables/useApi'
 import * as groupsApi from '@/api/groups'
+import { listRealms } from '@/api/realms'
 import DataTable from '@/components/DataTable.vue'
 import AppModal from '@/components/AppModal.vue'
 import FormField from '@/components/FormField.vue'
@@ -82,7 +85,8 @@ const deleteTarget  = ref(null)
 const members       = ref([])
 const newMemberDn   = ref('')
 const saving        = ref(false)
-const createForm    = ref({ parentDn: '', cn: '', objectClass: 'groupOfNames' })
+const realmData     = ref(null)
+const createForm    = ref({ parentDn: '', cn: '', objectClass: 'groupOfNames', owner: '', description: '' })
 
 const cols = [
   { key: 'dn',          label: 'DN' },
@@ -113,6 +117,8 @@ async function doCreate() {
       cn: [f.cn],
       objectClass: [f.objectClass],
     }
+    if (f.owner?.trim()) attributes.owner = [f.owner.trim()]
+    if (f.description?.trim()) attributes.description = [f.description.trim()]
     await groupsApi.createGroup(dirId, { dn, attributes })
     notif.success('Group created')
     showCreate.value = false
@@ -122,7 +128,13 @@ async function doCreate() {
 }
 
 function openCreate() {
-  createForm.value = { parentDn: '', cn: '', objectClass: 'groupOfNames' }
+  createForm.value = {
+    parentDn: realmData.value?.groupBaseDn || '',
+    cn: '',
+    objectClass: 'groupOfNames',
+    owner: '',
+    description: '',
+  }
   showCreate.value = true
 }
 
@@ -157,7 +169,17 @@ async function doDelete() {
   await load()
 }
 
-onMounted(load)
+async function loadRealm() {
+  try {
+    const { data: realms } = await listRealms(dirId)
+    if (realms.length) realmData.value = realms[0]
+  } catch { /* best-effort */ }
+}
+
+onMounted(() => {
+  load()
+  loadRealm()
+})
 </script>
 
 <style scoped>

@@ -22,6 +22,7 @@ public record UserFormRequest(
             @Size(max = 255) String customLabel,
             boolean requiredOnCreate,
             boolean editableOnCreate,
-            @NotNull String inputType) {
+            @NotNull String inputType,
+            boolean rdn) {
     }
 }
