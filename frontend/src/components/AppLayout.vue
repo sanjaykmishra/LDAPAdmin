@@ -15,12 +15,9 @@
           class="w-full bg-gray-800 border border-gray-600 text-white rounded px-2 py-1 text-sm"
         >
           <option value="">— select —</option>
-          <optgroup v-for="dir in dirs" :key="dir.id" :label="dir.displayName">
-            <option v-if="!dir.realms.length" :value="`dir:${dir.id}`">(no realms)</option>
-            <option v-for="realm in dir.realms" :key="realm.id" :value="`realm:${realm.id}`">
-              {{ realm.name }}
-            </option>
-          </optgroup>
+          <option v-for="realm in realms" :key="realm.id" :value="realm.id">
+            {{ realm.name }}
+          </option>
         </select>
       </div>
 
@@ -109,59 +106,38 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { listDirectories } from '@/api/directories'
-import { listRealms } from '@/api/realms'
+import { myRealms } from '@/api/auth'
 
 const auth   = useAuthStore()
 const router = useRouter()
 const route  = useRoute()
 
-const dirs        = ref([])   // directories with nested .realms arrays
-const pickerValue = ref('')   // "realm:<id>" or "dir:<id>"
+const realms      = ref([])   // flat list of authorized realms
+const pickerValue = ref('')   // realm id
 
-// Parse the picker value into a directoryId
+// Derive the directory id from the selected realm
 const currentDirId = computed(() => {
-  const v = pickerValue.value
-  if (!v) return ''
-  if (v.startsWith('dir:')) return v.slice(4)
-  if (v.startsWith('realm:')) {
-    const realmId = v.slice(6)
-    for (const dir of dirs.value) {
-      if (dir.realms?.some(r => r.id === realmId)) return dir.id
-    }
-  }
-  return ''
+  if (!pickerValue.value) return ''
+  const realm = realms.value.find(r => r.id === pickerValue.value)
+  return realm?.directoryId || ''
 })
 
-// Build a picker value for a given directory (prefer first realm, fallback to dir)
-function pickerValueForDir(dir) {
-  return dir.realms?.length ? `realm:${dir.realms[0].id}` : `dir:${dir.id}`
-}
-
-// Load directories and their realms for the sidebar picker
+// Load only the realms the current user is authorized for
 onMounted(async () => {
   try {
-    const { data: directories } = await listDirectories()
-    const results = await Promise.all(
-      directories.map(async (dir) => {
-        try {
-          const { data: realms } = await listRealms(dir.id)
-          return { ...dir, realms }
-        } catch {
-          return { ...dir, realms: [] }
-        }
-      })
-    )
-    dirs.value = results
+    const { data } = await myRealms()
+    realms.value = data
 
-    // If currently on a directory-scoped route, select matching entry
+    // If currently on a directory-scoped route, select the matching realm
     const routeDirId = route.params.dirId
     if (routeDirId) {
-      const dir = results.find(d => d.id === routeDirId)
-      if (dir) pickerValue.value = pickerValueForDir(dir)
-    } else if (results.length) {
-      // Auto-select first directory/realm
-      pickerValue.value = pickerValueForDir(results[0])
+      const match = data.find(r => r.directoryId === routeDirId)
+      if (match) pickerValue.value = match.id
+    }
+
+    // Auto-select first realm if nothing matched
+    if (!pickerValue.value && data.length) {
+      pickerValue.value = data[0].id
     }
   } catch { /* silently ignore */ }
 })
@@ -170,11 +146,11 @@ onMounted(async () => {
 watch(() => route.params.dirId, (dirId) => {
   if (!dirId) return
   if (currentDirId.value === dirId) return
-  const dir = dirs.value.find(d => d.id === dirId)
-  if (dir) pickerValue.value = pickerValueForDir(dir)
+  const match = realms.value.find(r => r.directoryId === dirId)
+  if (match) pickerValue.value = match.id
 })
 
-// Navigate when user picks a different entry from the dropdown
+// Navigate when user picks a different realm
 const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'realms']
 watch(currentDirId, (newDirId) => {
   if (!newDirId || newDirId === route.params.dirId) return

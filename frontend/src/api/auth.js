@@ -8,3 +8,6 @@ export const logout = () =>
 
 export const me = () =>
   client.get('/auth/me')
+
+export const myRealms = () =>
+  client.get('/auth/me/realms')
