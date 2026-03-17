@@ -127,7 +127,8 @@ async function load() {
       limit:  limit.value,
     }
     const { data } = await usersApi.searchUsers(dirId, params)
-    users.value = (data.entries || data).map(e => ({
+    const entries = Array.isArray(data) ? data : (data.entries || [])
+    users.value = entries.map(e => ({
       dn:      e.dn,
       cn:      e.attributes?.cn?.[0] || e.attributes?.CN?.[0] || '—',
       mail:    e.attributes?.mail?.[0] || '—',
