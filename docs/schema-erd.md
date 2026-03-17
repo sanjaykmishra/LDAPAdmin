@@ -133,14 +133,6 @@ erDiagram
         timestamptz updated_at
     }
 
-    admin_branch_restrictions {
-        uuid        id                  PK
-        uuid        admin_account_id    FK
-        uuid        realm_id            FK
-        varchar     branch_dn
-        timestamptz created_at
-    }
-
     admin_feature_permissions {
         uuid        id                  PK
         uuid        admin_account_id    FK
@@ -252,8 +244,6 @@ erDiagram
     %% Account permissions (4-dimensional model)
     accounts                    ||--o{     admin_realm_roles               : "realm roles"
     realms                      ||--o{     admin_realm_roles               : "scopes"
-    accounts                    ||--o{     admin_branch_restrictions       : "branch restrictions"
-    realms                      ||--o{     admin_branch_restrictions       : "scopes"
     accounts                    ||--o{     admin_feature_permissions       : "feature permissions"
 
     %% CSV templates

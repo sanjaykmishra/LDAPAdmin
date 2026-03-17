@@ -3,12 +3,12 @@ package com.ldapadmin.service;
 import com.ldapadmin.dto.admin.AdminAccountRequest;
 import com.ldapadmin.dto.admin.AdminAccountResponse;
 import com.ldapadmin.dto.admin.AdminPermissionsResponse;
-import com.ldapadmin.dto.admin.BranchRestrictionsRequest;
+
 import com.ldapadmin.dto.admin.FeaturePermissionRequest;
 import com.ldapadmin.dto.admin.RealmRoleRequest;
 import com.ldapadmin.dto.admin.RealmRoleResponse;
 import com.ldapadmin.entity.Account;
-import com.ldapadmin.entity.AdminBranchRestriction;
+
 import com.ldapadmin.entity.AdminFeaturePermission;
 import com.ldapadmin.entity.AdminRealmRole;
 import com.ldapadmin.entity.Realm;
@@ -18,7 +18,7 @@ import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.exception.ConflictException;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.repository.AccountRepository;
-import com.ldapadmin.repository.AdminBranchRestrictionRepository;
+
 import com.ldapadmin.repository.AdminFeaturePermissionRepository;
 import com.ldapadmin.repository.AdminRealmRoleRepository;
 import com.ldapadmin.repository.RealmRepository;
@@ -37,7 +37,7 @@ public class AdminManagementService {
     private final AccountRepository               accountRepo;
     private final RealmRepository                 realmRepo;
     private final AdminRealmRoleRepository        realmRoleRepo;
-    private final AdminBranchRestrictionRepository branchRepo;
+
     private final AdminFeaturePermissionRepository featureRepo;
     private final PasswordEncoder                 passwordEncoder;
 
@@ -119,7 +119,6 @@ public class AdminManagementService {
         requireAccount(adminId);
         return AdminPermissionsResponse.from(
                 realmRoleRepo.findAllByAdminAccountId(adminId),
-                branchRepo.findAllByAdminAccountId(adminId),
                 featureRepo.findAllByAdminAccountId(adminId));
     }
 
@@ -146,26 +145,6 @@ public class AdminManagementService {
     public void removeRealmRole(UUID adminId, UUID realmId) {
         requireAccount(adminId);
         realmRoleRepo.deleteByAdminAccountIdAndRealmId(adminId, realmId);
-    }
-
-    // ── Dimension 3: branch restrictions ─────────────────────────────────────
-
-    @Transactional
-    public void setBranchRestrictions(UUID adminId, BranchRestrictionsRequest req) {
-        Account admin = requireAccount(adminId);
-        Realm   realm = requireRealm(req.realmId());
-
-        branchRepo.deleteAllByAdminAccountIdAndRealmId(adminId, req.realmId());
-
-        if (req.branchDns() != null) {
-            req.branchDns().forEach(dn -> {
-                AdminBranchRestriction br = new AdminBranchRestriction();
-                br.setAdminAccount(admin);
-                br.setRealm(realm);
-                br.setBranchDn(dn);
-                branchRepo.save(br);
-            });
-        }
     }
 
     // ── Dimension 4: feature permissions ─────────────────────────────────────

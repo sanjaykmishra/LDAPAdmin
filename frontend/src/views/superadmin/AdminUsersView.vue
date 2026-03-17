@@ -121,37 +121,6 @@
           </div>
         </section>
 
-        <!-- Branch restrictions -->
-        <section>
-          <h3 class="font-semibold text-gray-700 mb-2">Branch restrictions</h3>
-          <div v-if="perms.realmRoles.length === 0" class="text-gray-400">Assign a realm role first.</div>
-          <div v-else class="space-y-3">
-            <div v-for="r in perms.realmRoles" :key="'br-' + r.realmId" class="border border-gray-100 rounded-lg p-3">
-              <p class="text-xs font-medium text-gray-600 mb-1">{{ r.realmName }}</p>
-              <div class="flex flex-wrap gap-1 mb-2">
-                <span v-if="!(perms.branchRestrictions[r.realmId] || []).length" class="text-xs text-gray-400">No restrictions (full access)</span>
-                <span
-                  v-for="(dn, idx) in (perms.branchRestrictions[r.realmId] || [])"
-                  :key="idx"
-                  class="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-700 rounded px-1.5 py-0.5 font-mono"
-                >
-                  {{ dn }}
-                  <button @click="removeBranch(r.realmId, idx)" class="text-red-400 hover:text-red-600 font-bold">&times;</button>
-                </span>
-              </div>
-              <div class="flex gap-2">
-                <input
-                  v-model="branchInputs[r.realmId]"
-                  placeholder="e.g. ou=People,dc=example,dc=com"
-                  class="input text-xs py-1 flex-1 font-mono"
-                  @keyup.enter="addBranch(r.realmId)"
-                />
-                <button @click="addBranch(r.realmId)" :disabled="!branchInputs[r.realmId]?.trim()" class="btn-primary btn-sm px-3 py-1 disabled:opacity-50">Add</button>
-              </div>
-            </div>
-          </div>
-        </section>
-
         <!-- Feature overrides -->
         <section>
           <h3 class="font-semibold text-gray-700 mb-2">Feature permission overrides</h3>
@@ -187,11 +156,11 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notifications'
 import { listAdmins, createAdmin, updateAdmin, deleteAdmin, getPermissions } from '@/api/adminManagement'
-import { setRealmRole, removeRealmRole, setBranchRestrictions, setFeaturePermissions, clearFeaturePermission } from '@/api/adminPermissions'
+import { setRealmRole, removeRealmRole, setFeaturePermissions, clearFeaturePermission } from '@/api/adminPermissions'
 import { myRealms } from '@/api/auth'
 import DataTable from '@/components/DataTable.vue'
 import AppModal from '@/components/AppModal.vue'
@@ -312,8 +281,6 @@ const availableRealms = computed(() => {
 
 const newRealmId   = ref('')
 const newRealmRole = ref('ADMIN')
-const branchInputs = reactive({})
-
 const allFeatureKeys = [
   'USER_CREATE', 'USER_EDIT', 'USER_DELETE', 'USER_ENABLE_DISABLE', 'USER_MOVE',
   'GROUP_MANAGE_MEMBERS', 'GROUP_CREATE_DELETE',
@@ -332,7 +299,6 @@ async function openPermissions(row) {
   perms.value = null
   newRealmId.value = ''
   newRealmRole.value = 'ADMIN'
-  Object.keys(branchInputs).forEach(k => delete branchInputs[k])
   showPerms.value = true
   permsLoading.value = true
   try {
@@ -378,30 +344,6 @@ async function changeRealmRole(realmId, baseRole) {
 async function doRemoveRealmRole(realmId) {
   try {
     await removeRealmRole(permsTarget.value.id, realmId)
-    await reloadPerms()
-  } catch (e) {
-    notif.error(e.response?.data?.detail || e.message)
-  }
-}
-
-async function addBranch(realmId) {
-  const dn = branchInputs[realmId]?.trim()
-  if (!dn) return
-  const current = perms.value.branchRestrictions[realmId] || []
-  try {
-    await setBranchRestrictions(permsTarget.value.id, { realmId, branchDns: [...current, dn] })
-    branchInputs[realmId] = ''
-    await reloadPerms()
-  } catch (e) {
-    notif.error(e.response?.data?.detail || e.message)
-  }
-}
-
-async function removeBranch(realmId, idx) {
-  const current = [...(perms.value.branchRestrictions[realmId] || [])]
-  current.splice(idx, 1)
-  try {
-    await setBranchRestrictions(permsTarget.value.id, { realmId, branchDns: current })
     await reloadPerms()
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
