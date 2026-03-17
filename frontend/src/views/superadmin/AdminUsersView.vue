@@ -28,13 +28,13 @@
         <span class="text-xs text-gray-500">{{ value ? new Date(value).toLocaleString() : '—' }}</span>
       </template>
       <template #actions="{ row }">
-        <div class="flex gap-2 justify-end">
-          <button @click="openEdit(row)" class="btn-sm btn-secondary">Edit</button>
-          <button v-if="row.role === 'ADMIN'" @click="openPermissions(row)" class="btn-sm btn-secondary">Permissions</button>
+        <div class="flex gap-3 justify-end whitespace-nowrap">
+          <button @click="openEdit(row)" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Edit</button>
+          <button v-if="row.role === 'ADMIN'" @click="openPermissions(row)" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Permissions</button>
           <button
             v-if="row.id !== auth.principal?.id"
             @click="confirmDelete(row)"
-            class="btn-sm btn-danger"
+            class="text-red-500 hover:text-red-700 text-xs font-medium"
           >Delete</button>
         </div>
       </template>
