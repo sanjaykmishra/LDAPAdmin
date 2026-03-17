@@ -2,6 +2,15 @@
   <div class="p-6 max-w-4xl">
     <h1 class="text-2xl font-bold text-gray-900 mb-6">Schema Browser</h1>
 
+    <!-- Directory picker -->
+    <div class="mb-6">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
+      <select v-model="selectedDirId" class="input w-64">
+        <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select directory —' }}</option>
+        <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
+      </select>
+    </div>
+
     <!-- Tabs -->
     <div class="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
       <button
@@ -48,19 +57,19 @@
 
           <!-- Object class detail -->
           <template v-if="activeTab === 'objectClasses'">
-            <div v-if="detail.requiredAttributes?.length" class="mb-4">
+            <div v-if="detail.required?.length" class="mb-4">
               <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Required Attributes</p>
               <div class="flex flex-wrap gap-1">
-                <span v-for="a in detail.requiredAttributes" :key="a" class="text-xs bg-red-50 text-red-700 rounded px-2 py-0.5 font-mono">{{ a }}</span>
+                <span v-for="a in detail.required" :key="a" class="text-xs bg-red-50 text-red-700 rounded px-2 py-0.5 font-mono">{{ a }}</span>
               </div>
             </div>
-            <div v-if="detail.optionalAttributes?.length">
+            <div v-if="detail.optional?.length">
               <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Optional Attributes</p>
               <div class="flex flex-wrap gap-1">
-                <span v-for="a in detail.optionalAttributes" :key="a" class="text-xs bg-gray-100 text-gray-700 rounded px-2 py-0.5 font-mono">{{ a }}</span>
+                <span v-for="a in detail.optional" :key="a" class="text-xs bg-gray-100 text-gray-700 rounded px-2 py-0.5 font-mono">{{ a }}</span>
               </div>
             </div>
-            <div v-if="!detail.requiredAttributes?.length && !detail.optionalAttributes?.length" class="text-sm text-gray-400">
+            <div v-if="!detail.required?.length && !detail.optional?.length" class="text-sm text-gray-400">
               No attribute information available.
             </div>
           </template>
@@ -84,18 +93,20 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
 import { useNotificationStore } from '@/stores/notifications'
+import { listDirectories } from '@/api/directories'
 import { listObjectClasses, getObjectClass, listAttributeTypes, getAttributeType } from '@/api/schema'
 
-const route = useRoute()
 const notif = useNotificationStore()
-const dirId = route.params.dirId
 
 const tabs = [
   { key: 'objectClasses',  label: 'Object Classes' },
   { key: 'attributeTypes', label: 'Attribute Types' },
 ]
+
+const directories   = ref([])
+const loadingDirs   = ref(false)
+const selectedDirId = ref('')
 
 const activeTab   = ref('objectClasses')
 const search      = ref('')
@@ -118,14 +129,20 @@ const detailRows = computed(() => {
     .map(([k, v]) => [k, v == null ? '—' : String(v)])
 })
 
+// Reload object classes / attribute types when directory changes
+watch(selectedDirId, () => {
+  if (selectedDirId.value) loadList()
+})
+
 async function loadList() {
+  if (!selectedDirId.value) return
   listLoading.value = true
   selected.value = null
   detail.value = null
   allItems.value = []
   try {
     const fn = activeTab.value === 'objectClasses' ? listObjectClasses : listAttributeTypes
-    const { data } = await fn(dirId)
+    const { data } = await fn(selectedDirId.value)
     allItems.value = Array.isArray(data) ? [...data].sort() : data
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
@@ -135,12 +152,13 @@ async function loadList() {
 }
 
 async function loadDetail(name) {
+  if (!selectedDirId.value) return
   selected.value = name
   detail.value = null
   detailLoading.value = true
   try {
     const fn = activeTab.value === 'objectClasses' ? getObjectClass : getAttributeType
-    const { data } = await fn(dirId, name)
+    const { data } = await fn(selectedDirId.value, name)
     detail.value = data
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
@@ -152,10 +170,23 @@ async function loadDetail(name) {
 function switchTab(tab) {
   activeTab.value = tab
   search.value = ''
-  loadList()
+  if (selectedDirId.value) loadList()
 }
 
-onMounted(loadList)
+onMounted(async () => {
+  loadingDirs.value = true
+  try {
+    const { data } = await listDirectories()
+    directories.value = data
+    if (data.length) {
+      selectedDirId.value = data[0].id
+    }
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  } finally {
+    loadingDirs.value = false
+  }
+})
 </script>
 
 <style scoped>
