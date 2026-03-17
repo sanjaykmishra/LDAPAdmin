@@ -114,6 +114,7 @@ public class AdminManagementService {
 
     // ── Permission management — summary ───────────────────────────────────────
 
+    @Transactional(readOnly = true)
     public AdminPermissionsResponse getPermissions(UUID adminId) {
         requireAccount(adminId);
         return AdminPermissionsResponse.from(
