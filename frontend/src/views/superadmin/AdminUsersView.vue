@@ -80,38 +80,91 @@
 
         <!-- Realm roles -->
         <section>
-          <h3 class="font-semibold text-gray-700 mb-2">Realm roles</h3>
-          <div v-if="perms.realmRoles.length === 0" class="text-gray-400">None assigned.</div>
-          <table v-else class="w-full text-xs border border-gray-100 rounded-lg overflow-hidden">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-semibold text-gray-700">Realm roles</h3>
+          </div>
+          <div v-if="perms.realmRoles.length === 0" class="text-gray-400 mb-2">None assigned.</div>
+          <table v-else class="w-full text-xs border border-gray-100 rounded-lg overflow-hidden mb-2">
             <thead class="bg-gray-50">
               <tr>
                 <th class="px-3 py-2 text-left text-gray-500 font-medium">Realm</th>
                 <th class="px-3 py-2 text-left text-gray-500 font-medium">Role</th>
-                <th class="px-3 py-2 text-left text-gray-500 font-medium">Write</th>
+                <th class="px-3 py-2"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-50">
               <tr v-for="r in perms.realmRoles" :key="r.realmId" class="hover:bg-gray-50">
                 <td class="px-3 py-2 text-gray-700">{{ r.realmName }}</td>
-                <td class="px-3 py-2 text-gray-700">{{ r.role }}</td>
                 <td class="px-3 py-2">
-                  <span :class="r.canWrite ? 'badge-green' : 'badge-gray'">{{ r.canWrite ? 'Yes' : 'No' }}</span>
+                  <select :value="r.baseRole" @change="changeRealmRole(r.realmId, $event.target.value)" class="input text-xs py-1">
+                    <option value="ADMIN">ADMIN</option>
+                    <option value="READ_ONLY">READ_ONLY</option>
+                  </select>
+                </td>
+                <td class="px-3 py-2 text-right">
+                  <button @click="doRemoveRealmRole(r.realmId)" class="text-red-500 hover:text-red-700 text-xs font-medium">Remove</button>
                 </td>
               </tr>
             </tbody>
           </table>
+          <!-- Add realm role -->
+          <div class="flex items-center gap-2">
+            <select v-model="newRealmId" class="input text-xs py-1 flex-1">
+              <option value="" disabled>— Add realm —</option>
+              <option v-for="r in availableRealms" :key="r.id" :value="r.id">{{ r.name }}</option>
+            </select>
+            <select v-model="newRealmRole" class="input text-xs py-1">
+              <option value="ADMIN">ADMIN</option>
+              <option value="READ_ONLY">READ_ONLY</option>
+            </select>
+            <button @click="doAddRealmRole" :disabled="!newRealmId" class="btn-primary btn-sm px-3 py-1 disabled:opacity-50">Add</button>
+          </div>
+        </section>
+
+        <!-- Branch restrictions -->
+        <section>
+          <h3 class="font-semibold text-gray-700 mb-2">Branch restrictions</h3>
+          <div v-if="perms.realmRoles.length === 0" class="text-gray-400">Assign a realm role first.</div>
+          <div v-else class="space-y-3">
+            <div v-for="r in perms.realmRoles" :key="'br-' + r.realmId" class="border border-gray-100 rounded-lg p-3">
+              <p class="text-xs font-medium text-gray-600 mb-1">{{ r.realmName }}</p>
+              <div class="flex flex-wrap gap-1 mb-2">
+                <span v-if="!(perms.branchRestrictions[r.realmId] || []).length" class="text-xs text-gray-400">No restrictions (full access)</span>
+                <span
+                  v-for="(dn, idx) in (perms.branchRestrictions[r.realmId] || [])"
+                  :key="idx"
+                  class="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-700 rounded px-1.5 py-0.5 font-mono"
+                >
+                  {{ dn }}
+                  <button @click="removeBranch(r.realmId, idx)" class="text-red-400 hover:text-red-600 font-bold">&times;</button>
+                </span>
+              </div>
+              <div class="flex gap-2">
+                <input
+                  v-model="branchInputs[r.realmId]"
+                  placeholder="e.g. ou=People,dc=example,dc=com"
+                  class="input text-xs py-1 flex-1 font-mono"
+                  @keyup.enter="addBranch(r.realmId)"
+                />
+                <button @click="addBranch(r.realmId)" :disabled="!branchInputs[r.realmId]?.trim()" class="btn-primary btn-sm px-3 py-1 disabled:opacity-50">Add</button>
+              </div>
+            </div>
+          </div>
         </section>
 
         <!-- Feature overrides -->
         <section>
           <h3 class="font-semibold text-gray-700 mb-2">Feature permission overrides</h3>
-          <div v-if="perms.featurePermissions.length === 0" class="text-gray-400">No overrides — defaults apply.</div>
-          <div v-else class="flex flex-wrap gap-2">
-            <span
-              v-for="f in perms.featurePermissions"
-              :key="f.featureKey"
-              :class="f.enabled ? 'badge-green' : 'badge-red'"
-            >{{ f.featureKey }}</span>
+          <p class="text-xs text-gray-400 mb-3">Override the default feature permissions for this admin. Leave as "Default" to use the role-based default.</p>
+          <div class="grid grid-cols-2 gap-x-6 gap-y-2">
+            <div v-for="fk in allFeatureKeys" :key="fk" class="flex items-center justify-between">
+              <span class="text-xs text-gray-700 font-mono">{{ fk }}</span>
+              <select :value="featureState(fk)" @change="changeFeature(fk, $event.target.value)" class="input text-xs py-0.5 w-28">
+                <option value="default">Default</option>
+                <option value="enabled">Enabled</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </div>
           </div>
         </section>
 
@@ -134,10 +187,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, reactive, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notifications'
 import { listAdmins, createAdmin, updateAdmin, deleteAdmin, getPermissions } from '@/api/adminManagement'
+import { setRealmRole, removeRealmRole, setBranchRestrictions, setFeaturePermissions, clearFeaturePermission } from '@/api/adminPermissions'
+import { myRealms } from '@/api/auth'
 import DataTable from '@/components/DataTable.vue'
 import AppModal from '@/components/AppModal.vue'
 import FormField from '@/components/FormField.vue'
@@ -238,9 +293,46 @@ async function doDelete() {
   }
 }
 
+// ── All realms (for the realm picker in permissions dialog) ──────────────────
+const allRealms = ref([])
+
+onMounted(async () => {
+  try {
+    const { data } = await myRealms()
+    allRealms.value = data
+  } catch { /* ignore */ }
+})
+
+// Realms not already assigned to this admin
+const availableRealms = computed(() => {
+  if (!perms.value) return allRealms.value
+  const assigned = new Set(perms.value.realmRoles.map(r => r.realmId))
+  return allRealms.value.filter(r => !assigned.has(r.id))
+})
+
+const newRealmId   = ref('')
+const newRealmRole = ref('ADMIN')
+const branchInputs = reactive({})
+
+const allFeatureKeys = [
+  'USER_CREATE', 'USER_EDIT', 'USER_DELETE', 'USER_ENABLE_DISABLE', 'USER_MOVE',
+  'GROUP_MANAGE_MEMBERS', 'GROUP_CREATE_DELETE',
+  'BULK_IMPORT', 'BULK_EXPORT',
+  'REPORTS_RUN', 'REPORTS_EXPORT', 'REPORTS_SCHEDULE',
+]
+
+function featureState(fk) {
+  const f = perms.value?.featurePermissions?.find(p => p.featureKey === fk)
+  if (!f) return 'default'
+  return f.enabled ? 'enabled' : 'disabled'
+}
+
 async function openPermissions(row) {
   permsTarget.value = row
   perms.value = null
+  newRealmId.value = ''
+  newRealmRole.value = 'ADMIN'
+  Object.keys(branchInputs).forEach(k => delete branchInputs[k])
   showPerms.value = true
   permsLoading.value = true
   try {
@@ -251,6 +343,81 @@ async function openPermissions(row) {
     showPerms.value = false
   } finally {
     permsLoading.value = false
+  }
+}
+
+async function reloadPerms() {
+  try {
+    const { data } = await getPermissions(permsTarget.value.id)
+    perms.value = data
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  }
+}
+
+async function doAddRealmRole() {
+  if (!newRealmId.value) return
+  try {
+    await setRealmRole(permsTarget.value.id, { realmId: newRealmId.value, baseRole: newRealmRole.value })
+    newRealmId.value = ''
+    await reloadPerms()
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  }
+}
+
+async function changeRealmRole(realmId, baseRole) {
+  try {
+    await setRealmRole(permsTarget.value.id, { realmId, baseRole })
+    await reloadPerms()
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  }
+}
+
+async function doRemoveRealmRole(realmId) {
+  try {
+    await removeRealmRole(permsTarget.value.id, realmId)
+    await reloadPerms()
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  }
+}
+
+async function addBranch(realmId) {
+  const dn = branchInputs[realmId]?.trim()
+  if (!dn) return
+  const current = perms.value.branchRestrictions[realmId] || []
+  try {
+    await setBranchRestrictions(permsTarget.value.id, { realmId, branchDns: [...current, dn] })
+    branchInputs[realmId] = ''
+    await reloadPerms()
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  }
+}
+
+async function removeBranch(realmId, idx) {
+  const current = [...(perms.value.branchRestrictions[realmId] || [])]
+  current.splice(idx, 1)
+  try {
+    await setBranchRestrictions(permsTarget.value.id, { realmId, branchDns: current })
+    await reloadPerms()
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  }
+}
+
+async function changeFeature(featureKey, state) {
+  try {
+    if (state === 'default') {
+      await clearFeaturePermission(permsTarget.value.id, featureKey)
+    } else {
+      await setFeaturePermissions(permsTarget.value.id, [{ featureKey, enabled: state === 'enabled' }])
+    }
+    await reloadPerms()
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
   }
 }
 </script>
@@ -265,4 +432,5 @@ async function openPermissions(row) {
 .badge-gray    { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600; }
 .badge-blue    { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800; }
 .badge-red     { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700; }
+.input         { @apply border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500; }
 </style>

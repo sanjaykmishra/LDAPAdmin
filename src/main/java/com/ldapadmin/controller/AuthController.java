@@ -3,9 +3,14 @@ package com.ldapadmin.controller;
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.auth.AuthenticationService;
 import com.ldapadmin.auth.LoginRateLimiter;
+import com.ldapadmin.auth.PrincipalType;
 import com.ldapadmin.auth.dto.LoginRequest;
 import com.ldapadmin.auth.dto.LoginResponse;
 import com.ldapadmin.config.AppProperties;
+import com.ldapadmin.entity.AdminRealmRole;
+import com.ldapadmin.entity.Realm;
+import com.ldapadmin.repository.AdminRealmRoleRepository;
+import com.ldapadmin.repository.RealmRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -22,16 +27,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Authentication endpoints.
  *
  * <pre>
- *   POST /api/auth/login   — issue a JWT (set as httpOnly cookie; body carries principal info)
- *   POST /api/auth/logout  — clear the JWT cookie
- *   GET  /api/auth/me      — return current principal info
+ *   POST /api/auth/login      — issue a JWT (set as httpOnly cookie; body carries principal info)
+ *   POST /api/auth/logout     — clear the JWT cookie
+ *   GET  /api/auth/me         — return current principal info
+ *   GET  /api/auth/me/realms  — return realms the current principal is authorized for
  * </pre>
  */
 @RestController
@@ -41,9 +50,11 @@ public class AuthController {
 
     private static final String JWT_COOKIE = "jwt";
 
-    private final AuthenticationService authenticationService;
-    private final LoginRateLimiter      rateLimiter;
-    private final AppProperties         appProperties;
+    private final AuthenticationService   authenticationService;
+    private final LoginRateLimiter        rateLimiter;
+    private final AppProperties           appProperties;
+    private final AdminRealmRoleRepository realmRoleRepo;
+    private final RealmRepository          realmRepo;
 
     /**
      * Authenticates the caller, sets an httpOnly JWT cookie, and returns
@@ -105,5 +116,40 @@ public class AuthController {
         body.put("accountType", principal.type().name());
         body.put("id",          principal.id().toString());
         return ResponseEntity.ok(body);
+    }
+
+    /**
+     * Returns the realms that the current principal is authorized to access.
+     * Superadmins see all realms; admins see only realms with an assigned realm role.
+     */
+    @GetMapping("/me/realms")
+    public List<Map<String, Object>> myRealms(
+            @AuthenticationPrincipal AuthPrincipal principal) {
+
+        if (principal == null) {
+            throw new BadCredentialsException("Not authenticated");
+        }
+
+        List<Realm> realms;
+
+        if (principal.type() == PrincipalType.SUPERADMIN) {
+            realms = realmRepo.findAll();
+        } else {
+            realms = realmRoleRepo.findAllByAdminAccountId(principal.id()).stream()
+                    .map(AdminRealmRole::getRealm)
+                    .toList();
+        }
+
+        return realms.stream()
+                .sorted(Comparator.comparing(Realm::getDisplayOrder)
+                        .thenComparing(Realm::getName, String.CASE_INSENSITIVE_ORDER))
+                .map(r -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("id", r.getId());
+                    m.put("name", r.getName());
+                    m.put("directoryId", r.getDirectory().getId());
+                    return m;
+                })
+                .toList();
     }
 }
