@@ -55,8 +55,6 @@ class UserFormServiceTest {
             f.setId(formId);
             return f;
         });
-        when(configRepo.saveAll(any())).thenReturn(List.of());
-
         UserFormResponse resp = service.create(new UserFormRequest(
                 dirId, "inetOrgPerson", "Standard Form", List.of()));
 
@@ -73,8 +71,6 @@ class UserFormServiceTest {
             f.setId(formId);
             return f;
         });
-        when(configRepo.saveAll(any())).thenReturn(List.of());
-
         UserFormResponse resp = service.create(new UserFormRequest(
                 null, "inetOrgPerson", "Standard Form", List.of()));
 
@@ -136,7 +132,6 @@ class UserFormServiceTest {
         dir.setId(dirId);
         when(directoryRepo.findById(dirId)).thenReturn(Optional.of(dir));
         when(formRepo.save(any())).thenReturn(existing);
-        when(configRepo.saveAll(any())).thenReturn(List.of());
 
         service.update(formId, new UserFormRequest(
                 dirId, "inetOrgPerson", "Updated Form", List.of()));
