@@ -54,4 +54,8 @@ public class UserFormAttributeConfig {
     @Enumerated(EnumType.STRING)
     @Column(name = "input_type", nullable = false, length = 20)
     private InputType inputType = InputType.TEXT;
+
+    /** Whether this attribute is used as the RDN (Relative Distinguished Name) for user entries. */
+    @Column(name = "is_rdn", nullable = false)
+    private boolean rdn = false;
 }

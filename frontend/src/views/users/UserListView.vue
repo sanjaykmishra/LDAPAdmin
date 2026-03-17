@@ -115,12 +115,15 @@ const cols = [
 const realmData       = ref(null)
 const userFormConfig  = ref(null)
 
-const emptyForm = () => ({
-  parentDn: realmData.value?.userBaseDn || '',
-  rdnAttribute: 'uid',
-  rdnValue: '',
-  attributes: {},
-})
+const emptyForm = () => {
+  const rdnConfig = userFormConfig.value?.attributeConfigs?.find(a => a.rdn)
+  return {
+    parentDn: realmData.value?.userBaseDn || '',
+    rdnAttribute: rdnConfig?.attributeName || 'uid',
+    rdnValue: '',
+    attributes: {},
+  }
+}
 const form = ref(emptyForm())
 
 function search() { limit.value = PAGE_SIZE; load() }
