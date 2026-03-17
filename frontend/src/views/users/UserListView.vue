@@ -51,7 +51,7 @@
 
     <!-- Create/Edit modal -->
     <AppModal v-model="showModal" :title="editingDn ? 'Edit User' : 'New User'" size="lg">
-      <UserForm :data="form" :is-edit="!!editingDn" @update="v => form = v" />
+      <UserForm :data="form" :is-edit="!!editingDn" :user-form-config="userFormConfig" @update="v => form = v" />
       <template #footer>
         <button @click="showModal = false" class="btn-secondary">Cancel</button>
         <button @click="save" :disabled="saving" class="btn-primary">{{ saving ? 'Saving…' : 'Save' }}</button>
@@ -77,6 +77,8 @@ import { useRoute } from 'vue-router'
 import { useNotificationStore } from '@/stores/notifications'
 import { useApi } from '@/composables/useApi'
 import * as usersApi from '@/api/users'
+import { listRealms } from '@/api/realms'
+import { getUserForm } from '@/api/userForms'
 import DataTable from '@/components/DataTable.vue'
 import AppModal from '@/components/AppModal.vue'
 import FormField from '@/components/FormField.vue'
@@ -110,7 +112,15 @@ const cols = [
   { key: 'enabled', label: 'Status' },
 ]
 
-const emptyForm = () => ({ parentDn: '', rdnAttribute: 'uid', rdnValue: '', attributes: {} })
+const realmData       = ref(null)
+const userFormConfig  = ref(null)
+
+const emptyForm = () => ({
+  parentDn: realmData.value?.userBaseDn || '',
+  rdnAttribute: 'uid',
+  rdnValue: '',
+  attributes: {},
+})
 const form = ref(emptyForm())
 
 function search() { limit.value = PAGE_SIZE; load() }
@@ -171,6 +181,15 @@ async function save() {
       }
       // Include the RDN attribute in the attributes map
       attributes[f.rdnAttribute] = [f.rdnValue]
+      // Include objectClass from the user form definition
+      if (userFormConfig.value?.objectClassName) {
+        const ocs = [userFormConfig.value.objectClassName]
+        const auxClasses = realmData.value?.auxiliaryObjectclasses || []
+        for (const aux of auxClasses) {
+          ocs.push(aux.objectclassName)
+        }
+        attributes.objectClass = ocs
+      }
       await usersApi.createUser(dirId, { dn, attributes })
       notif.success('User created')
     }
@@ -214,7 +233,23 @@ async function doDelete() {
   await load()
 }
 
-onMounted(load)
+async function loadRealmAndForm() {
+  try {
+    const { data: realms } = await listRealms(dirId)
+    if (realms.length) {
+      realmData.value = realms[0]
+      if (realms[0].userFormId) {
+        const { data: uf } = await getUserForm(realms[0].userFormId)
+        userFormConfig.value = uf
+      }
+    }
+  } catch { /* realm/form loading is best-effort */ }
+}
+
+onMounted(() => {
+  load()
+  loadRealmAndForm()
+})
 </script>
 
 <style scoped>
