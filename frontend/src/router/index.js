@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { myRealms } from '@/api/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -17,7 +18,7 @@ const router = createRouter({
       path: '/',
       component: () => import('@/components/AppLayout.vue'),
       children: [
-        { path: '', redirect: '/superadmin/directories' },
+        { path: '', name: 'home', redirect: () => '/superadmin/directories' },
 
         // Users
         {
@@ -114,6 +115,20 @@ const router = createRouter({
   ],
 })
 
+/**
+ * Resolve the default landing path for the current user.
+ * Superadmins land on the directories management page;
+ * regular admins land on the user list for their first authorized realm.
+ */
+async function resolveHomePath(auth) {
+  if (auth.isSuperadmin) return '/superadmin/directories'
+  try {
+    const { data } = await myRealms()
+    if (data.length) return `/directories/${data[0].directoryId}/users`
+  } catch { /* fall through */ }
+  return '/login'
+}
+
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
   // Restore session from httpOnly cookie on first navigation after page load
@@ -122,7 +137,7 @@ router.beforeEach(async (to) => {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
   if (to.meta.requiresSuperadmin && !auth.isSuperadmin) {
-    return { path: '/superadmin/directories' }
+    return { path: await resolveHomePath(auth) }
   }
 })
 
