@@ -170,13 +170,16 @@ const form = ref(emptyForm())
 // When selected directory changes, sync to form and fetch object classes
 watch(selectedDirId, async (dirId) => {
   form.value.directoryId = dirId || null
-  objectClasses.value = []
-  if (!dirId) return
+  if (!dirId) {
+    objectClasses.value = []
+    return
+  }
   loadingOCs.value = true
   try {
     const { data } = await listObjectClasses(dirId)
     objectClasses.value = data
   } catch (e) {
+    objectClasses.value = []
     notif.error('Failed to load object classes: ' + (e.response?.data?.detail || e.message))
   } finally {
     loadingOCs.value = false
@@ -258,7 +261,9 @@ function openCreate() {
 
 function openEdit(f) {
   editing.value = f.id
-  objectClasses.value = []
+  // Pre-seed with the current value so the <select> has a matching option
+  // while the full list loads asynchronously — prevents v-model reset.
+  objectClasses.value = f.objectClassName ? [f.objectClassName] : []
   selectedDirId.value = f.directoryId || ''
   form.value = {
     directoryId: f.directoryId || null,
