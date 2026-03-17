@@ -1,5 +1,6 @@
 package com.ldapadmin.dto.admin;
 
+import com.ldapadmin.entity.enums.AccountRole;
 import com.ldapadmin.entity.enums.AccountType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -10,6 +11,7 @@ public record AdminAccountRequest(
         @NotBlank @Size(max = 255) String username,
         @Size(max = 255) String displayName,
         @Email @Size(max = 255) String email,
+        @NotNull AccountRole role,
         @NotNull AccountType authType,
         @Size(max = 255) String password,
         @Size(max = 1000) String ldapDn,

@@ -54,11 +54,8 @@
         </RouterLink>
 
         <template v-if="auth.isSuperadmin">
-          <RouterLink to="/superadmin" class="nav-item">
-            <span class="icon">🛡</span> Superadmins
-          </RouterLink>
           <RouterLink to="/superadmin/admins" class="nav-item">
-            <span class="icon">👤</span> Admin Users
+            <span class="icon">👤</span> Accounts
           </RouterLink>
           <RouterLink to="/superadmin/directories" class="nav-item">
             <span class="icon">🗄</span> Directories
