@@ -38,6 +38,12 @@ public class RealmService {
     // ── Public API ────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
+    public List<RealmResponse> listAll() {
+        return realmRepo.findAllByOrderByDirectoryIdAscDisplayOrderAsc()
+                .stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<RealmResponse> listByDirectory(UUID directoryId) {
         requireDirectory(directoryId);
         return realmRepo.findAllByDirectoryIdOrderByDisplayOrderAsc(directoryId)

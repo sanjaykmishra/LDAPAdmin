@@ -12,6 +12,7 @@ import java.util.UUID;
 public record RealmResponse(
         UUID id,
         UUID directoryId,
+        String directoryName,
         String name,
         String userBaseDn,
         String groupBaseDn,
@@ -38,6 +39,7 @@ public record RealmResponse(
         return new RealmResponse(
                 r.getId(),
                 r.getDirectory().getId(),
+                r.getDirectory().getDisplayName(),
                 r.getName(),
                 r.getUserBaseDn(),
                 r.getGroupBaseDn(),
