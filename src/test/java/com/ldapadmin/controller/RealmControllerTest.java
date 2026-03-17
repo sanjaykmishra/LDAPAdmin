@@ -165,7 +165,7 @@ class RealmControllerTest extends BaseControllerTest {
     }
 
     private RealmResponse realmResponse() {
-        return new RealmResponse(REALM_ID, DIR_ID, "Test Realm",
+        return new RealmResponse(REALM_ID, DIR_ID, "Test Directory", "Test Realm",
                 "ou=users,dc=example,dc=com",
                 "ou=groups,dc=example,dc=com",
                 "inetOrgPerson", 0, null, List.of(),
