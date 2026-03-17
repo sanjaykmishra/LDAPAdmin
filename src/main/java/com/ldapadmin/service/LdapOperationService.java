@@ -109,7 +109,7 @@ public class LdapOperationService {
                                      String dn, String[] attributes) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
-        permissionService.requireBranchAccessForDirectory(principal, directoryId, dn);
+
         return LdapEntryResponse.from(userService.getUser(dc, dn, attributes));
     }
 
@@ -118,7 +118,7 @@ public class LdapOperationService {
     public LdapEntryResponse createUser(UUID directoryId, AuthPrincipal principal,
                                         CreateEntryRequest req) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
-        permissionService.requireBranchAccessForDirectory(principal, directoryId, req.dn());
+
         userService.createUser(dc, req.dn(), req.attributes());
         LdapEntryResponse result = LdapEntryResponse.from(userService.getUser(dc, req.dn()));
         auditService.record(principal, directoryId, AuditAction.USER_CREATE, req.dn(),
@@ -129,7 +129,7 @@ public class LdapOperationService {
     public LdapEntryResponse updateUser(UUID directoryId, AuthPrincipal principal,
                                         String dn, UpdateEntryRequest req) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
-        permissionService.requireBranchAccessForDirectory(principal, directoryId, dn);
+
         List<Modification> mods = toModifications(req);
         userService.updateUser(dc, dn, mods);
         LdapEntryResponse result = LdapEntryResponse.from(userService.getUser(dc, dn));
@@ -141,21 +141,21 @@ public class LdapOperationService {
 
     public void deleteUser(UUID directoryId, AuthPrincipal principal, String dn) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
-        permissionService.requireBranchAccessForDirectory(principal, directoryId, dn);
+
         userService.deleteUser(dc, dn);
         auditService.record(principal, directoryId, AuditAction.USER_DELETE, dn, null);
     }
 
     public void enableUser(UUID directoryId, AuthPrincipal principal, String dn) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
-        permissionService.requireBranchAccessForDirectory(principal, directoryId, dn);
+
         userService.enableUser(dc, dn);
         auditService.record(principal, directoryId, AuditAction.USER_ENABLE, dn, null);
     }
 
     public void disableUser(UUID directoryId, AuthPrincipal principal, String dn) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
-        permissionService.requireBranchAccessForDirectory(principal, directoryId, dn);
+
         userService.disableUser(dc, dn);
         auditService.record(principal, directoryId, AuditAction.USER_DISABLE, dn, null);
     }
@@ -163,8 +163,8 @@ public class LdapOperationService {
     public void moveUser(UUID directoryId, AuthPrincipal principal,
                          String dn, MoveUserRequest req) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
-        permissionService.requireBranchAccessForDirectory(principal, directoryId, dn);
-        permissionService.requireBranchAccessForDirectory(principal, directoryId, req.newParentDn());
+
+
         userService.moveUser(dc, dn, req.newParentDn());
         auditService.record(principal, directoryId, AuditAction.USER_MOVE, dn,
                 Map.of("newParentDn", req.newParentDn()));
@@ -186,7 +186,7 @@ public class LdapOperationService {
                                       String dn, String[] attributes) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
-        permissionService.requireBranchAccessForDirectory(principal, directoryId, dn);
+
         return LdapEntryResponse.from(groupService.getGroup(dc, dn, attributes));
     }
 
@@ -194,7 +194,7 @@ public class LdapOperationService {
                                         String dn, String memberAttribute) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
-        permissionService.requireBranchAccessForDirectory(principal, directoryId, dn);
+
         return groupService.getMembers(dc, dn, memberAttribute);
     }
 
@@ -203,7 +203,7 @@ public class LdapOperationService {
     public LdapEntryResponse createGroup(UUID directoryId, AuthPrincipal principal,
                                          CreateEntryRequest req) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
-        permissionService.requireBranchAccessForDirectory(principal, directoryId, req.dn());
+
         groupService.createGroup(dc, req.dn(), req.attributes());
         LdapEntryResponse result = LdapEntryResponse.from(groupService.getGroup(dc, req.dn()));
         auditService.record(principal, directoryId, AuditAction.GROUP_CREATE, req.dn(),
@@ -213,7 +213,7 @@ public class LdapOperationService {
 
     public void deleteGroup(UUID directoryId, AuthPrincipal principal, String dn) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
-        permissionService.requireBranchAccessForDirectory(principal, directoryId, dn);
+
         groupService.deleteGroup(dc, dn);
         auditService.record(principal, directoryId, AuditAction.GROUP_DELETE, dn, null);
     }
@@ -221,7 +221,7 @@ public class LdapOperationService {
     public void addGroupMember(UUID directoryId, AuthPrincipal principal,
                                String groupDn, String memberAttribute, String memberValue) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
-        permissionService.requireBranchAccessForDirectory(principal, directoryId, groupDn);
+
         groupService.addMember(dc, groupDn, memberAttribute, memberValue);
         auditService.record(principal, directoryId, AuditAction.GROUP_MEMBER_ADD, groupDn,
                 Map.of("attribute", memberAttribute, "member", memberValue));
@@ -230,7 +230,7 @@ public class LdapOperationService {
     public void removeGroupMember(UUID directoryId, AuthPrincipal principal,
                                   String groupDn, String memberAttribute, String memberValue) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
-        permissionService.requireBranchAccessForDirectory(principal, directoryId, groupDn);
+
         groupService.removeMember(dc, groupDn, memberAttribute, memberValue);
         auditService.record(principal, directoryId, AuditAction.GROUP_MEMBER_REMOVE, groupDn,
                 Map.of("attribute", memberAttribute, "member", memberValue));

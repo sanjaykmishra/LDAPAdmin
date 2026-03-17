@@ -35,15 +35,11 @@
         </span>
       </template>
       <template #actions="{ row }">
-        <div class="flex gap-2 justify-end">
-          <button @click="openEdit(row)" class="btn-sm btn-secondary">Edit</button>
-          <button
-            @click="toggleEnabled(row)"
-            class="btn-sm"
-            :class="row.enabled !== false ? 'btn-secondary' : 'btn-primary'"
-          >{{ row.enabled !== false ? 'Disable' : 'Enable' }}</button>
-          <button @click="openMove(row)" class="btn-sm btn-secondary">Move</button>
-          <button @click="confirmDelete(row)" class="btn-sm btn-danger">Delete</button>
+        <div class="flex gap-3 justify-end whitespace-nowrap">
+          <button @click="openEdit(row)" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Edit</button>
+          <button @click="toggleEnabled(row)" class="text-xs font-medium" :class="row.enabled !== false ? 'text-amber-600 hover:text-amber-800' : 'text-green-600 hover:text-green-800'">{{ row.enabled !== false ? 'Disable' : 'Enable' }}</button>
+          <button @click="openMove(row)" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Move</button>
+          <button @click="confirmDelete(row)" class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
         </div>
       </template>
     </DataTable>

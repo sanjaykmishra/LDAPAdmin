@@ -1,6 +1,7 @@
 package com.ldapadmin.service;
 
 import com.ldapadmin.dto.settings.ApplicationSettingsDto;
+import com.ldapadmin.dto.settings.BrandingDto;
 import com.ldapadmin.dto.settings.UpdateApplicationSettingsRequest;
 import com.ldapadmin.entity.ApplicationSettings;
 import com.ldapadmin.repository.ApplicationSettingsRepository;
@@ -40,6 +41,17 @@ public class ApplicationSettingsService {
         return settingsRepo.findFirstBy()
                 .map(this::toDto)
                 .orElseGet(this::defaultDto);
+    }
+
+    /**
+     * Returns only the branding subset of the settings (public / unauthenticated).
+     */
+    @Transactional(readOnly = true)
+    public BrandingDto getBranding() {
+        return settingsRepo.findFirstBy()
+                .map(s -> new BrandingDto(s.getAppName(), s.getLogoUrl(),
+                                          s.getPrimaryColour(), s.getSecondaryColour()))
+                .orElse(new BrandingDto("LDAP Portal", null, null, null));
     }
 
     /**

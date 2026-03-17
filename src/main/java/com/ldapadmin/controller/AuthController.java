@@ -20,6 +20,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -123,6 +124,7 @@ public class AuthController {
      * Superadmins see all realms; admins see only realms with an assigned realm role.
      */
     @GetMapping("/me/realms")
+    @Transactional(readOnly = true)
     public List<Map<String, Object>> myRealms(
             @AuthenticationPrincipal AuthPrincipal principal) {
 

@@ -20,7 +20,7 @@ import java.util.UUID;
  *   <li>the form configuration ({@link RealmObjectclass} / {@link ObjectclassAttributeConfig})
  *       that drives the user creation and edit UI.</li>
  * </ul>
- * Admin permissions ({@link AdminRealmRole}, {@link AdminBranchRestriction}) are scoped
+ * Admin permissions ({@link AdminRealmRole}) are scoped
  * to realms rather than to directories.
  */
 @Entity

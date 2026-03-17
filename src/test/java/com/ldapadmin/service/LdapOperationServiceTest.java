@@ -21,7 +21,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
 
 import java.util.List;
 import java.util.Map;
@@ -33,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
+
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -97,38 +96,6 @@ class LdapOperationServiceTest {
     // ── User operations ───────────────────────────────────────────────────────
 
     @Test
-    void getUser_callsBranchAccessCheck() {
-        DirectoryConnection dc = enabledDir(true);
-        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dc));
-        LdapUser user = new LdapUser("cn=Alice,ou=Users,dc=example,dc=com",
-                Map.of("cn", List.of("Alice")));
-        when(userService.getUser(eq(dc), anyString())).thenReturn(user);
-
-        AuthPrincipal principal = adminPrincipal();
-        service.getUser(dirId, principal, "cn=Alice,ou=Users,dc=example,dc=com", new String[0]);
-
-        verify(permissionService).requireBranchAccessForDirectory(
-                principal, dirId, "cn=Alice,ou=Users,dc=example,dc=com");
-    }
-
-    @Test
-    void createUser_branchDenied_doesNotCallLdap() {
-        DirectoryConnection dc = enabledDir(true);
-        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dc));
-        AuthPrincipal principal = adminPrincipal();
-        doThrow(new AccessDeniedException("branch denied"))
-                .when(permissionService).requireBranchAccessForDirectory(principal, dirId, "cn=X,ou=Restricted");
-
-        CreateEntryRequest req = new CreateEntryRequest(
-                "cn=X,ou=Restricted", Map.of("cn", List.of("X")));
-
-        assertThatThrownBy(() -> service.createUser(dirId, principal, req))
-                .isInstanceOf(AccessDeniedException.class);
-
-        verify(userService, never()).createUser(any(), anyString(), any());
-    }
-
-    @Test
     void deleteUser_callsUserService() {
         String dn = "cn=Bob,ou=Users,dc=example,dc=com";
         DirectoryConnection dc = enabledDir(true);
@@ -137,21 +104,6 @@ class LdapOperationServiceTest {
         service.deleteUser(dirId, adminPrincipal(), dn);
 
         verify(userService).deleteUser(dc, dn);
-    }
-
-    @Test
-    void moveUser_checksTargetBranchAccess() {
-        String dn        = "cn=Carol,ou=Old,dc=example,dc=com";
-        String newParent = "ou=New,dc=example,dc=com";
-        DirectoryConnection dc = enabledDir(true);
-        when(dirRepo.findById(dirId)).thenReturn(Optional.of(dc));
-        AuthPrincipal principal = adminPrincipal();
-
-        service.moveUser(dirId, principal, dn, new MoveUserRequest(newParent));
-
-        verify(permissionService).requireBranchAccessForDirectory(principal, dirId, dn);
-        verify(permissionService).requireBranchAccessForDirectory(principal, dirId, newParent);
-        verify(userService).moveUser(dc, dn, newParent);
     }
 
     @Test
