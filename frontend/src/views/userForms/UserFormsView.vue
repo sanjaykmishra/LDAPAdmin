@@ -81,6 +81,7 @@
             <table class="w-full text-sm">
               <thead class="bg-gray-50">
                 <tr>
+                  <th class="px-3 py-2 text-center text-xs font-medium text-gray-500">Order</th>
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Attribute</th>
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Label</th>
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Input Type</th>
@@ -91,6 +92,22 @@
               </thead>
               <tbody class="divide-y divide-gray-100">
                 <tr v-for="(attr, idx) in form.attributeConfigs" :key="idx">
+                  <td class="px-3 py-2 text-center whitespace-nowrap">
+                    <button
+                      type="button"
+                      :disabled="idx === 0"
+                      @click="moveAttribute(idx, -1)"
+                      class="text-gray-400 hover:text-gray-700 disabled:opacity-25 disabled:cursor-not-allowed text-xs font-bold px-1"
+                      title="Move up"
+                    >&#9650;</button>
+                    <button
+                      type="button"
+                      :disabled="idx === form.attributeConfigs.length - 1"
+                      @click="moveAttribute(idx, 1)"
+                      class="text-gray-400 hover:text-gray-700 disabled:opacity-25 disabled:cursor-not-allowed text-xs font-bold px-1"
+                      title="Move down"
+                    >&#9660;</button>
+                  </td>
                   <td class="px-3 py-2">
                     <input v-model="attr.attributeName" placeholder="e.g. cn" class="input w-full" required />
                   </td>
@@ -234,6 +251,14 @@ function dirName(dirId) {
 
 function addAttribute() {
   form.value.attributeConfigs.push(emptyAttribute())
+}
+
+function moveAttribute(idx, direction) {
+  const list = form.value.attributeConfigs
+  const target = idx + direction
+  if (target < 0 || target >= list.length) return
+  const [item] = list.splice(idx, 1)
+  list.splice(target, 0, item)
 }
 
 async function load() {
