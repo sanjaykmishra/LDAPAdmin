@@ -17,6 +17,7 @@
         <thead class="bg-gray-50 border-b border-gray-100">
           <tr>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Form Name</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-500">Directory</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Object Class</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Attributes</th>
             <th class="px-4 py-3"></th>
@@ -25,6 +26,7 @@
         <tbody class="divide-y divide-gray-50">
           <tr v-for="f in forms" :key="f.id" class="hover:bg-gray-50">
             <td class="px-4 py-3 font-medium text-gray-900">{{ f.formName }}</td>
+            <td class="px-4 py-3 text-gray-600 text-xs">{{ dirName(f.directoryId) }}</td>
             <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ f.objectClassName }}</td>
             <td class="px-4 py-3">
               <div class="flex flex-wrap gap-1">
@@ -50,7 +52,7 @@
       <form @submit.prevent="save" class="space-y-4">
         <!-- Directory picker (not persisted — used to look up schema) -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Directory <span class="text-gray-400 font-normal">(for schema lookup)</span></label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
           <select v-model="selectedDirId" class="input w-full">
             <option value="">— Select directory —</option>
             <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
@@ -165,8 +167,9 @@ const selectedDirId  = ref('')
 
 const form = ref(emptyForm())
 
-// When selected directory changes, fetch its object classes
+// When selected directory changes, sync to form and fetch object classes
 watch(selectedDirId, async (dirId) => {
+  form.value.directoryId = dirId || null
   objectClasses.value = []
   if (!dirId) return
   loadingOCs.value = true
@@ -203,6 +206,7 @@ watch(() => form.value.objectClassName, async (ocName) => {
 
 function emptyForm() {
   return {
+    directoryId: null,
     formName: '',
     objectClassName: '',
     attributeConfigs: [],
@@ -217,6 +221,12 @@ function emptyAttribute() {
     requiredOnCreate: false,
     editableOnCreate: true,
   }
+}
+
+function dirName(dirId) {
+  if (!dirId) return '—'
+  const d = directories.value.find(d => d.id === dirId)
+  return d ? d.displayName : dirId
 }
 
 function addAttribute() {
@@ -248,9 +258,10 @@ function openCreate() {
 
 function openEdit(f) {
   editing.value = f.id
-  selectedDirId.value = ''
   objectClasses.value = []
+  selectedDirId.value = f.directoryId || ''
   form.value = {
+    directoryId: f.directoryId || null,
     formName: f.formName,
     objectClassName: f.objectClassName,
     attributeConfigs: (f.attributeConfigs || []).map(a => ({
