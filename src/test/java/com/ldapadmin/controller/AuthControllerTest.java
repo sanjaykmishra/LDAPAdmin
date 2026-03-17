@@ -7,6 +7,8 @@ import com.ldapadmin.auth.LoginRateLimiter;
 import com.ldapadmin.auth.PrincipalType;
 import com.ldapadmin.auth.dto.LoginRequest;
 import com.ldapadmin.auth.dto.LoginResponse;
+import com.ldapadmin.repository.AdminRealmRoleRepository;
+import com.ldapadmin.repository.RealmRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -34,8 +36,10 @@ class AuthControllerTest extends BaseControllerTest {
     @Autowired MockMvc       mockMvc;
     @Autowired ObjectMapper  objectMapper;
 
-    @MockBean AuthenticationService authenticationService;
-    @MockBean LoginRateLimiter      loginRateLimiter;
+    @MockBean AuthenticationService    authenticationService;
+    @MockBean LoginRateLimiter        loginRateLimiter;
+    @MockBean AdminRealmRoleRepository adminRealmRoleRepository;
+    @MockBean RealmRepository          realmRepository;
 
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
