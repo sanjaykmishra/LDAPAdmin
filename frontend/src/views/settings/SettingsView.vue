@@ -96,10 +96,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
+import { useSettingsStore } from '@/stores/settings'
 import { getSettings, updateSettings } from '@/api/settings'
 import FormField from '@/components/FormField.vue'
 
-const notif   = useNotificationStore()
+const notif         = useNotificationStore()
+const settingsStore = useSettingsStore()
 const loading = ref(false)
 const saving  = ref(false)
 const settings = ref(null)
@@ -178,6 +180,8 @@ async function doSave() {
       s3PresignedUrlTtlHours: form.value.s3PresignedUrlTtlHours ?? 24,
     })
     notif.success('Settings saved')
+    // Sync branding store so sidebar + page title update immediately
+    settingsStore.apply(form.value)
     await loadSettings()
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
