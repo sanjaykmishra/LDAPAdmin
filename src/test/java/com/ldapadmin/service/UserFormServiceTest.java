@@ -109,7 +109,7 @@ class UserFormServiceTest {
         when(configRepo.saveAll(any())).thenReturn(List.of(savedConfig));
 
         var configEntry = new UserFormRequest.AttributeConfigEntry(
-                "cn", "Common Name", true, true, "TEXT");
+                "cn", "Common Name", true, true, "TEXT", true);
 
         UserFormResponse resp = service.create(new UserFormRequest(
                 null, "inetOrgPerson", "Form", List.of(configEntry)));
