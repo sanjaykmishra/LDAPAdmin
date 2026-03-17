@@ -146,6 +146,32 @@
       </form>
     </AppModal>
 
+    <!-- Add missing attributes confirm -->
+    <Teleport to="body">
+      <div v-if="showMissingAttrs" class="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">Add Missing Attributes</h3>
+          <p class="text-sm text-gray-600 mb-3">
+            The selected object class has {{ pendingMissingAttrs.length }} attribute(s) not in the current form:
+          </p>
+          <div class="max-h-48 overflow-y-auto mb-4">
+            <div class="flex flex-wrap gap-1">
+              <span
+                v-for="attr in pendingMissingAttrs"
+                :key="attr.attributeName"
+                class="text-xs bg-blue-50 text-blue-700 rounded px-1.5 py-0.5 font-mono"
+              >{{ attr.attributeName }}</span>
+            </div>
+          </div>
+          <p class="text-sm text-gray-600 mb-6">Would you like to add them?</p>
+          <div class="flex justify-end gap-3">
+            <button @click="showMissingAttrs = false" class="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">No</button>
+            <button @click="appendMissingAttrs(); showMissingAttrs = false" class="px-4 py-2 text-sm rounded-lg text-white font-medium bg-blue-600 hover:bg-blue-700">Add Attributes</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- Delete confirm -->
     <ConfirmDialog
       v-if="deleteTarget"
@@ -203,26 +229,60 @@ watch(selectedDirId, async (dirId) => {
   }
 })
 
-// When object class changes, fetch its attributes and populate the form
+// When object class changes, fetch its attributes and compare with the form
+const showMissingAttrs    = ref(false)
+const pendingMissingAttrs = ref([])
+
 watch(() => form.value.objectClassName, async (ocName) => {
   if (!ocName || !selectedDirId.value) return
   loadingAttrs.value = true
   try {
     const { data } = await getObjectClass(selectedDirId.value, ocName)
-    const attrs = []
+    const existing = new Set(
+      form.value.attributeConfigs.map(a => a.attributeName.toLowerCase())
+    )
+
+    // If the form has no attributes yet, populate directly
+    if (existing.size === 0) {
+      const attrs = []
+      for (const name of (data.required || [])) {
+        attrs.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: true, editableOnCreate: true })
+      }
+      for (const name of (data.optional || [])) {
+        attrs.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: false, editableOnCreate: true })
+      }
+      form.value.attributeConfigs = attrs
+      return
+    }
+
+    // Build list of attributes in the object class but not in the form
+    const missing = []
     for (const name of (data.required || [])) {
-      attrs.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: true, editableOnCreate: true })
+      if (!existing.has(name.toLowerCase())) {
+        missing.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: true, editableOnCreate: true })
+      }
     }
     for (const name of (data.optional || [])) {
-      attrs.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: false, editableOnCreate: true })
+      if (!existing.has(name.toLowerCase())) {
+        missing.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: false, editableOnCreate: true })
+      }
     }
-    form.value.attributeConfigs = attrs
+
+    if (missing.length) {
+      pendingMissingAttrs.value = missing
+      showMissingAttrs.value = true
+    }
   } catch (e) {
     notif.error('Failed to load attributes: ' + (e.response?.data?.detail || e.message))
   } finally {
     loadingAttrs.value = false
   }
 })
+
+function appendMissingAttrs() {
+  form.value.attributeConfigs.push(...pendingMissingAttrs.value)
+  pendingMissingAttrs.value = []
+}
 
 function emptyForm() {
   return {
