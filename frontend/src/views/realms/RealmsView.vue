@@ -1,9 +1,9 @@
 <template>
-  <div class="p-6 max-w-4xl">
+  <div class="p-6 max-w-5xl">
     <div class="flex items-center justify-between mb-6">
       <div>
         <h1 class="text-2xl font-bold text-gray-900">Realms</h1>
-        <p class="text-sm text-gray-500 mt-1">Logical partitions of this directory with separate user/group base DNs and objectclass configuration</p>
+        <p class="text-sm text-gray-500 mt-1">Manage realms across all directories</p>
       </div>
       <button @click="openCreate" class="btn-primary">+ New Realm</button>
     </div>
@@ -11,11 +11,12 @@
     <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
       <div v-if="loading" class="p-8 text-center text-gray-500 text-sm">Loading…</div>
       <div v-else-if="realms.length === 0" class="p-8 text-center text-gray-400 text-sm">
-        No realms configured. Create one to define user/group scopes within this directory.
+        No realms configured. Create one to define user/group scopes within a directory.
       </div>
       <table v-else class="w-full text-sm">
         <thead class="bg-gray-50 border-b border-gray-100">
           <tr>
+            <th class="px-4 py-3 text-left font-medium text-gray-500">Directory</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Name</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">User Base DN</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Group Base DN</th>
@@ -27,6 +28,7 @@
         </thead>
         <tbody class="divide-y divide-gray-50">
           <tr v-for="r in realms" :key="r.id" class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-gray-600 text-xs">{{ r.directoryName }}</td>
             <td class="px-4 py-3 font-medium text-gray-900">{{ r.name }}</td>
             <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ r.userBaseDn }}</td>
             <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ r.groupBaseDn }}</td>
@@ -129,17 +131,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, onMounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
-import { listRealms, createRealm, updateRealm, deleteRealm } from '@/api/realms'
+import { listAllRealms, createRealm, updateRealm, deleteRealm } from '@/api/realms'
 import { listUserForms } from '@/api/userForms'
 import { listDirectories } from '@/api/directories'
 import FormField from '@/components/FormField.vue'
 import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
-const route = useRoute()
 const notif = useNotificationStore()
 
 const loading      = ref(false)
@@ -151,13 +151,11 @@ const showModal    = ref(false)
 const editing      = ref(null)
 const deleteTarget = ref(null)
 
-const dirId = () => route.params.dirId
-
 const form = ref(emptyForm())
 
 function emptyForm() {
   return {
-    directoryId: dirId(),
+    directoryId: '',
     name: '',
     userBaseDn: '',
     groupBaseDn: '',
@@ -178,7 +176,7 @@ async function load() {
   loading.value = true
   try {
     const [realmsRes, formsRes, dirsRes] = await Promise.all([
-      listRealms(dirId()),
+      listAllRealms(),
       listUserForms(),
       listDirectories(),
     ])
@@ -193,7 +191,6 @@ async function load() {
 }
 
 onMounted(load)
-watch(() => route.params.dirId, load)
 
 function openCreate() {
   editing.value = null
@@ -204,7 +201,7 @@ function openCreate() {
 function openEdit(r) {
   editing.value = r.id
   form.value = {
-    directoryId: r.directoryId || dirId(),
+    directoryId: r.directoryId,
     name: r.name,
     userBaseDn: r.userBaseDn,
     groupBaseDn: r.groupBaseDn,
@@ -243,7 +240,7 @@ function confirmDelete(r) { deleteTarget.value = r }
 
 async function doDelete() {
   try {
-    await deleteRealm(dirId(), deleteTarget.value.id)
+    await deleteRealm(deleteTarget.value.directoryId, deleteTarget.value.id)
     notif.success('Realm deleted')
     deleteTarget.value = null
     await load()

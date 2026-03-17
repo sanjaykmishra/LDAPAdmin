@@ -55,14 +55,6 @@ const router = createRouter({
           component: () => import('@/views/reports/ReportJobsView.vue'),
         },
 
-        // Realms
-        {
-          path: 'directories/:dirId/realms',
-          name: 'realms',
-          component: () => import('@/views/realms/RealmsView.vue'),
-          meta: { requiresSuperadmin: true },
-        },
-
         // Schema Browser (superadmin)
         {
           path: 'superadmin/schema',
@@ -99,6 +91,12 @@ const router = createRouter({
           path: 'superadmin/audit-sources',
           name: 'auditSources',
           component: () => import('@/views/superadmin/AuditSourcesView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
+        {
+          path: 'superadmin/realms',
+          name: 'realms',
+          component: () => import('@/views/realms/RealmsView.vue'),
           meta: { requiresSuperadmin: true },
         },
         {
