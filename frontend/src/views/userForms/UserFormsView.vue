@@ -121,7 +121,7 @@
                     </select>
                   </td>
                   <td class="px-3 py-2 text-center">
-                    <input type="radio" :name="'rdn-' + editing" :checked="attr.rdn" @change="setRdn(idx)" />
+                    <input type="radio" name="rdn-selector" :checked="attr.rdn" @change="setRdn(idx)" />
                   </td>
                   <td class="px-3 py-2 text-center">
                     <input type="checkbox" v-model="attr.requiredOnCreate" :disabled="attr.rdn" />
