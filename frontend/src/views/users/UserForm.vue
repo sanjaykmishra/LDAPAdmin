@@ -20,7 +20,7 @@
 </template>
 
 <script setup>
-import { reactive, watch } from 'vue'
+import { reactive, watch, nextTick } from 'vue'
 import FormField from '@/components/FormField.vue'
 
 const props = defineProps({
@@ -33,6 +33,16 @@ const local = reactive({
   ...props.data,
   attributes: { ...(props.data.attributes || {}) }
 })
-watch(local, v => emit('update', JSON.parse(JSON.stringify(v))), { deep: true })
-watch(() => props.data, v => { Object.assign(local, v); Object.assign(local.attributes, v.attributes || {}) }, { deep: true })
+
+let syncing = false
+watch(local, v => {
+  if (syncing) return
+  emit('update', JSON.parse(JSON.stringify(v)))
+}, { deep: true })
+watch(() => props.data, v => {
+  syncing = true
+  Object.assign(local, v)
+  Object.assign(local.attributes, v.attributes || {})
+  nextTick(() => { syncing = false })
+}, { deep: true })
 </script>
