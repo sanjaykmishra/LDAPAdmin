@@ -2,7 +2,13 @@
   <div class="min-h-screen bg-gray-100 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-8">
       <div class="text-center mb-8">
-        <div class="text-4xl mb-3">🔐</div>
+        <svg class="w-12 h-12 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+          <rect width="32" height="32" rx="6" fill="#2563EB"/>
+          <path d="M8 8h4v12H8z" fill="#fff"/>
+          <path d="M8 20h10v3H8z" fill="#fff"/>
+          <path d="M20 8h4v15h-4z" fill="#fff" opacity="0.55"/>
+          <circle cx="22" cy="12" r="2.5" fill="#fff" opacity="0.55"/>
+        </svg>
         <h1 class="text-2xl font-bold text-gray-900">LDAP Admin</h1>
         <p class="text-sm text-gray-500 mt-1">Sign in to continue</p>
       </div>
