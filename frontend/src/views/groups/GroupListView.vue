@@ -93,7 +93,8 @@ const cols = [
 async function load() {
   await call(async () => {
     const { data } = await groupsApi.searchGroups(dirId, { filter: filterText.value || undefined })
-    groups.value = (data.entries || data).map(e => ({
+    const entries = Array.isArray(data) ? data : (data?.entries || [])
+    groups.value = entries.map(e => ({
       dn:          e.dn,
       cn:          e.attributes?.cn?.[0] || '—',
       memberCount: (e.attributes?.member || e.attributes?.uniqueMember || []).length,
