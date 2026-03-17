@@ -49,7 +49,7 @@ async function handleLogin() {
     const rawRedirect = route.query.redirect
     const redirect = (typeof rawRedirect === 'string' && rawRedirect.startsWith('/') && rawRedirect !== '/login')
       ? rawRedirect
-      : '/superadmin/directories'
+      : '/'
     router.push(redirect)
   } catch (err) {
     errorMsg.value = err.response?.data?.detail
