@@ -13,6 +13,8 @@ public interface RealmRepository extends JpaRepository<Realm, UUID> {
 
     List<Realm> findAllByDirectoryIdOrderByDisplayOrderAsc(UUID directoryId);
 
+    List<Realm> findAllByOrderByDirectoryIdAscDisplayOrderAsc();
+
     Optional<Realm> findByIdAndDirectoryId(UUID id, UUID directoryId);
 
     boolean existsByIdAndDirectoryId(UUID id, UUID directoryId);

@@ -1,5 +1,23 @@
 <template>
   <div class="flex h-screen bg-gray-100 overflow-hidden">
+    <!-- No-realms modal for admin users -->
+    <Teleport to="body">
+      <div v-if="showNoRealms" class="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">No Realms Assigned</h3>
+          <p class="text-sm text-gray-600 mb-6">
+            There are no realms assigned to your account. Please contact your administrator to request access.
+          </p>
+          <div class="flex justify-end">
+            <button
+              @click="handleNoRealmsOk"
+              class="px-4 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium"
+            >OK</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- Sidebar -->
     <aside class="w-60 bg-gray-900 text-white flex flex-col shrink-0">
       <!-- Logo -->
@@ -7,8 +25,8 @@
         <span class="text-lg font-bold tracking-tight">LDAP Admin</span>
       </div>
 
-      <!-- Realm picker -->
-      <div class="px-3 py-3 border-b border-gray-700">
+      <!-- Realm picker (admin users only) -->
+      <div v-if="!auth.isSuperadmin" class="px-3 py-3 border-b border-gray-700">
         <label class="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Realm</label>
         <select
           v-model="pickerValue"
@@ -23,36 +41,40 @@
 
       <!-- Navigation -->
       <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        <template v-if="currentDirId">
-          <RouterLink :to="`/directories/${currentDirId}/users`" class="nav-item">
-            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="6" r="3.25"/><path d="M3.5 17.5c0-3.59 2.91-6.5 6.5-6.5s6.5 2.91 6.5 6.5"/></svg>
-            Users
-          </RouterLink>
-          <RouterLink :to="`/directories/${currentDirId}/groups`" class="nav-item">
-            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="6" r="2.75"/><circle cx="13.5" cy="6" r="2.75"/><path d="M1.5 17c0-3.04 2.46-5.5 5.5-5.5 1.26 0 2.42.42 3.35 1.14M12 11.64A5.48 5.48 0 0 1 18.5 17"/></svg>
-            Groups
-          </RouterLink>
-          <RouterLink :to="`/directories/${currentDirId}/audit`" class="nav-item">
-            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><path d="M7 6h6M7 10h6M7 14h3"/></svg>
-            Audit Log
-          </RouterLink>
-          <RouterLink :to="`/directories/${currentDirId}/bulk`" class="nav-item">
-            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v12M10 2l4 4M10 2 6 6"/><path d="M3 13v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
-            Bulk Import/Export
-          </RouterLink>
-          <RouterLink :to="`/directories/${currentDirId}/reports`" class="nav-item">
-            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V10M10 16V4M15 16v-4"/></svg>
-            Reports
+        <!-- Admin navigation (directory-scoped) -->
+        <template v-if="!auth.isSuperadmin">
+          <template v-if="currentDirId">
+            <RouterLink :to="`/directories/${currentDirId}/users`" class="nav-item">
+              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="6" r="3.25"/><path d="M3.5 17.5c0-3.59 2.91-6.5 6.5-6.5s6.5 2.91 6.5 6.5"/></svg>
+              Users
+            </RouterLink>
+            <RouterLink :to="`/directories/${currentDirId}/groups`" class="nav-item">
+              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="6" r="2.75"/><circle cx="13.5" cy="6" r="2.75"/><path d="M1.5 17c0-3.04 2.46-5.5 5.5-5.5 1.26 0 2.42.42 3.35 1.14M12 11.64A5.48 5.48 0 0 1 18.5 17"/></svg>
+              Groups
+            </RouterLink>
+            <RouterLink :to="`/directories/${currentDirId}/audit`" class="nav-item">
+              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><path d="M7 6h6M7 10h6M7 14h3"/></svg>
+              Audit Log
+            </RouterLink>
+            <RouterLink :to="`/directories/${currentDirId}/bulk`" class="nav-item">
+              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v12M10 2l4 4M10 2 6 6"/><path d="M3 13v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
+              Bulk Import/Export
+            </RouterLink>
+            <RouterLink :to="`/directories/${currentDirId}/reports`" class="nav-item">
+              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V10M10 16V4M15 16v-4"/></svg>
+              Reports
+            </RouterLink>
+          </template>
+
+          <div class="border-t border-gray-700 my-2" />
+
+          <RouterLink to="/settings" class="nav-item">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.5"/><path d="M10 1.5v2M10 16.5v2M18.5 10h-2M3.5 10h-2M16 4l-1.4 1.4M5.4 14.6 4 16M16 16l-1.4-1.4M5.4 5.4 4 4"/></svg>
+            Settings
           </RouterLink>
         </template>
 
-        <div class="border-t border-gray-700 my-2" />
-
-        <RouterLink v-if="!auth.isSuperadmin" to="/settings" class="nav-item">
-          <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.5"/><path d="M10 1.5v2M10 16.5v2M18.5 10h-2M3.5 10h-2M16 4l-1.4 1.4M5.4 14.6 4 16M16 16l-1.4-1.4M5.4 5.4 4 4"/></svg>
-          Settings
-        </RouterLink>
-
+        <!-- Superadmin navigation -->
         <template v-if="auth.isSuperadmin">
           <RouterLink to="/superadmin/admins" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="5.5" r="3.25"/><path d="M3.5 18c0-3.59 2.91-6.5 6.5-6.5s6.5 2.91 6.5 6.5"/><path d="M13.5 2.5l1 2 2 .5-1.5 1.5.5 2-2-1.25L11.5 8.5l.5-2L10.5 5l2-.5 1-2z"/></svg>
@@ -62,7 +84,7 @@
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2V5z"/><path d="M6.5 3v14"/><path d="M2.5 7h4M2.5 11h4"/></svg>
             Directories
           </RouterLink>
-          <RouterLink v-if="currentDirId" :to="`/directories/${currentDirId}/realms`" class="nav-item">
+          <RouterLink to="/superadmin/realms" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17V5l7-3 7 3v12"/><path d="M3 17h14"/><path d="M7 9h2v4H7zM11 9h2v4h-2z"/><path d="M10 17v-4"/></svg>
             Realms
           </RouterLink>
@@ -112,8 +134,9 @@ const auth   = useAuthStore()
 const router = useRouter()
 const route  = useRoute()
 
-const realms      = ref([])   // flat list of authorized realms
-const pickerValue = ref('')   // realm id
+const realms       = ref([])   // flat list of authorized realms (admin only)
+const pickerValue  = ref('')   // realm id
+const showNoRealms = ref(false)
 
 // Derive the directory id from the selected realm
 const currentDirId = computed(() => {
@@ -122,11 +145,18 @@ const currentDirId = computed(() => {
   return realm?.directoryId || ''
 })
 
-// Load only the realms the current user is authorized for
+// Load realms for admin users; superadmins don't need the picker
 onMounted(async () => {
+  if (auth.isSuperadmin) return
+
   try {
     const { data } = await myRealms()
     realms.value = data
+
+    if (!data.length) {
+      showNoRealms.value = true
+      return
+    }
 
     // If currently on a directory-scoped route, select the matching realm
     const routeDirId = route.params.dirId
@@ -151,12 +181,18 @@ watch(() => route.params.dirId, (dirId) => {
 })
 
 // Navigate when user picks a different realm
-const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'realms']
+const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports']
 watch(currentDirId, (newDirId) => {
   if (!newDirId || newDirId === route.params.dirId) return
   const section = dirSections.includes(route.name) ? route.name : 'users'
   router.push(`/directories/${newDirId}/${section}`)
 })
+
+async function handleNoRealmsOk() {
+  showNoRealms.value = false
+  await auth.logout()
+  router.push('/login')
+}
 
 async function handleLogout() {
   await auth.logout()
