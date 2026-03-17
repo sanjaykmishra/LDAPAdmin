@@ -13,6 +13,8 @@ import com.ldapadmin.repository.UserFormRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
 import java.util.UUID;
@@ -43,6 +45,7 @@ public class UserFormService {
 
     @Transactional
     public UserFormResponse create(UserFormRequest req) {
+        validateRdn(req.attributeConfigs());
         UserForm form = new UserForm();
         form.setDirectoryConnection(resolveDirectory(req.directoryId()));
         form.setObjectClassName(req.objectClassName());
@@ -55,6 +58,7 @@ public class UserFormService {
 
     @Transactional
     public UserFormResponse update(UUID id, UserFormRequest req) {
+        validateRdn(req.attributeConfigs());
         UserForm form = requireForm(id);
         form.setDirectoryConnection(resolveDirectory(req.directoryId()));
         form.setObjectClassName(req.objectClassName());
@@ -87,6 +91,19 @@ public class UserFormService {
                 .orElseThrow(() -> new ResourceNotFoundException("DirectoryConnection", directoryId));
     }
 
+    private void validateRdn(List<UserFormRequest.AttributeConfigEntry> entries) {
+        if (entries == null || entries.isEmpty()) return;
+        long rdnCount = entries.stream().filter(UserFormRequest.AttributeConfigEntry::rdn).count();
+        if (rdnCount == 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Exactly one attribute must be designated as the RDN attribute");
+        }
+        if (rdnCount > 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Only one attribute can be the RDN attribute");
+        }
+    }
+
     private List<UserFormAttributeConfig> saveConfigs(UserForm form,
                                                       List<UserFormRequest.AttributeConfigEntry> entries) {
         if (entries == null || entries.isEmpty()) {
@@ -97,9 +114,10 @@ public class UserFormService {
             c.setUserForm(form);
             c.setAttributeName(e.attributeName());
             c.setCustomLabel(e.customLabel());
-            c.setRequiredOnCreate(e.requiredOnCreate());
+            c.setRequiredOnCreate(e.rdn() || e.requiredOnCreate());
             c.setEditableOnCreate(e.editableOnCreate());
             c.setInputType(InputType.valueOf(e.inputType()));
+            c.setRdn(e.rdn());
             return c;
         }).toList();
         return configRepo.saveAll(configs);

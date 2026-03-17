@@ -85,6 +85,7 @@
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Attribute</th>
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Label</th>
                   <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Input Type</th>
+                  <th class="px-3 py-2 text-center text-xs font-medium text-gray-500">RDN</th>
                   <th class="px-3 py-2 text-center text-xs font-medium text-gray-500">Required</th>
                   <th class="px-3 py-2 text-center text-xs font-medium text-gray-500">Editable</th>
                   <th class="px-3 py-2"></th>
@@ -120,7 +121,10 @@
                     </select>
                   </td>
                   <td class="px-3 py-2 text-center">
-                    <input type="checkbox" v-model="attr.requiredOnCreate" />
+                    <input type="radio" name="rdn-selector" :checked="attr.rdn" @change="setRdn(idx)" />
+                  </td>
+                  <td class="px-3 py-2 text-center">
+                    <input type="checkbox" v-model="attr.requiredOnCreate" :disabled="attr.rdn" />
                   </td>
                   <td class="px-3 py-2 text-center">
                     <input type="checkbox" v-model="attr.editableOnCreate" />
@@ -321,10 +325,10 @@ async function fetchAndPopulateAttributes(ocName, replaceAll) {
     // Build full attribute list from the object class schema
     const allAttrs = []
     for (const name of (data.required || [])) {
-      allAttrs.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: true, editableOnCreate: true })
+      allAttrs.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: true, editableOnCreate: true, rdn: false })
     }
     for (const name of (data.optional || [])) {
-      allAttrs.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: false, editableOnCreate: true })
+      allAttrs.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: false, editableOnCreate: true, rdn: false })
     }
 
     // Cache for the Add Attribute picker
@@ -356,7 +360,15 @@ function emptyAttribute() {
     inputType: 'TEXT',
     requiredOnCreate: false,
     editableOnCreate: true,
+    rdn: false,
   }
+}
+
+function setRdn(idx) {
+  form.value.attributeConfigs.forEach((attr, i) => {
+    attr.rdn = i === idx
+    if (attr.rdn) attr.requiredOnCreate = true
+  })
 }
 
 function dirName(dirId) {
@@ -437,12 +449,21 @@ function openEdit(f) {
       inputType: a.inputType,
       requiredOnCreate: a.requiredOnCreate,
       editableOnCreate: a.editableOnCreate,
+      rdn: a.rdn || false,
     })),
   }
   showModal.value = true
 }
 
 async function save() {
+  // Validate exactly one RDN attribute
+  if (form.value.attributeConfigs.length > 0) {
+    const rdnCount = form.value.attributeConfigs.filter(a => a.rdn).length
+    if (rdnCount === 0) {
+      notif.error('One attribute must be designated as the RDN attribute')
+      return
+    }
+  }
   saving.value = true
   try {
     if (editing.value) {
