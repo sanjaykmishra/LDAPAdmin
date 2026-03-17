@@ -2,10 +2,12 @@ package com.ldapadmin.service;
 
 import com.ldapadmin.dto.userform.UserFormRequest;
 import com.ldapadmin.dto.userform.UserFormResponse;
+import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.UserForm;
 import com.ldapadmin.entity.UserFormAttributeConfig;
 import com.ldapadmin.entity.enums.InputType;
 import com.ldapadmin.exception.ResourceNotFoundException;
+import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.repository.UserFormAttributeConfigRepository;
 import com.ldapadmin.repository.UserFormRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ public class UserFormService {
 
     private final UserFormRepository                formRepo;
     private final UserFormAttributeConfigRepository configRepo;
+    private final DirectoryConnectionRepository     directoryRepo;
 
     @Transactional(readOnly = true)
     public List<UserFormResponse> list() {
@@ -41,6 +44,7 @@ public class UserFormService {
     @Transactional
     public UserFormResponse create(UserFormRequest req) {
         UserForm form = new UserForm();
+        form.setDirectoryConnection(resolveDirectory(req.directoryId()));
         form.setObjectClassName(req.objectClassName());
         form.setFormName(req.formName());
         form = formRepo.save(form);
@@ -52,6 +56,7 @@ public class UserFormService {
     @Transactional
     public UserFormResponse update(UUID id, UserFormRequest req) {
         UserForm form = requireForm(id);
+        form.setDirectoryConnection(resolveDirectory(req.directoryId()));
         form.setObjectClassName(req.objectClassName());
         form.setFormName(req.formName());
         form = formRepo.save(form);
@@ -74,6 +79,12 @@ public class UserFormService {
     private UserForm requireForm(UUID id) {
         return formRepo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("UserForm", id));
+    }
+
+    private DirectoryConnection resolveDirectory(UUID directoryId) {
+        if (directoryId == null) return null;
+        return directoryRepo.findById(directoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("DirectoryConnection", directoryId));
     }
 
     private List<UserFormAttributeConfig> saveConfigs(UserForm form,

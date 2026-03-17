@@ -6,11 +6,13 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Create / update request for a user form and its attribute configs.
  */
 public record UserFormRequest(
+        UUID directoryId,
         @NotBlank @Size(max = 255) String objectClassName,
         @NotBlank @Size(max = 255) String formName,
         List<@Valid AttributeConfigEntry> attributeConfigs) {

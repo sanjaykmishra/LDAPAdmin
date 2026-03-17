@@ -9,6 +9,7 @@ import java.util.UUID;
 /** Read DTO for a user form with its attribute configs. */
 public record UserFormResponse(
         UUID id,
+        UUID directoryId,
         String objectClassName,
         String formName,
         List<AttributeConfigEntry> attributeConfigs) {
@@ -35,6 +36,7 @@ public record UserFormResponse(
     public static UserFormResponse from(UserForm f, List<UserFormAttributeConfig> configs) {
         return new UserFormResponse(
                 f.getId(),
+                f.getDirectoryConnection() != null ? f.getDirectoryConnection().getId() : null,
                 f.getObjectClassName(),
                 f.getFormName(),
                 configs.stream().map(AttributeConfigEntry::from).toList());

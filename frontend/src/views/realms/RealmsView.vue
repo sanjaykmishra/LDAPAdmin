@@ -151,6 +151,8 @@ const showModal    = ref(false)
 const editing      = ref(null)
 const deleteTarget = ref(null)
 
+const dirId = () => route.params.dirId
+
 const form = ref(emptyForm())
 
 function emptyForm() {
@@ -171,8 +173,6 @@ function userFormLabel(formId) {
   const uf = userForms.value.find(f => f.id === formId)
   return uf ? `${uf.formName} (${uf.objectClassName})` : formId
 }
-
-const dirId = () => route.params.dirId
 
 async function load() {
   loading.value = true
