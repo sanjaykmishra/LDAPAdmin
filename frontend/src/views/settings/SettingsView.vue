@@ -12,8 +12,20 @@
         <div class="grid grid-cols-2 gap-4">
           <FormField label="Application Name" v-model="form.appName" required />
           <FormField label="Logo URL" v-model="form.logoUrl" placeholder="https://…/logo.png" />
-          <FormField label="Primary Colour" v-model="form.primaryColour" placeholder="#3b82f6" />
-          <FormField label="Secondary Colour" v-model="form.secondaryColour" placeholder="#64748b" />
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Primary Colour</label>
+            <div class="flex items-center gap-2">
+              <input type="color" v-model="form.primaryColour" class="h-9 w-10 rounded border border-gray-300 cursor-pointer p-0.5" />
+              <input type="text" v-model="form.primaryColour" placeholder="#3b82f6" class="input flex-1" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Secondary Colour</label>
+            <div class="flex items-center gap-2">
+              <input type="color" v-model="form.secondaryColour" class="h-9 w-10 rounded border border-gray-300 cursor-pointer p-0.5" />
+              <input type="text" v-model="form.secondaryColour" placeholder="#64748b" class="input flex-1" />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -95,8 +107,8 @@ const settings = ref(null)
 const form = ref({
   appName: 'LDAP Portal',
   logoUrl: '',
-  primaryColour: '',
-  secondaryColour: '',
+  primaryColour: '#3b82f6',
+  secondaryColour: '#64748b',
   sessionTimeoutMinutes: 60,
   smtpHost: '',
   smtpPort: 587,
@@ -120,8 +132,8 @@ async function loadSettings() {
     Object.assign(form.value, {
       appName:                data.appName ?? 'LDAP Portal',
       logoUrl:                data.logoUrl ?? '',
-      primaryColour:          data.primaryColour ?? '',
-      secondaryColour:        data.secondaryColour ?? '',
+      primaryColour:          data.primaryColour ?? '#3b82f6',
+      secondaryColour:        data.secondaryColour ?? '#64748b',
       sessionTimeoutMinutes:  data.sessionTimeoutMinutes ?? 60,
       smtpHost:               data.smtpHost ?? '',
       smtpPort:               data.smtpPort ?? 587,
@@ -180,4 +192,5 @@ onMounted(loadSettings)
 <style scoped>
 @reference "tailwindcss";
 .btn-primary { @apply px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50; }
+.input       { @apply border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500; }
 </style>

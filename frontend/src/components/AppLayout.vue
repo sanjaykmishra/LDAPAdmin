@@ -28,49 +28,62 @@
       <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         <template v-if="currentDirId">
           <RouterLink :to="`/directories/${currentDirId}/users`" class="nav-item">
-            <span class="icon">👤</span> Users
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="6" r="3.25"/><path d="M3.5 17.5c0-3.59 2.91-6.5 6.5-6.5s6.5 2.91 6.5 6.5"/></svg>
+            Users
           </RouterLink>
           <RouterLink :to="`/directories/${currentDirId}/groups`" class="nav-item">
-            <span class="icon">👥</span> Groups
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="6" r="2.75"/><circle cx="13.5" cy="6" r="2.75"/><path d="M1.5 17c0-3.04 2.46-5.5 5.5-5.5 1.26 0 2.42.42 3.35 1.14M12 11.64A5.48 5.48 0 0 1 18.5 17"/></svg>
+            Groups
           </RouterLink>
           <RouterLink :to="`/directories/${currentDirId}/audit`" class="nav-item">
-            <span class="icon">📋</span> Audit Log
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><path d="M7 6h6M7 10h6M7 14h3"/></svg>
+            Audit Log
           </RouterLink>
           <RouterLink :to="`/directories/${currentDirId}/bulk`" class="nav-item">
-            <span class="icon">📤</span> Bulk Import/Export
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v12M10 2l4 4M10 2 6 6"/><path d="M3 13v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
+            Bulk Import/Export
           </RouterLink>
           <RouterLink :to="`/directories/${currentDirId}/reports`" class="nav-item">
-            <span class="icon">📊</span> Reports
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V10M10 16V4M15 16v-4"/></svg>
+            Reports
           </RouterLink>
         </template>
 
         <div class="border-t border-gray-700 my-2" />
 
         <RouterLink v-if="!auth.isSuperadmin" to="/settings" class="nav-item">
-          <span class="icon">⚙️</span> Settings
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.5"/><path d="M10 1.5v2M10 16.5v2M18.5 10h-2M3.5 10h-2M16 4l-1.4 1.4M5.4 14.6 4 16M16 16l-1.4-1.4M5.4 5.4 4 4"/></svg>
+          Settings
         </RouterLink>
 
         <template v-if="auth.isSuperadmin">
           <RouterLink to="/superadmin/admins" class="nav-item">
-            <span class="icon">👤</span> Accounts
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="5.5" r="3.25"/><path d="M3.5 18c0-3.59 2.91-6.5 6.5-6.5s6.5 2.91 6.5 6.5"/><path d="M13.5 2.5l1 2 2 .5-1.5 1.5.5 2-2-1.25L11.5 8.5l.5-2L10.5 5l2-.5 1-2z"/></svg>
+            Accounts
           </RouterLink>
           <RouterLink to="/superadmin/directories" class="nav-item">
-            <span class="icon">🗄</span> Directories
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2V5z"/><path d="M6.5 3v14"/><path d="M2.5 7h4M2.5 11h4"/></svg>
+            Directories
           </RouterLink>
           <RouterLink v-if="currentDirId" :to="`/directories/${currentDirId}/realms`" class="nav-item">
-            <span class="icon">🏛</span> Realms
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17V5l7-3 7 3v12"/><path d="M3 17h14"/><path d="M7 9h2v4H7zM11 9h2v4h-2z"/><path d="M10 17v-4"/></svg>
+            Realms
           </RouterLink>
           <RouterLink to="/superadmin/audit-sources" class="nav-item">
-            <span class="icon">📋</span> Audit Sources
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16z"/><path d="M10 6v4l2.5 2.5"/></svg>
+            Audit Sources
           </RouterLink>
           <RouterLink to="/superadmin/user-forms" class="nav-item">
-            <span class="icon">📝</span> User Forms
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><path d="M7 6h6M7 10h6M7 14h3"/><path d="M14 13l1.5 1.5 3-3"/></svg>
+            User Forms
           </RouterLink>
           <RouterLink to="/superadmin/schema" class="nav-item">
-            <span class="icon">🔍</span> Schema Browser
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M18 18l-4-4"/></svg>
+            Schema Browser
           </RouterLink>
           <RouterLink to="/settings" class="nav-item">
-            <span class="icon">⚙️</span> Settings
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.5"/><path d="M10 1.5v2M10 16.5v2M18.5 10h-2M3.5 10h-2M16 4l-1.4 1.4M5.4 14.6 4 16M16 16l-1.4-1.4M5.4 5.4 4 4"/></svg>
+            Settings
           </RouterLink>
         </template>
       </nav>
@@ -178,10 +191,10 @@ async function handleLogout() {
 <style scoped>
 @reference "tailwindcss";
 .nav-item {
-  @apply flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors;
+  @apply flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors;
 }
 .nav-item.router-link-active {
   @apply bg-gray-800 text-white;
 }
-.icon { @apply text-base; }
+.nav-icon { @apply w-5 h-5 shrink-0; }
 </style>
