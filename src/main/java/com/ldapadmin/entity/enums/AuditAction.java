@@ -23,6 +23,9 @@ public enum AuditAction {
     GROUP_MEMBER_ADD     ("group.member_add"),
     GROUP_MEMBER_REMOVE  ("group.member_remove"),
 
+    // ── Generic entry operations (superadmin browser) ─────────────────────────
+    ENTRY_CREATE         ("entry.create"),
+
     // ── Changelog-sourced (raw LDAP changelog entry) ──────────────────────────
     LDAP_CHANGE          ("ldap.change");
 

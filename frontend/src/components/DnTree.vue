@@ -87,4 +87,28 @@ function select(node) {
     toggle(node)
   }
 }
+
+/**
+ * Refresh a node's children from externally provided data.
+ * Called by the parent after a new entry is created.
+ */
+function refreshNode(dn, children) {
+  const updated = new Map(childrenMap.value)
+  updated.set(dn, children)
+  childrenMap.value = updated
+
+  // Ensure the node is expanded and marked as having children
+  expanded.add(dn)
+
+  // Also update the node's hasChildren flag in our props
+  const node = props.nodes.find(n => n.dn === dn)
+  if (node) {
+    node.hasChildren = true
+  }
+
+  // Propagate to child DnTree instances via recursive search
+  // (handled by the parent re-rendering with new childrenMap)
+}
+
+defineExpose({ refreshNode })
 </script>
