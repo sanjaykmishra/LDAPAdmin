@@ -153,7 +153,9 @@
                     <button
                       type="button"
                       @click="form.attributeConfigs.splice(idx, 1)"
-                      class="text-red-500 hover:text-red-700 text-xs font-medium"
+                      :disabled="attr.requiredOnCreate || attr.rdn"
+                      :class="attr.requiredOnCreate || attr.rdn ? 'text-gray-300 cursor-not-allowed' : 'text-red-500 hover:text-red-700'"
+                      class="text-xs font-medium"
                     >Remove</button>
                   </td>
                 </tr>

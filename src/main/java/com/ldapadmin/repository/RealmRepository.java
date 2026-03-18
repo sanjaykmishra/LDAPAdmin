@@ -11,9 +11,9 @@ import java.util.UUID;
 @Repository
 public interface RealmRepository extends JpaRepository<Realm, UUID> {
 
-    List<Realm> findAllByDirectoryIdOrderByDisplayOrderAsc(UUID directoryId);
+    List<Realm> findAllByDirectoryIdOrderByNameAsc(UUID directoryId);
 
-    List<Realm> findAllByOrderByDirectoryIdAscDisplayOrderAsc();
+    List<Realm> findAllByOrderByDirectoryIdAscNameAsc();
 
     Optional<Realm> findByIdAndDirectoryId(UUID id, UUID directoryId);
 

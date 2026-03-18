@@ -15,7 +15,6 @@ public record RealmResponse(
         String name,
         String userBaseDn,
         String groupBaseDn,
-        int displayOrder,
         List<UserFormEntry> userForms,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
@@ -38,7 +37,6 @@ public record RealmResponse(
                 r.getName(),
                 r.getUserBaseDn(),
                 r.getGroupBaseDn(),
-                r.getDisplayOrder(),
                 forms,
                 r.getCreatedAt(),
                 r.getUpdatedAt());
