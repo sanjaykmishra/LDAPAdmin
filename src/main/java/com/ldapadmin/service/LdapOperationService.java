@@ -204,7 +204,7 @@ public class LdapOperationService {
      * LDAP filter that restricts results to well-known group objectClasses.
      */
     private static final String GROUP_OBJECTCLASS_FILTER =
-            "(|(objectClass=groupOfNames)(objectClass=groupOfUniqueNames)(objectClass=posixGroup)(objectClass=group))";
+            "(|(objectClass=groupOfNames)(objectClass=groupOfUniqueNames)(objectClass=posixGroup)(objectClass=group)(objectClass=groupOfURLs))";
 
     public List<LdapEntryResponse> searchGroups(UUID directoryId, AuthPrincipal principal,
                                                 String filter, String baseDn,
