@@ -36,7 +36,7 @@
                   v-for="uf in r.userForms"
                   :key="uf.id"
                   class="text-xs bg-blue-50 text-blue-700 rounded px-1.5 py-0.5"
-                >{{ uf.formName }} ({{ uf.objectClassName }})</span>
+                >{{ uf.formName }}{{ uf.objectClassNames?.length ? ` (${uf.objectClassNames.join(', ')})` : '' }}</span>
                 <span v-if="!r.userForms?.length" class="text-xs text-gray-400">—</span>
               </div>
             </td>
@@ -87,7 +87,7 @@
                 class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
               <span class="text-sm text-gray-800">{{ uf.formName }}</span>
-              <span class="text-xs text-gray-400">({{ uf.objectClassName }})</span>
+              <span v-if="uf.objectClassNames?.length" class="text-xs text-gray-400">({{ uf.objectClassNames.join(', ') }})</span>
             </label>
             <p v-if="userForms.length === 0" class="text-xs text-gray-400 px-2 py-1">No user forms available. Create one first.</p>
           </div>
