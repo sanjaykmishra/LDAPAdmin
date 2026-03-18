@@ -39,7 +39,7 @@ public record UserFormResponse(
         return new UserFormResponse(
                 f.getId(),
                 f.getDirectoryConnection() != null ? f.getDirectoryConnection().getId() : null,
-                f.getObjectClassNames(),
+                List.copyOf(f.getObjectClassNames()),
                 f.getFormName(),
                 configs.stream().map(AttributeConfigEntry::from).toList());
     }
