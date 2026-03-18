@@ -91,7 +91,7 @@ class RealmControllerTest extends BaseControllerTest {
     @Test
     void create_blankName_returns400() throws Exception {
         RealmRequest req = new RealmRequest("", "ou=users,dc=example,dc=com",
-                "ou=groups,dc=example,dc=com", 0, null);
+                "ou=groups,dc=example,dc=com", null);
 
         mockMvc.perform(post("/api/v1/directories/{dirId}/realms", DIR_ID)
                         .with(authentication(superadminAuth()))
@@ -161,14 +161,14 @@ class RealmControllerTest extends BaseControllerTest {
         return new RealmRequest("Test Realm",
                 "ou=users,dc=example,dc=com",
                 "ou=groups,dc=example,dc=com",
-                0, null);
+                null);
     }
 
     private RealmResponse realmResponse() {
         return new RealmResponse(REALM_ID, DIR_ID, "Test Directory", "Test Realm",
                 "ou=users,dc=example,dc=com",
                 "ou=groups,dc=example,dc=com",
-                0, List.of(),
+                List.of(),
                 OffsetDateTime.now(), OffsetDateTime.now());
     }
 }
