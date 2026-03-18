@@ -5,6 +5,7 @@ import com.ldapadmin.auth.RequiresFeature;
 import com.ldapadmin.dto.ldap.CreateEntryRequest;
 import com.ldapadmin.dto.ldap.LdapEntryResponse;
 import com.ldapadmin.dto.ldap.MoveUserRequest;
+import com.ldapadmin.dto.ldap.ResetPasswordLdapRequest;
 import com.ldapadmin.dto.ldap.UpdateEntryRequest;
 import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.service.LdapOperationService;
@@ -151,6 +152,19 @@ public class UserController {
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn) {
         service.disableUser(directoryId, principal, dn);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ── Reset Password ─────────────────────────────────────────────────────────
+
+    @PostMapping("/reset-password")
+    @RequiresFeature(FeatureKey.USER_RESET_PASSWORD)
+    public ResponseEntity<Void> resetPassword(
+            @PathVariable UUID directoryId,
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @RequestParam String dn,
+            @Valid @RequestBody ResetPasswordLdapRequest req) {
+        service.resetPassword(directoryId, principal, dn, req.newPassword());
         return ResponseEntity.noContent().build();
     }
 

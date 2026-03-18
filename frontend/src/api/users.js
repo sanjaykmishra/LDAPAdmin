@@ -25,3 +25,6 @@ export const disableUser = (dirId, dn) =>
 
 export const moveUser = (dirId, dn, data) =>
   client.post(`${base(dirId)}/move`, data, { params: { dn } })
+
+export const resetPassword = (dirId, dn, newPassword) =>
+  client.post(`${base(dirId)}/reset-password`, { newPassword }, { params: { dn } })

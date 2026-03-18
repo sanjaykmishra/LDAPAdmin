@@ -302,6 +302,22 @@ public class LdapUserService {
         });
     }
 
+    // ── Reset password ─────────────────────────────────────────────────────────
+
+    /**
+     * Resets the user's password by replacing the {@code userPassword} attribute.
+     *
+     * @param dc          directory connection
+     * @param dn          distinguished name of the user
+     * @param newPassword the new password (cleartext — OpenLDAP will hash it
+     *                    server-side if the ppolicy overlay is configured)
+     */
+    public void resetPassword(DirectoryConnection dc, String dn, String newPassword) {
+        Modification mod = new Modification(ModificationType.REPLACE, "userPassword", newPassword);
+        updateUser(dc, dn, List.of(mod));
+        log.info("Reset password for LDAP user {}", dn);
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private void checkResult(LDAPResult result, String operation, String dn) {
