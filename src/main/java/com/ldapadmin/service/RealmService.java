@@ -4,7 +4,6 @@ import com.ldapadmin.dto.realm.RealmRequest;
 import com.ldapadmin.dto.realm.RealmResponse;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.Realm;
-import com.ldapadmin.entity.RealmAuxiliaryObjectclass;
 import com.ldapadmin.entity.RealmObjectclass;
 import com.ldapadmin.entity.UserForm;
 import com.ldapadmin.exception.ResourceNotFoundException;
@@ -16,15 +15,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
- * CRUD for realms (§3.1).
+ * CRUD for realms.
  *
  * <p>A realm is a logical partition of a directory connection that defines the
- * LDAP subtrees and objectClasses used for user/group entries.  Admin permissions
- * are scoped to realms rather than to directories.</p>
+ * LDAP subtrees used for user/group entries and links to one or more user forms
+ * that drive the user creation UI.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -62,17 +61,16 @@ public class RealmService {
         realm.setDirectory(dir);
         applyRequest(realm, req);
         realm = realmRepo.save(realm);
-        syncUserForm(realm, req.userFormId());
+        syncUserForms(realm, req.userFormIds());
         return toResponse(realm);
     }
 
     @Transactional
     public RealmResponse update(UUID directoryId, UUID realmId, RealmRequest req) {
         Realm realm = requireRealm(directoryId, realmId);
-        realm.getAuxiliaryObjectclasses().clear();
         applyRequest(realm, req);
         realm = realmRepo.save(realm);
-        syncUserForm(realm, req.userFormId());
+        syncUserForms(realm, req.userFormIds());
         return toResponse(realm);
     }
 
@@ -103,49 +101,45 @@ public class RealmService {
         realm.setName(req.name());
         realm.setUserBaseDn(req.userBaseDn());
         realm.setGroupBaseDn(req.groupBaseDn());
-        realm.setPrimaryUserObjectclass(req.primaryUserObjectclass());
         realm.setDisplayOrder(req.displayOrder());
-
-        if (req.auxiliaryObjectclasses() != null) {
-            req.auxiliaryObjectclasses().forEach(aux -> {
-                RealmAuxiliaryObjectclass entry = new RealmAuxiliaryObjectclass();
-                entry.setRealm(realm);
-                entry.setObjectclassName(aux.objectclassName());
-                entry.setDisplayOrder(aux.displayOrder());
-                realm.getAuxiliaryObjectclasses().add(entry);
-            });
-        }
     }
 
     /**
-     * Syncs the realm_objectclasses entry that links a realm to a user form.
-     * If userFormId is null, any existing link is removed.
+     * Syncs the realm_objectclasses entries that link a realm to user forms.
+     * Removes links to forms no longer in the list and adds new ones.
      */
-    private void syncUserForm(Realm realm, UUID userFormId) {
+    private void syncUserForms(Realm realm, List<UUID> userFormIds) {
         List<RealmObjectclass> existing = realmOcRepo.findAllByRealmId(realm.getId());
+        List<UUID> desired = userFormIds != null ? userFormIds : List.of();
 
-        if (userFormId == null) {
-            // Remove any existing objectclass entries that have a user form
-            existing.stream()
-                    .filter(oc -> oc.getUserForm() != null)
-                    .forEach(realmOcRepo::delete);
-            return;
+        // Index existing entries by user form id
+        Map<UUID, RealmObjectclass> existingByFormId = existing.stream()
+                .filter(oc -> oc.getUserForm() != null)
+                .collect(Collectors.toMap(oc -> oc.getUserForm().getId(), oc -> oc));
+
+        // Remove entries not in the desired list
+        Set<UUID> desiredSet = new HashSet<>(desired);
+        for (var entry : existingByFormId.entrySet()) {
+            if (!desiredSet.contains(entry.getKey())) {
+                realmOcRepo.delete(entry.getValue());
+            }
         }
 
-        UserForm form = userFormRepo.findById(userFormId)
-                .orElseThrow(() -> new ResourceNotFoundException("UserForm", userFormId));
+        // Add new entries
+        for (UUID formId : desired) {
+            if (!existingByFormId.containsKey(formId)) {
+                UserForm form = userFormRepo.findById(formId)
+                        .orElseThrow(() -> new ResourceNotFoundException("UserForm", formId));
+                RealmObjectclass oc = new RealmObjectclass();
+                oc.setRealm(realm);
+                oc.setUserForm(form);
+                realmOcRepo.save(oc);
+            }
+        }
 
-        // Find an existing entry to update, or create a new one
-        RealmObjectclass oc = existing.stream()
-                .filter(e -> e.getUserForm() != null)
-                .findFirst()
-                .orElseGet(() -> {
-                    RealmObjectclass newOc = new RealmObjectclass();
-                    newOc.setRealm(realm);
-                    return newOc;
-                });
-
-        oc.setUserForm(form);
-        realmOcRepo.save(oc);
+        // Remove entries with no user form link (orphans from old data)
+        existing.stream()
+                .filter(oc -> oc.getUserForm() == null)
+                .forEach(realmOcRepo::delete);
     }
 }

@@ -8,17 +8,14 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 /**
  * A realm is a logical partition of a {@link DirectoryConnection} that defines:
  * <ul>
  *   <li>the LDAP subtrees searched for user and group entries,</li>
- *   <li>the structural objectClass (and any auxiliary classes) used for new user entries, and</li>
- *   <li>the form configuration ({@link RealmObjectclass} / {@link ObjectclassAttributeConfig})
- *       that drives the user creation and edit UI.</li>
+ *   <li>the user forms available for creating/editing user entries
+ *       (linked via {@link RealmObjectclass}).</li>
  * </ul>
  * Admin permissions ({@link AdminRealmRole}) are scoped
  * to realms rather than to directories.
@@ -50,17 +47,8 @@ public class Realm {
     @Column(name = "group_base_dn", nullable = false)
     private String groupBaseDn;
 
-    /** Structural (primary) objectClass applied to new user entries in this realm. */
-    @Column(name = "primary_user_objectclass", nullable = false)
-    private String primaryUserObjectclass;
-
     @Column(name = "display_order", nullable = false)
     private int displayOrder = 0;
-
-    /** Auxiliary objectClasses applied alongside the primary objectClass. */
-    @OneToMany(mappedBy = "realm", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("displayOrder ASC")
-    private List<RealmAuxiliaryObjectclass> auxiliaryObjectclasses = new ArrayList<>();
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
