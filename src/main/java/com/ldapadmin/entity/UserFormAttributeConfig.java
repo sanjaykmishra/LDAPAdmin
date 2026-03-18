@@ -58,4 +58,8 @@ public class UserFormAttributeConfig {
     /** Whether this attribute is used as the RDN (Relative Distinguished Name) for user entries. */
     @Column(name = "is_rdn", nullable = false)
     private boolean rdn = false;
+
+    /** Position of this attribute in the form (0-based). Drives rendering order in the UI. */
+    @Column(name = "display_order", nullable = false)
+    private int displayOrder = 0;
 }

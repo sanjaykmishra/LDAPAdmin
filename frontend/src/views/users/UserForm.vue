@@ -46,7 +46,6 @@
           :type="mapInputType(attr.inputType)"
           :required="attr.requiredOnCreate"
           :disabled="!attr.editableOnCreate"
-          :placeholder="attr.attributeName"
         />
       </template>
     </template>
@@ -188,15 +187,10 @@ const rdnAttr = computed(() => {
   return props.userFormConfig.attributeConfigs.find(a => a.rdn) || null
 })
 
-/** All non-RDN attributes, with required fields first then alphabetical. */
+/** All non-RDN attributes, preserving the order defined in the user form config. */
 const nonRdnAttributes = computed(() => {
   if (!props.userFormConfig?.attributeConfigs) return []
-  return props.userFormConfig.attributeConfigs
-    .filter(a => !a.rdn)
-    .sort((a, b) => {
-      if (a.requiredOnCreate !== b.requiredOnCreate) return a.requiredOnCreate ? -1 : 1
-      return a.attributeName.localeCompare(b.attributeName)
-    })
+  return props.userFormConfig.attributeConfigs.filter(a => !a.rdn)
 })
 
 let syncing = false

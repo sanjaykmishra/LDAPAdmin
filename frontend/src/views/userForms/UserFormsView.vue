@@ -130,7 +130,7 @@
                     >&#9660;</button>
                   </td>
                   <td class="px-3 py-2">
-                    <input v-model="attr.attributeName" placeholder="e.g. cn" class="input w-full" required />
+                    <input v-model="attr.attributeName" placeholder="e.g. cn" class="input w-full" required disabled />
                   </td>
                   <td class="px-3 py-2">
                     <input v-model="attr.customLabel" placeholder="Custom label" class="input w-full" />
