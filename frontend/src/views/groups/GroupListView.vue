@@ -37,8 +37,12 @@
 
     <!-- Create group -->
     <AppModal v-model="showCreate" title="New Group" size="md">
-      <FormField label="Group Name (cn) (RDN)" v-model="createForm.cn" required />
-      <FormField label="DN" :model-value="computedGroupDn" required disabled />
+      <div class="grid grid-cols-3 gap-3">
+        <FormField label="Group Name (cn) (RDN)" v-model="createForm.cn" required />
+        <div class="col-span-2">
+          <FormField label="DN" :model-value="computedGroupDn" required disabled />
+        </div>
+      </div>
       <FormField label="Object Class" v-model="createForm.objectClass" />
       <FormField label="Owner" v-model="createForm.owner" placeholder="DN of the group owner" />
       <FormField label="Description" v-model="createForm.description" placeholder="Group description" />

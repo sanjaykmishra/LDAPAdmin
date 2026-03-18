@@ -1,29 +1,41 @@
 <template>
   <div v-if="!isEdit" class="space-y-3">
-    <!-- RDN attribute (first field — before DN so it feeds the computed DN) -->
-    <FormField
-      v-if="rdnAttr"
-      :label="(rdnAttr.customLabel || rdnAttr.attributeName) + ' (RDN)'"
-      v-model="local.rdnValue"
-      :type="mapInputType(rdnAttr.inputType)"
-      required
-      :placeholder="rdnAttr.attributeName"
-    />
-
-    <!-- Fallback RDN fields when no user form config -->
-    <div v-if="!userFormConfig" class="grid grid-cols-2 gap-3">
-      <FormField label="RDN Attribute" v-model="local.rdnAttribute" placeholder="uid" required />
-      <FormField label="RDN Value (RDN)" v-model="local.rdnValue" placeholder="jsmith" required />
+    <!-- Row 1: RDN (1/3) + DN (2/3) -->
+    <div v-if="rdnAttr" class="grid grid-cols-3 gap-3">
+      <FormField
+        :label="(rdnAttr.customLabel || rdnAttr.attributeName) + ' (RDN)'"
+        v-model="local.rdnValue"
+        :type="mapInputType(rdnAttr.inputType)"
+        required
+        :placeholder="rdnAttr.attributeName"
+      />
+      <div class="col-span-2">
+        <FormField
+          label="DN"
+          :model-value="computedDn"
+          placeholder="uid=jsmith,ou=people,dc=example,dc=com"
+          required
+          disabled
+        />
+      </div>
     </div>
 
-    <!-- Computed DN (auto-populated from RDN + base DN) -->
-    <FormField
-      label="DN"
-      :model-value="computedDn"
-      placeholder="uid=jsmith,ou=people,dc=example,dc=com"
-      required
-      disabled
-    />
+    <!-- Fallback RDN + DN row when no user form config -->
+    <div v-if="!userFormConfig" class="grid grid-cols-3 gap-3">
+      <FormField label="RDN Attribute" v-model="local.rdnAttribute" placeholder="uid" required />
+      <div class="col-span-2">
+        <FormField
+          label="DN"
+          :model-value="computedDn"
+          placeholder="uid=jsmith,ou=people,dc=example,dc=com"
+          required
+          disabled
+        />
+      </div>
+    </div>
+
+    <!-- RDN Value when using fallback (no user form config) -->
+    <FormField v-if="!userFormConfig" label="RDN Value" v-model="local.rdnValue" placeholder="jsmith" required />
 
     <!-- Dynamic fields from user form config (non-RDN attributes) -->
     <template v-if="userFormConfig?.attributeConfigs?.length">
