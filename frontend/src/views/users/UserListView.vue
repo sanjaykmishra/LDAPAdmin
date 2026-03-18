@@ -73,7 +73,7 @@
 
     <!-- Create/Edit modal (step 2 of create, or edit) -->
     <AppModal v-model="showModal" :title="editingDn ? 'Edit User' : 'New User'" size="lg">
-      <UserForm :data="form" :is-edit="!!editingDn" :user-form-config="userFormConfig" @update="v => form = v" />
+      <UserForm :data="form" :is-edit="!!editingDn" :user-form-config="userFormConfig" :dir-id="dirId" @update="v => form = v" />
       <template #footer>
         <button @click="showModal = false" class="btn-secondary">Cancel</button>
         <button @click="save" :disabled="saving" class="btn-primary">{{ saving ? 'Saving…' : 'Save' }}</button>
