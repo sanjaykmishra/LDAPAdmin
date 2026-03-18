@@ -178,6 +178,44 @@ public class LdapBrowseService {
         }
     }
 
+    /**
+     * Moves an entry to a new parent DN (ModDN with newSuperior).
+     */
+    public void moveEntry(DirectoryConnection dc, String dn, String newParentDn) {
+        connectionFactory.withConnection(dc, conn -> {
+            String currentRdn = extractCurrentRdn(dn);
+            LDAPResult result = conn.modifyDN(dn, currentRdn, true, newParentDn);
+            if (result.getResultCode() != ResultCode.SUCCESS) {
+                throw new LdapOperationException(
+                    "moveEntry failed for [" + dn + "]: "
+                    + result.getResultCode() + " — " + result.getDiagnosticMessage());
+            }
+            log.info("Moved LDAP entry {} to {}", dn, newParentDn);
+            return null;
+        });
+    }
+
+    /**
+     * Renames an entry (changes its RDN in place).
+     */
+    public void renameEntry(DirectoryConnection dc, String dn, String newRdn) {
+        connectionFactory.withConnection(dc, conn -> {
+            LDAPResult result = conn.modifyDN(dn, newRdn, true);
+            if (result.getResultCode() != ResultCode.SUCCESS) {
+                throw new LdapOperationException(
+                    "renameEntry failed for [" + dn + "]: "
+                    + result.getResultCode() + " — " + result.getDiagnosticMessage());
+            }
+            log.info("Renamed LDAP entry {} to {}", dn, newRdn);
+            return null;
+        });
+    }
+
+    private String extractCurrentRdn(String dn) {
+        int idx = dn.indexOf(',');
+        return idx > 0 ? dn.substring(0, idx) : dn;
+    }
+
     private String extractRdn(String childDn, String parentDn) {
         // Remove ",parentDn" suffix to get the RDN
         if (childDn.toLowerCase().endsWith("," + parentDn.toLowerCase())) {

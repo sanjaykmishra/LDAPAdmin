@@ -14,6 +14,12 @@ export const updateEntry = (dirId, dn, data) =>
 export const deleteEntry = (dirId, dn, recursive = false) =>
   client.delete(base(dirId), { params: { dn, recursive } })
 
+export const moveEntry = (dirId, dn, newParentDn) =>
+  client.post(`${base(dirId)}/move`, { newParentDn }, { params: { dn } })
+
+export const renameEntry = (dirId, dn, newRdn) =>
+  client.post(`${base(dirId)}/rename`, { newRdn }, { params: { dn } })
+
 export const browseObjectClasses = (dirId) =>
   client.get(`${base(dirId)}/schema/object-classes`)
 

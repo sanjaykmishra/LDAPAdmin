@@ -3,6 +3,8 @@ package com.ldapadmin.controller.superadmin;
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.dto.ldap.AttributeModification;
 import com.ldapadmin.dto.ldap.CreateEntryRequest;
+import com.ldapadmin.dto.ldap.MoveEntryRequest;
+import com.ldapadmin.dto.ldap.RenameEntryRequest;
 import com.ldapadmin.dto.ldap.UpdateEntryRequest;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.enums.AuditAction;
@@ -106,6 +108,35 @@ public class BrowseController {
 
         auditService.record(principal, directoryId, AuditAction.ENTRY_DELETE, dn,
                 Map.of("recursive", recursive));
+
+        return browseService.browse(dc, parentDn);
+    }
+
+    @PostMapping("/move")
+    public BrowseResult moveEntry(@PathVariable UUID directoryId,
+                                  @AuthenticationPrincipal AuthPrincipal principal,
+                                  @RequestParam String dn,
+                                  @Valid @RequestBody MoveEntryRequest req) {
+        DirectoryConnection dc = loadDirectory(directoryId);
+        browseService.moveEntry(dc, dn, req.newParentDn());
+
+        auditService.record(principal, directoryId, AuditAction.ENTRY_MOVE, dn,
+                Map.of("newParentDn", req.newParentDn()));
+
+        return browseService.browse(dc, req.newParentDn());
+    }
+
+    @PostMapping("/rename")
+    public BrowseResult renameEntry(@PathVariable UUID directoryId,
+                                    @AuthenticationPrincipal AuthPrincipal principal,
+                                    @RequestParam String dn,
+                                    @Valid @RequestBody RenameEntryRequest req) {
+        DirectoryConnection dc = loadDirectory(directoryId);
+        browseService.renameEntry(dc, dn, req.newRdn());
+
+        String parentDn = extractParentDn(dn, dc.getBaseDn());
+        auditService.record(principal, directoryId, AuditAction.ENTRY_RENAME, dn,
+                Map.of("newRdn", req.newRdn()));
 
         return browseService.browse(dc, parentDn);
     }
