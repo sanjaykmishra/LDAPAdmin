@@ -148,7 +148,7 @@ const resultColumns = computed(() => {
 })
 
 async function doSearch() {
-  if (!form.directoryId.value && !form.value.directoryId) return
+  if (!form.value.directoryId) return
   searching.value = true
   hasSearched.value = false
   try {
