@@ -47,9 +47,6 @@ public class Realm {
     @Column(name = "group_base_dn", nullable = false)
     private String groupBaseDn;
 
-    @Column(name = "display_order", nullable = false)
-    private int displayOrder = 0;
-
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

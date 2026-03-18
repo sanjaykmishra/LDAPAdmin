@@ -38,14 +38,14 @@ public class RealmService {
 
     @Transactional(readOnly = true)
     public List<RealmResponse> listAll() {
-        return realmRepo.findAllByOrderByDirectoryIdAscDisplayOrderAsc()
+        return realmRepo.findAllByOrderByDirectoryIdAscNameAsc()
                 .stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
     public List<RealmResponse> listByDirectory(UUID directoryId) {
         requireDirectory(directoryId);
-        return realmRepo.findAllByDirectoryIdOrderByDisplayOrderAsc(directoryId)
+        return realmRepo.findAllByDirectoryIdOrderByNameAsc(directoryId)
                 .stream().map(this::toResponse).toList();
     }
 
@@ -101,7 +101,6 @@ public class RealmService {
         realm.setName(req.name());
         realm.setUserBaseDn(req.userBaseDn());
         realm.setGroupBaseDn(req.groupBaseDn());
-        realm.setDisplayOrder(req.displayOrder());
     }
 
     /**
