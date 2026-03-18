@@ -4,7 +4,7 @@
 
     <!-- Search form -->
     <div class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
-      <div class="grid grid-cols-2 gap-4 mb-4">
+      <div class="grid grid-cols-4 gap-4 mb-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
           <select v-model="form.directoryId" class="input w-full">
@@ -20,9 +20,6 @@
             <option value="base">Base</option>
           </select>
         </div>
-      </div>
-
-      <div class="grid grid-cols-2 gap-4 mb-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Base DN</label>
           <input v-model="form.baseDn" class="input w-full" placeholder="dc=example,dc=com (optional)" />
@@ -33,14 +30,15 @@
         </div>
       </div>
 
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-1">LDAP Filter</label>
-        <input v-model="form.filter" class="input w-full" placeholder="(objectClass=inetOrgPerson)" @keyup.enter="doSearch" />
-      </div>
-
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Attributes <span class="text-gray-400 font-normal">(comma-separated, optional)</span></label>
-        <input v-model="form.attributes" class="input w-full" placeholder="cn,mail,uid" />
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">LDAP Filter</label>
+          <input v-model="form.filter" class="input w-full" placeholder="(objectClass=inetOrgPerson)" @keyup.enter="doSearch" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Attributes <span class="text-gray-400 font-normal">(comma-separated, optional)</span></label>
+          <input v-model="form.attributes" class="input w-full" placeholder="cn,mail,uid" />
+        </div>
       </div>
 
       <div class="flex items-center gap-3">
