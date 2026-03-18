@@ -69,8 +69,6 @@
           <FormField label="User Base DN" v-model="form.userBaseDn" required placeholder="ou=people,dc=example,dc=com" />
           <FormField label="Group Base DN" v-model="form.groupBaseDn" required placeholder="ou=groups,dc=example,dc=com" />
         </div>
-        <FormField label="Display Order" v-model.number="form.displayOrder" type="number" placeholder="0" />
-
         <!-- User Forms multi-select -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">User Forms</label>
@@ -140,7 +138,6 @@ function emptyForm() {
     name: '',
     userBaseDn: '',
     groupBaseDn: '',
-    displayOrder: 0,
     userFormIds: [],
   }
 }
@@ -178,7 +175,6 @@ function openEdit(r) {
     name: r.name,
     userBaseDn: r.userBaseDn,
     groupBaseDn: r.groupBaseDn,
-    displayOrder: r.displayOrder,
     userFormIds: (r.userForms || []).map(uf => uf.id),
   }
   showModal.value = true
@@ -192,7 +188,6 @@ async function save() {
       name: form.value.name,
       userBaseDn: form.value.userBaseDn,
       groupBaseDn: form.value.groupBaseDn,
-      displayOrder: form.value.displayOrder,
       userFormIds: form.value.userFormIds,
     }
     if (editing.value) {

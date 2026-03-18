@@ -13,6 +13,5 @@ public record RealmRequest(
         @NotBlank @Size(max = 255) String name,
         @NotBlank String userBaseDn,
         @NotBlank String groupBaseDn,
-        int displayOrder,
         List<UUID> userFormIds) {
 }

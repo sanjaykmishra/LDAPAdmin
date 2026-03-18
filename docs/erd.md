@@ -69,7 +69,6 @@ erDiagram
         string user_base_dn
         string group_base_dn
         string primary_user_objectclass
-        int display_order
         timestamptz created_at
         timestamptz updated_at
     }
