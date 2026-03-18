@@ -143,8 +143,7 @@ public class AuthController {
         }
 
         return realms.stream()
-                .sorted(Comparator.comparing(Realm::getDisplayOrder)
-                        .thenComparing(Realm::getName, String.CASE_INSENSITIVE_ORDER))
+                .sorted(Comparator.comparing(Realm::getName, String.CASE_INSENSITIVE_ORDER))
                 .map(r -> {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("id", r.getId());

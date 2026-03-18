@@ -138,7 +138,7 @@ class RealmServiceTest {
 
         RealmRequest req = new RealmRequest(
                 "employees", "ou=people,dc=corp,dc=com", "ou=groups,dc=corp,dc=com",
-                0, List.of(formId1, formId2));
+                List.of(formId1, formId2));
 
         service.create(dirId, req);
 
@@ -164,7 +164,7 @@ class RealmServiceTest {
 
         RealmRequest req = new RealmRequest(
                 "renamed", "ou=staff,dc=corp,dc=com", "ou=teams,dc=corp,dc=com",
-                2, List.of());
+                List.of());
 
         RealmResponse resp = service.update(dirId, realmId, req);
 
@@ -216,7 +216,6 @@ class RealmServiceTest {
         r.setName("users");
         r.setUserBaseDn("ou=people,dc=corp,dc=com");
         r.setGroupBaseDn("ou=groups,dc=corp,dc=com");
-        r.setDisplayOrder(0);
         return r;
     }
 
@@ -225,7 +224,6 @@ class RealmServiceTest {
                 name,
                 "ou=people,dc=corp,dc=com",
                 "ou=groups,dc=corp,dc=com",
-                0,
                 null);
     }
 }
