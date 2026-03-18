@@ -105,6 +105,12 @@ const router = createRouter({
           component: () => import('@/views/userForms/UserFormsView.vue'),
           meta: { requiresSuperadmin: true },
         },
+        {
+          path: 'superadmin/browser',
+          name: 'directoryBrowser',
+          component: () => import('@/views/superadmin/DirectoryBrowserView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
       ],
     },
 
