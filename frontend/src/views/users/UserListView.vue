@@ -133,6 +133,7 @@ import { useRoute } from 'vue-router'
 import { useNotificationStore } from '@/stores/notifications'
 import { useApi } from '@/composables/useApi'
 import * as usersApi from '@/api/users'
+import * as groupsApi from '@/api/groups'
 import { listRealms } from '@/api/realms'
 import { getUserForm } from '@/api/userForms'
 import DataTable from '@/components/DataTable.vue'
@@ -332,7 +333,17 @@ async function save() {
         attributes.objectClass = userFormConfig.value.objectClassNames
       }
       await usersApi.createUser(dirId, { dn, attributes })
-      notif.success('User created')
+      // Add user to any groups selected during creation
+      const pending = f._pendingGroups || []
+      for (const pg of pending) {
+        try {
+          await groupsApi.addGroupMember(dirId, pg.dn, {
+            memberAttribute: pg.memberAttr,
+            memberValue: dn,
+          })
+        } catch { /* best-effort — user is created even if group add fails */ }
+      }
+      notif.success(pending.length ? `User created and added to ${pending.length} group(s)` : 'User created')
     }
     showModal.value = false
     await load()
