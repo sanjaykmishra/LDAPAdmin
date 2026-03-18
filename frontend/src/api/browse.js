@@ -8,6 +8,9 @@ export const browse = (dirId, dn) =>
 export const createEntry = (dirId, data) =>
   client.post(base(dirId), data)
 
+export const updateEntry = (dirId, dn, data) =>
+  client.put(base(dirId), data, { params: { dn } })
+
 export const browseObjectClasses = (dirId) =>
   client.get(`${base(dirId)}/schema/object-classes`)
 

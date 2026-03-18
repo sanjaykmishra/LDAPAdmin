@@ -25,6 +25,7 @@ public enum AuditAction {
 
     // ── Generic entry operations (superadmin browser) ─────────────────────────
     ENTRY_CREATE         ("entry.create"),
+    ENTRY_UPDATE         ("entry.update"),
 
     // ── Changelog-sourced (raw LDAP changelog entry) ──────────────────────────
     LDAP_CHANGE          ("ldap.change");

@@ -43,6 +43,16 @@
           @cancel="creatingEntry = false"
         />
 
+        <!-- Edit form mode -->
+        <EditEntryForm
+          v-else-if="editingEntry && selectedDirId && entryDetail"
+          :directory-id="selectedDirId"
+          :dn="entryDetail.dn"
+          :attributes="entryDetail.attributes"
+          @updated="onEntryUpdated"
+          @cancel="editingEntry = false"
+        />
+
         <!-- Normal browse mode -->
         <template v-else>
           <div v-if="!selectedDn" class="text-sm text-gray-400 text-center mt-8">
@@ -50,7 +60,7 @@
           </div>
           <div v-else-if="detailLoading" class="text-sm text-gray-400 text-center mt-8">Loading…</div>
           <template v-else-if="entryDetail">
-            <div class="flex items-start justify-between mb-4">
+            <div class="flex items-end justify-between mb-4">
               <div class="flex-1 min-w-0">
                 <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Distinguished Name</p>
                 <p class="text-sm font-mono text-gray-900 bg-gray-50 px-3 py-2 rounded-lg break-all">{{ entryDetail.dn }}</p>
@@ -67,8 +77,8 @@
                           class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                     New Entry
                   </button>
-                  <button disabled
-                          class="w-full text-left px-4 py-2 text-sm text-gray-400 cursor-not-allowed">
+                  <button @click="editingEntry = true; showActionsMenu = false"
+                          class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                     Edit Entry
                   </button>
                   <button disabled
@@ -112,6 +122,7 @@ import { listDirectories } from '@/api/directories'
 import { browse } from '@/api/browse'
 import DnTree from '@/components/DnTree.vue'
 import CreateEntryForm from '@/components/CreateEntryForm.vue'
+import EditEntryForm from '@/components/EditEntryForm.vue'
 
 const notif = useNotificationStore()
 
@@ -125,6 +136,7 @@ const selectedDn    = ref('')
 const detailLoading = ref(false)
 const entryDetail   = ref(null)
 const creatingEntry   = ref(false)
+const editingEntry    = ref(false)
 const treeRef         = ref(null)
 const showActionsMenu = ref(false)
 const menuRef         = ref(null)
@@ -196,6 +208,13 @@ async function selectEntry(dn) {
   } finally {
     detailLoading.value = false
   }
+}
+
+async function onEntryUpdated(browseResult) {
+  editingEntry.value = false
+  // Refresh entry detail from the returned browse result
+  entryDetail.value = { dn: browseResult.dn, attributes: browseResult.attributes }
+  notif.success('Entry updated successfully')
 }
 
 async function onEntryCreated(browseResult) {
