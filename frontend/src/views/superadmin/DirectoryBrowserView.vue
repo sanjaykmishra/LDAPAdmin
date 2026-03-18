@@ -81,8 +81,8 @@
                           class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                     Edit Entry
                   </button>
-                  <button disabled
-                          class="w-full text-left px-4 py-2 text-sm text-gray-400 cursor-not-allowed">
+                  <button @click="showDeleteConfirm = true; deleteRecursive = false; showActionsMenu = false"
+                          class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                     Delete Entry
                   </button>
                 </div>
@@ -112,6 +112,32 @@
         </template>
       </div>
     </div>
+
+    <!-- Delete confirmation dialog -->
+    <Teleport to="body">
+      <div v-if="showDeleteConfirm" class="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">Delete Entry</h3>
+          <p class="text-sm text-gray-600 mb-3">Are you sure you want to delete this entry?</p>
+          <p class="text-sm font-mono text-gray-900 bg-gray-50 px-3 py-2 rounded-lg break-all mb-3">{{ selectedDn }}</p>
+          <label class="flex items-center gap-2 text-sm text-gray-700 mb-4">
+            <input type="checkbox" v-model="deleteRecursive" class="rounded border-gray-300" />
+            Delete recursively (include all children)
+          </label>
+          <div v-if="deleteError" class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{{ deleteError }}</div>
+          <div class="flex justify-end gap-3">
+            <button @click="showDeleteConfirm = false; deleteError = ''"
+                    :disabled="deleting"
+                    class="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">Cancel</button>
+            <button @click="onDeleteConfirmed"
+                    :disabled="deleting"
+                    class="px-4 py-2 text-sm rounded-lg text-white font-medium bg-red-600 hover:bg-red-700 disabled:opacity-50">
+              {{ deleting ? 'Deleting…' : 'Delete' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -119,7 +145,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
 import { listDirectories } from '@/api/directories'
-import { browse } from '@/api/browse'
+import { browse, deleteEntry } from '@/api/browse'
 import DnTree from '@/components/DnTree.vue'
 import CreateEntryForm from '@/components/CreateEntryForm.vue'
 import EditEntryForm from '@/components/EditEntryForm.vue'
@@ -138,8 +164,12 @@ const entryDetail   = ref(null)
 const creatingEntry   = ref(false)
 const editingEntry    = ref(false)
 const treeRef         = ref(null)
-const showActionsMenu = ref(false)
-const menuRef         = ref(null)
+const showActionsMenu   = ref(false)
+const menuRef           = ref(null)
+const showDeleteConfirm = ref(false)
+const deleteRecursive   = ref(false)
+const deleting          = ref(false)
+const deleteError       = ref('')
 
 function onClickOutside(e) {
   if (menuRef.value && !menuRef.value.contains(e.target)) {
@@ -215,6 +245,28 @@ async function onEntryUpdated(browseResult) {
   // Refresh entry detail from the returned browse result
   entryDetail.value = { dn: browseResult.dn, attributes: browseResult.attributes }
   notif.success('Entry updated successfully')
+}
+
+async function onDeleteConfirmed() {
+  deleteError.value = ''
+  deleting.value = true
+  try {
+    const { data: parentBrowse } = await deleteEntry(selectedDirId.value, selectedDn.value, deleteRecursive.value)
+    showDeleteConfirm.value = false
+    // Compute parent DN to refresh tree
+    const parentDn = parentBrowse.dn
+    if (treeRef.value) {
+      treeRef.value.refreshNode(parentDn, parentBrowse.children)
+    }
+    // Select the parent after deletion
+    selectedDn.value = parentDn
+    entryDetail.value = { dn: parentBrowse.dn, attributes: parentBrowse.attributes }
+    notif.success('Entry deleted successfully')
+  } catch (e) {
+    deleteError.value = e.response?.data?.detail || e.response?.data?.message || e.message
+  } finally {
+    deleting.value = false
+  }
 }
 
 async function onEntryCreated(browseResult) {
