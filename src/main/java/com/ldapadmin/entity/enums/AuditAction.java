@@ -15,6 +15,7 @@ public enum AuditAction {
     USER_ENABLE          ("user.enable"),
     USER_DISABLE         ("user.disable"),
     USER_MOVE            ("user.move"),
+    PASSWORD_RESET       ("password.reset"),
 
     // ── Group operations ──────────────────────────────────────────────────────
     GROUP_CREATE         ("group.create"),
