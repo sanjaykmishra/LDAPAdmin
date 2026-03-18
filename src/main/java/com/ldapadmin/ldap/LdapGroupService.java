@@ -84,7 +84,17 @@ public class LdapGroupService {
                     Filter.create(filter), attributes);
                 request.addControl(pagingRequest);
 
-                SearchResult searchResult = conn.search(request);
+                SearchResult searchResult;
+                try {
+                    searchResult = conn.search(request);
+                } catch (LDAPSearchException e) {
+                    if (e.getResultCode() == ResultCode.NO_SUCH_OBJECT) {
+                        log.debug("Search base '{}' does not exist — returning empty result", searchBase);
+                        return results;
+                    }
+                    throw e;
+                }
+
                 for (SearchResultEntry entry : searchResult.getSearchEntries()) {
                     results.add(LdapEntryMapper.toGroup(entry));
                     if (results.size() >= maxResults) {
