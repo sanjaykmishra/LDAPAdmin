@@ -20,6 +20,12 @@ export const moveEntry = (dirId, dn, newParentDn) =>
 export const renameEntry = (dirId, dn, newRdn) =>
   client.post(`${base(dirId)}/rename`, { newRdn }, { params: { dn } })
 
+export const exportLdif = (dirId, dn, scope = 'base') =>
+  client.get(`${base(dirId)}/export/ldif`, {
+    params: { dn, scope },
+    responseType: 'blob',
+  })
+
 export const browseObjectClasses = (dirId) =>
   client.get(`${base(dirId)}/schema/object-classes`)
 

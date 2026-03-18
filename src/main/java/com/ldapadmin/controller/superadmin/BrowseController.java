@@ -13,10 +13,13 @@ import com.ldapadmin.ldap.LdapBrowseService;
 import com.ldapadmin.ldap.LdapBrowseService.BrowseResult;
 import com.ldapadmin.ldap.LdapSchemaService;
 import com.ldapadmin.ldap.LdapSchemaService.ObjectClassAttributes;
+import com.ldapadmin.ldap.LdifService;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.service.AuditService;
 import com.unboundid.ldap.sdk.Modification;
 import com.unboundid.ldap.sdk.ModificationType;
+import com.unboundid.ldap.sdk.SearchScope;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -24,6 +27,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -47,6 +51,7 @@ public class BrowseController {
 
     private final LdapBrowseService browseService;
     private final LdapSchemaService schemaService;
+    private final LdifService ldifService;
     private final AuditService auditService;
     private final DirectoryConnectionRepository dirRepo;
 
@@ -147,6 +152,31 @@ public class BrowseController {
             case REPLACE -> ModificationType.REPLACE;
             case DELETE -> ModificationType.DELETE;
         };
+    }
+
+    // ── LDIF Export ────────────────────────────────────────────────────────────
+
+    @GetMapping("/export/ldif")
+    public void exportLdif(@PathVariable UUID directoryId,
+                           @RequestParam String dn,
+                           @RequestParam(defaultValue = "base") String scope,
+                           HttpServletResponse response) throws IOException {
+        DirectoryConnection dc = loadDirectory(directoryId);
+
+        SearchScope searchScope = switch (scope.toLowerCase()) {
+            case "one" -> SearchScope.ONE;
+            case "sub" -> SearchScope.SUB;
+            default    -> SearchScope.BASE;
+        };
+
+        response.setContentType("application/ldif");
+        response.setHeader("Content-Disposition", "attachment; filename=\"export.ldif\"");
+
+        if (searchScope == SearchScope.BASE) {
+            ldifService.exportEntry(dc, dn, response.getOutputStream());
+        } else {
+            ldifService.exportSubtree(dc, dn, searchScope, response.getOutputStream());
+        }
     }
 
     // ── Schema endpoints (superadmin bypass — no realm/feature checks) ────────
