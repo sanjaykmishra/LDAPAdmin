@@ -81,6 +81,14 @@
                           class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                     Edit Entry
                   </button>
+                  <button @click="openRenameModal(); showActionsMenu = false"
+                          class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                    Rename Entry
+                  </button>
+                  <button @click="openMoveModal(); showActionsMenu = false"
+                          class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                    Move Entry
+                  </button>
                   <button @click="showDeleteConfirm = true; deleteRecursive = false; showActionsMenu = false"
                           class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                     Delete Entry
@@ -138,6 +146,58 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- Move entry modal -->
+    <Teleport to="body">
+      <div v-if="showMoveModal" class="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">Move Entry</h3>
+          <p class="text-sm text-gray-600 mb-1">Moving:</p>
+          <p class="text-sm font-mono text-gray-900 bg-gray-50 px-3 py-2 rounded-lg break-all mb-3">{{ selectedDn }}</p>
+          <label class="block text-sm font-medium text-gray-700 mb-1">New Parent DN</label>
+          <input v-model="moveTargetDn" type="text"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                 placeholder="ou=People,dc=example,dc=com" />
+          <div v-if="moveError" class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{{ moveError }}</div>
+          <div class="flex justify-end gap-3">
+            <button @click="showMoveModal = false"
+                    :disabled="moving"
+                    class="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">Cancel</button>
+            <button @click="onMoveConfirmed"
+                    :disabled="moving || !moveTargetDn.trim()"
+                    class="px-4 py-2 text-sm rounded-lg text-white font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50">
+              {{ moving ? 'Moving…' : 'Move' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Rename entry modal -->
+    <Teleport to="body">
+      <div v-if="showRenameModal" class="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">Rename Entry</h3>
+          <p class="text-sm text-gray-600 mb-1">Renaming:</p>
+          <p class="text-sm font-mono text-gray-900 bg-gray-50 px-3 py-2 rounded-lg break-all mb-3">{{ selectedDn }}</p>
+          <label class="block text-sm font-medium text-gray-700 mb-1">New RDN</label>
+          <input v-model="renameNewRdn" type="text"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                 placeholder="cn=NewName" />
+          <div v-if="renameError" class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{{ renameError }}</div>
+          <div class="flex justify-end gap-3">
+            <button @click="showRenameModal = false"
+                    :disabled="renaming"
+                    class="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">Cancel</button>
+            <button @click="onRenameConfirmed"
+                    :disabled="renaming || !renameNewRdn.trim()"
+                    class="px-4 py-2 text-sm rounded-lg text-white font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50">
+              {{ renaming ? 'Renaming…' : 'Rename' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -145,7 +205,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
 import { listDirectories } from '@/api/directories'
-import { browse, deleteEntry } from '@/api/browse'
+import { browse, deleteEntry, moveEntry, renameEntry } from '@/api/browse'
 import DnTree from '@/components/DnTree.vue'
 import CreateEntryForm from '@/components/CreateEntryForm.vue'
 import EditEntryForm from '@/components/EditEntryForm.vue'
@@ -170,6 +230,16 @@ const showDeleteConfirm = ref(false)
 const deleteRecursive   = ref(false)
 const deleting          = ref(false)
 const deleteError       = ref('')
+
+const showMoveModal     = ref(false)
+const moveTargetDn      = ref('')
+const moving            = ref(false)
+const moveError         = ref('')
+
+const showRenameModal   = ref(false)
+const renameNewRdn      = ref('')
+const renaming          = ref(false)
+const renameError       = ref('')
 
 function onClickOutside(e) {
   if (menuRef.value && !menuRef.value.contains(e.target)) {
@@ -266,6 +336,74 @@ async function onDeleteConfirmed() {
     deleteError.value = e.response?.data?.detail || e.response?.data?.message || e.message
   } finally {
     deleting.value = false
+  }
+}
+
+function extractParentDn(dn) {
+  const idx = dn.indexOf(',')
+  return idx > 0 ? dn.substring(idx + 1) : dn
+}
+
+function extractRdn(dn) {
+  const idx = dn.indexOf(',')
+  return idx > 0 ? dn.substring(0, idx) : dn
+}
+
+function openMoveModal() {
+  moveTargetDn.value = extractParentDn(selectedDn.value)
+  moveError.value = ''
+  showMoveModal.value = true
+}
+
+function openRenameModal() {
+  renameNewRdn.value = extractRdn(selectedDn.value)
+  renameError.value = ''
+  showRenameModal.value = true
+}
+
+async function onMoveConfirmed() {
+  moveError.value = ''
+  moving.value = true
+  try {
+    const { data: newParentBrowse } = await moveEntry(selectedDirId.value, selectedDn.value, moveTargetDn.value)
+    showMoveModal.value = false
+    // Refresh the old parent's tree node (remove the moved entry)
+    const oldParentDn = extractParentDn(selectedDn.value)
+    const { data: oldParentBrowse } = await browse(selectedDirId.value, oldParentDn)
+    if (treeRef.value) {
+      treeRef.value.refreshNode(oldParentDn, oldParentBrowse.children)
+      treeRef.value.refreshNode(moveTargetDn.value, newParentBrowse.children)
+    }
+    // Select the entry at its new location
+    const rdn = extractRdn(selectedDn.value)
+    const newDn = rdn + ',' + moveTargetDn.value
+    await selectEntry(newDn)
+    notif.success('Entry moved successfully')
+  } catch (e) {
+    moveError.value = e.response?.data?.detail || e.response?.data?.message || e.message
+  } finally {
+    moving.value = false
+  }
+}
+
+async function onRenameConfirmed() {
+  renameError.value = ''
+  renaming.value = true
+  try {
+    const { data: parentBrowse } = await renameEntry(selectedDirId.value, selectedDn.value, renameNewRdn.value)
+    showRenameModal.value = false
+    const parentDn = extractParentDn(selectedDn.value)
+    if (treeRef.value) {
+      treeRef.value.refreshNode(parentDn, parentBrowse.children)
+    }
+    // Select the entry at its new DN
+    const newDn = renameNewRdn.value + ',' + parentDn
+    await selectEntry(newDn)
+    notif.success('Entry renamed successfully')
+  } catch (e) {
+    renameError.value = e.response?.data?.detail || e.response?.data?.message || e.message
+  } finally {
+    renaming.value = false
   }
 }
 
