@@ -19,8 +19,7 @@
             <th class="px-4 py-3 text-left font-medium text-gray-500">Form Name</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Directory</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Object Classes</th>
-            <th class="px-4 py-3 text-left font-medium text-gray-500">User Base DN</th>
-            <th class="px-4 py-3 text-left font-medium text-gray-500">Group Base DN</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-500">Attributes</th>
             <th class="px-4 py-3"></th>
           </tr>
         </thead>
@@ -37,8 +36,16 @@
                 >{{ oc }}</span>
               </div>
             </td>
-            <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ realmForForm(f.id)?.userBaseDn || '—' }}</td>
-            <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ realmForForm(f.id)?.groupBaseDn || '—' }}</td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1">
+                <span
+                  v-for="attr in f.attributeConfigs"
+                  :key="attr.id"
+                  class="text-xs bg-blue-50 text-blue-700 rounded px-1.5 py-0.5"
+                >{{ attr.attributeName }}</span>
+                <span v-if="!f.attributeConfigs.length" class="text-xs text-gray-400">None</span>
+              </div>
+            </td>
             <td class="px-4 py-3 text-right whitespace-nowrap">
               <button @click="openEdit(f)" class="text-blue-600 hover:text-blue-800 text-xs font-medium mr-3">Edit</button>
               <button @click="confirmDelete(f)" class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
@@ -211,7 +218,6 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
 import { listUserForms, createUserForm, updateUserForm, deleteUserForm } from '@/api/userForms'
 import { listDirectories } from '@/api/directories'
-import { listAllRealms } from '@/api/realms'
 import { listObjectClasses, getObjectClass } from '@/api/schema'
 import FormField from '@/components/FormField.vue'
 import AppModal from '@/components/AppModal.vue'
@@ -225,13 +231,6 @@ const loading        = ref(false)
 const saving         = ref(false)
 const forms          = ref([])
 const directories    = ref([])
-const allRealms      = ref([])
-
-function realmForForm(formId) {
-  return allRealms.value.find(r =>
-    r.userForms?.some(uf => uf.id === formId)
-  )
-}
 const objectClasses  = ref([])
 const loadingOCs     = ref(false)
 const loadingAttrs   = ref(false)
@@ -462,12 +461,9 @@ function moveAttribute(idx, direction) {
 async function load() {
   loading.value = true
   try {
-    const [formsRes, dirsRes, realmsRes] = await Promise.all([
-      listUserForms(), listDirectories(), listAllRealms(),
-    ])
+    const [formsRes, dirsRes] = await Promise.all([listUserForms(), listDirectories()])
     forms.value = formsRes.data
     directories.value = dirsRes.data
-    allRealms.value = realmsRes.data
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
   } finally {
