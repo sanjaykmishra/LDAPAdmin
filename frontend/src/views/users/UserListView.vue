@@ -276,9 +276,26 @@ async function selectFormAndCreate(uf) {
   showModal.value = true
 }
 
-function openEdit(row) {
+async function openEdit(row) {
   editingDn.value = row.dn
   const attrs = row._raw?.attributes || {}
+
+  // Try to resolve a matching user form from the realm's linked forms
+  userFormConfig.value = null
+  const userOCs = (attrs.objectClass || attrs.objectclass || []).map(s => s.toLowerCase())
+  if (userOCs.length && availableForms.value.length) {
+    // Find the form whose objectClassNames best match the user's objectClasses
+    const match = availableForms.value.find(uf =>
+      (uf.objectClassNames || []).every(oc => userOCs.includes(oc.toLowerCase()))
+    )
+    if (match) {
+      try {
+        const { data } = await getUserForm(match.id)
+        userFormConfig.value = data
+      } catch { /* fall back to raw edit */ }
+    }
+  }
+
   form.value = { dn: row.dn, attributes: Object.fromEntries(
     Object.entries(attrs).map(([k, v]) => [k, Array.isArray(v) ? v.join('\n') : v])
   )}
@@ -289,11 +306,16 @@ async function save() {
   saving.value = true
   try {
     if (editingDn.value) {
-      const mods = Object.entries(form.value.attributes || {}).map(([attr, val]) => ({
-        operation: 'REPLACE',
-        attribute: attr,
-        values: val.split('\n').map(v => v.trim()).filter(v => v.length > 0),
-      }))
+      const mods = Object.entries(form.value.attributes || {})
+        .filter(([attr]) => attr.toLowerCase() !== 'objectclass')
+        .map(([attr, val]) => ({
+          operation: 'REPLACE',
+          attribute: attr,
+          values: typeof val === 'string'
+            ? val.split('\n').map(v => v.trim()).filter(v => v.length > 0)
+            : [String(val)],
+        }))
+        .filter(m => m.values.length > 0)
       await usersApi.updateUser(dirId, editingDn.value, { modifications: mods })
       notif.success('User updated')
     } else {
