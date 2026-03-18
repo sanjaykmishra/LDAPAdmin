@@ -25,13 +25,17 @@
       <FormField label="RDN Value" v-model="local.rdnValue" placeholder="jsmith" required />
     </div>
 
-    <!-- Object Class (disabled, from user form definition) -->
-    <FormField
-      v-if="userFormConfig"
-      label="Object Class"
-      :model-value="userFormConfig.objectClassName"
-      disabled
-    />
+    <!-- Object Classes (disabled, from user form definition) -->
+    <div v-if="userFormConfig?.objectClassNames?.length">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Object Classes</label>
+      <div class="flex flex-wrap gap-1">
+        <span
+          v-for="oc in userFormConfig.objectClassNames"
+          :key="oc"
+          class="inline-block text-xs bg-purple-50 text-purple-700 rounded px-2 py-0.5 font-mono"
+        >{{ oc }}</span>
+      </div>
+    </div>
 
     <!-- Dynamic fields from user form config (non-RDN attributes) -->
     <template v-if="userFormConfig?.attributeConfigs?.length">

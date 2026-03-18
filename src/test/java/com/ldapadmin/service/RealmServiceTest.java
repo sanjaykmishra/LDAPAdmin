@@ -128,11 +128,11 @@ class RealmServiceTest {
         UserForm form1 = new UserForm();
         form1.setId(formId1);
         form1.setFormName("Person Form");
-        form1.setObjectClassName("inetOrgPerson");
+        form1.setObjectClassNames(new java.util.ArrayList<>(List.of("inetOrgPerson")));
         UserForm form2 = new UserForm();
         form2.setId(formId2);
         form2.setFormName("Service Account Form");
-        form2.setObjectClassName("account");
+        form2.setObjectClassNames(new java.util.ArrayList<>(List.of("account")));
         when(userFormRepo.findById(formId1)).thenReturn(Optional.of(form1));
         when(userFormRepo.findById(formId2)).thenReturn(Optional.of(form2));
 

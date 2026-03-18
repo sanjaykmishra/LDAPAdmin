@@ -10,5 +10,5 @@ import java.util.UUID;
 @Repository
 public interface UserFormRepository extends JpaRepository<UserForm, UUID> {
 
-    List<UserForm> findAllByObjectClassName(String objectClassName);
+    List<UserForm> findAllByObjectClassNamesContaining(String objectClassName);
 }

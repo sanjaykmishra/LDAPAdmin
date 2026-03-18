@@ -86,6 +86,13 @@ public class LdapOperationService {
         return schemaService.getAttributesForObjectClass(dc, objectClass);
     }
 
+    public ObjectClassAttributes getObjectClassAttributesBulk(UUID directoryId, AuthPrincipal principal,
+                                                              List<String> objectClasses) {
+        DirectoryConnection dc = loadDirectory(directoryId, principal);
+        permissionService.requireDirectoryAccess(principal, directoryId);
+        return schemaService.getAttributesForObjectClasses(dc, objectClasses);
+    }
+
     public AttributeTypeInfo getAttributeTypeInfo(UUID directoryId, AuthPrincipal principal,
                                                    String attributeName) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);

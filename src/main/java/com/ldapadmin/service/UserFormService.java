@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -48,7 +49,7 @@ public class UserFormService {
         validateRdn(req.attributeConfigs());
         UserForm form = new UserForm();
         form.setDirectoryConnection(resolveDirectory(req.directoryId()));
-        form.setObjectClassName(req.objectClassName());
+        form.setObjectClassNames(new ArrayList<>(req.objectClassNames()));
         form.setFormName(req.formName());
         form = formRepo.save(form);
 
@@ -61,7 +62,7 @@ public class UserFormService {
         validateRdn(req.attributeConfigs());
         UserForm form = requireForm(id);
         form.setDirectoryConnection(resolveDirectory(req.directoryId()));
-        form.setObjectClassName(req.objectClassName());
+        form.setObjectClassNames(new ArrayList<>(req.objectClassNames()));
         form.setFormName(req.formName());
         form = formRepo.save(form);
 

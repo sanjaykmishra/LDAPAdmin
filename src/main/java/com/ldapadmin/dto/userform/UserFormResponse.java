@@ -10,7 +10,7 @@ import java.util.UUID;
 public record UserFormResponse(
         UUID id,
         UUID directoryId,
-        String objectClassName,
+        List<String> objectClassNames,
         String formName,
         List<AttributeConfigEntry> attributeConfigs) {
 
@@ -39,7 +39,7 @@ public record UserFormResponse(
         return new UserFormResponse(
                 f.getId(),
                 f.getDirectoryConnection() != null ? f.getDirectoryConnection().getId() : null,
-                f.getObjectClassName(),
+                f.getObjectClassNames(),
                 f.getFormName(),
                 configs.stream().map(AttributeConfigEntry::from).toList());
     }
