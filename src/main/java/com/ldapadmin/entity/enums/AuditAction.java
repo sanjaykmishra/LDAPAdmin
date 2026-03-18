@@ -30,6 +30,7 @@ public enum AuditAction {
     ENTRY_DELETE         ("entry.delete"),
     ENTRY_MOVE           ("entry.move"),
     ENTRY_RENAME         ("entry.rename"),
+    LDIF_IMPORT          ("ldif.import"),
 
     // ── Changelog-sourced (raw LDAP changelog entry) ──────────────────────────
     LDAP_CHANGE          ("ldap.change");

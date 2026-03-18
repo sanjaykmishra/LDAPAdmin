@@ -29,6 +29,15 @@ export const exportLdif = (dirId, dn, scope = 'base') =>
     responseType: 'blob',
   })
 
+export const importLdif = (dirId, file, conflictHandling = 'SKIP', dryRun = false) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return client.post(`${base(dirId)}/import/ldif`, formData, {
+    params: { conflictHandling, dryRun },
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+
 export const browseObjectClasses = (dirId) =>
   client.get(`${base(dirId)}/schema/object-classes`)
 
