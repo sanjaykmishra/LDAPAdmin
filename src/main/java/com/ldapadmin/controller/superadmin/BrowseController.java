@@ -3,11 +3,13 @@ package com.ldapadmin.controller.superadmin;
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.dto.ldap.AttributeModification;
 import com.ldapadmin.dto.ldap.CreateEntryRequest;
+import com.ldapadmin.dto.ldap.LdifImportResult;
 import com.ldapadmin.dto.ldap.MoveEntryRequest;
 import com.ldapadmin.dto.ldap.RenameEntryRequest;
 import com.ldapadmin.dto.ldap.UpdateEntryRequest;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.enums.AuditAction;
+import com.ldapadmin.entity.enums.ConflictHandling;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.ldap.LdapBrowseService;
 import com.ldapadmin.ldap.LdapBrowseService.BrowseResult;
@@ -27,6 +29,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
@@ -203,6 +206,29 @@ public class BrowseController {
         } else {
             ldifService.exportSubtree(dc, dn, searchScope, response.getOutputStream());
         }
+    }
+
+    // ── LDIF Import ─────────────────────────────────────────────────────────
+
+    @PostMapping("/import/ldif")
+    public LdifImportResult importLdif(@PathVariable UUID directoryId,
+                                       @AuthenticationPrincipal AuthPrincipal principal,
+                                       @RequestParam("file") MultipartFile file,
+                                       @RequestParam(defaultValue = "SKIP") ConflictHandling conflictHandling,
+                                       @RequestParam(defaultValue = "false") boolean dryRun) throws IOException {
+        DirectoryConnection dc = loadDirectory(directoryId);
+
+        LdifImportResult result = ldifService.importLdif(
+                dc, file.getInputStream(), conflictHandling, dryRun);
+
+        auditService.record(principal, directoryId, AuditAction.LDIF_IMPORT, dc.getBaseDn(),
+                Map.of("added", result.added(),
+                       "updated", result.updated(),
+                       "skipped", result.skipped(),
+                       "failed", result.failed(),
+                       "dryRun", dryRun));
+
+        return result;
     }
 
     // ── Schema endpoints (superadmin bypass — no realm/feature checks) ────────

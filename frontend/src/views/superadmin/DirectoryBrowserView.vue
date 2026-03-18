@@ -102,6 +102,10 @@
                           class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                     Export LDIF — Entire Subtree
                   </button>
+                  <button @click="showImportModal = true; showActionsMenu = false"
+                          class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                    Import LDIF
+                  </button>
                   <div class="border-t border-gray-100 my-1"></div>
                   <button @click="showDeleteConfirm = true; deleteRecursive = false; showActionsMenu = false"
                           class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
@@ -212,6 +216,13 @@
         </div>
       </div>
     </Teleport>
+    <!-- LDIF Import modal -->
+    <LdifImportModal
+      v-if="selectedDirId"
+      v-model="showImportModal"
+      :directory-id="selectedDirId"
+      @imported="onLdifImported"
+    />
   </div>
 </template>
 
@@ -219,10 +230,11 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
 import { listDirectories } from '@/api/directories'
-import { browse, deleteEntry, moveEntry, renameEntry, exportLdif } from '@/api/browse'
+import { browse, deleteEntry, moveEntry, renameEntry, exportLdif, importLdif } from '@/api/browse'
 import DnTree from '@/components/DnTree.vue'
 import CreateEntryForm from '@/components/CreateEntryForm.vue'
 import EditEntryForm from '@/components/EditEntryForm.vue'
+import LdifImportModal from '@/components/LdifImportModal.vue'
 
 const notif = useNotificationStore()
 
@@ -254,6 +266,8 @@ const showRenameModal   = ref(false)
 const renameNewRdn      = ref('')
 const renaming          = ref(false)
 const renameError       = ref('')
+
+const showImportModal   = ref(false)
 
 function onClickOutside(e) {
   if (menuRef.value && !menuRef.value.contains(e.target)) {
@@ -444,6 +458,29 @@ async function doExportLdif(scope) {
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
   }
+}
+
+async function onLdifImported() {
+  // Refresh tree from root
+  if (selectedDirId.value) {
+    treeLoading.value = true
+    try {
+      const { data } = await browse(selectedDirId.value)
+      rootNodes.value = [{
+        dn: data.dn,
+        rdn: data.dn,
+        hasChildren: data.children.length > 0,
+        _preloaded: data.children,
+      }]
+      entryDetail.value = data
+      selectedDn.value = data.dn
+    } catch (e) {
+      notif.error(e.response?.data?.detail || e.message)
+    } finally {
+      treeLoading.value = false
+    }
+  }
+  notif.success('LDIF import completed')
 }
 
 function formatValue(val) {
