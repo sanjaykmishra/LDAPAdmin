@@ -11,6 +11,7 @@ import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.ldap.LdapBrowseService;
 import com.ldapadmin.ldap.LdapBrowseService.BrowseResult;
+import com.ldapadmin.ldap.LdapBrowseService.SearchEntry;
 import com.ldapadmin.ldap.LdapSchemaService;
 import com.ldapadmin.ldap.LdapSchemaService.ObjectClassAttributes;
 import com.ldapadmin.ldap.LdifService;
@@ -152,6 +153,31 @@ public class BrowseController {
             case REPLACE -> ModificationType.REPLACE;
             case DELETE -> ModificationType.DELETE;
         };
+    }
+
+    // ── Search ────────────────────────────────────────────────────────────────
+
+    @GetMapping("/search")
+    public List<SearchEntry> searchEntries(
+            @PathVariable UUID directoryId,
+            @RequestParam(required = false) String baseDn,
+            @RequestParam(defaultValue = "sub") String scope,
+            @RequestParam(required = false) String filter,
+            @RequestParam(required = false) String attributes,
+            @RequestParam(defaultValue = "100") int limit) {
+        DirectoryConnection dc = loadDirectory(directoryId);
+
+        SearchScope searchScope = switch (scope.toLowerCase()) {
+            case "base" -> SearchScope.BASE;
+            case "one"  -> SearchScope.ONE;
+            default     -> SearchScope.SUB;
+        };
+
+        int safeLimit = Math.max(1, Math.min(limit, 1000));
+        List<String> attrList = (attributes == null || attributes.isBlank())
+                ? List.of() : List.of(attributes.split(","));
+
+        return browseService.searchEntries(dc, baseDn, searchScope, filter, attrList, safeLimit);
     }
 
     // ── LDIF Export ────────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ package com.ldapadmin.ldap;
 
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.exception.LdapOperationException;
+import com.unboundid.asn1.ASN1OctetString;
 import com.unboundid.ldap.sdk.*;
 import com.unboundid.ldap.sdk.controls.SimplePagedResultsControl;
 import lombok.RequiredArgsConstructor;
@@ -224,6 +225,68 @@ public class LdapBrowseService {
         return childDn;
     }
 
+    // ── Search ────────────────────────────────────────────────────────────────
+
+    /**
+     * Searches the DIT with configurable scope, filter, and attribute selection.
+     *
+     * @param dc         directory connection
+     * @param baseDn     search base DN
+     * @param scope      search scope (BASE, ONE, SUB)
+     * @param filter     LDAP filter string
+     * @param attributes attributes to return (empty = all)
+     * @param sizeLimit  maximum entries to return
+     * @return list of matching entries with their attributes
+     */
+    public List<SearchEntry> searchEntries(DirectoryConnection dc, String baseDn,
+                                           SearchScope scope, String filter,
+                                           List<String> attributes, int sizeLimit) {
+        String searchBase = (baseDn != null && !baseDn.isBlank()) ? baseDn : dc.getBaseDn();
+        String effectiveFilter = (filter == null || filter.isBlank()) ? "(objectClass=*)" : filter;
+        String[] attrArray = (attributes == null || attributes.isEmpty())
+                ? new String[0] : attributes.toArray(new String[0]);
+        int pageSize = Math.min(dc.getPagingSize(), sizeLimit);
+
+        return connectionFactory.withConnection(dc, conn -> {
+            List<SearchEntry> results = new ArrayList<>();
+            ASN1OctetString cookie = null;
+
+            do {
+                SearchRequest request = new SearchRequest(
+                        searchBase, scope, Filter.create(effectiveFilter), attrArray);
+                request.addControl(new SimplePagedResultsControl(pageSize, cookie));
+
+                SearchResult result;
+                try {
+                    result = conn.search(request);
+                } catch (LDAPSearchException e) {
+                    if (e.getResultCode() == ResultCode.NO_SUCH_OBJECT) {
+                        return results;
+                    }
+                    throw e;
+                }
+
+                for (SearchResultEntry entry : result.getSearchEntries()) {
+                    Map<String, List<String>> attrs = new LinkedHashMap<>();
+                    for (var attr : entry.getAttributes()) {
+                        attrs.put(attr.getBaseName(), Arrays.asList(attr.getValues()));
+                    }
+                    results.add(new SearchEntry(entry.getDN(), attrs));
+                    if (results.size() >= sizeLimit) {
+                        return results;
+                    }
+                }
+
+                SimplePagedResultsControl pageResponse =
+                        SimplePagedResultsControl.get(result);
+                cookie = (pageResponse != null && pageResponse.moreResultsToReturn())
+                        ? pageResponse.getCookie() : null;
+            } while (cookie != null && cookie.getValue().length > 0);
+
+            return results;
+        });
+    }
+
     // ── Value objects ─────────────────────────────────────────────────────────
 
     public record BrowseResult(
@@ -236,5 +299,10 @@ public class LdapBrowseService {
             String dn,
             String rdn,
             boolean hasChildren
+    ) {}
+
+    public record SearchEntry(
+            String dn,
+            Map<String, List<String>> attributes
     ) {}
 }
