@@ -20,7 +20,7 @@ public record RealmResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
 
-    public record UserFormEntry(UUID id, String formName, String objectClassName) {}
+    public record UserFormEntry(UUID id, String formName, List<String> objectClassNames) {}
 
     public static RealmResponse from(Realm r, List<RealmObjectclass> realmOcs) {
         List<UserFormEntry> forms = realmOcs.stream()
@@ -28,7 +28,7 @@ public record RealmResponse(
                 .map(oc -> new UserFormEntry(
                         oc.getUserForm().getId(),
                         oc.getUserForm().getFormName(),
-                        oc.getUserForm().getObjectClassName()))
+                        oc.getUserForm().getObjectClassNames()))
                 .toList();
 
         return new RealmResponse(

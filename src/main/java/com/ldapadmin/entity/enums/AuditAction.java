@@ -18,6 +18,7 @@ public enum AuditAction {
 
     // ── Group operations ──────────────────────────────────────────────────────
     GROUP_CREATE         ("group.create"),
+    GROUP_UPDATE         ("group.update"),
     GROUP_DELETE         ("group.delete"),
     GROUP_MEMBER_ADD     ("group.member_add"),
     GROUP_MEMBER_REMOVE  ("group.member_remove"),

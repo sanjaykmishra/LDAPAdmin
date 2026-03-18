@@ -18,7 +18,7 @@
           <tr>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Form Name</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Directory</th>
-            <th class="px-4 py-3 text-left font-medium text-gray-500">Object Class</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-500">Object Classes</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Attributes</th>
             <th class="px-4 py-3"></th>
           </tr>
@@ -27,7 +27,15 @@
           <tr v-for="f in forms" :key="f.id" class="hover:bg-gray-50">
             <td class="px-4 py-3 font-medium text-gray-900">{{ f.formName }}</td>
             <td class="px-4 py-3 text-gray-600 text-xs">{{ dirName(f.directoryId) }}</td>
-            <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ f.objectClassName }}</td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1">
+                <span
+                  v-for="oc in f.objectClassNames"
+                  :key="oc"
+                  class="text-xs bg-purple-50 text-purple-700 rounded px-1.5 py-0.5 font-mono"
+                >{{ oc }}</span>
+              </div>
+            </td>
             <td class="px-4 py-3">
               <div class="flex flex-wrap gap-1">
                 <span
@@ -50,7 +58,7 @@
     <!-- Create/Edit modal -->
     <AppModal v-model="showModal" :title="editing ? 'Edit User Form' : 'New User Form'" size="xl">
       <form @submit.prevent="save" class="space-y-4">
-        <!-- Directory picker (not persisted — used to look up schema) -->
+        <!-- Directory picker -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
           <select v-model="selectedDirId" class="input w-full">
@@ -59,16 +67,28 @@
           </select>
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
-          <FormField label="Form Name" v-model="form.formName" required placeholder="e.g. Standard User Form" />
-          <!-- Object class picker or freetext depending on whether a directory is selected -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Object Class <span class="text-red-500">*</span></label>
-            <select v-if="selectedDirId" v-model="form.objectClassName" class="input w-full" required>
-              <option value="" disabled>{{ loadingOCs ? 'Loading…' : '— Select object class —' }}</option>
-              <option v-for="oc in objectClasses" :key="oc" :value="oc">{{ oc }}</option>
+        <FormField label="Form Name" v-model="form.formName" required placeholder="e.g. Standard User Form" />
+
+        <!-- Object Classes section -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Object Classes <span class="text-red-500">*</span></label>
+          <div v-if="form.objectClassNames.length" class="flex flex-wrap gap-2 mb-2">
+            <span
+              v-for="oc in form.objectClassNames"
+              :key="oc"
+              class="inline-flex items-center gap-1 text-sm bg-purple-50 text-purple-700 rounded-lg px-2.5 py-1 font-mono"
+            >
+              {{ oc }}
+              <button type="button" @click="removeObjectClass(oc)" class="text-purple-400 hover:text-red-600 ml-1" title="Remove">&times;</button>
+            </span>
+          </div>
+          <div class="flex gap-2">
+            <select v-if="selectedDirId" v-model="ocToAdd" class="input flex-1">
+              <option value="" disabled>{{ loadingOCs ? 'Loading…' : '— Add object class —' }}</option>
+              <option v-for="oc in availableObjectClasses" :key="oc" :value="oc">{{ oc }}</option>
             </select>
-            <input v-else v-model="form.objectClassName" class="input w-full" required placeholder="e.g. inetOrgPerson" />
+            <input v-else v-model="ocToAdd" class="input flex-1" placeholder="e.g. inetOrgPerson" />
+            <button type="button" @click="addObjectClass" :disabled="!ocToAdd" class="btn-primary text-xs">Add</button>
           </div>
         </div>
 
@@ -133,10 +153,7 @@
                     <button
                       type="button"
                       @click="form.attributeConfigs.splice(idx, 1)"
-                      :disabled="attr.requiredOnCreate"
-                      :class="attr.requiredOnCreate ? 'text-gray-300 cursor-not-allowed' : 'text-red-500 hover:text-red-700'"
-                      class="text-xs font-medium"
-                      :title="attr.requiredOnCreate ? 'Required attributes cannot be removed' : 'Remove attribute'"
+                      class="text-red-500 hover:text-red-700 text-xs font-medium"
                     >Remove</button>
                   </td>
                 </tr>
@@ -156,22 +173,6 @@
         </div>
       </form>
     </AppModal>
-
-    <!-- Confirm object class change -->
-    <Teleport to="body">
-      <div v-if="showOcChangeConfirm" class="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-        <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">Change Object Class</h3>
-          <p class="text-sm text-gray-600 mb-6">
-            Changing the object class will clear all existing attributes and repopulate the form with attributes from the new object class. Do you want to continue?
-          </p>
-          <div class="flex justify-end gap-3">
-            <button @click="cancelOcChange" class="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">Cancel</button>
-            <button @click="confirmOcChange" class="px-4 py-2 text-sm rounded-lg text-white font-medium bg-blue-600 hover:bg-blue-700">Continue</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
 
     <!-- Add Attribute picker -->
     <Teleport to="body">
@@ -211,7 +212,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
 import { listUserForms, createUserForm, updateUserForm, deleteUserForm } from '@/api/userForms'
 import { listDirectories } from '@/api/directories'
@@ -235,8 +236,15 @@ const showModal      = ref(false)
 const editing        = ref(null)
 const deleteTarget   = ref(null)
 const selectedDirId  = ref('')
+const ocToAdd        = ref('')
 
 const form = ref(emptyForm())
+
+/**
+ * Per-objectClass schema cache.  Key = class name, value = { required: Set, optional: Set }.
+ * Used to determine which attributes to add/remove when objectClasses change.
+ */
+const ocSchemaCache = ref({})
 
 // When selected directory changes, sync to form and fetch object classes
 watch(selectedDirId, async (dirId) => {
@@ -257,110 +265,145 @@ watch(selectedDirId, async (dirId) => {
   }
 })
 
-// Track whether this is the initial object class value (set when dialog opens)
-const initialOcLoad = ref(true)
+/** Object classes not yet added to the form. */
+const availableObjectClasses = computed(() => {
+  const added = new Set(form.value.objectClassNames.map(n => n.toLowerCase()))
+  return objectClasses.value.filter(oc => !added.has(oc.toLowerCase()))
+})
 
-// Object class change confirmation
-const showOcChangeConfirm = ref(false)
-const pendingOcName       = ref('')
-const previousOcName      = ref('')
-const revertingOc         = ref(false)
+// ── Add / remove object classes ──────────────────────────────────────────────
 
-// Cached schema attributes for the current object class (used by Add Attribute picker)
-const cachedSchemaAttrs = ref([])
+async function addObjectClass() {
+  const oc = ocToAdd.value?.trim()
+  if (!oc) return
+  if (form.value.objectClassNames.some(n => n.toLowerCase() === oc.toLowerCase())) return
+
+  form.value.objectClassNames.push(oc)
+  ocToAdd.value = ''
+
+  // Fetch schema attributes for this class, add new ones
+  if (selectedDirId.value) {
+    await fetchAndMergeAttributes(oc)
+  }
+}
+
+async function removeObjectClass(oc) {
+  form.value.objectClassNames = form.value.objectClassNames.filter(n => n !== oc)
+
+  // Build the set of attributes owned by the remaining classes
+  const remainingAttrs = new Set()
+  for (const name of form.value.objectClassNames) {
+    const cached = ocSchemaCache.value[name.toLowerCase()]
+    if (cached) {
+      cached.required.forEach(a => remainingAttrs.add(a.toLowerCase()))
+      cached.optional.forEach(a => remainingAttrs.add(a.toLowerCase()))
+    }
+  }
+
+  // Determine which attributes were contributed by the removed class
+  const removedCache = ocSchemaCache.value[oc.toLowerCase()]
+  if (removedCache) {
+    const removedAttrs = new Set()
+    removedCache.required.forEach(a => removedAttrs.add(a.toLowerCase()))
+    removedCache.optional.forEach(a => removedAttrs.add(a.toLowerCase()))
+
+    // Only remove attributes unique to the removed class
+    form.value.attributeConfigs = form.value.attributeConfigs.filter(attr => {
+      const lower = attr.attributeName.toLowerCase()
+      if (!removedAttrs.has(lower)) return true   // not from the removed class
+      if (remainingAttrs.has(lower)) return true   // shared with a remaining class
+      return false                                 // unique to removed class — drop it
+    })
+  }
+
+  delete ocSchemaCache.value[oc.toLowerCase()]
+}
+
+async function fetchAndMergeAttributes(ocName) {
+  loadingAttrs.value = true
+  try {
+    const { data } = await getObjectClass(selectedDirId.value, ocName)
+
+    const required = new Set(data.required || [])
+    const optional = new Set(data.optional || [])
+    ocSchemaCache.value[ocName.toLowerCase()] = { required, optional }
+
+    // Determine which attributes are already in the form
+    const existing = new Set(form.value.attributeConfigs.map(a => a.attributeName.toLowerCase()))
+
+    // Add required attributes that are new (insert at top, before first non-required)
+    const newRequired = []
+    for (const name of required) {
+      if (!existing.has(name.toLowerCase())) {
+        newRequired.push({
+          attributeName: name, customLabel: '', inputType: 'TEXT',
+          requiredOnCreate: true, editableOnCreate: true, rdn: false,
+        })
+      }
+    }
+
+    // Add optional attributes that are new (append at end)
+    const newOptional = []
+    for (const name of optional) {
+      if (!existing.has(name.toLowerCase()) && !required.has(name)) {
+        newOptional.push({
+          attributeName: name, customLabel: '', inputType: 'TEXT',
+          requiredOnCreate: false, editableOnCreate: true, rdn: false,
+        })
+      }
+    }
+
+    // Insert required before the first optional attribute, or at the start
+    if (newRequired.length) {
+      // Find the first non-required attribute index
+      const firstOptIdx = form.value.attributeConfigs.findIndex(a => !a.requiredOnCreate)
+      const insertIdx = firstOptIdx >= 0 ? firstOptIdx : form.value.attributeConfigs.length
+      form.value.attributeConfigs.splice(insertIdx, 0, ...newRequired)
+    }
+
+    // Append optional at the end
+    form.value.attributeConfigs.push(...newOptional)
+  } catch (e) {
+    notif.error('Failed to load attributes for ' + ocName + ': ' + (e.response?.data?.detail || e.message))
+  } finally {
+    loadingAttrs.value = false
+  }
+}
+
+/** Cached combined schema attrs for the Add Attribute picker. */
+const cachedSchemaAttrs = computed(() => {
+  const result = []
+  const seen = new Set()
+  for (const ocName of form.value.objectClassNames) {
+    const cached = ocSchemaCache.value[ocName.toLowerCase()]
+    if (!cached) continue
+    for (const name of cached.required) {
+      if (!seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase())
+        result.push({ attributeName: name, requiredOnCreate: true })
+      }
+    }
+    for (const name of cached.optional) {
+      if (!seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase())
+        result.push({ attributeName: name, requiredOnCreate: false })
+      }
+    }
+  }
+  return result
+})
 
 // Add Attribute picker state
 const showAddAttrPicker       = ref(false)
 const availableAttrsForPicker = ref([])
 const pickerSelected          = ref([])
 
-watch(() => form.value.objectClassName, async (ocName, oldVal) => {
-  if (!ocName || !selectedDirId.value) return
-
-  // Skip if we're reverting from a cancelled change
-  if (revertingOc.value) {
-    revertingOc.value = false
-    return
-  }
-
-  // On initial load (when dialog first opens), just fetch and cache — no confirmation, no clearing
-  if (initialOcLoad.value) {
-    initialOcLoad.value = false
-    await fetchAndPopulateAttributes(ocName, false)
-    return
-  }
-
-  // If the form already has attributes, confirm before clearing
-  if (form.value.attributeConfigs.length > 0) {
-    pendingOcName.value = ocName
-    previousOcName.value = oldVal || ''
-    showOcChangeConfirm.value = true
-    return
-  }
-
-  // No existing attributes — just populate directly
-  await fetchAndPopulateAttributes(ocName, true)
-})
-
-function cancelOcChange() {
-  showOcChangeConfirm.value = false
-  // Revert the object class selection without re-triggering the watcher
-  revertingOc.value = true
-  form.value.objectClassName = previousOcName.value
-  pendingOcName.value = ''
-}
-
-async function confirmOcChange() {
-  showOcChangeConfirm.value = false
-  // Clear existing attributes and repopulate
-  await fetchAndPopulateAttributes(pendingOcName.value, true)
-  pendingOcName.value = ''
-}
-
-async function fetchAndPopulateAttributes(ocName, replaceAll) {
-  loadingAttrs.value = true
-  try {
-    const { data } = await getObjectClass(selectedDirId.value, ocName)
-
-    // Build full attribute list from the object class schema
-    const allAttrs = []
-    for (const name of (data.required || [])) {
-      allAttrs.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: true, editableOnCreate: true, rdn: false })
-    }
-    for (const name of (data.optional || [])) {
-      allAttrs.push({ attributeName: name, customLabel: '', inputType: 'TEXT', requiredOnCreate: false, editableOnCreate: true, rdn: false })
-    }
-
-    // Cache for the Add Attribute picker
-    cachedSchemaAttrs.value = allAttrs
-
-    if (replaceAll) {
-      form.value.attributeConfigs = allAttrs
-    }
-  } catch (e) {
-    notif.error('Failed to load attributes: ' + (e.response?.data?.detail || e.message))
-  } finally {
-    loadingAttrs.value = false
-  }
-}
-
 function emptyForm() {
   return {
     directoryId: null,
     formName: '',
-    objectClassName: '',
+    objectClassNames: [],
     attributeConfigs: [],
-  }
-}
-
-function emptyAttribute() {
-  return {
-    attributeName: '',
-    customLabel: '',
-    inputType: 'TEXT',
-    requiredOnCreate: false,
-    editableOnCreate: true,
-    rdn: false,
   }
 }
 
@@ -392,7 +435,14 @@ function addSelectedAttributes() {
   for (const name of pickerSelected.value) {
     const attr = availableAttrsForPicker.value.find(a => a.attributeName === name)
     if (attr) {
-      form.value.attributeConfigs.push({ ...attr })
+      form.value.attributeConfigs.push({
+        attributeName: attr.attributeName,
+        customLabel: '',
+        inputType: 'TEXT',
+        requiredOnCreate: attr.requiredOnCreate,
+        editableOnCreate: true,
+        rdn: false,
+      })
     }
   }
   showAddAttrPicker.value = false
@@ -425,24 +475,21 @@ function openCreate() {
   editing.value = null
   selectedDirId.value = ''
   objectClasses.value = []
-  cachedSchemaAttrs.value = []
-  initialOcLoad.value = false
+  ocSchemaCache.value = {}
   form.value = emptyForm()
   showModal.value = true
 }
 
-function openEdit(f) {
+async function openEdit(f) {
   editing.value = f.id
-  // Pre-seed with the current value so the <select> has a matching option
-  // while the full list loads asynchronously — prevents v-model reset.
-  objectClasses.value = f.objectClassName ? [f.objectClassName] : []
-  cachedSchemaAttrs.value = []
-  initialOcLoad.value = true
+  ocSchemaCache.value = {}
+  // Pre-seed objectClasses list so the dropdown has matching options
+  objectClasses.value = f.objectClassNames?.length ? [...f.objectClassNames] : []
   selectedDirId.value = f.directoryId || ''
   form.value = {
     directoryId: f.directoryId || null,
     formName: f.formName,
-    objectClassName: f.objectClassName,
+    objectClassNames: [...(f.objectClassNames || [])],
     attributeConfigs: (f.attributeConfigs || []).map(a => ({
       attributeName: a.attributeName,
       customLabel: a.customLabel || '',
@@ -453,9 +500,26 @@ function openEdit(f) {
     })),
   }
   showModal.value = true
+
+  // Pre-populate the schema cache for existing object classes
+  if (f.directoryId && f.objectClassNames?.length) {
+    for (const oc of f.objectClassNames) {
+      try {
+        const { data } = await getObjectClass(f.directoryId, oc)
+        ocSchemaCache.value[oc.toLowerCase()] = {
+          required: new Set(data.required || []),
+          optional: new Set(data.optional || []),
+        }
+      } catch { /* best-effort */ }
+    }
+  }
 }
 
 async function save() {
+  if (!form.value.objectClassNames.length) {
+    notif.error('At least one object class is required')
+    return
+  }
   // Validate exactly one RDN attribute
   if (form.value.attributeConfigs.length > 0) {
     const rdnCount = form.value.attributeConfigs.filter(a => a.rdn).length

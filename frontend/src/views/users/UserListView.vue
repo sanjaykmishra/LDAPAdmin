@@ -63,7 +63,7 @@
           class="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
         >
           <span class="font-medium text-gray-900 text-sm">{{ uf.formName }}</span>
-          <span class="text-xs text-gray-500 ml-2">({{ uf.objectClassName }})</span>
+          <span class="text-xs text-gray-500 ml-2">({{ (uf.objectClassNames || []).join(', ') }})</span>
         </button>
       </div>
       <template #footer>
@@ -73,7 +73,7 @@
 
     <!-- Create/Edit modal (step 2 of create, or edit) -->
     <AppModal v-model="showModal" :title="editingDn ? 'Edit User' : 'New User'" size="lg">
-      <UserForm :data="form" :is-edit="!!editingDn" :user-form-config="userFormConfig" @update="v => form = v" />
+      <UserForm :data="form" :is-edit="!!editingDn" :user-form-config="userFormConfig" :dir-id="dirId" @update="v => form = v" />
       <template #footer>
         <button @click="showModal = false" class="btn-secondary">Cancel</button>
         <button @click="save" :disabled="saving" class="btn-primary">{{ saving ? 'Saving…' : 'Save' }}</button>
@@ -229,9 +229,9 @@ async function save() {
       }
       // Include the RDN attribute in the attributes map
       attributes[f.rdnAttribute] = [f.rdnValue]
-      // Include objectClass from the selected user form
-      if (userFormConfig.value?.objectClassName) {
-        attributes.objectClass = [userFormConfig.value.objectClassName]
+      // Include objectClasses from the selected user form
+      if (userFormConfig.value?.objectClassNames?.length) {
+        attributes.objectClass = userFormConfig.value.objectClassNames
       }
       await usersApi.createUser(dirId, { dn, attributes })
       notif.success('User created')

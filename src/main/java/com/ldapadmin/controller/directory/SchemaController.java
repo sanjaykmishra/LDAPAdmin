@@ -6,10 +6,7 @@ import com.ldapadmin.ldap.LdapSchemaService.ObjectClassAttributes;
 import com.ldapadmin.service.LdapOperationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
@@ -47,6 +44,14 @@ public class SchemaController {
             @PathVariable String name,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return service.getObjectClassAttributes(directoryId, principal, name);
+    }
+
+    @GetMapping("/object-classes/bulk")
+    public ObjectClassAttributes getObjectClassesBulk(
+            @PathVariable UUID directoryId,
+            @RequestParam List<String> names,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        return service.getObjectClassAttributesBulk(directoryId, principal, names);
     }
 
     @GetMapping("/attribute-types")

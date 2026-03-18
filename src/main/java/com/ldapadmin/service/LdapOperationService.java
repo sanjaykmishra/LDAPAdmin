@@ -86,6 +86,13 @@ public class LdapOperationService {
         return schemaService.getAttributesForObjectClass(dc, objectClass);
     }
 
+    public ObjectClassAttributes getObjectClassAttributesBulk(UUID directoryId, AuthPrincipal principal,
+                                                              List<String> objectClasses) {
+        DirectoryConnection dc = loadDirectory(directoryId, principal);
+        permissionService.requireDirectoryAccess(principal, directoryId);
+        return schemaService.getAttributesForObjectClasses(dc, objectClasses);
+    }
+
     public AttributeTypeInfo getAttributeTypeInfo(UUID directoryId, AuthPrincipal principal,
                                                    String attributeName) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
@@ -134,6 +141,19 @@ public class LdapOperationService {
         userService.updateUser(dc, dn, mods);
         LdapEntryResponse result = LdapEntryResponse.from(userService.getUser(dc, dn));
         auditService.record(principal, directoryId, AuditAction.USER_UPDATE, dn,
+                Map.of("modifiedAttributes", req.modifications().stream()
+                        .map(AttributeModification::attribute).toList()));
+        return result;
+    }
+
+    public LdapEntryResponse updateGroup(UUID directoryId, AuthPrincipal principal,
+                                         String dn, UpdateEntryRequest req) {
+        DirectoryConnection dc = loadDirectory(directoryId, principal);
+
+        List<Modification> mods = toModifications(req);
+        groupService.updateGroup(dc, dn, mods);
+        LdapEntryResponse result = LdapEntryResponse.from(groupService.getGroup(dc, dn));
+        auditService.record(principal, directoryId, AuditAction.GROUP_UPDATE, dn,
                 Map.of("modifiedAttributes", req.modifications().stream()
                         .map(AttributeModification::attribute).toList()));
         return result;

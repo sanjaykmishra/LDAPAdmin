@@ -162,6 +162,20 @@ public class LdapGroupService {
         });
     }
 
+    /**
+     * Applies the given modifications to a group entry.
+     */
+    public void updateGroup(DirectoryConnection dc,
+                            String dn,
+                            List<Modification> modifications) {
+        connectionFactory.withConnection(dc, conn -> {
+            LDAPResult result = conn.modify(new ModifyRequest(dn, modifications));
+            checkResult(result, "updateGroup", dn);
+            log.info("Updated LDAP group {}", dn);
+            return null;
+        });
+    }
+
     // ── Member management ─────────────────────────────────────────────────────
 
     /**

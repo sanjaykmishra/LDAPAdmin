@@ -17,6 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -56,7 +57,7 @@ class UserFormServiceTest {
             return f;
         });
         UserFormResponse resp = service.create(new UserFormRequest(
-                dirId, "inetOrgPerson", "Standard Form", List.of()));
+                dirId, List.of("inetOrgPerson"), "Standard Form", List.of()));
 
         assertThat(resp.directoryId()).isEqualTo(dirId);
         ArgumentCaptor<UserForm> captor = ArgumentCaptor.forClass(UserForm.class);
@@ -72,7 +73,7 @@ class UserFormServiceTest {
             return f;
         });
         UserFormResponse resp = service.create(new UserFormRequest(
-                null, "inetOrgPerson", "Standard Form", List.of()));
+                null, List.of("inetOrgPerson"), "Standard Form", List.of()));
 
         assertThat(resp.directoryId()).isNull();
         ArgumentCaptor<UserForm> captor = ArgumentCaptor.forClass(UserForm.class);
@@ -87,7 +88,7 @@ class UserFormServiceTest {
         when(directoryRepo.findById(badId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.create(new UserFormRequest(
-                badId, "inetOrgPerson", "Form", List.of())))
+                badId, List.of("inetOrgPerson"), "Form", List.of())))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(formRepo, never()).save(any());
@@ -112,19 +113,35 @@ class UserFormServiceTest {
                 "cn", "Common Name", true, true, "TEXT", true);
 
         UserFormResponse resp = service.create(new UserFormRequest(
-                null, "inetOrgPerson", "Form", List.of(configEntry)));
+                null, List.of("inetOrgPerson"), "Form", List.of(configEntry)));
 
         assertThat(resp.attributeConfigs()).hasSize(1);
         verify(configRepo).saveAll(any());
     }
 
+    @Test
+    void create_withMultipleObjectClasses_storesAll() {
+        when(formRepo.save(any())).thenAnswer(inv -> {
+            UserForm f = inv.getArgument(0);
+            f.setId(formId);
+            return f;
+        });
+        UserFormResponse resp = service.create(new UserFormRequest(
+                null, List.of("inetOrgPerson", "posixAccount"), "Multi-Class Form", List.of()));
+
+        assertThat(resp.objectClassNames()).containsExactly("inetOrgPerson", "posixAccount");
+        ArgumentCaptor<UserForm> captor = ArgumentCaptor.forClass(UserForm.class);
+        verify(formRepo).save(captor.capture());
+        assertThat(captor.getValue().getObjectClassNames()).containsExactly("inetOrgPerson", "posixAccount");
+    }
+
     // ── update ──────────────────────────────────────────────────────────────
 
     @Test
-    void update_changesDirectoryId() {
+    void update_changesObjectClassNames() {
         UserForm existing = new UserForm();
         existing.setId(formId);
-        existing.setObjectClassName("person");
+        existing.setObjectClassNames(new ArrayList<>(List.of("person")));
         existing.setFormName("Old");
         when(formRepo.findById(formId)).thenReturn(Optional.of(existing));
 
@@ -134,10 +151,10 @@ class UserFormServiceTest {
         when(formRepo.save(any())).thenReturn(existing);
 
         service.update(formId, new UserFormRequest(
-                dirId, "inetOrgPerson", "Updated Form", List.of()));
+                dirId, List.of("inetOrgPerson", "posixAccount"), "Updated Form", List.of()));
 
         assertThat(existing.getDirectoryConnection()).isEqualTo(dir);
-        assertThat(existing.getObjectClassName()).isEqualTo("inetOrgPerson");
+        assertThat(existing.getObjectClassNames()).containsExactly("inetOrgPerson", "posixAccount");
     }
 
     @Test
@@ -145,7 +162,7 @@ class UserFormServiceTest {
         when(formRepo.findById(formId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.update(formId, new UserFormRequest(
-                null, "inetOrgPerson", "Form", List.of())))
+                null, List.of("inetOrgPerson"), "Form", List.of())))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -155,7 +172,7 @@ class UserFormServiceTest {
     void list_returnsMappedForms() {
         UserForm f = new UserForm();
         f.setId(formId);
-        f.setObjectClassName("inetOrgPerson");
+        f.setObjectClassNames(new ArrayList<>(List.of("inetOrgPerson")));
         f.setFormName("Test");
         when(formRepo.findAll()).thenReturn(List.of(f));
         when(configRepo.findAllByUserFormId(formId)).thenReturn(List.of());
