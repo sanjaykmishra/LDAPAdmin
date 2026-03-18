@@ -11,6 +11,9 @@ export const createEntry = (dirId, data) =>
 export const updateEntry = (dirId, dn, data) =>
   client.put(base(dirId), data, { params: { dn } })
 
+export const deleteEntry = (dirId, dn, recursive = false) =>
+  client.delete(base(dirId), { params: { dn, recursive } })
+
 export const browseObjectClasses = (dirId) =>
   client.get(`${base(dirId)}/schema/object-classes`)
 
