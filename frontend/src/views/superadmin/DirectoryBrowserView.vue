@@ -55,10 +55,28 @@
                 <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Distinguished Name</p>
                 <p class="text-sm font-mono text-gray-900 bg-gray-50 px-3 py-2 rounded-lg break-all">{{ entryDetail.dn }}</p>
               </div>
-              <button @click="creatingEntry = true"
-                      class="ml-3 shrink-0 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
-                + New Entry
-              </button>
+              <div class="ml-3 shrink-0 relative" ref="menuRef">
+                <button @click="showActionsMenu = !showActionsMenu"
+                        class="px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-1">
+                  Actions
+                  <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+                </button>
+                <div v-if="showActionsMenu"
+                     class="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1">
+                  <button @click="creatingEntry = true; showActionsMenu = false"
+                          class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                    New Entry
+                  </button>
+                  <button disabled
+                          class="w-full text-left px-4 py-2 text-sm text-gray-400 cursor-not-allowed">
+                    Edit Entry
+                  </button>
+                  <button disabled
+                          class="w-full text-left px-4 py-2 text-sm text-gray-400 cursor-not-allowed">
+                    Delete Entry
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div v-if="Object.keys(entryDetail.attributes).length === 0" class="text-sm text-gray-400">
@@ -88,7 +106,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
 import { listDirectories } from '@/api/directories'
 import { browse } from '@/api/browse'
@@ -106,8 +124,19 @@ const rootNodes     = ref([])
 const selectedDn    = ref('')
 const detailLoading = ref(false)
 const entryDetail   = ref(null)
-const creatingEntry = ref(false)
-const treeRef       = ref(null)
+const creatingEntry   = ref(false)
+const treeRef         = ref(null)
+const showActionsMenu = ref(false)
+const menuRef         = ref(null)
+
+function onClickOutside(e) {
+  if (menuRef.value && !menuRef.value.contains(e.target)) {
+    showActionsMenu.value = false
+  }
+}
+
+onMounted(() => document.addEventListener('click', onClickOutside))
+onUnmounted(() => document.removeEventListener('click', onClickOutside))
 
 const sortedAttributes = computed(() => {
   if (!entryDetail.value?.attributes) return []
