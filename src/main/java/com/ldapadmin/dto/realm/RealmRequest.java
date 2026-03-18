@@ -13,14 +13,6 @@ public record RealmRequest(
         @NotBlank @Size(max = 255) String name,
         @NotBlank String userBaseDn,
         @NotBlank String groupBaseDn,
-        @NotBlank String primaryUserObjectclass,
         int displayOrder,
-        UUID userFormId,
-        List<AuxEntry> auxiliaryObjectclasses) {
-
-    /** An auxiliary objectClass entry within a realm. */
-    public record AuxEntry(
-            @NotBlank String objectclassName,
-            int displayOrder) {
-    }
+        List<UUID> userFormIds) {
 }

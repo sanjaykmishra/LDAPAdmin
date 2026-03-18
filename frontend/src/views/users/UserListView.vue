@@ -49,7 +49,29 @@
       <button @click="loadMore" :disabled="loading" class="btn-secondary">Load more</button>
     </div>
 
-    <!-- Create/Edit modal -->
+    <!-- Form picker modal (step 1 of create) -->
+    <AppModal v-model="showFormPicker" title="Choose User Form" size="sm">
+      <div class="space-y-2">
+        <p class="text-sm text-gray-600 mb-3">Select a user form to define which attributes are available for the new user.</p>
+        <div v-if="availableForms.length === 0" class="text-sm text-gray-400 py-4 text-center">
+          No user forms are linked to this realm. Configure user forms in the Realms settings first.
+        </div>
+        <button
+          v-for="uf in availableForms"
+          :key="uf.id"
+          @click="selectFormAndCreate(uf)"
+          class="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
+        >
+          <span class="font-medium text-gray-900 text-sm">{{ uf.formName }}</span>
+          <span class="text-xs text-gray-500 ml-2">({{ uf.objectClassName }})</span>
+        </button>
+      </div>
+      <template #footer>
+        <button @click="showFormPicker = false" class="btn-secondary">Cancel</button>
+      </template>
+    </AppModal>
+
+    <!-- Create/Edit modal (step 2 of create, or edit) -->
     <AppModal v-model="showModal" :title="editingDn ? 'Edit User' : 'New User'" size="lg">
       <UserForm :data="form" :is-edit="!!editingDn" :user-form-config="userFormConfig" @update="v => form = v" />
       <template #footer>
@@ -96,6 +118,7 @@ const users          = ref([])
 const filterText     = ref('')
 const baseDnOverride = ref('')
 const limit          = ref(PAGE_SIZE)
+const showFormPicker = ref(false)
 const showModal      = ref(false)
 const showMove       = ref(false)
 const showDelete     = ref(false)
@@ -113,6 +136,7 @@ const cols = [
 ]
 
 const realmData       = ref(null)
+const availableForms  = ref([])
 const userFormConfig  = ref(null)
 
 const emptyForm = () => {
@@ -151,6 +175,27 @@ function loadMore() { limit.value += 50; load() }
 
 function openCreate() {
   editingDn.value = null
+  userFormConfig.value = null
+  if (availableForms.value.length === 1) {
+    // Only one form available — skip the picker
+    selectFormAndCreate(availableForms.value[0])
+  } else if (availableForms.value.length > 1) {
+    showFormPicker.value = true
+  } else {
+    // No forms linked — open create dialog with fallback fields
+    form.value = emptyForm()
+    showModal.value = true
+  }
+}
+
+async function selectFormAndCreate(uf) {
+  showFormPicker.value = false
+  try {
+    const { data } = await getUserForm(uf.id)
+    userFormConfig.value = data
+  } catch {
+    userFormConfig.value = null
+  }
   form.value = emptyForm()
   showModal.value = true
 }
@@ -184,14 +229,9 @@ async function save() {
       }
       // Include the RDN attribute in the attributes map
       attributes[f.rdnAttribute] = [f.rdnValue]
-      // Include objectClass from the user form definition
+      // Include objectClass from the selected user form
       if (userFormConfig.value?.objectClassName) {
-        const ocs = [userFormConfig.value.objectClassName]
-        const auxClasses = realmData.value?.auxiliaryObjectclasses || []
-        for (const aux of auxClasses) {
-          ocs.push(aux.objectclassName)
-        }
-        attributes.objectClass = ocs
+        attributes.objectClass = [userFormConfig.value.objectClassName]
       }
       await usersApi.createUser(dirId, { dn, attributes })
       notif.success('User created')
@@ -236,22 +276,20 @@ async function doDelete() {
   await load()
 }
 
-async function loadRealmAndForm() {
+async function loadRealmAndForms() {
   try {
     const { data: realms } = await listRealms(dirId)
     if (realms.length) {
       realmData.value = realms[0]
-      if (realms[0].userFormId) {
-        const { data: uf } = await getUserForm(realms[0].userFormId)
-        userFormConfig.value = uf
-      }
+      // Collect available user forms from the realm
+      availableForms.value = realms[0].userForms || []
     }
-  } catch { /* realm/form loading is best-effort */ }
+  } catch { /* realm loading is best-effort */ }
 }
 
 onMounted(() => {
   load()
-  loadRealmAndForm()
+  loadRealmAndForms()
 })
 </script>
 
