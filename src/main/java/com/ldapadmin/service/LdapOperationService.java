@@ -200,12 +200,25 @@ public class LdapOperationService {
 
     // ── Groups — read ─────────────────────────────────────────────────────────
 
+    /**
+     * LDAP filter that restricts results to well-known group objectClasses.
+     */
+    private static final String GROUP_OBJECTCLASS_FILTER =
+            "(|(objectClass=groupOfNames)(objectClass=groupOfUniqueNames)(objectClass=posixGroup)(objectClass=group)(objectClass=groupOfURLs))";
+
     public List<LdapEntryResponse> searchGroups(UUID directoryId, AuthPrincipal principal,
                                                 String filter, String baseDn,
                                                 int limit, String[] attributes) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
-        String effectiveFilter = (filter == null || filter.isBlank()) ? "(objectClass=*)" : filter;
+
+        // Always intersect with known group objectClasses so non-group entries are excluded.
+        String effectiveFilter;
+        if (filter == null || filter.isBlank()) {
+            effectiveFilter = GROUP_OBJECTCLASS_FILTER;
+        } else {
+            effectiveFilter = "(&" + filter + GROUP_OBJECTCLASS_FILTER + ")";
+        }
         return groupService.searchGroups(dc, effectiveFilter, baseDn, limit, attributes)
                 .stream().map(LdapEntryResponse::from).toList();
     }
