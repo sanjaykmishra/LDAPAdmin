@@ -125,6 +125,23 @@ public class LdapBrowseService {
         });
     }
 
+    /**
+     * Updates an existing LDAP entry by applying the given attribute modifications.
+     */
+    public void updateEntry(DirectoryConnection dc, String dn,
+                            List<Modification> modifications) {
+        connectionFactory.withConnection(dc, conn -> {
+            LDAPResult result = conn.modify(new ModifyRequest(dn, modifications));
+            if (result.getResultCode() != ResultCode.SUCCESS) {
+                throw new LdapOperationException(
+                    "updateEntry failed for [" + dn + "]: "
+                    + result.getResultCode() + " — " + result.getDiagnosticMessage());
+            }
+            log.info("Updated LDAP entry {}", dn);
+            return null;
+        });
+    }
+
     private String extractRdn(String childDn, String parentDn) {
         // Remove ",parentDn" suffix to get the RDN
         if (childDn.toLowerCase().endsWith("," + parentDn.toLowerCase())) {

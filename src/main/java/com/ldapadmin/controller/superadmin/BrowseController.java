@@ -1,7 +1,9 @@
 package com.ldapadmin.controller.superadmin;
 
 import com.ldapadmin.auth.AuthPrincipal;
+import com.ldapadmin.dto.ldap.AttributeModification;
 import com.ldapadmin.dto.ldap.CreateEntryRequest;
+import com.ldapadmin.dto.ldap.UpdateEntryRequest;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.exception.ResourceNotFoundException;
@@ -11,6 +13,8 @@ import com.ldapadmin.ldap.LdapSchemaService;
 import com.ldapadmin.ldap.LdapSchemaService.ObjectClassAttributes;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.service.AuditService;
+import com.unboundid.ldap.sdk.Modification;
+import com.unboundid.ldap.sdk.ModificationType;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -66,6 +70,36 @@ public class BrowseController {
         // Return the parent's browse result so the UI can refresh the tree
         String parentDn = extractParentDn(req.dn(), dc.getBaseDn());
         return browseService.browse(dc, parentDn);
+    }
+
+    @PutMapping
+    public BrowseResult updateEntry(@PathVariable UUID directoryId,
+                                    @AuthenticationPrincipal AuthPrincipal principal,
+                                    @RequestParam String dn,
+                                    @Valid @RequestBody UpdateEntryRequest req) {
+        DirectoryConnection dc = loadDirectory(directoryId);
+
+        List<Modification> mods = req.modifications().stream()
+                .map(m -> new Modification(
+                        toModificationType(m.operation()),
+                        m.attribute(),
+                        m.values() != null ? m.values().toArray(new String[0]) : new String[0]))
+                .toList();
+
+        browseService.updateEntry(dc, dn, mods);
+
+        auditService.record(principal, directoryId, AuditAction.ENTRY_UPDATE, dn,
+                Map.of("modifications", req.modifications().size()));
+
+        return browseService.browse(dc, dn);
+    }
+
+    private ModificationType toModificationType(AttributeModification.Operation op) {
+        return switch (op) {
+            case ADD -> ModificationType.ADD;
+            case REPLACE -> ModificationType.REPLACE;
+            case DELETE -> ModificationType.DELETE;
+        };
     }
 
     // ── Schema endpoints (superadmin bypass — no realm/feature checks) ────────
