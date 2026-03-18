@@ -74,11 +74,47 @@
       >Groups</button>
     </div>
 
-    <!-- Attributes tab -->
+    <!-- Attributes tab: form-config-driven edit -->
     <div v-show="activeTab === 'attributes'" class="space-y-3">
       <p class="text-xs text-gray-500 mb-3">Editing: <code class="bg-gray-100 px-1 rounded">{{ local.dn }}</code></p>
-      <template v-for="(_, key) in editableAttributes" :key="key">
-        <FormField :label="key" v-model="local.attributes[key]" type="textarea" :rows="2" hint="One value per line" />
+
+      <!-- When user form config is available, render structured fields -->
+      <template v-if="userFormConfig?.attributeConfigs?.length">
+        <template v-for="attr in editFormAttributes" :key="attr.id || attr.attributeName">
+          <FormField
+            :label="attr.customLabel || attr.attributeName"
+            v-model="local.attributes[attr.attributeName]"
+            :type="mapInputType(attr.inputType)"
+            :required="attr.requiredOnCreate"
+            :disabled="attr.rdn"
+            :rows="attr.inputType === 'TEXTAREA' || attr.inputType === 'MULTI_VALUE' ? 3 : undefined"
+            :hint="attr.inputType === 'MULTI_VALUE' ? 'One value per line' : undefined"
+          />
+        </template>
+
+        <!-- Other attributes not in the form config -->
+        <div v-if="Object.keys(extraEditAttributes).length">
+          <button @click="showExtraAttrs = !showExtraAttrs"
+                  class="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-700 mt-2">
+            <svg :class="['w-3 h-3 transition-transform', showExtraAttrs && 'rotate-90']"
+                 viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
+            </svg>
+            Other Attributes ({{ Object.keys(extraEditAttributes).length }})
+          </button>
+          <div v-if="showExtraAttrs" class="space-y-3 mt-3 pl-3 border-l-2 border-gray-100">
+            <template v-for="(_, key) in extraEditAttributes" :key="key">
+              <FormField :label="key" v-model="local.attributes[key]" type="textarea" :rows="2" hint="One value per line" />
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <!-- Fallback: raw attribute editing when no form config -->
+      <template v-else>
+        <template v-for="(_, key) in editableAttributes" :key="key">
+          <FormField :label="key" v-model="local.attributes[key]" type="textarea" :rows="2" hint="One value per line" />
+        </template>
       </template>
     </div>
 
@@ -153,6 +189,8 @@ const availableGroups = ref([])
 const groupFilter     = ref('')
 const allGroups       = ref([])
 
+const showExtraAttrs = ref(false)
+
 const HIDDEN_EDIT_ATTRS = new Set(['objectclass', 'objectClass'])
 
 /** Attributes to show in edit mode (excludes objectClass). */
@@ -160,6 +198,29 @@ const editableAttributes = computed(() => {
   const result = {}
   for (const key of Object.keys(local.attributes)) {
     if (!HIDDEN_EDIT_ATTRS.has(key)) {
+      result[key] = local.attributes[key]
+    }
+  }
+  return result
+})
+
+/** Attributes from the form config to show in edit mode (excludes objectClass). */
+const editFormAttributes = computed(() => {
+  if (!props.userFormConfig?.attributeConfigs) return []
+  return props.userFormConfig.attributeConfigs.filter(
+    a => a.attributeName.toLowerCase() !== 'objectclass'
+  )
+})
+
+/** Attributes present on the entry but NOT in the form config (edit mode overflow). */
+const extraEditAttributes = computed(() => {
+  if (!props.userFormConfig?.attributeConfigs) return {}
+  const configuredNames = new Set(
+    props.userFormConfig.attributeConfigs.map(a => a.attributeName.toLowerCase())
+  )
+  const result = {}
+  for (const key of Object.keys(local.attributes)) {
+    if (!HIDDEN_EDIT_ATTRS.has(key) && !configuredNames.has(key.toLowerCase())) {
       result[key] = local.attributes[key]
     }
   }
