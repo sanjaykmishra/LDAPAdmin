@@ -28,7 +28,7 @@ public record RealmResponse(
                 .map(oc -> new UserFormEntry(
                         oc.getUserForm().getId(),
                         oc.getUserForm().getFormName(),
-                        oc.getUserForm().getObjectClassNames()))
+                        List.copyOf(oc.getUserForm().getObjectClassNames())))
                 .toList();
 
         return new RealmResponse(

@@ -37,7 +37,7 @@ public class UserForm {
     private DirectoryConnection directoryConnection;
 
     /** LDAP objectClasses this form is designed for. */
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
         name = "user_form_object_classes",
         joinColumns = @JoinColumn(name = "user_form_id")
