@@ -37,8 +37,8 @@
 
     <!-- Create group -->
     <AppModal v-model="showCreate" title="New Group" size="md">
-      <FormField label="Parent DN" v-model="createForm.parentDn" required :disabled="!!realmData?.groupBaseDn" />
-      <FormField label="Group Name (cn)" v-model="createForm.cn" required />
+      <FormField label="Group Name (cn) (RDN)" v-model="createForm.cn" required />
+      <FormField label="DN" :model-value="computedGroupDn" required disabled />
       <FormField label="Object Class" v-model="createForm.objectClass" />
       <FormField label="Owner" v-model="createForm.owner" placeholder="DN of the group owner" />
       <FormField label="Description" v-model="createForm.description" placeholder="Group description" />
@@ -79,7 +79,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useNotificationStore } from '@/stores/notifications'
 import { useApi } from '@/composables/useApi'
@@ -113,6 +113,13 @@ const createForm    = ref({ parentDn: '', cn: '', objectClass: 'groupOfNames', o
 const editForm      = ref({ owner: '', description: '' })
 const editingDn     = ref(null)
 
+const computedGroupDn = computed(() => {
+  const cn = createForm.value.cn?.trim()
+  const base = createForm.value.parentDn
+  if (!cn || !base) return ''
+  return `cn=${cn},${base}`
+})
+
 const cols = [
   { key: 'dn',          label: 'DN' },
   { key: 'cn',          label: 'Name' },
@@ -141,7 +148,7 @@ async function doCreate() {
   saving.value = true
   try {
     const f = createForm.value
-    const dn = `cn=${f.cn},${f.parentDn}`
+    const dn = computedGroupDn.value
     const attributes = {
       cn: [f.cn],
       objectClass: [f.objectClass],

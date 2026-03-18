@@ -1,6 +1,7 @@
 package com.ldapadmin.ldap;
 
 import com.ldapadmin.entity.DirectoryConnection;
+import com.ldapadmin.exception.LdapOperationException;
 import com.unboundid.ldap.sdk.*;
 import com.unboundid.ldap.sdk.controls.SimplePagedResultsControl;
 import lombok.RequiredArgsConstructor;
@@ -101,6 +102,27 @@ public class LdapBrowseService {
             // If we can't probe, assume it might have children
             return false;
         }
+    }
+
+    /**
+     * Creates a new LDAP entry with the given DN and attributes.
+     */
+    public void createEntry(DirectoryConnection dc, String dn,
+                            Map<String, List<String>> attributes) {
+        List<Attribute> ldapAttrs = new ArrayList<>();
+        attributes.forEach((name, values) ->
+            ldapAttrs.add(new Attribute(name, values.toArray(new String[0]))));
+
+        connectionFactory.withConnection(dc, conn -> {
+            LDAPResult result = conn.add(new AddRequest(dn, ldapAttrs));
+            if (result.getResultCode() != ResultCode.SUCCESS) {
+                throw new LdapOperationException(
+                    "createEntry failed for [" + dn + "]: "
+                    + result.getResultCode() + " — " + result.getDiagnosticMessage());
+            }
+            log.info("Created LDAP entry {}", dn);
+            return null;
+        });
     }
 
     private String extractRdn(String childDn, String parentDn) {

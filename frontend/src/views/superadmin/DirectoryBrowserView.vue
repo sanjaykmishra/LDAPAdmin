@@ -24,6 +24,7 @@
         </div>
         <DnTree
           v-else
+          ref="treeRef"
           :nodes="rootNodes"
           :selected-dn="selectedDn"
           :load-children="loadChildren"
@@ -31,37 +32,55 @@
         />
       </div>
 
-      <!-- Right panel: Entry details (2/3) -->
+      <!-- Right panel: Entry details or create form (2/3) -->
       <div class="w-2/3 bg-white border border-gray-200 rounded-xl overflow-y-auto p-5">
-        <div v-if="!selectedDn" class="text-sm text-gray-400 text-center mt-8">
-          Select an entry from the tree to view its attributes.
-        </div>
-        <div v-else-if="detailLoading" class="text-sm text-gray-400 text-center mt-8">Loading…</div>
-        <template v-else-if="entryDetail">
-          <div class="mb-4">
-            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Distinguished Name</p>
-            <p class="text-sm font-mono text-gray-900 bg-gray-50 px-3 py-2 rounded-lg break-all">{{ entryDetail.dn }}</p>
-          </div>
+        <!-- Create form mode -->
+        <CreateEntryForm
+          v-if="creatingEntry && selectedDirId && selectedDn"
+          :directory-id="selectedDirId"
+          :parent-dn="selectedDn"
+          @created="onEntryCreated"
+          @cancel="creatingEntry = false"
+        />
 
-          <div v-if="Object.keys(entryDetail.attributes).length === 0" class="text-sm text-gray-400">
-            No attributes returned for this entry.
+        <!-- Normal browse mode -->
+        <template v-else>
+          <div v-if="!selectedDn" class="text-sm text-gray-400 text-center mt-8">
+            Select an entry from the tree to view its attributes.
           </div>
-          <table v-else class="w-full text-sm">
-            <thead>
-              <tr class="border-b border-gray-200">
-                <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-48">Attribute</th>
-                <th class="text-left py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Value</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-50">
-              <tr v-for="[attr, values] in sortedAttributes" :key="attr">
-                <td class="py-2 pr-4 text-gray-600 font-mono text-xs align-top">{{ attr }}</td>
-                <td class="py-2 text-gray-900 font-mono text-xs">
-                  <div v-for="(val, i) in values" :key="i" class="break-all">{{ formatValue(val) }}</div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div v-else-if="detailLoading" class="text-sm text-gray-400 text-center mt-8">Loading…</div>
+          <template v-else-if="entryDetail">
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Distinguished Name</p>
+                <p class="text-sm font-mono text-gray-900 bg-gray-50 px-3 py-2 rounded-lg break-all">{{ entryDetail.dn }}</p>
+              </div>
+              <button @click="creatingEntry = true"
+                      class="ml-3 shrink-0 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+                + New Entry
+              </button>
+            </div>
+
+            <div v-if="Object.keys(entryDetail.attributes).length === 0" class="text-sm text-gray-400">
+              No attributes returned for this entry.
+            </div>
+            <table v-else class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-gray-200">
+                  <th class="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-48">Attribute</th>
+                  <th class="text-left py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Value</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-50">
+                <tr v-for="[attr, values] in sortedAttributes" :key="attr">
+                  <td class="py-2 pr-4 text-gray-600 font-mono text-xs align-top">{{ attr }}</td>
+                  <td class="py-2 text-gray-900 font-mono text-xs">
+                    <div v-for="(val, i) in values" :key="i" class="break-all">{{ formatValue(val) }}</div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </template>
         </template>
       </div>
     </div>
@@ -74,6 +93,7 @@ import { useNotificationStore } from '@/stores/notifications'
 import { listDirectories } from '@/api/directories'
 import { browse } from '@/api/browse'
 import DnTree from '@/components/DnTree.vue'
+import CreateEntryForm from '@/components/CreateEntryForm.vue'
 
 const notif = useNotificationStore()
 
@@ -86,6 +106,8 @@ const rootNodes     = ref([])
 const selectedDn    = ref('')
 const detailLoading = ref(false)
 const entryDetail   = ref(null)
+const creatingEntry = ref(false)
+const treeRef       = ref(null)
 
 const sortedAttributes = computed(() => {
   if (!entryDetail.value?.attributes) return []
@@ -145,6 +167,17 @@ async function selectEntry(dn) {
   } finally {
     detailLoading.value = false
   }
+}
+
+async function onEntryCreated(browseResult) {
+  creatingEntry.value = false
+  // The server returned the parent's browse result — use it to refresh the tree
+  if (treeRef.value) {
+    treeRef.value.refreshNode(selectedDn.value, browseResult.children)
+  }
+  // Reload the current entry detail
+  await selectEntry(selectedDn.value)
+  notif.success('Entry created successfully')
 }
 
 function formatValue(val) {

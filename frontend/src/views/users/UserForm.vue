@@ -1,18 +1,9 @@
 <template>
   <div v-if="!isEdit" class="space-y-3">
-    <!-- Parent DN (disabled when populated from realm) -->
-    <FormField
-      label="Parent DN"
-      v-model="local.parentDn"
-      placeholder="ou=people,dc=example,dc=com"
-      required
-      :disabled="!!local.parentDn && !!userFormConfig"
-    />
-
-    <!-- RDN attribute (first field after Parent DN) -->
+    <!-- RDN attribute (first field — before DN so it feeds the computed DN) -->
     <FormField
       v-if="rdnAttr"
-      :label="rdnAttr.customLabel || rdnAttr.attributeName"
+      :label="(rdnAttr.customLabel || rdnAttr.attributeName) + ' (RDN)'"
       v-model="local.rdnValue"
       :type="mapInputType(rdnAttr.inputType)"
       required
@@ -22,8 +13,17 @@
     <!-- Fallback RDN fields when no user form config -->
     <div v-if="!userFormConfig" class="grid grid-cols-2 gap-3">
       <FormField label="RDN Attribute" v-model="local.rdnAttribute" placeholder="uid" required />
-      <FormField label="RDN Value" v-model="local.rdnValue" placeholder="jsmith" required />
+      <FormField label="RDN Value (RDN)" v-model="local.rdnValue" placeholder="jsmith" required />
     </div>
+
+    <!-- Computed DN (auto-populated from RDN + base DN) -->
+    <FormField
+      label="DN"
+      :model-value="computedDn"
+      placeholder="uid=jsmith,ou=people,dc=example,dc=com"
+      required
+      disabled
+    />
 
     <!-- Dynamic fields from user form config (non-RDN attributes) -->
     <template v-if="userFormConfig?.attributeConfigs?.length">
@@ -173,6 +173,15 @@ function mapInputType(inputType) {
 const rdnAttr = computed(() => {
   if (!props.userFormConfig?.attributeConfigs) return null
   return props.userFormConfig.attributeConfigs.find(a => a.rdn) || null
+})
+
+/** Computed full DN based on RDN attribute, RDN value, and parent DN. */
+const computedDn = computed(() => {
+  const attr = rdnAttr.value?.attributeName || local.rdnAttribute || ''
+  const val = local.rdnValue || ''
+  const base = local.parentDn || ''
+  if (!attr || !val || !base) return ''
+  return `${attr}=${val},${base}`
 })
 
 /** All non-RDN attributes, preserving the order defined in the user form config. */
