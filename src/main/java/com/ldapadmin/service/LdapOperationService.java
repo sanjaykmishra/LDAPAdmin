@@ -139,6 +139,19 @@ public class LdapOperationService {
         return result;
     }
 
+    public LdapEntryResponse updateGroup(UUID directoryId, AuthPrincipal principal,
+                                         String dn, UpdateEntryRequest req) {
+        DirectoryConnection dc = loadDirectory(directoryId, principal);
+
+        List<Modification> mods = toModifications(req);
+        groupService.updateGroup(dc, dn, mods);
+        LdapEntryResponse result = LdapEntryResponse.from(groupService.getGroup(dc, dn));
+        auditService.record(principal, directoryId, AuditAction.GROUP_UPDATE, dn,
+                Map.of("modifiedAttributes", req.modifications().stream()
+                        .map(AttributeModification::attribute).toList()));
+        return result;
+    }
+
     public void deleteUser(UUID directoryId, AuthPrincipal principal, String dn) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
 

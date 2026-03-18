@@ -11,6 +11,9 @@ export const getGroup = (dirId, dn) =>
 export const createGroup = (dirId, data) =>
   client.post(base(dirId), data)
 
+export const updateGroup = (dirId, dn, data) =>
+  client.put(`${base(dirId)}/entry`, data, { params: { dn } })
+
 export const deleteGroup = (dirId, dn) =>
   client.delete(`${base(dirId)}/entry`, { params: { dn } })
 
