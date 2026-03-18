@@ -190,6 +190,14 @@ public class LdapOperationService {
                 Map.of("newParentDn", req.newParentDn()));
     }
 
+    public void resetPassword(UUID directoryId, AuthPrincipal principal,
+                              String dn, String newPassword) {
+        DirectoryConnection dc = loadDirectory(directoryId, principal);
+
+        userService.resetPassword(dc, dn, newPassword);
+        auditService.record(principal, directoryId, AuditAction.PASSWORD_RESET, dn, null);
+    }
+
     // ── Groups — read ─────────────────────────────────────────────────────────
 
     public List<LdapEntryResponse> searchGroups(UUID directoryId, AuthPrincipal principal,

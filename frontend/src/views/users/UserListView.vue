@@ -47,6 +47,7 @@
         <div class="flex gap-3 justify-end whitespace-nowrap">
           <button @click="openEdit(row)" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Edit</button>
           <button @click="toggleEnabled(row)" class="text-xs font-medium" :class="row.enabled !== false ? 'text-amber-600 hover:text-amber-800' : 'text-green-600 hover:text-green-800'">{{ row.enabled !== false ? 'Disable' : 'Enable' }}</button>
+          <button @click="openResetPassword(row)" class="text-purple-600 hover:text-purple-800 text-xs font-medium">Password</button>
           <button @click="openMove(row)" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Move</button>
           <button @click="confirmDelete(row)" class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
         </div>
@@ -98,12 +99,36 @@
       </template>
     </AppModal>
 
+    <!-- Reset Password modal -->
+    <AppModal v-model="showResetPassword" title="Reset Password" size="sm">
+      <div class="space-y-4">
+        <p class="text-sm text-gray-600">Reset password for:</p>
+        <p class="text-sm font-mono text-gray-900 bg-gray-50 px-3 py-2 rounded-lg break-all">{{ resetPwTarget?.dn }}</p>
+        <FormField label="New Password" v-model="resetPwNew" type="password" required />
+        <FormField label="Confirm Password" v-model="resetPwConfirm" type="password" required />
+        <div v-if="resetPwNew" class="flex items-center gap-2">
+          <div class="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div class="h-full rounded-full transition-all" :class="pwStrengthColor" :style="{ width: pwStrengthPct + '%' }"></div>
+          </div>
+          <span class="text-xs font-medium" :class="pwStrengthTextColor">{{ pwStrengthLabel }}</span>
+        </div>
+        <p v-if="resetPwConfirm && resetPwNew !== resetPwConfirm" class="text-xs text-red-600">Passwords do not match.</p>
+        <p v-if="resetPwError" class="text-sm text-red-600">{{ resetPwError }}</p>
+      </div>
+      <template #footer>
+        <button @click="showResetPassword = false" class="btn-secondary">Cancel</button>
+        <button @click="doResetPassword" :disabled="saving || !resetPwNew || resetPwNew !== resetPwConfirm" class="btn-primary">
+          {{ saving ? 'Resetting…' : 'Reset Password' }}
+        </button>
+      </template>
+    </AppModal>
+
     <ConfirmDialog v-model="showDelete" title="Delete User" :message="`Delete '${deleteTarget?.dn}'?`" confirm-label="Delete" danger @confirm="doDelete" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useNotificationStore } from '@/stores/notifications'
 import { useApi } from '@/composables/useApi'
@@ -135,7 +160,47 @@ const editingDn      = ref(null)
 const deleteTarget   = ref(null)
 const moveTarget     = ref(null)
 const newParentDn    = ref('')
-const saving         = ref(false)
+const saving             = ref(false)
+const showResetPassword  = ref(false)
+const resetPwTarget      = ref(null)
+const resetPwNew         = ref('')
+const resetPwConfirm     = ref('')
+const resetPwError       = ref('')
+
+function computePasswordStrength(pw) {
+  if (!pw) return 0
+  let score = 0
+  if (pw.length >= 8) score++
+  if (pw.length >= 12) score++
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) score++
+  if (/\d/.test(pw)) score++
+  if (/[^a-zA-Z0-9]/.test(pw)) score++
+  return score
+}
+
+const pwStrength = computed(() => computePasswordStrength(resetPwNew.value))
+const pwStrengthPct = computed(() => Math.min(100, pwStrength.value * 20))
+const pwStrengthLabel = computed(() => {
+  const s = pwStrength.value
+  if (s <= 1) return 'Weak'
+  if (s <= 2) return 'Fair'
+  if (s <= 3) return 'Good'
+  return 'Strong'
+})
+const pwStrengthColor = computed(() => {
+  const s = pwStrength.value
+  if (s <= 1) return 'bg-red-500'
+  if (s <= 2) return 'bg-amber-500'
+  if (s <= 3) return 'bg-blue-500'
+  return 'bg-green-500'
+})
+const pwStrengthTextColor = computed(() => {
+  const s = pwStrength.value
+  if (s <= 1) return 'text-red-600'
+  if (s <= 2) return 'text-amber-600'
+  if (s <= 3) return 'text-blue-600'
+  return 'text-green-600'
+})
 
 const cols = [
   { key: 'dn',   label: 'DN' },
@@ -278,6 +343,28 @@ async function doMove() {
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
   } finally { saving.value = false }
+}
+
+function openResetPassword(row) {
+  resetPwTarget.value  = row
+  resetPwNew.value     = ''
+  resetPwConfirm.value = ''
+  resetPwError.value   = ''
+  showResetPassword.value = true
+}
+
+async function doResetPassword() {
+  resetPwError.value = ''
+  saving.value = true
+  try {
+    await usersApi.resetPassword(dirId, resetPwTarget.value.dn, resetPwNew.value)
+    notif.success('Password reset successfully')
+    showResetPassword.value = false
+  } catch (e) {
+    resetPwError.value = e.response?.data?.detail || e.message
+  } finally {
+    saving.value = false
+  }
 }
 
 function confirmDelete(row) { deleteTarget.value = row; showDelete.value = true }
