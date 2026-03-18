@@ -175,7 +175,7 @@ class UserFormServiceTest {
         f.setObjectClassNames(new ArrayList<>(List.of("inetOrgPerson")));
         f.setFormName("Test");
         when(formRepo.findAll()).thenReturn(List.of(f));
-        when(configRepo.findAllByUserFormId(formId)).thenReturn(List.of());
+        when(configRepo.findAllByUserFormIdOrderByDisplayOrderAsc(formId)).thenReturn(List.of());
 
         List<UserFormResponse> result = service.list();
 

@@ -34,14 +34,14 @@ public class UserFormService {
     @Transactional(readOnly = true)
     public List<UserFormResponse> list() {
         return formRepo.findAll().stream()
-                .map(f -> UserFormResponse.from(f, configRepo.findAllByUserFormId(f.getId())))
+                .map(f -> UserFormResponse.from(f, configRepo.findAllByUserFormIdOrderByDisplayOrderAsc(f.getId())))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public UserFormResponse get(UUID id) {
         UserForm form = requireForm(id);
-        return UserFormResponse.from(form, configRepo.findAllByUserFormId(id));
+        return UserFormResponse.from(form, configRepo.findAllByUserFormIdOrderByDisplayOrderAsc(id));
     }
 
     @Transactional
@@ -110,7 +110,9 @@ public class UserFormService {
         if (entries == null || entries.isEmpty()) {
             return List.of();
         }
-        List<UserFormAttributeConfig> configs = entries.stream().map(e -> {
+        List<UserFormAttributeConfig> configs = new ArrayList<>();
+        for (int i = 0; i < entries.size(); i++) {
+            UserFormRequest.AttributeConfigEntry e = entries.get(i);
             UserFormAttributeConfig c = new UserFormAttributeConfig();
             c.setUserForm(form);
             c.setAttributeName(e.attributeName());
@@ -119,8 +121,9 @@ public class UserFormService {
             c.setEditableOnCreate(e.editableOnCreate());
             c.setInputType(InputType.valueOf(e.inputType()));
             c.setRdn(e.rdn());
-            return c;
-        }).toList();
+            c.setDisplayOrder(i);
+            configs.add(c);
+        }
         return configRepo.saveAll(configs);
     }
 }

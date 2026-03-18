@@ -25,18 +25,6 @@
       <FormField label="RDN Value" v-model="local.rdnValue" placeholder="jsmith" required />
     </div>
 
-    <!-- Object Classes (disabled, from user form definition) -->
-    <div v-if="userFormConfig?.objectClassNames?.length">
-      <label class="block text-sm font-medium text-gray-700 mb-1">Object Classes</label>
-      <div class="flex flex-wrap gap-1">
-        <span
-          v-for="oc in userFormConfig.objectClassNames"
-          :key="oc"
-          class="inline-block text-xs bg-purple-50 text-purple-700 rounded px-2 py-0.5 font-mono"
-        >{{ oc }}</span>
-      </div>
-    </div>
-
     <!-- Dynamic fields from user form config (non-RDN attributes) -->
     <template v-if="userFormConfig?.attributeConfigs?.length">
       <template v-for="attr in nonRdnAttributes" :key="attr.id || attr.attributeName">
@@ -46,7 +34,6 @@
           :type="mapInputType(attr.inputType)"
           :required="attr.requiredOnCreate"
           :disabled="!attr.editableOnCreate"
-          :placeholder="attr.attributeName"
         />
       </template>
     </template>
@@ -188,15 +175,10 @@ const rdnAttr = computed(() => {
   return props.userFormConfig.attributeConfigs.find(a => a.rdn) || null
 })
 
-/** All non-RDN attributes, with required fields first then alphabetical. */
+/** All non-RDN attributes, preserving the order defined in the user form config. */
 const nonRdnAttributes = computed(() => {
   if (!props.userFormConfig?.attributeConfigs) return []
-  return props.userFormConfig.attributeConfigs
-    .filter(a => !a.rdn)
-    .sort((a, b) => {
-      if (a.requiredOnCreate !== b.requiredOnCreate) return a.requiredOnCreate ? -1 : 1
-      return a.attributeName.localeCompare(b.attributeName)
-    })
+  return props.userFormConfig.attributeConfigs.filter(a => !a.rdn && a.attributeName.toLowerCase() !== 'objectclass')
 })
 
 let syncing = false
