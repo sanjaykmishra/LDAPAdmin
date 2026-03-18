@@ -6,7 +6,16 @@
         <h1 class="text-2xl font-bold text-gray-900">Users</h1>
         <p class="text-sm text-gray-500 mt-1">Directory: <code class="text-xs bg-gray-100 px-1 rounded">{{ dirId }}</code></p>
       </div>
-      <button @click="openCreate" class="btn-primary">+ New User</button>
+      <div class="flex items-center gap-3">
+        <div v-if="allRealms.length > 1" class="flex items-center gap-2">
+          <label class="text-sm text-gray-600 font-medium">Realm:</label>
+          <select v-model="selectedRealmId" @change="onRealmChange"
+            class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option v-for="r in allRealms" :key="r.id" :value="r.id">{{ r.name }}</option>
+          </select>
+        </div>
+        <button @click="openCreate" class="btn-primary">+ New User</button>
+      </div>
     </div>
 
     <!-- Search bar -->
@@ -135,6 +144,8 @@ const cols = [
   { key: 'enabled', label: 'Status' },
 ]
 
+const allRealms       = ref([])
+const selectedRealmId = ref(route.query.realmId || '')
 const realmData       = ref(null)
 const availableForms  = ref([])
 const userFormConfig  = ref(null)
@@ -156,7 +167,7 @@ async function load() {
   await call(async () => {
     const params = {
       filter: filterText.value || undefined,
-      baseDn: baseDnOverride.value || undefined,
+      baseDn: baseDnOverride.value || realmData.value?.userBaseDn || undefined,
       limit:  limit.value,
     }
     const { data } = await usersApi.searchUsers(dirId, params)
@@ -276,20 +287,38 @@ async function doDelete() {
   await load()
 }
 
+function selectRealm(realms) {
+  // Use realmId from query param if it matches, otherwise first realm
+  const match = selectedRealmId.value
+    ? realms.find(r => r.id === selectedRealmId.value)
+    : null
+  const selected = match || realms[0]
+  selectedRealmId.value = selected.id
+  realmData.value = selected
+  availableForms.value = selected.userForms || []
+}
+
 async function loadRealmAndForms() {
   try {
     const { data: realms } = await listRealms(dirId)
-    if (realms.length) {
-      realmData.value = realms[0]
-      // Collect available user forms from the realm
-      availableForms.value = realms[0].userForms || []
-    }
+    allRealms.value = realms
+    if (realms.length) selectRealm(realms)
   } catch { /* realm loading is best-effort */ }
 }
 
-onMounted(() => {
+function onRealmChange() {
+  const realm = allRealms.value.find(r => r.id === selectedRealmId.value)
+  if (realm) {
+    realmData.value = realm
+    availableForms.value = realm.userForms || []
+  }
+  limit.value = PAGE_SIZE
   load()
-  loadRealmAndForms()
+}
+
+onMounted(async () => {
+  await loadRealmAndForms()
+  load()
 })
 </script>
 

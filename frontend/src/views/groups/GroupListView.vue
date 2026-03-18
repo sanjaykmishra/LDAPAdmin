@@ -2,7 +2,16 @@
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Groups</h1>
-      <button @click="openCreate" class="btn-primary">+ New Group</button>
+      <div class="flex items-center gap-3">
+        <div v-if="allRealms.length > 1" class="flex items-center gap-2">
+          <label class="text-sm text-gray-600 font-medium">Realm:</label>
+          <select v-model="selectedRealmId" @change="onRealmChange"
+            class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option v-for="r in allRealms" :key="r.id" :value="r.id">{{ r.name }}</option>
+          </select>
+        </div>
+        <button @click="openCreate" class="btn-primary">+ New Group</button>
+      </div>
     </div>
 
     <!-- Search -->
@@ -97,6 +106,8 @@ const deleteTarget  = ref(null)
 const members       = ref([])
 const newMemberDn   = ref('')
 const saving        = ref(false)
+const allRealms     = ref([])
+const selectedRealmId = ref(route.query.realmId || '')
 const realmData     = ref(null)
 const createForm    = ref({ parentDn: '', cn: '', objectClass: 'groupOfNames', owner: '', description: '' })
 const editForm      = ref({ owner: '', description: '' })
@@ -110,7 +121,10 @@ const cols = [
 
 async function load() {
   await call(async () => {
-    const { data } = await groupsApi.searchGroups(dirId, { filter: filterText.value || undefined })
+    const { data } = await groupsApi.searchGroups(dirId, {
+      filter: filterText.value || undefined,
+      baseDn: realmData.value?.groupBaseDn || undefined,
+    })
     const entries = Array.isArray(data) ? data : (data?.entries || [])
     groups.value = entries.map(e => ({
       dn:          e.dn,
@@ -208,16 +222,32 @@ async function doDelete() {
   await load()
 }
 
+function selectRealm(realms) {
+  const match = selectedRealmId.value
+    ? realms.find(r => r.id === selectedRealmId.value)
+    : null
+  const selected = match || realms[0]
+  selectedRealmId.value = selected.id
+  realmData.value = selected
+}
+
 async function loadRealm() {
   try {
     const { data: realms } = await listRealms(dirId)
-    if (realms.length) realmData.value = realms[0]
+    allRealms.value = realms
+    if (realms.length) selectRealm(realms)
   } catch { /* best-effort */ }
 }
 
-onMounted(() => {
+function onRealmChange() {
+  const realm = allRealms.value.find(r => r.id === selectedRealmId.value)
+  if (realm) realmData.value = realm
   load()
-  loadRealm()
+}
+
+onMounted(async () => {
+  await loadRealm()
+  load()
 })
 </script>
 
