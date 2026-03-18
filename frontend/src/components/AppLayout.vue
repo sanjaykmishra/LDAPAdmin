@@ -45,23 +45,23 @@
         <!-- Admin navigation (directory-scoped) -->
         <template v-if="!auth.isSuperadmin">
           <template v-if="currentDirId">
-            <RouterLink :to="`/directories/${currentDirId}/users`" class="nav-item">
+            <RouterLink :to="{ path: `/directories/${currentDirId}/users`, query: { realmId: pickerValue } }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="6" r="3.25"/><path d="M3.5 17.5c0-3.59 2.91-6.5 6.5-6.5s6.5 2.91 6.5 6.5"/></svg>
               Users
             </RouterLink>
-            <RouterLink :to="`/directories/${currentDirId}/groups`" class="nav-item">
+            <RouterLink :to="{ path: `/directories/${currentDirId}/groups`, query: { realmId: pickerValue } }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="6" r="2.75"/><circle cx="13.5" cy="6" r="2.75"/><path d="M1.5 17c0-3.04 2.46-5.5 5.5-5.5 1.26 0 2.42.42 3.35 1.14M12 11.64A5.48 5.48 0 0 1 18.5 17"/></svg>
               Groups
             </RouterLink>
-            <RouterLink :to="`/directories/${currentDirId}/audit`" class="nav-item">
+            <RouterLink :to="{ path: `/directories/${currentDirId}/audit`, query: { realmId: pickerValue } }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><path d="M7 6h6M7 10h6M7 14h3"/></svg>
               Audit Log
             </RouterLink>
-            <RouterLink :to="`/directories/${currentDirId}/bulk`" class="nav-item">
+            <RouterLink :to="{ path: `/directories/${currentDirId}/bulk`, query: { realmId: pickerValue } }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v12M10 2l4 4M10 2 6 6"/><path d="M3 13v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
               Bulk Import/Export
             </RouterLink>
-            <RouterLink :to="`/directories/${currentDirId}/reports`" class="nav-item">
+            <RouterLink :to="{ path: `/directories/${currentDirId}/reports`, query: { realmId: pickerValue } }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V10M10 16V4M15 16v-4"/></svg>
               Reports
             </RouterLink>
@@ -184,7 +184,7 @@ const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports']
 watch(currentDirId, (newDirId) => {
   if (!newDirId || newDirId === route.params.dirId) return
   const section = dirSections.includes(route.name) ? route.name : 'users'
-  router.push(`/directories/${newDirId}/${section}`)
+  router.push({ path: `/directories/${newDirId}/${section}`, query: { realmId: pickerValue.value } })
 })
 
 async function handleNoRealmsOk() {
