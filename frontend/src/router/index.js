@@ -111,6 +111,12 @@ const router = createRouter({
           component: () => import('@/views/superadmin/DirectoryBrowserView.vue'),
           meta: { requiresSuperadmin: true },
         },
+        {
+          path: 'superadmin/search',
+          name: 'ldapSearch',
+          component: () => import('@/views/superadmin/LdapSearchView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
       ],
     },
 
