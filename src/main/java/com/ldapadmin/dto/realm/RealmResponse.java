@@ -1,7 +1,6 @@
 package com.ldapadmin.dto.realm;
 
 import com.ldapadmin.entity.Realm;
-import com.ldapadmin.entity.RealmAuxiliaryObjectclass;
 import com.ldapadmin.entity.RealmObjectclass;
 
 import java.time.OffsetDateTime;
@@ -16,25 +15,21 @@ public record RealmResponse(
         String name,
         String userBaseDn,
         String groupBaseDn,
-        String primaryUserObjectclass,
         int displayOrder,
-        UUID userFormId,
-        List<AuxEntry> auxiliaryObjectclasses,
+        List<UserFormEntry> userForms,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
 
-    public record AuxEntry(UUID id, String objectclassName, int displayOrder) {
-        public static AuxEntry from(RealmAuxiliaryObjectclass aux) {
-            return new AuxEntry(aux.getId(), aux.getObjectclassName(), aux.getDisplayOrder());
-        }
-    }
+    public record UserFormEntry(UUID id, String formName, String objectClassName) {}
 
     public static RealmResponse from(Realm r, List<RealmObjectclass> realmOcs) {
-        UUID formId = realmOcs.stream()
+        List<UserFormEntry> forms = realmOcs.stream()
                 .filter(oc -> oc.getUserForm() != null)
-                .map(oc -> oc.getUserForm().getId())
-                .findFirst()
-                .orElse(null);
+                .map(oc -> new UserFormEntry(
+                        oc.getUserForm().getId(),
+                        oc.getUserForm().getFormName(),
+                        oc.getUserForm().getObjectClassName()))
+                .toList();
 
         return new RealmResponse(
                 r.getId(),
@@ -43,10 +38,8 @@ public record RealmResponse(
                 r.getName(),
                 r.getUserBaseDn(),
                 r.getGroupBaseDn(),
-                r.getPrimaryUserObjectclass(),
                 r.getDisplayOrder(),
-                formId,
-                r.getAuxiliaryObjectclasses().stream().map(AuxEntry::from).toList(),
+                forms,
                 r.getCreatedAt(),
                 r.getUpdatedAt());
     }

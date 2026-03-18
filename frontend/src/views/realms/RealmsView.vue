@@ -20,9 +20,7 @@
             <th class="px-4 py-3 text-left font-medium text-gray-500">Name</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">User Base DN</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Group Base DN</th>
-            <th class="px-4 py-3 text-left font-medium text-gray-500">Primary Objectclass</th>
-            <th class="px-4 py-3 text-left font-medium text-gray-500">User Form</th>
-            <th class="px-4 py-3 text-left font-medium text-gray-500">Aux Classes</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-500">User Forms</th>
             <th class="px-4 py-3"></th>
           </tr>
         </thead>
@@ -32,15 +30,14 @@
             <td class="px-4 py-3 font-medium text-gray-900">{{ r.name }}</td>
             <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ r.userBaseDn }}</td>
             <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ r.groupBaseDn }}</td>
-            <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ r.primaryUserObjectclass }}</td>
-            <td class="px-4 py-3 text-gray-600 text-xs">{{ userFormLabel(r.userFormId) }}</td>
             <td class="px-4 py-3">
               <div class="flex flex-wrap gap-1">
                 <span
-                  v-for="aux in r.auxiliaryObjectclasses"
-                  :key="aux.id"
+                  v-for="uf in r.userForms"
+                  :key="uf.id"
                   class="text-xs bg-blue-50 text-blue-700 rounded px-1.5 py-0.5"
-                >{{ aux.objectclassName }}</span>
+                >{{ uf.formName }} ({{ uf.objectClassName }})</span>
+                <span v-if="!r.userForms?.length" class="text-xs text-gray-400">—</span>
               </div>
             </td>
             <td class="px-4 py-3 text-right whitespace-nowrap">
@@ -72,45 +69,29 @@
           <FormField label="User Base DN" v-model="form.userBaseDn" required placeholder="ou=people,dc=example,dc=com" />
           <FormField label="Group Base DN" v-model="form.groupBaseDn" required placeholder="ou=groups,dc=example,dc=com" />
         </div>
-        <div class="grid grid-cols-2 gap-4">
-          <FormField label="Primary User Objectclass" v-model="form.primaryUserObjectclass" required placeholder="inetOrgPerson" />
-          <FormField label="Display Order" v-model.number="form.displayOrder" type="number" placeholder="0" />
-        </div>
+        <FormField label="Display Order" v-model.number="form.displayOrder" type="number" placeholder="0" />
 
-        <!-- User Form picker -->
+        <!-- User Forms multi-select -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">User Form</label>
-          <select v-model="form.userFormId" class="input w-full">
-            <option :value="null">— None —</option>
-            <option v-for="uf in userForms" :key="uf.id" :value="uf.id">
-              {{ uf.formName }} ({{ uf.objectClassName }})
-            </option>
-          </select>
-          <p class="text-xs text-gray-400 mt-1">The form definition used to render user create/edit fields in this realm</p>
-        </div>
-
-        <!-- Auxiliary objectclasses -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Auxiliary Objectclasses</label>
-          <div v-for="(aux, idx) in form.auxiliaryObjectclasses" :key="idx" class="flex gap-2 mb-2">
-            <input
-              v-model="aux.objectclassName"
-              placeholder="e.g. posixAccount"
-              class="input flex-1"
-            />
-            <input
-              v-model.number="aux.displayOrder"
-              type="number"
-              placeholder="Order"
-              class="input w-20"
-            />
-            <button type="button" @click="form.auxiliaryObjectclasses.splice(idx, 1)" class="text-red-500 hover:text-red-700 text-sm px-2">Remove</button>
+          <label class="block text-sm font-medium text-gray-700 mb-1">User Forms</label>
+          <div class="border border-gray-300 rounded-lg p-2 max-h-48 overflow-y-auto space-y-1">
+            <label
+              v-for="uf in userForms"
+              :key="uf.id"
+              class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                :value="uf.id"
+                v-model="form.userFormIds"
+                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span class="text-sm text-gray-800">{{ uf.formName }}</span>
+              <span class="text-xs text-gray-400">({{ uf.objectClassName }})</span>
+            </label>
+            <p v-if="userForms.length === 0" class="text-xs text-gray-400 px-2 py-1">No user forms available. Create one first.</p>
           </div>
-          <button
-            type="button"
-            @click="form.auxiliaryObjectclasses.push({ objectclassName: '', displayOrder: form.auxiliaryObjectclasses.length })"
-            class="text-blue-600 hover:text-blue-800 text-xs font-medium"
-          >+ Add auxiliary objectclass</button>
+          <p class="text-xs text-gray-400 mt-1">Select the user forms available for creating users in this realm</p>
         </div>
 
         <div class="flex justify-end gap-2 pt-2">
@@ -123,7 +104,7 @@
     <!-- Delete confirm -->
     <ConfirmDialog
       v-if="deleteTarget"
-      :message="`Delete realm '${deleteTarget.name}'? This will remove all associated objectclass configuration.`"
+      :message="`Delete realm '${deleteTarget.name}'? This will remove all associated configuration.`"
       @confirm="doDelete"
       @cancel="deleteTarget = null"
     />
@@ -159,17 +140,9 @@ function emptyForm() {
     name: '',
     userBaseDn: '',
     groupBaseDn: '',
-    primaryUserObjectclass: 'inetOrgPerson',
     displayOrder: 0,
-    userFormId: null,
-    auxiliaryObjectclasses: [],
+    userFormIds: [],
   }
-}
-
-function userFormLabel(formId) {
-  if (!formId) return '—'
-  const uf = userForms.value.find(f => f.id === formId)
-  return uf ? `${uf.formName} (${uf.objectClassName})` : formId
 }
 
 async function load() {
@@ -205,13 +178,8 @@ function openEdit(r) {
     name: r.name,
     userBaseDn: r.userBaseDn,
     groupBaseDn: r.groupBaseDn,
-    primaryUserObjectclass: r.primaryUserObjectclass,
     displayOrder: r.displayOrder,
-    userFormId: r.userFormId || null,
-    auxiliaryObjectclasses: (r.auxiliaryObjectclasses || []).map(a => ({
-      objectclassName: a.objectclassName,
-      displayOrder: a.displayOrder,
-    })),
+    userFormIds: (r.userForms || []).map(uf => uf.id),
   }
   showModal.value = true
 }
@@ -220,11 +188,18 @@ async function save() {
   saving.value = true
   try {
     const targetDirId = form.value.directoryId
+    const payload = {
+      name: form.value.name,
+      userBaseDn: form.value.userBaseDn,
+      groupBaseDn: form.value.groupBaseDn,
+      displayOrder: form.value.displayOrder,
+      userFormIds: form.value.userFormIds,
+    }
     if (editing.value) {
-      await updateRealm(targetDirId, editing.value, form.value)
+      await updateRealm(targetDirId, editing.value, payload)
       notif.success('Realm updated')
     } else {
-      await createRealm(targetDirId, form.value)
+      await createRealm(targetDirId, payload)
       notif.success('Realm created')
     }
     showModal.value = false

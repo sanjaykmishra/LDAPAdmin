@@ -4,6 +4,8 @@ import com.ldapadmin.dto.realm.RealmRequest;
 import com.ldapadmin.dto.realm.RealmResponse;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.Realm;
+import com.ldapadmin.entity.RealmObjectclass;
+import com.ldapadmin.entity.UserForm;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.repository.RealmObjectclassRepository;
@@ -112,7 +114,7 @@ class RealmServiceTest {
     }
 
     @Test
-    void create_withAuxiliaryObjectclasses_savedToo() {
+    void create_withUserForms_linksMultipleForms() {
         DirectoryConnection dir = mockDirectory();
         when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
         when(realmRepo.save(any(Realm.class))).thenAnswer(inv -> {
@@ -121,15 +123,26 @@ class RealmServiceTest {
             return r;
         });
 
+        UUID formId1 = UUID.randomUUID();
+        UUID formId2 = UUID.randomUUID();
+        UserForm form1 = new UserForm();
+        form1.setId(formId1);
+        form1.setFormName("Person Form");
+        form1.setObjectClassName("inetOrgPerson");
+        UserForm form2 = new UserForm();
+        form2.setId(formId2);
+        form2.setFormName("Service Account Form");
+        form2.setObjectClassName("account");
+        when(userFormRepo.findById(formId1)).thenReturn(Optional.of(form1));
+        when(userFormRepo.findById(formId2)).thenReturn(Optional.of(form2));
+
         RealmRequest req = new RealmRequest(
                 "employees", "ou=people,dc=corp,dc=com", "ou=groups,dc=corp,dc=com",
-                "inetOrgPerson", 1, null,
-                List.of(new RealmRequest.AuxEntry("shadowAccount", 1)));
+                0, List.of(formId1, formId2));
 
-        RealmResponse resp = service.create(dirId, req);
+        service.create(dirId, req);
 
-        assertThat(resp.auxiliaryObjectclasses()).hasSize(1);
-        assertThat(resp.auxiliaryObjectclasses().get(0).objectclassName()).isEqualTo("shadowAccount");
+        verify(realmOcRepo, times(2)).save(any(RealmObjectclass.class));
     }
 
     @Test
@@ -143,7 +156,7 @@ class RealmServiceTest {
     // ── update ────────────────────────────────────────────────────────────────
 
     @Test
-    void update_replacesFieldsAndAuxiliary() {
+    void update_replacesFields() {
         DirectoryConnection dir = mockDirectory();
         Realm existing = mockRealm(dir);
         when(realmRepo.findByIdAndDirectoryId(realmId, dirId)).thenReturn(Optional.of(existing));
@@ -151,7 +164,7 @@ class RealmServiceTest {
 
         RealmRequest req = new RealmRequest(
                 "renamed", "ou=staff,dc=corp,dc=com", "ou=teams,dc=corp,dc=com",
-                "organizationalPerson", 2, null, List.of());
+                2, List.of());
 
         RealmResponse resp = service.update(dirId, realmId, req);
 
@@ -203,7 +216,6 @@ class RealmServiceTest {
         r.setName("users");
         r.setUserBaseDn("ou=people,dc=corp,dc=com");
         r.setGroupBaseDn("ou=groups,dc=corp,dc=com");
-        r.setPrimaryUserObjectclass("inetOrgPerson");
         r.setDisplayOrder(0);
         return r;
     }
@@ -213,9 +225,7 @@ class RealmServiceTest {
                 name,
                 "ou=people,dc=corp,dc=com",
                 "ou=groups,dc=corp,dc=com",
-                "inetOrgPerson",
                 0,
-                null,
                 null);
     }
 }
