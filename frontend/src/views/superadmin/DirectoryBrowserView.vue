@@ -72,7 +72,7 @@
                   <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
                 </button>
                 <div v-if="showActionsMenu"
-                     class="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1">
+                     class="absolute right-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1">
                   <button @click="creatingEntry = true; showActionsMenu = false"
                           class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                     New Entry
@@ -89,6 +89,20 @@
                           class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                     Move Entry
                   </button>
+                  <div class="border-t border-gray-100 my-1"></div>
+                  <button @click="doExportLdif('base'); showActionsMenu = false"
+                          class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                    Export LDIF — This Entry
+                  </button>
+                  <button @click="doExportLdif('one'); showActionsMenu = false"
+                          class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                    Export LDIF — Direct Children
+                  </button>
+                  <button @click="doExportLdif('sub'); showActionsMenu = false"
+                          class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                    Export LDIF — Entire Subtree
+                  </button>
+                  <div class="border-t border-gray-100 my-1"></div>
                   <button @click="showDeleteConfirm = true; deleteRecursive = false; showActionsMenu = false"
                           class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                     Delete Entry
@@ -205,7 +219,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
 import { listDirectories } from '@/api/directories'
-import { browse, deleteEntry, moveEntry, renameEntry } from '@/api/browse'
+import { browse, deleteEntry, moveEntry, renameEntry, exportLdif } from '@/api/browse'
 import DnTree from '@/components/DnTree.vue'
 import CreateEntryForm from '@/components/CreateEntryForm.vue'
 import EditEntryForm from '@/components/EditEntryForm.vue'
@@ -416,6 +430,20 @@ async function onEntryCreated(browseResult) {
   // Reload the current entry detail
   await selectEntry(selectedDn.value)
   notif.success('Entry created successfully')
+}
+
+async function doExportLdif(scope) {
+  try {
+    const { data } = await exportLdif(selectedDirId.value, selectedDn.value, scope)
+    const url = URL.createObjectURL(data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'export.ldif'
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  }
 }
 
 function formatValue(val) {

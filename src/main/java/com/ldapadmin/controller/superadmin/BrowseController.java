@@ -11,12 +11,16 @@ import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.ldap.LdapBrowseService;
 import com.ldapadmin.ldap.LdapBrowseService.BrowseResult;
+import com.ldapadmin.ldap.LdapBrowseService.SearchEntry;
 import com.ldapadmin.ldap.LdapSchemaService;
 import com.ldapadmin.ldap.LdapSchemaService.ObjectClassAttributes;
+import com.ldapadmin.ldap.LdifService;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.service.AuditService;
 import com.unboundid.ldap.sdk.Modification;
 import com.unboundid.ldap.sdk.ModificationType;
+import com.unboundid.ldap.sdk.SearchScope;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -24,6 +28,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -47,6 +52,7 @@ public class BrowseController {
 
     private final LdapBrowseService browseService;
     private final LdapSchemaService schemaService;
+    private final LdifService ldifService;
     private final AuditService auditService;
     private final DirectoryConnectionRepository dirRepo;
 
@@ -147,6 +153,56 @@ public class BrowseController {
             case REPLACE -> ModificationType.REPLACE;
             case DELETE -> ModificationType.DELETE;
         };
+    }
+
+    // ── Search ────────────────────────────────────────────────────────────────
+
+    @GetMapping("/search")
+    public List<SearchEntry> searchEntries(
+            @PathVariable UUID directoryId,
+            @RequestParam(required = false) String baseDn,
+            @RequestParam(defaultValue = "sub") String scope,
+            @RequestParam(required = false) String filter,
+            @RequestParam(required = false) String attributes,
+            @RequestParam(defaultValue = "100") int limit) {
+        DirectoryConnection dc = loadDirectory(directoryId);
+
+        SearchScope searchScope = switch (scope.toLowerCase()) {
+            case "base" -> SearchScope.BASE;
+            case "one"  -> SearchScope.ONE;
+            default     -> SearchScope.SUB;
+        };
+
+        int safeLimit = Math.max(1, Math.min(limit, 1000));
+        List<String> attrList = (attributes == null || attributes.isBlank())
+                ? List.of() : List.of(attributes.split(","));
+
+        return browseService.searchEntries(dc, baseDn, searchScope, filter, attrList, safeLimit);
+    }
+
+    // ── LDIF Export ────────────────────────────────────────────────────────────
+
+    @GetMapping("/export/ldif")
+    public void exportLdif(@PathVariable UUID directoryId,
+                           @RequestParam String dn,
+                           @RequestParam(defaultValue = "base") String scope,
+                           HttpServletResponse response) throws IOException {
+        DirectoryConnection dc = loadDirectory(directoryId);
+
+        SearchScope searchScope = switch (scope.toLowerCase()) {
+            case "one" -> SearchScope.ONE;
+            case "sub" -> SearchScope.SUB;
+            default    -> SearchScope.BASE;
+        };
+
+        response.setContentType("application/ldif");
+        response.setHeader("Content-Disposition", "attachment; filename=\"export.ldif\"");
+
+        if (searchScope == SearchScope.BASE) {
+            ldifService.exportEntry(dc, dn, response.getOutputStream());
+        } else {
+            ldifService.exportSubtree(dc, dn, searchScope, response.getOutputStream());
+        }
     }
 
     // ── Schema endpoints (superadmin bypass — no realm/feature checks) ────────
