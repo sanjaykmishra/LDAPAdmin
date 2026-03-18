@@ -29,6 +29,7 @@
         <div v-if="loading.has(node.dn)" class="ml-8 py-1 text-xs text-gray-400">Loading…</div>
         <DnTree
           v-else-if="childrenMap.has(node.dn)"
+          :ref="el => setChildRef(node.dn, el)"
           :nodes="childrenMap.get(node.dn)"
           :depth="depth + 1"
           :selected-dn="selectedDn"
@@ -55,6 +56,15 @@ const emit = defineEmits(['select'])
 const expanded    = reactive(new Set())
 const loading     = reactive(new Set())
 const childrenMap = ref(new Map())
+const childRefs   = new Map()
+
+function setChildRef(dn, el) {
+  if (el) {
+    childRefs.set(dn, el)
+  } else {
+    childRefs.delete(dn)
+  }
+}
 
 async function toggle(node) {
   if (expanded.has(node.dn)) {
@@ -90,24 +100,29 @@ function select(node) {
 
 /**
  * Refresh a node's children from externally provided data.
- * Called by the parent after a new entry is created.
+ * Propagates recursively through child DnTree instances until
+ * the target DN is found at the correct level.
  */
 function refreshNode(dn, children) {
-  const updated = new Map(childrenMap.value)
-  updated.set(dn, children)
-  childrenMap.value = updated
-
-  // Ensure the node is expanded and marked as having children
-  expanded.add(dn)
-
-  // Also update the node's hasChildren flag in our props
+  // Check if the target DN is one of our direct nodes
   const node = props.nodes.find(n => n.dn === dn)
   if (node) {
-    node.hasChildren = true
+    // This is our level — update childrenMap and expand
+    const updated = new Map(childrenMap.value)
+    updated.set(dn, children)
+    childrenMap.value = updated
+    expanded.add(dn)
+    node.hasChildren = children.length > 0
+    return true
   }
 
-  // Propagate to child DnTree instances via recursive search
-  // (handled by the parent re-rendering with new childrenMap)
+  // Not at this level — delegate to child DnTree instances
+  for (const [, childTree] of childRefs) {
+    if (childTree?.refreshNode(dn, children)) {
+      return true
+    }
+  }
+  return false
 }
 
 defineExpose({ refreshNode })
