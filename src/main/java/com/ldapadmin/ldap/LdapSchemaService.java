@@ -162,6 +162,28 @@ public class LdapSchemaService {
         }
     }
 
+    /**
+     * Returns the merged required and optional attributes for multiple objectClasses.
+     * Attributes required by any class are listed as required; attributes optional
+     * in all classes are listed as optional.  Duplicates are collapsed.
+     */
+    public ObjectClassAttributes getAttributesForObjectClasses(DirectoryConnection dc,
+                                                                List<String> objectClasses) {
+        Set<String> allRequired = new LinkedHashSet<>();
+        Set<String> allOptional = new LinkedHashSet<>();
+        for (String oc : objectClasses) {
+            ObjectClassAttributes attrs = getAttributesForObjectClass(dc, oc);
+            allRequired.addAll(attrs.required());
+            allOptional.addAll(attrs.optional());
+        }
+        // Anything in required should not also appear in optional
+        allOptional.removeAll(allRequired);
+        return new ObjectClassAttributes(
+            String.join(", ", objectClasses),
+            Collections.unmodifiableSet(allRequired),
+            Collections.unmodifiableSet(allOptional));
+    }
+
     // ── Value objects ─────────────────────────────────────────────────────────
 
     /**

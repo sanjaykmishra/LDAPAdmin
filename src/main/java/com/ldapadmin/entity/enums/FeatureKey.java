@@ -14,6 +14,7 @@ public enum FeatureKey {
     USER_DELETE          ("user.delete"),
     USER_ENABLE_DISABLE  ("user.enable_disable"),
     USER_MOVE            ("user.move"),
+    GROUP_EDIT           ("group.edit"),
     GROUP_MANAGE_MEMBERS ("group.manage_members"),
     GROUP_CREATE_DELETE  ("group.create_delete"),
     BULK_IMPORT          ("bulk.import"),

@@ -14,11 +14,12 @@
 
     <DataTable :columns="cols" :rows="groups" :loading="loading" row-key="dn">
       <template #cell-dn="{ value }"><code class="text-xs">{{ value }}</code></template>
-      <template #cell-memberCount="{ value }">
-        <span class="badge-blue">{{ value }} members</span>
+      <template #cell-description="{ value }">
+        <span class="text-gray-600 text-xs">{{ value }}</span>
       </template>
       <template #actions="{ row }">
         <div class="flex gap-3 justify-end whitespace-nowrap">
+          <button @click="openEdit(row)" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Edit</button>
           <button @click="openMembers(row)" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Members</button>
           <button @click="confirmDelete(row)" class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
         </div>
@@ -35,6 +36,16 @@
       <template #footer>
         <button @click="showCreate = false" class="btn-secondary">Cancel</button>
         <button @click="doCreate" :disabled="saving" class="btn-primary">Create</button>
+      </template>
+    </AppModal>
+
+    <!-- Edit group -->
+    <AppModal v-model="showEdit" title="Edit Group" size="md">
+      <FormField label="Owner" v-model="editForm.owner" placeholder="DN of the group owner" />
+      <FormField label="Description" v-model="editForm.description" placeholder="Group description" />
+      <template #footer>
+        <button @click="showEdit = false" class="btn-secondary">Cancel</button>
+        <button @click="doEdit" :disabled="saving" class="btn-primary">{{ saving ? 'Saving…' : 'Save' }}</button>
       </template>
     </AppModal>
 
@@ -78,6 +89,7 @@ const dirId         = route.params.dirId
 const groups        = ref([])
 const filterText    = ref('')
 const showCreate    = ref(false)
+const showEdit      = ref(false)
 const showMembers   = ref(false)
 const showDelete    = ref(false)
 const selectedGroup = ref(null)
@@ -87,11 +99,13 @@ const newMemberDn   = ref('')
 const saving        = ref(false)
 const realmData     = ref(null)
 const createForm    = ref({ parentDn: '', cn: '', objectClass: 'groupOfNames', owner: '', description: '' })
+const editForm      = ref({ owner: '', description: '' })
+const editingDn     = ref(null)
 
 const cols = [
   { key: 'dn',          label: 'DN' },
   { key: 'cn',          label: 'Name' },
-  { key: 'memberCount', label: 'Members' },
+  { key: 'description', label: 'Description' },
 ]
 
 async function load() {
@@ -101,7 +115,8 @@ async function load() {
     groups.value = entries.map(e => ({
       dn:          e.dn,
       cn:          e.attributes?.cn?.[0] || '—',
-      memberCount: (e.attributes?.member || e.attributes?.uniqueMember || []).length,
+      description: e.attributes?.description?.[0] || '—',
+      _owner:      e.attributes?.owner?.[0] || '',
       _members:    e.attributes?.member || e.attributes?.uniqueMember || [],
       _memberAttr: e.attributes?.member ? 'member' : e.attributes?.uniqueMember ? 'uniqueMember' : 'member',
     }))
@@ -136,6 +151,30 @@ function openCreate() {
     description: '',
   }
   showCreate.value = true
+}
+
+function openEdit(row) {
+  editingDn.value = row.dn
+  editForm.value = {
+    owner: row._owner,
+    description: row.description === '—' ? '' : row.description,
+  }
+  showEdit.value = true
+}
+
+async function doEdit() {
+  saving.value = true
+  try {
+    const mods = [
+      { operation: 'REPLACE', attribute: 'owner', values: editForm.value.owner?.trim() ? [editForm.value.owner.trim()] : [] },
+      { operation: 'REPLACE', attribute: 'description', values: editForm.value.description?.trim() ? [editForm.value.description.trim()] : [] },
+    ]
+    await groupsApi.updateGroup(dirId, editingDn.value, { modifications: mods })
+    notif.success('Group updated')
+    showEdit.value = false
+    await load()
+  } catch (e) { notif.error(e.response?.data?.detail || e.message) }
+  finally { saving.value = false }
 }
 
 function openMembers(row) {

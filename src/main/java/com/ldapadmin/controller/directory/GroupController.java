@@ -5,6 +5,7 @@ import com.ldapadmin.auth.RequiresFeature;
 import com.ldapadmin.dto.ldap.CreateEntryRequest;
 import com.ldapadmin.dto.ldap.LdapEntryResponse;
 import com.ldapadmin.dto.ldap.MemberRequest;
+import com.ldapadmin.dto.ldap.UpdateEntryRequest;
 import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.service.LdapOperationService;
 import jakarta.validation.Valid;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -86,6 +88,16 @@ public class GroupController {
 
         String[] attrArray = attributes.isBlank() ? new String[0] : attributes.split(",");
         return service.getGroup(directoryId, principal, dn, attrArray);
+    }
+
+    @PutMapping("/entry")
+    @RequiresFeature(FeatureKey.GROUP_EDIT)
+    public LdapEntryResponse update(
+            @PathVariable UUID directoryId,
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @RequestParam String dn,
+            @Valid @RequestBody UpdateEntryRequest req) {
+        return service.updateGroup(directoryId, principal, dn, req);
     }
 
     @DeleteMapping("/entry")

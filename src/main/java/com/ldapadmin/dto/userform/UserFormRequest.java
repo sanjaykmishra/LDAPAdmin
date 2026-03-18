@@ -2,6 +2,7 @@ package com.ldapadmin.dto.userform;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
@@ -13,7 +14,7 @@ import java.util.UUID;
  */
 public record UserFormRequest(
         UUID directoryId,
-        @NotBlank @Size(max = 255) String objectClassName,
+        @NotEmpty List<@NotBlank @Size(max = 255) String> objectClassNames,
         @NotBlank @Size(max = 255) String formName,
         List<@Valid AttributeConfigEntry> attributeConfigs) {
 

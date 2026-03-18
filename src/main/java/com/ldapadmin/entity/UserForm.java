@@ -5,12 +5,14 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
- * A reusable form definition associated with a specific LDAP objectClass.
+ * A reusable form definition associated with one or more LDAP objectClasses.
  * <p>
- * Multiple forms may exist for the same objectClass (distinguished by
+ * Multiple forms may exist for the same set of objectClasses (distinguished by
  * {@code formName}), allowing different realms to use different field
  * configurations for the same structural class.
  * <p>
@@ -34,11 +36,16 @@ public class UserForm {
     @JoinColumn(name = "directory_id")
     private DirectoryConnection directoryConnection;
 
-    /** LDAP objectClass this form is designed for. */
-    @Column(name = "object_class_name", nullable = false)
-    private String objectClassName;
+    /** LDAP objectClasses this form is designed for. */
+    @ElementCollection
+    @CollectionTable(
+        name = "user_form_object_classes",
+        joinColumns = @JoinColumn(name = "user_form_id")
+    )
+    @Column(name = "object_class_name")
+    private List<String> objectClassNames = new ArrayList<>();
 
-    /** Human-readable name that distinguishes this form from others for the same objectClass. */
+    /** Human-readable name that distinguishes this form from others. */
     @Column(name = "form_name", nullable = false)
     private String formName;
 }
