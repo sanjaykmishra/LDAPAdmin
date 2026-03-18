@@ -94,6 +94,22 @@ public class BrowseController {
         return browseService.browse(dc, dn);
     }
 
+    @DeleteMapping
+    public BrowseResult deleteEntry(@PathVariable UUID directoryId,
+                                    @AuthenticationPrincipal AuthPrincipal principal,
+                                    @RequestParam String dn,
+                                    @RequestParam(defaultValue = "false") boolean recursive) {
+        DirectoryConnection dc = loadDirectory(directoryId);
+        String parentDn = extractParentDn(dn, dc.getBaseDn());
+
+        browseService.deleteEntry(dc, dn, recursive);
+
+        auditService.record(principal, directoryId, AuditAction.ENTRY_DELETE, dn,
+                Map.of("recursive", recursive));
+
+        return browseService.browse(dc, parentDn);
+    }
+
     private ModificationType toModificationType(AttributeModification.Operation op) {
         return switch (op) {
             case ADD -> ModificationType.ADD;

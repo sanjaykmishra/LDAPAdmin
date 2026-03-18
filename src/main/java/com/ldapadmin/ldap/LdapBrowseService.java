@@ -142,6 +142,42 @@ public class LdapBrowseService {
         });
     }
 
+    /**
+     * Deletes an LDAP entry.  When {@code recursive} is true, all descendant
+     * entries are deleted bottom-up first (OpenLDAP rejects delete on non-leaf).
+     */
+    public void deleteEntry(DirectoryConnection dc, String dn, boolean recursive) {
+        connectionFactory.withConnection(dc, conn -> {
+            if (recursive) {
+                deleteSubtree(conn, dc, dn);
+            } else {
+                LDAPResult result = conn.delete(dn);
+                if (result.getResultCode() != ResultCode.SUCCESS) {
+                    throw new LdapOperationException(
+                        "deleteEntry failed for [" + dn + "]: "
+                        + result.getResultCode() + " — " + result.getDiagnosticMessage());
+                }
+            }
+            log.info("Deleted LDAP entry {}{}", dn, recursive ? " (recursive)" : "");
+            return null;
+        });
+    }
+
+    private void deleteSubtree(LDAPConnection conn, DirectoryConnection dc,
+                                String dn) throws LDAPException {
+        // Depth-first: delete children before the parent
+        List<ChildEntry> children = listChildren(conn, dc, dn);
+        for (ChildEntry child : children) {
+            deleteSubtree(conn, dc, child.dn());
+        }
+        LDAPResult result = conn.delete(dn);
+        if (result.getResultCode() != ResultCode.SUCCESS) {
+            throw new LdapOperationException(
+                "deleteEntry failed for [" + dn + "]: "
+                + result.getResultCode() + " — " + result.getDiagnosticMessage());
+        }
+    }
+
     private String extractRdn(String childDn, String parentDn) {
         // Remove ",parentDn" suffix to get the RDN
         if (childDn.toLowerCase().endsWith("," + parentDn.toLowerCase())) {
