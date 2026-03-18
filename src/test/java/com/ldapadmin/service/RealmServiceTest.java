@@ -52,7 +52,7 @@ class RealmServiceTest {
     void listByDirectory_returnsRealms() {
         DirectoryConnection dir = mockDirectory();
         when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
-        when(realmRepo.findAllByDirectoryIdOrderByDisplayOrderAsc(dirId))
+        when(realmRepo.findAllByDirectoryIdOrderByNameAsc(dirId))
                 .thenReturn(List.of(mockRealm(dir)));
 
         List<RealmResponse> result = service.listByDirectory(dirId);
