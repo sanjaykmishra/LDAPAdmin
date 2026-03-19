@@ -34,14 +34,14 @@ public class UserFormService {
     @Transactional(readOnly = true)
     public List<UserFormResponse> list() {
         return formRepo.findAll().stream()
-                .map(f -> UserFormResponse.from(f, configRepo.findAllByUserFormIdOrderByDisplayOrderAsc(f.getId())))
+                .map(f -> UserFormResponse.from(f, configRepo.findAllByUserFormId(f.getId())))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public UserFormResponse get(UUID id) {
         UserForm form = requireForm(id);
-        return UserFormResponse.from(form, configRepo.findAllByUserFormIdOrderByDisplayOrderAsc(id));
+        return UserFormResponse.from(form, configRepo.findAllByUserFormId(id));
     }
 
     @Transactional
@@ -121,7 +121,6 @@ public class UserFormService {
             c.setEditableOnCreate(e.editableOnCreate());
             c.setInputType(InputType.valueOf(e.inputType()));
             c.setRdn(e.rdn());
-            c.setDisplayOrder(i);
             c.setSectionName(e.sectionName());
             c.setColumnSpan(e.columnSpan() != null ? e.columnSpan() : 3);
             configs.add(c);

@@ -59,10 +59,6 @@ public class UserFormAttributeConfig {
     @Column(name = "is_rdn", nullable = false)
     private boolean rdn = false;
 
-    /** Position of this attribute in the form (0-based). Drives rendering order in the UI. */
-    @Column(name = "display_order", nullable = false)
-    private int displayOrder = 0;
-
     /** Optional section/group name. Attributes sharing the same section are visually grouped. */
     @Column(name = "section_name")
     private String sectionName;
