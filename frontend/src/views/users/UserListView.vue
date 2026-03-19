@@ -26,11 +26,6 @@
         class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         @keyup.enter="search"
       />
-      <input
-        v-model="baseDnOverride"
-        placeholder="Base DN (optional)"
-        class="w-64 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
       <button @click="search" class="btn-primary">Search</button>
     </div>
 
@@ -155,7 +150,6 @@ const { loading, call } = useApi()
 const dirId          = route.params.dirId
 const users          = ref([])
 const filterText     = ref('')
-const baseDnOverride = ref('')
 const limit          = ref(PAGE_SIZE)
 const showTemplatePicker = ref(false)
 const showModal      = ref(false)
@@ -237,7 +231,7 @@ async function load() {
   await call(async () => {
     const params = {
       filter: filterText.value || undefined,
-      baseDn: baseDnOverride.value || realmData.value?.userBaseDn || undefined,
+      baseDn: realmData.value?.userBaseDn || undefined,
       limit:  limit.value,
     }
     const { data } = await usersApi.searchUsers(dirId, params)

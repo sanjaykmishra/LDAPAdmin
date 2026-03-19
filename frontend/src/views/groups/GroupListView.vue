@@ -41,7 +41,7 @@
     </DataTable>
 
     <!-- Create group -->
-    <AppModal v-model="showCreate" title="New Group" size="md">
+    <AppModal v-model="showCreate" title="New Group" size="lg">
       <div class="grid grid-cols-3 gap-3">
         <FormField label="Group Name (cn) (RDN)" v-model="createForm.cn" required />
         <div class="col-span-2">
