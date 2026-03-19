@@ -192,7 +192,12 @@ public class LdapChangelogReader {
                 }
             }
 
-            conn.bind(src.getBindDn(), password);
+            try {
+                conn.bind(src.getBindDn(), password);
+            } catch (Exception ex) {
+                conn.close();
+                throw ex;
+            }
             return conn;
 
         } catch (LdapConnectionException ex) {
