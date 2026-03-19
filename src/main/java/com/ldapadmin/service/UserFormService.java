@@ -122,6 +122,8 @@ public class UserFormService {
             c.setInputType(InputType.valueOf(e.inputType()));
             c.setRdn(e.rdn());
             c.setDisplayOrder(i);
+            c.setSectionName(e.sectionName());
+            c.setColumnSpan(e.columnSpan() != null ? e.columnSpan() : 3);
             configs.add(c);
         }
         return configRepo.saveAll(configs);

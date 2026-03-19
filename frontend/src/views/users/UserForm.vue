@@ -58,14 +58,27 @@
 
         <!-- Dynamic fields from user form config (non-RDN attributes) -->
         <template v-if="userFormConfig?.attributeConfigs?.length">
-          <template v-for="attr in nonRdnAttributes" :key="attr.id || attr.attributeName">
-            <FormField
-              :label="attr.customLabel || attr.attributeName"
-              v-model="local.attributes[attr.attributeName]"
-              :type="mapInputType(attr.inputType)"
-              :required="attr.requiredOnCreate"
-              :disabled="!attr.editableOnCreate"
-            />
+          <template v-for="(section, sIdx) in createSections" :key="sIdx">
+            <fieldset v-if="section.fields.length" class="space-y-3">
+              <legend v-if="section.name" class="text-sm font-semibold text-gray-800 pb-1 border-b border-gray-100 w-full mb-2">{{ section.name }}</legend>
+              <div class="grid grid-cols-3 gap-3">
+                <div
+                  v-for="attr in section.fields"
+                  :key="attr.id || attr.attributeName"
+                  :style="{ gridColumn: `span ${attr.columnSpan || 3}` }"
+                >
+                  <FormField
+                    :label="attr.customLabel || attr.attributeName"
+                    v-model="local.attributes[attr.attributeName]"
+                    :type="mapInputType(attr.inputType)"
+                    :required="attr.requiredOnCreate"
+                    :disabled="!attr.editableOnCreate"
+                    :rows="attr.inputType === 'TEXTAREA' || attr.inputType === 'MULTI_VALUE' ? 3 : undefined"
+                    :hint="attr.inputType === 'MULTI_VALUE' ? 'One value per line' : undefined"
+                  />
+                </div>
+              </div>
+            </fieldset>
           </template>
         </template>
 
@@ -84,16 +97,27 @@
 
         <!-- When user form config is available, render structured fields -->
         <template v-if="userFormConfig?.attributeConfigs?.length">
-          <template v-for="attr in editFormAttributes" :key="attr.id || attr.attributeName">
-            <FormField
-              :label="attr.customLabel || attr.attributeName"
-              v-model="local.attributes[attr.attributeName]"
-              :type="mapInputType(attr.inputType)"
-              :required="attr.requiredOnCreate"
-              :disabled="attr.rdn"
-              :rows="attr.inputType === 'TEXTAREA' || attr.inputType === 'MULTI_VALUE' ? 3 : undefined"
-              :hint="attr.inputType === 'MULTI_VALUE' ? 'One value per line' : undefined"
-            />
+          <template v-for="(section, sIdx) in editSections" :key="sIdx">
+            <fieldset v-if="section.fields.length" class="space-y-3">
+              <legend v-if="section.name" class="text-sm font-semibold text-gray-800 pb-1 border-b border-gray-100 w-full mb-2">{{ section.name }}</legend>
+              <div class="grid grid-cols-3 gap-3">
+                <div
+                  v-for="attr in section.fields"
+                  :key="attr.id || attr.attributeName"
+                  :style="{ gridColumn: `span ${attr.columnSpan || 3}` }"
+                >
+                  <FormField
+                    :label="attr.customLabel || attr.attributeName"
+                    v-model="local.attributes[attr.attributeName]"
+                    :type="mapInputType(attr.inputType)"
+                    :required="attr.requiredOnCreate"
+                    :disabled="attr.rdn"
+                    :rows="attr.inputType === 'TEXTAREA' || attr.inputType === 'MULTI_VALUE' ? 3 : undefined"
+                    :hint="attr.inputType === 'MULTI_VALUE' ? 'One value per line' : undefined"
+                  />
+                </div>
+              </div>
+            </fieldset>
           </template>
 
           <!-- Other attributes not in the form config -->
@@ -284,6 +308,25 @@ const nonRdnAttributes = computed(() => {
   if (!props.userFormConfig?.attributeConfigs) return []
   return props.userFormConfig.attributeConfigs.filter(a => !a.rdn && a.attributeName.toLowerCase() !== 'objectclass')
 })
+
+/** Group non-RDN attributes into sections for create mode. */
+const createSections = computed(() => groupIntoSections(nonRdnAttributes.value))
+
+/** Group edit-mode attributes into sections. */
+const editSections = computed(() => groupIntoSections(editFormAttributes.value))
+
+function groupIntoSections(attrs) {
+  const map = new Map()
+  for (const attr of attrs) {
+    const key = attr.sectionName || ''
+    if (!map.has(key)) {
+      map.set(key, { name: key, fields: [] })
+    }
+    map.get(key).fields.push(attr)
+  }
+  const result = Array.from(map.values())
+  return result.length ? result : [{ name: '', fields: attrs }]
+}
 
 let syncing = false
 watch(local, v => {
