@@ -2,6 +2,7 @@ package com.ldapadmin.controller.superadmin;
 
 import com.ldapadmin.dto.audit.AuditSourceRequest;
 import com.ldapadmin.dto.audit.AuditSourceResponse;
+import com.ldapadmin.dto.directory.TestConnectionResult;
 import com.ldapadmin.service.AuditDataSourceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,11 +18,12 @@ import java.util.UUID;
  * CRUD management of audit data sources (LDAP changelog reader connections).
  *
  * <pre>
- *   GET    /api/v1/superadmin/audit-sources        — list
- *   POST   /api/v1/superadmin/audit-sources        — create
- *   GET    /api/v1/superadmin/audit-sources/{id}   — get
- *   PUT    /api/v1/superadmin/audit-sources/{id}   — update
- *   DELETE /api/v1/superadmin/audit-sources/{id}   — delete
+ *   GET    /api/v1/superadmin/audit-sources           — list
+ *   POST   /api/v1/superadmin/audit-sources           — create
+ *   POST   /api/v1/superadmin/audit-sources/test      — test connection
+ *   GET    /api/v1/superadmin/audit-sources/{id}      — get
+ *   PUT    /api/v1/superadmin/audit-sources/{id}      — update
+ *   DELETE /api/v1/superadmin/audit-sources/{id}      — delete
  * </pre>
  */
 @RestController
@@ -40,6 +42,11 @@ public class AuditDataSourceController {
     @PostMapping
     public ResponseEntity<AuditSourceResponse> create(@Valid @RequestBody AuditSourceRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(req));
+    }
+
+    @PostMapping("/test")
+    public TestConnectionResult test(@Valid @RequestBody AuditSourceRequest req) {
+        return service.testConnection(req);
     }
 
     @GetMapping("/{id}")

@@ -74,9 +74,18 @@
             Enabled
           </label>
         </div>
-        <div class="flex justify-end gap-2 pt-2">
-          <button type="button" @click="showModal = false" class="btn-secondary">Cancel</button>
-          <button type="submit" :disabled="saving" class="btn-primary">{{ saving ? 'Saving…' : 'Save' }}</button>
+        <!-- Test connection result -->
+        <div v-if="testResult" :class="testResult.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-700'" class="border rounded-lg px-3 py-2 text-sm">
+          {{ testResult.message }} <span v-if="testResult.elapsedMs != null" class="text-xs opacity-70">({{ testResult.elapsedMs }}ms)</span>
+        </div>
+        <div class="flex justify-between items-center pt-2">
+          <button type="button" @click="doTest" :disabled="testLoading || !form.host || !form.bindDn || (!editing && !form.bindPassword)" class="btn-secondary text-sm">
+            {{ testLoading ? 'Testing…' : 'Test Connection' }}
+          </button>
+          <div class="flex gap-2">
+            <button type="button" @click="showModal = false" class="btn-secondary">Cancel</button>
+            <button type="submit" :disabled="saving" class="btn-primary">{{ saving ? 'Saving…' : 'Save' }}</button>
+          </div>
         </div>
       </form>
     </AppModal>
@@ -94,7 +103,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
-import { listAuditSources, createAuditSource, updateAuditSource, deleteAuditSource } from '@/api/auditDataSources'
+import { listAuditSources, createAuditSource, updateAuditSource, deleteAuditSource, testAuditSource } from '@/api/auditDataSources'
 import FormField from '@/components/FormField.vue'
 import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -107,6 +116,8 @@ const sources      = ref([])
 const showModal    = ref(false)
 const editing      = ref(null)
 const deleteTarget = ref(null)
+const testLoading  = ref(false)
+const testResult   = ref(null)
 
 const form = ref(emptyForm())
 
@@ -134,12 +145,14 @@ onMounted(load)
 
 function openCreate() {
   editing.value = null
+  testResult.value = null
   form.value = emptyForm()
   showModal.value = true
 }
 
 function openEdit(s) {
   editing.value = s.id
+  testResult.value = null
   form.value = {
     displayName: s.displayName, host: s.host, port: s.port, sslMode: s.sslMode,
     trustAllCerts: s.trustAllCerts, bindDn: s.bindDn, bindPassword: '',
@@ -147,6 +160,19 @@ function openEdit(s) {
     enabled: s.enabled,
   }
   showModal.value = true
+}
+
+async function doTest() {
+  testLoading.value = true
+  testResult.value = null
+  try {
+    const { data } = await testAuditSource(form.value)
+    testResult.value = data
+  } catch (e) {
+    testResult.value = { success: false, message: e.response?.data?.detail || e.message }
+  } finally {
+    testLoading.value = false
+  }
 }
 
 async function save() {
