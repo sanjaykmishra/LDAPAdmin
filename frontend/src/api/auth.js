@@ -11,3 +11,9 @@ export const me = () =>
 
 export const myRealms = () =>
   client.get('/auth/me/realms')
+
+export const oidcAuthorize = () =>
+  client.get('/auth/oidc/authorize')
+
+export const oidcCallback = (code, state) =>
+  client.post('/auth/oidc/callback', { code, state })

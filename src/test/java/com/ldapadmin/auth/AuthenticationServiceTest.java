@@ -198,6 +198,7 @@ class AuthenticationServiceTest {
 
     private ApplicationSettings ldapSettings(String bindDnPattern) {
         ApplicationSettings s = new ApplicationSettings();
+        s.getEnabledAuthTypes().add(AccountType.LDAP);
         s.setLdapAuthHost("localhost");
         s.setLdapAuthPort(ldapServer.getListenPort());
         s.setLdapAuthSslMode(SslMode.NONE);

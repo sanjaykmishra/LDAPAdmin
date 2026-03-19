@@ -37,6 +37,77 @@
         </div>
       </section>
 
+      <!-- Authentication -->
+      <section class="bg-white border border-gray-200 rounded-xl p-6">
+        <h2 class="text-base font-semibold text-gray-900 mb-4">Authentication</h2>
+
+        <!-- Enabled auth methods -->
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Enabled login methods</label>
+          <div class="flex gap-6">
+            <label v-for="t in ['LOCAL', 'LDAP', 'OIDC']" :key="t" class="flex items-center gap-2">
+              <input type="checkbox" :value="t" v-model="form.enabledAuthTypes"
+                class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+              <span class="text-sm text-gray-700">{{ t }}</span>
+            </label>
+          </div>
+          <p class="text-xs text-gray-400 mt-1">At least one method must remain enabled.</p>
+        </div>
+
+        <!-- LDAP Auth Provider -->
+        <div v-if="form.enabledAuthTypes.includes('LDAP')" class="border-t border-gray-100 pt-4 mb-4">
+          <h3 class="text-sm font-semibold text-gray-700 mb-3">LDAP Auth Provider</h3>
+          <div class="grid grid-cols-2 gap-4">
+            <FormField label="Host" v-model="form.ldapAuthHost" placeholder="ldap.example.com" />
+            <FormField label="Port" v-model.number="form.ldapAuthPort" type="number" placeholder="389" />
+            <FormField label="SSL Mode" v-model="form.ldapAuthSslMode" type="select"
+              :options="[{ value: '', label: 'None' }, { value: 'STARTTLS', label: 'STARTTLS' }, { value: 'LDAPS', label: 'LDAPS' }]" />
+            <div class="flex items-center gap-2 pt-6">
+              <input type="checkbox" id="ldapTrustAll" v-model="form.ldapAuthTrustAllCerts" class="rounded" />
+              <label for="ldapTrustAll" class="text-sm text-gray-700">Trust all certificates</label>
+            </div>
+            <div class="col-span-2">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Trusted Certificate (PEM)</label>
+              <textarea v-model="form.ldapAuthTrustedCertPem" rows="3" placeholder="-----BEGIN CERTIFICATE-----"
+                class="input w-full font-mono text-xs"></textarea>
+            </div>
+            <FormField label="Service Account Bind DN" v-model="form.ldapAuthBindDn"
+              placeholder="cn=admin,dc=example,dc=com" />
+            <div>
+              <FormField label="Bind Password" v-model="form.ldapAuthBindPassword" type="password"
+                :placeholder="settings?.ldapAuthBindPasswordConfigured ? '●●●●●●●● (leave blank to keep)' : 'Set password'" />
+              <p class="text-xs text-gray-400 mt-1">Leave blank to keep existing. Enter a space to clear.</p>
+            </div>
+            <FormField label="User Search Base" v-model="form.ldapAuthUserSearchBase"
+              placeholder="ou=people,dc=example,dc=com" />
+            <FormField label="Bind DN Pattern" v-model="form.ldapAuthBindDnPattern"
+              placeholder="uid={username},ou=people,dc=example,dc=com"
+              hint="{username} is replaced with the login username." />
+          </div>
+        </div>
+
+        <!-- OIDC Provider -->
+        <div v-if="form.enabledAuthTypes.includes('OIDC')" class="border-t border-gray-100 pt-4">
+          <h3 class="text-sm font-semibold text-gray-700 mb-3">OIDC Provider</h3>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="col-span-2">
+              <FormField label="Issuer URL" v-model="form.oidcIssuerUrl"
+                placeholder="https://accounts.google.com"
+                hint="Must support OpenID Connect Discovery (/.well-known/openid-configuration)." />
+            </div>
+            <FormField label="Client ID" v-model="form.oidcClientId" placeholder="your-client-id" />
+            <div>
+              <FormField label="Client Secret" v-model="form.oidcClientSecret" type="password"
+                :placeholder="settings?.oidcClientSecretConfigured ? '●●●●●●●● (leave blank to keep)' : 'Set secret'" />
+              <p class="text-xs text-gray-400 mt-1">Leave blank to keep existing. Enter a space to clear.</p>
+            </div>
+            <FormField label="Scopes" v-model="form.oidcScopes" placeholder="openid profile email" />
+            <FormField label="Username Claim" v-model="form.oidcUsernameClaim" placeholder="preferred_username"
+              hint="ID token claim matched against Account.username." />
+          </div>
+        </div>
+      </section>
+
       <!-- SMTP -->
       <section class="bg-white border border-gray-200 rounded-xl p-6">
         <h2 class="text-base font-semibold text-gray-900 mb-4">SMTP (Email Delivery)</h2>
@@ -124,6 +195,24 @@ const form = ref({
   s3SecretKey: null,
   s3Region: '',
   s3PresignedUrlTtlHours: 24,
+  // Authentication
+  enabledAuthTypes: ['LOCAL'],
+  // LDAP auth provider
+  ldapAuthHost: '',
+  ldapAuthPort: null,
+  ldapAuthSslMode: '',
+  ldapAuthTrustAllCerts: false,
+  ldapAuthTrustedCertPem: '',
+  ldapAuthBindDn: '',
+  ldapAuthBindPassword: null,
+  ldapAuthUserSearchBase: '',
+  ldapAuthBindDnPattern: '',
+  // OIDC provider
+  oidcIssuerUrl: '',
+  oidcClientId: '',
+  oidcClientSecret: null,
+  oidcScopes: 'openid profile email',
+  oidcUsernameClaim: 'preferred_username',
 })
 
 async function loadSettings() {
@@ -141,14 +230,32 @@ async function loadSettings() {
       smtpPort:               data.smtpPort ?? 587,
       smtpSenderAddress:      data.smtpSenderAddress ?? '',
       smtpUsername:           data.smtpUsername ?? '',
-      smtpPassword:           null,   // never populate from server
+      smtpPassword:           null,
       smtpUseTls:             data.smtpUseTls ?? true,
       s3EndpointUrl:          data.s3EndpointUrl ?? '',
       s3BucketName:           data.s3BucketName ?? '',
       s3AccessKey:            data.s3AccessKey ?? '',
-      s3SecretKey:            null,   // never populate from server
+      s3SecretKey:            null,
       s3Region:               data.s3Region ?? '',
       s3PresignedUrlTtlHours: data.s3PresignedUrlTtlHours ?? 24,
+      // Authentication
+      enabledAuthTypes:       data.enabledAuthTypes ? [...data.enabledAuthTypes] : ['LOCAL'],
+      // LDAP auth provider
+      ldapAuthHost:           data.ldapAuthHost ?? '',
+      ldapAuthPort:           data.ldapAuthPort ?? null,
+      ldapAuthSslMode:        data.ldapAuthSslMode ?? '',
+      ldapAuthTrustAllCerts:  data.ldapAuthTrustAllCerts ?? false,
+      ldapAuthTrustedCertPem: data.ldapAuthTrustedCertPem ?? '',
+      ldapAuthBindDn:         data.ldapAuthBindDn ?? '',
+      ldapAuthBindPassword:   null,
+      ldapAuthUserSearchBase: data.ldapAuthUserSearchBase ?? '',
+      ldapAuthBindDnPattern:  data.ldapAuthBindDnPattern ?? '',
+      // OIDC provider
+      oidcIssuerUrl:          data.oidcIssuerUrl ?? '',
+      oidcClientId:           data.oidcClientId ?? '',
+      oidcClientSecret:       null,
+      oidcScopes:             data.oidcScopes ?? 'openid profile email',
+      oidcUsernameClaim:      data.oidcUsernameClaim ?? 'preferred_username',
     })
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
@@ -158,6 +265,11 @@ async function loadSettings() {
 }
 
 async function doSave() {
+  // Validate at least one auth method
+  if (!form.value.enabledAuthTypes || form.value.enabledAuthTypes.length === 0) {
+    notif.error('At least one authentication method must be enabled.')
+    return
+  }
   saving.value = true
   try {
     await updateSettings({
@@ -170,7 +282,7 @@ async function doSave() {
       smtpPort:              form.value.smtpPort   || null,
       smtpSenderAddress:     form.value.smtpSenderAddress || null,
       smtpUsername:          form.value.smtpUsername || null,
-      smtpPassword:          form.value.smtpPassword,  // null=keep, ''=clear, text=set
+      smtpPassword:          form.value.smtpPassword,
       smtpUseTls:            form.value.smtpUseTls,
       s3EndpointUrl:         form.value.s3EndpointUrl   || null,
       s3BucketName:          form.value.s3BucketName    || null,
@@ -178,6 +290,24 @@ async function doSave() {
       s3SecretKey:           form.value.s3SecretKey,
       s3Region:              form.value.s3Region        || null,
       s3PresignedUrlTtlHours: form.value.s3PresignedUrlTtlHours ?? 24,
+      // Authentication
+      enabledAuthTypes:      form.value.enabledAuthTypes,
+      // LDAP auth provider
+      ldapAuthHost:          form.value.ldapAuthHost   || null,
+      ldapAuthPort:          form.value.ldapAuthPort   || null,
+      ldapAuthSslMode:       form.value.ldapAuthSslMode || null,
+      ldapAuthTrustAllCerts: form.value.ldapAuthTrustAllCerts,
+      ldapAuthTrustedCertPem: form.value.ldapAuthTrustedCertPem || null,
+      ldapAuthBindDn:        form.value.ldapAuthBindDn || null,
+      ldapAuthBindPassword:  form.value.ldapAuthBindPassword,
+      ldapAuthUserSearchBase: form.value.ldapAuthUserSearchBase || null,
+      ldapAuthBindDnPattern: form.value.ldapAuthBindDnPattern || null,
+      // OIDC provider
+      oidcIssuerUrl:         form.value.oidcIssuerUrl   || null,
+      oidcClientId:          form.value.oidcClientId    || null,
+      oidcClientSecret:      form.value.oidcClientSecret,
+      oidcScopes:            form.value.oidcScopes      || null,
+      oidcUsernameClaim:     form.value.oidcUsernameClaim || null,
     })
     notif.success('Settings saved')
     // Sync branding store so sidebar + page title update immediately
