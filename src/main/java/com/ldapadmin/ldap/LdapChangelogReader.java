@@ -29,6 +29,8 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Scheduled poller that reads LDAP {@code cn=changelog} entries from each
@@ -50,6 +52,7 @@ import java.util.*;
 public class LdapChangelogReader {
 
     private static final int MAX_CHANGELOG_ENTRIES_PER_POLL = 500;
+    private static final int MAX_CONSECUTIVE_FAILURES = 3;
 
     /** GeneralizedTime format used in LDAP changeLog timestamps. */
     private static final DateTimeFormatter GENERALIZED_TIME =
@@ -60,6 +63,9 @@ public class LdapChangelogReader {
     private final AuditService                 auditService;
     private final EncryptionService            encryptionService;
 
+    /** Tracks consecutive poll failures per source for exponential backoff. */
+    private final ConcurrentMap<UUID, Integer> consecutiveFailures = new ConcurrentHashMap<>();
+
     // ── Scheduler ─────────────────────────────────────────────────────────────
 
     @Scheduled(fixedDelayString = "${app.audit.changelog-poll-interval-ms:60000}",
@@ -69,12 +75,35 @@ public class LdapChangelogReader {
                 .filter(AuditDataSource::isEnabled)
                 .toList();
 
+        // Remove tracking for sources that no longer exist or are disabled
+        consecutiveFailures.keySet().retainAll(
+                sources.stream().map(AuditDataSource::getId).collect(java.util.stream.Collectors.toSet()));
+
         for (AuditDataSource src : sources) {
+            int failures = consecutiveFailures.getOrDefault(src.getId(), 0);
+            if (failures >= MAX_CONSECUTIVE_FAILURES) {
+                // Exponential backoff: skip 2^(failures-3) polls (i.e. 1, 2, 4, 8…)
+                // Reset periodically so we eventually retry
+                int skip = 1 << Math.min(failures - MAX_CONSECUTIVE_FAILURES, 6);
+                if (failures % skip != 0) {
+                    consecutiveFailures.merge(src.getId(), 1, Integer::sum);
+                    continue;
+                }
+            }
+
             try {
                 pollSource(src);
+                consecutiveFailures.remove(src.getId());
             } catch (Exception ex) {
-                log.warn("Changelog poll failed for source [{}]: {}",
-                        src.getDisplayName(), ex.getMessage(), ex);
+                int newCount = consecutiveFailures.merge(src.getId(), 1, Integer::sum);
+                if (newCount <= MAX_CONSECUTIVE_FAILURES) {
+                    log.warn("Changelog poll failed for source [{}]: {}",
+                            src.getDisplayName(), ex.getMessage(), ex);
+                } else {
+                    log.warn("Changelog poll failed for source [{}] ({} consecutive failures, "
+                                    + "backing off): {}",
+                            src.getDisplayName(), newCount, ex.getMessage());
+                }
             }
         }
     }
@@ -173,6 +202,8 @@ public class LdapChangelogReader {
     private LDAPConnection openConnection(AuditDataSource src) {
         try {
             String password = encryptionService.decrypt(src.getBindPasswordEncrypted());
+            String bindDn = src.getBindDn() != null ? src.getBindDn().trim() : "";
+
             LDAPConnectionOptions opts = new LDAPConnectionOptions();
             opts.setConnectTimeoutMillis(10_000);
             opts.setResponseTimeoutMillis(30_000L);
@@ -185,15 +216,20 @@ public class LdapChangelogReader {
             } else {
                 conn = new LDAPConnection(opts, src.getHost(), src.getPort());
                 if (src.getSslMode() == SslMode.STARTTLS) {
-                    SSLUtil sslUtil = buildSslUtil(src);
-                    conn.processExtendedOperation(
-                            new com.unboundid.ldap.sdk.extensions.StartTLSExtendedRequest(
-                                    sslUtil.createSSLContext()));
+                    try {
+                        SSLUtil sslUtil = buildSslUtil(src);
+                        conn.processExtendedOperation(
+                                new com.unboundid.ldap.sdk.extensions.StartTLSExtendedRequest(
+                                        sslUtil.createSSLContext()));
+                    } catch (Exception ex) {
+                        conn.close();
+                        throw ex;
+                    }
                 }
             }
 
             try {
-                conn.bind(src.getBindDn(), password);
+                conn.bind(bindDn, password);
             } catch (Exception ex) {
                 conn.close();
                 throw ex;
