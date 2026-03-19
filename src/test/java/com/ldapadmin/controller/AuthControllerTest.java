@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.auth.AuthenticationService;
 import com.ldapadmin.auth.LoginRateLimiter;
+import com.ldapadmin.auth.OidcAuthenticationService;
 import com.ldapadmin.auth.PrincipalType;
 import com.ldapadmin.auth.dto.LoginRequest;
 import com.ldapadmin.auth.dto.LoginResponse;
@@ -36,10 +37,11 @@ class AuthControllerTest extends BaseControllerTest {
     @Autowired MockMvc       mockMvc;
     @Autowired ObjectMapper  objectMapper;
 
-    @MockBean AuthenticationService    authenticationService;
-    @MockBean LoginRateLimiter        loginRateLimiter;
-    @MockBean AdminRealmRoleRepository adminRealmRoleRepository;
-    @MockBean RealmRepository          realmRepository;
+    @MockBean AuthenticationService      authenticationService;
+    @MockBean OidcAuthenticationService oidcAuthenticationService;
+    @MockBean LoginRateLimiter          loginRateLimiter;
+    @MockBean AdminRealmRoleRepository  adminRealmRoleRepository;
+    @MockBean RealmRepository           realmRepository;
 
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 

@@ -3,6 +3,7 @@ package com.ldapadmin.controller;
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.auth.AuthenticationService;
 import com.ldapadmin.auth.LoginRateLimiter;
+import com.ldapadmin.auth.OidcAuthenticationService;
 import com.ldapadmin.auth.PrincipalType;
 import com.ldapadmin.auth.dto.LoginRequest;
 import com.ldapadmin.auth.dto.LoginResponse;
@@ -51,11 +52,12 @@ public class AuthController {
 
     private static final String JWT_COOKIE = "jwt";
 
-    private final AuthenticationService   authenticationService;
-    private final LoginRateLimiter        rateLimiter;
-    private final AppProperties           appProperties;
-    private final AdminRealmRoleRepository realmRoleRepo;
-    private final RealmRepository          realmRepo;
+    private final AuthenticationService      authenticationService;
+    private final OidcAuthenticationService oidcAuthenticationService;
+    private final LoginRateLimiter          rateLimiter;
+    private final AppProperties             appProperties;
+    private final AdminRealmRoleRepository  realmRoleRepo;
+    private final RealmRepository           realmRepo;
 
     /**
      * Authenticates the caller, sets an httpOnly JWT cookie, and returns
@@ -117,6 +119,78 @@ public class AuthController {
         body.put("accountType", principal.type().name());
         body.put("id",          principal.id().toString());
         return ResponseEntity.ok(body);
+    }
+
+    // ── OIDC endpoints ─────────────────────────────────────────────────────
+
+    /**
+     * Initiates the OIDC Authorization Code Flow.
+     * Returns the IdP authorization URL for the frontend to redirect to.
+     */
+    @GetMapping("/oidc/authorize")
+    public ResponseEntity<Map<String, String>> oidcAuthorize(HttpServletRequest request) {
+        rateLimiter.check(request);
+
+        // Build redirect_uri from the current request origin
+        String redirectUri = buildOidcRedirectUri(request);
+
+        OidcAuthenticationService.AuthorizeResult result =
+                oidcAuthenticationService.buildAuthorizationUrl(redirectUri);
+
+        Map<String, String> body = new LinkedHashMap<>();
+        body.put("authorizationUrl", result.authorizationUrl());
+        body.put("state", result.state());
+        return ResponseEntity.ok(body);
+    }
+
+    /**
+     * Completes the OIDC flow: exchanges the authorization code for tokens,
+     * validates the ID token, and issues a JWT cookie.
+     */
+    @PostMapping("/oidc/callback")
+    public ResponseEntity<LoginResponse> oidcCallback(
+            @RequestBody Map<String, String> body,
+            HttpServletRequest request,
+            HttpServletResponse response) {
+
+        rateLimiter.check(request);
+
+        String code  = body.get("code");
+        String state = body.get("state");
+
+        if (code == null || state == null) {
+            throw new BadCredentialsException("Missing code or state parameter");
+        }
+
+        OidcAuthenticationService.OidcLoginResult result =
+                oidcAuthenticationService.handleCallback(code, state);
+
+        // Set JWT cookie — same as regular login
+        ResponseCookie cookie = ResponseCookie.from(JWT_COOKIE, result.token())
+                .httpOnly(true)
+                .secure(appProperties.getCookie().isSecure())
+                .sameSite("Strict")
+                .path("/api/v1")
+                .maxAge(Duration.ofMinutes(appProperties.getJwt().getExpiryMinutes()))
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
+        LoginResponse resp = new LoginResponse(result.token(), result.username(),
+                result.accountType(), result.id());
+        return ResponseEntity.ok(resp);
+    }
+
+    private String buildOidcRedirectUri(HttpServletRequest request) {
+        String scheme = request.getScheme();
+        String host = request.getServerName();
+        int port = request.getServerPort();
+
+        StringBuilder uri = new StringBuilder(scheme).append("://").append(host);
+        if (("http".equals(scheme) && port != 80) || ("https".equals(scheme) && port != 443)) {
+            uri.append(":").append(port);
+        }
+        uri.append("/oidc/callback");
+        return uri.toString();
     }
 
     /**

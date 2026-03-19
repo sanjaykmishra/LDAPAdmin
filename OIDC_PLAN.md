@@ -106,20 +106,9 @@ private String oidcUsernameClaim;      // claim to match against Account.usernam
 - Create `enabled_auth_types` join table with a default `LOCAL` row
 - Add OIDC columns to `application_settings` table
 
-### 5. Add dependency
+### 5. No new dependency needed
 
-**File:** `pom.xml` or `build.gradle`
-
-```xml
-<!-- Nimbus JOSE+JWT for ID token validation -->
-<dependency>
-    <groupId>com.nimbusds</groupId>
-    <artifactId>nimbus-jose-jwt</artifactId>
-    <version>9.37</version>
-</dependency>
-```
-
-Using Nimbus directly (rather than `spring-boot-starter-oauth2-client`) avoids pulling in session-based OAuth which conflicts with the stateless JWT design.
+~~Originally planned Nimbus JOSE+JWT, but~~ the existing JJWT library (0.12.6, already on the classpath for internal JWT signing) supports RSA public key verification via `Jwts.parser().verifyWith(publicKey)`. The `OidcAuthenticationService` manually fetches the IdP's JWKS, constructs RSA public keys from JWK `n`/`e` parameters, and validates ID tokens using JJWT. HTTP calls use `java.net.http.HttpClient` (JDK 11+). No new dependency required.
 
 ### 6. Create `OidcAuthenticationService`
 
@@ -260,4 +249,4 @@ Add `OIDC` option to auth type selector when creating/editing admin accounts.
 | Frontend login | Login view (SSO button + callback route, driven by `enabledAuthTypes`) |
 | Frontend settings | Settings view (new Authentication section: enabled methods, LDAP provider, OIDC provider) |
 | Frontend admin mgmt | Admin form (OIDC auth type option) |
-| Dependency | `pom.xml` / `build.gradle` (Nimbus JOSE+JWT) |
+| Dependency | None needed — uses existing JJWT library |

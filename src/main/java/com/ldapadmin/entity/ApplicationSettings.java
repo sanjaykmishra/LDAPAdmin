@@ -10,6 +10,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -91,16 +93,19 @@ public class ApplicationSettings {
     @Column(name = "s3_presigned_url_ttl_hours", nullable = false)
     private int s3PresignedUrlTtlHours = 24;
 
-    // ── Admin authentication configuration (V17) ──────────────────────────────
+    // ── Admin authentication configuration ─────────────────────────────────────
 
     /**
-     * Authentication method governing admin logins.
-     * LOCAL = bcrypt password in accounts.password_hash;
-     * LDAP = bind against the server described by ldap_auth_* columns.
+     * Set of authentication methods enabled for admin logins.
+     * Controls which login UI elements the frontend shows (password form, SSO button, or both).
      */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "enabled_auth_types", joinColumns = @JoinColumn(name = "settings_id"))
     @Enumerated(EnumType.STRING)
-    @Column(name = "admin_auth_type", nullable = false, length = 10)
-    private AccountType adminAuthType = AccountType.LOCAL;
+    @Column(name = "auth_type", nullable = false, length = 10)
+    private Set<AccountType> enabledAuthTypes = new HashSet<>(Set.of(AccountType.LOCAL));
+
+    // ── LDAP auth provider ───────────────────────────────────────────────────
 
     @Column(name = "ldap_auth_host")
     private String ldapAuthHost;
@@ -136,6 +141,26 @@ public class ApplicationSettings {
      */
     @Column(name = "ldap_auth_bind_dn_pattern", length = 500)
     private String ldapAuthBindDnPattern;
+
+    // ── OIDC auth provider ───────────────────────────────────────────────────
+
+    /** OIDC issuer URL, e.g. https://accounts.google.com */
+    @Column(name = "oidc_issuer_url", length = 1000)
+    private String oidcIssuerUrl;
+
+    @Column(name = "oidc_client_id", length = 500)
+    private String oidcClientId;
+
+    /** AES-256-GCM encrypted OIDC client secret. */
+    @Column(name = "oidc_client_secret_enc", columnDefinition = "TEXT")
+    private String oidcClientSecretEnc;
+
+    @Column(name = "oidc_scopes", length = 500)
+    private String oidcScopes = "openid profile email";
+
+    /** Claim from the ID token used to match against Account.username. */
+    @Column(name = "oidc_username_claim", length = 100)
+    private String oidcUsernameClaim = "preferred_username";
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

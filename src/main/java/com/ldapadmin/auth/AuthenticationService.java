@@ -68,6 +68,13 @@ public class AuthenticationService {
             Account account = accountRepo.findByUsernameAndActiveTrue(req.username())
                     .orElseThrow(() -> new BadCredentialsException("Bad credentials"));
 
+            // Gate: reject if this account's auth type is not currently enabled
+            settingsRepo.findFirstBy().ifPresent(settings -> {
+                if (!settings.getEnabledAuthTypes().contains(account.getAuthType())) {
+                    throw new BadCredentialsException("Bad credentials");
+                }
+            });
+
             if (account.getAuthType() == AccountType.LOCAL) {
                 if (!passwordEncoder.matches(req.password(), account.getPasswordHash())) {
                     throw new BadCredentialsException("Bad credentials");

@@ -71,6 +71,7 @@ public class AdminManagementService {
         if (req.authType() == AccountType.LDAP) {
             a.setLdapDn(req.ldapDn());
         }
+        // OIDC accounts need no password or ldapDn — username is matched against IdP claim
         return AdminAccountResponse.from(accountRepo.save(a));
     }
 
@@ -93,6 +94,10 @@ public class AdminManagementService {
             a.setLdapDn(req.ldapDn());
         } else {
             a.setLdapDn(null);
+        }
+        // Clear password hash when switching away from LOCAL
+        if (req.authType() != AccountType.LOCAL) {
+            a.setPasswordHash(null);
         }
         return AdminAccountResponse.from(accountRepo.save(a));
     }
