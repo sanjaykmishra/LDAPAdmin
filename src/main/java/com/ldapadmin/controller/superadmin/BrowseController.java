@@ -3,6 +3,8 @@ package com.ldapadmin.controller.superadmin;
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.dto.ldap.AttributeModification;
 import com.ldapadmin.dto.ldap.CreateEntryRequest;
+import com.ldapadmin.dto.ldap.IntegrityReport;
+import com.ldapadmin.dto.ldap.IntegrityReport.IssueType;
 import com.ldapadmin.dto.ldap.LdifImportResult;
 import com.ldapadmin.dto.ldap.MoveEntryRequest;
 import com.ldapadmin.dto.ldap.RenameEntryRequest;
@@ -11,6 +13,7 @@ import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.entity.enums.ConflictHandling;
 import com.ldapadmin.exception.ResourceNotFoundException;
+import com.ldapadmin.ldap.IntegrityCheckService;
 import com.ldapadmin.ldap.LdapBrowseService;
 import com.ldapadmin.ldap.LdapBrowseService.BrowseResult;
 import com.ldapadmin.ldap.LdapBrowseService.SearchEntry;
@@ -32,9 +35,13 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Superadmin-only DIT browser — lists children of a DN, returns
@@ -56,6 +63,7 @@ public class BrowseController {
     private final LdapBrowseService browseService;
     private final LdapSchemaService schemaService;
     private final LdifService ldifService;
+    private final IntegrityCheckService integrityCheckService;
     private final AuditService auditService;
     private final DirectoryConnectionRepository dirRepo;
 
@@ -229,6 +237,31 @@ public class BrowseController {
                        "dryRun", dryRun));
 
         return result;
+    }
+
+    // ── Integrity Check ─────────────────────────────────────────────────────
+
+    @PostMapping("/integrity-check")
+    public IntegrityReport integrityCheck(
+            @PathVariable UUID directoryId,
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @RequestParam(required = false) String baseDn,
+            @RequestParam(defaultValue = "BROKEN_MEMBER,ORPHANED_ENTRY,EMPTY_GROUP") String checks) {
+        DirectoryConnection dc = loadDirectory(directoryId);
+
+        Set<IssueType> checkTypes = Arrays.stream(checks.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(IssueType::valueOf)
+                .collect(Collectors.toCollection(() -> EnumSet.noneOf(IssueType.class)));
+
+        IntegrityReport report = integrityCheckService.runChecks(dc, baseDn, checkTypes);
+
+        auditService.record(principal, directoryId, AuditAction.INTEGRITY_CHECK,
+                baseDn != null ? baseDn : dc.getBaseDn(),
+                Map.of("checks", checks, "issuesFound", report.issues().size()));
+
+        return report;
     }
 
     // ── Schema endpoints (superadmin bypass — no realm/feature checks) ────────

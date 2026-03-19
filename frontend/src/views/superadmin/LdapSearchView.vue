@@ -22,7 +22,7 @@
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Base DN</label>
-          <input v-model="form.baseDn" class="input w-full" placeholder="dc=example,dc=com (optional)" />
+          <DnPicker v-model="form.baseDn" :directory-id="form.directoryId" placeholder="dc=example,dc=com (optional)" />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Size Limit</label>
@@ -109,6 +109,7 @@ import { useRouter } from 'vue-router'
 import { useNotificationStore } from '@/stores/notifications'
 import { listDirectories } from '@/api/directories'
 import { searchEntries, exportLdif } from '@/api/browse'
+import DnPicker from '@/components/DnPicker.vue'
 
 const HISTORY_KEY = 'ldap-search-history'
 const MAX_HISTORY = 10

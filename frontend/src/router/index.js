@@ -117,6 +117,12 @@ const router = createRouter({
           component: () => import('@/views/superadmin/LdapSearchView.vue'),
           meta: { requiresSuperadmin: true },
         },
+        {
+          path: 'superadmin/integrity',
+          name: 'integrityCheck',
+          component: () => import('@/views/superadmin/IntegrityCheckView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
       ],
     },
 
