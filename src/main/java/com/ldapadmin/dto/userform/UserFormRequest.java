@@ -24,6 +24,8 @@ public record UserFormRequest(
             boolean requiredOnCreate,
             boolean editableOnCreate,
             @NotNull String inputType,
-            boolean rdn) {
+            boolean rdn,
+            @Size(max = 255) String sectionName,
+            Integer columnSpan) {
     }
 }

@@ -62,4 +62,12 @@ public class UserFormAttributeConfig {
     /** Position of this attribute in the form (0-based). Drives rendering order in the UI. */
     @Column(name = "display_order", nullable = false)
     private int displayOrder = 0;
+
+    /** Optional section/group name. Attributes sharing the same section are visually grouped. */
+    @Column(name = "section_name")
+    private String sectionName;
+
+    /** Number of grid columns this field spans (1–3 in a 3-column grid). Default 3 = full width. */
+    @Column(name = "column_span", nullable = false)
+    private int columnSpan = 3;
 }

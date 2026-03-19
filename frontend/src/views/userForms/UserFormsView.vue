@@ -94,79 +94,107 @@
 
         <div v-if="loadingAttrs" class="text-sm text-gray-500">Loading attributes…</div>
 
-        <!-- Attribute configs -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Attribute Configurations</label>
-          <div v-if="form.attributeConfigs.length" class="border border-gray-200 rounded-lg overflow-hidden mb-2">
-            <table class="w-full text-sm">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-3 py-2 text-center text-xs font-medium text-gray-500">Order</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Attribute</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Label</th>
-                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Input Type</th>
-                  <th class="px-3 py-2 text-center text-xs font-medium text-gray-500">RDN</th>
-                  <th class="px-3 py-2 text-center text-xs font-medium text-gray-500">Required</th>
-                  <th class="px-3 py-2 text-center text-xs font-medium text-gray-500">Editable</th>
-                  <th class="px-3 py-2"></th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100">
-                <tr v-for="(attr, idx) in form.attributeConfigs" :key="idx">
-                  <td class="px-3 py-2 text-center whitespace-nowrap">
-                    <button
-                      type="button"
-                      :disabled="idx === 0"
-                      @click="moveAttribute(idx, -1)"
-                      class="text-gray-400 hover:text-gray-700 disabled:opacity-25 disabled:cursor-not-allowed text-xs font-bold px-1"
-                      title="Move up"
-                    >&#9650;</button>
-                    <button
-                      type="button"
-                      :disabled="idx === form.attributeConfigs.length - 1"
-                      @click="moveAttribute(idx, 1)"
-                      class="text-gray-400 hover:text-gray-700 disabled:opacity-25 disabled:cursor-not-allowed text-xs font-bold px-1"
-                      title="Move down"
-                    >&#9660;</button>
-                  </td>
-                  <td class="px-3 py-2">
-                    <input v-model="attr.attributeName" placeholder="e.g. cn" class="input w-full" required disabled />
-                  </td>
-                  <td class="px-3 py-2">
-                    <input v-model="attr.customLabel" placeholder="Custom label" class="input w-full" />
-                  </td>
-                  <td class="px-3 py-2">
-                    <select v-model="attr.inputType" class="input w-full">
-                      <option v-for="t in inputTypes" :key="t" :value="t">{{ t }}</option>
-                    </select>
-                  </td>
-                  <td class="px-3 py-2 text-center">
-                    <input type="radio" name="rdn-selector" :checked="attr.rdn" @change="setRdn(idx)" />
-                  </td>
-                  <td class="px-3 py-2 text-center">
-                    <input type="checkbox" v-model="attr.requiredOnCreate" :disabled="attr.rdn" />
-                  </td>
-                  <td class="px-3 py-2 text-center">
-                    <input type="checkbox" v-model="attr.editableOnCreate" />
-                  </td>
-                  <td class="px-3 py-2 text-right">
-                    <button
-                      type="button"
-                      @click="form.attributeConfigs.splice(idx, 1)"
-                      :disabled="attr.requiredOnCreate || attr.rdn"
-                      :class="attr.requiredOnCreate || attr.rdn ? 'text-gray-300 cursor-not-allowed' : 'text-red-500 hover:text-red-700'"
-                      class="text-xs font-medium"
-                    >Remove</button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+        <!-- Tabs: Attributes | Layout -->
+        <div class="border-b border-gray-200">
+          <div class="flex">
+            <button
+              type="button"
+              @click="modalTab = 'attributes'"
+              class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+              :class="modalTab === 'attributes' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+            >Attributes</button>
+            <button
+              type="button"
+              @click="modalTab = 'layout'"
+              class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+              :class="modalTab === 'layout' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+            >Layout Designer</button>
           </div>
-          <button
-            type="button"
-            @click="addAttribute"
-            class="text-blue-600 hover:text-blue-800 text-xs font-medium"
-          >+ Add attribute</button>
+        </div>
+
+        <!-- Attributes tab -->
+        <div v-show="modalTab === 'attributes'">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Attribute Configurations</label>
+            <div v-if="form.attributeConfigs.length" class="border border-gray-200 rounded-lg overflow-hidden mb-2">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-3 py-2 text-center text-xs font-medium text-gray-500">Order</th>
+                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Attribute</th>
+                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Label</th>
+                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Input Type</th>
+                    <th class="px-3 py-2 text-center text-xs font-medium text-gray-500">RDN</th>
+                    <th class="px-3 py-2 text-center text-xs font-medium text-gray-500">Required</th>
+                    <th class="px-3 py-2 text-center text-xs font-medium text-gray-500">Editable</th>
+                    <th class="px-3 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <tr v-for="(attr, idx) in form.attributeConfigs" :key="idx">
+                    <td class="px-3 py-2 text-center whitespace-nowrap">
+                      <button
+                        type="button"
+                        :disabled="idx === 0"
+                        @click="moveAttribute(idx, -1)"
+                        class="text-gray-400 hover:text-gray-700 disabled:opacity-25 disabled:cursor-not-allowed text-xs font-bold px-1"
+                        title="Move up"
+                      >&#9650;</button>
+                      <button
+                        type="button"
+                        :disabled="idx === form.attributeConfigs.length - 1"
+                        @click="moveAttribute(idx, 1)"
+                        class="text-gray-400 hover:text-gray-700 disabled:opacity-25 disabled:cursor-not-allowed text-xs font-bold px-1"
+                        title="Move down"
+                      >&#9660;</button>
+                    </td>
+                    <td class="px-3 py-2">
+                      <input v-model="attr.attributeName" placeholder="e.g. cn" class="input w-full" required disabled />
+                    </td>
+                    <td class="px-3 py-2">
+                      <input v-model="attr.customLabel" placeholder="Custom label" class="input w-full" />
+                    </td>
+                    <td class="px-3 py-2">
+                      <select v-model="attr.inputType" class="input w-full">
+                        <option v-for="t in inputTypes" :key="t" :value="t">{{ t }}</option>
+                      </select>
+                    </td>
+                    <td class="px-3 py-2 text-center">
+                      <input type="radio" name="rdn-selector" :checked="attr.rdn" @change="setRdn(idx)" />
+                    </td>
+                    <td class="px-3 py-2 text-center">
+                      <input type="checkbox" v-model="attr.requiredOnCreate" :disabled="attr.rdn" />
+                    </td>
+                    <td class="px-3 py-2 text-center">
+                      <input type="checkbox" v-model="attr.editableOnCreate" />
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                      <button
+                        type="button"
+                        @click="form.attributeConfigs.splice(idx, 1)"
+                        :disabled="attr.requiredOnCreate || attr.rdn"
+                        :class="attr.requiredOnCreate || attr.rdn ? 'text-gray-300 cursor-not-allowed' : 'text-red-500 hover:text-red-700'"
+                        class="text-xs font-medium"
+                      >Remove</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <button
+              type="button"
+              @click="addAttribute"
+              class="text-blue-600 hover:text-blue-800 text-xs font-medium"
+            >+ Add attribute</button>
+          </div>
+        </div>
+
+        <!-- Layout Designer tab -->
+        <div v-show="modalTab === 'layout'">
+          <FormLayoutDesigner
+            :attribute-configs="form.attributeConfigs"
+            @update:attribute-configs="onLayoutUpdate"
+          />
         </div>
 
         <div class="flex justify-end gap-2 pt-2">
@@ -222,6 +250,7 @@ import { listObjectClasses, getObjectClass } from '@/api/schema'
 import FormField from '@/components/FormField.vue'
 import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import FormLayoutDesigner from '@/components/FormLayoutDesigner.vue'
 
 const notif = useNotificationStore()
 
@@ -239,6 +268,7 @@ const editing        = ref(null)
 const deleteTarget   = ref(null)
 const selectedDirId  = ref('')
 const ocToAdd        = ref('')
+const modalTab       = ref('attributes')
 
 const form = ref(emptyForm())
 
@@ -340,6 +370,7 @@ async function fetchAndMergeAttributes(ocName) {
         newRequired.push({
           attributeName: name, customLabel: '', inputType: 'TEXT',
           requiredOnCreate: true, editableOnCreate: true, rdn: false,
+          sectionName: '', columnSpan: 3,
         })
       }
     }
@@ -351,6 +382,7 @@ async function fetchAndMergeAttributes(ocName) {
         newOptional.push({
           attributeName: name, customLabel: '', inputType: 'TEXT',
           requiredOnCreate: false, editableOnCreate: true, rdn: false,
+          sectionName: '', columnSpan: 3,
         })
       }
     }
@@ -409,6 +441,15 @@ function emptyForm() {
   }
 }
 
+function onLayoutUpdate(updatedConfigs) {
+  // Merge layout changes (sectionName, columnSpan, order) back into the form
+  form.value.attributeConfigs = updatedConfigs.map(attr => {
+    // Find existing config to preserve non-layout fields
+    const existing = form.value.attributeConfigs.find(a => a.attributeName === attr.attributeName)
+    return existing ? { ...existing, sectionName: attr.sectionName || '', columnSpan: attr.columnSpan ?? 3 } : attr
+  })
+}
+
 function setRdn(idx) {
   form.value.attributeConfigs.forEach((attr, i) => {
     attr.rdn = i === idx
@@ -444,6 +485,8 @@ function addSelectedAttributes() {
         requiredOnCreate: attr.requiredOnCreate,
         editableOnCreate: true,
         rdn: false,
+        sectionName: '',
+        columnSpan: 3,
       })
     }
   }
@@ -478,6 +521,7 @@ function openCreate() {
   selectedDirId.value = ''
   objectClasses.value = []
   ocSchemaCache.value = {}
+  modalTab.value = 'attributes'
   form.value = emptyForm()
   showModal.value = true
 }
@@ -485,6 +529,7 @@ function openCreate() {
 async function openEdit(f) {
   editing.value = f.id
   ocSchemaCache.value = {}
+  modalTab.value = 'attributes'
   // Pre-seed objectClasses list so the dropdown has matching options
   objectClasses.value = f.objectClassNames?.length ? [...f.objectClassNames] : []
   selectedDirId.value = f.directoryId || ''
@@ -499,6 +544,8 @@ async function openEdit(f) {
       requiredOnCreate: a.requiredOnCreate,
       editableOnCreate: a.editableOnCreate,
       rdn: a.rdn || false,
+      sectionName: a.sectionName || '',
+      columnSpan: a.columnSpan ?? 3,
     })),
   }
   showModal.value = true
