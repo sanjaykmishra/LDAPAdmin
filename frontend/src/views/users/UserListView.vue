@@ -63,30 +63,30 @@
     </div>
 
     <!-- Form picker modal (step 1 of create) -->
-    <AppModal v-model="showFormPicker" title="Choose User Form" size="sm">
+    <AppModal v-model="showTemplatePicker" title="Choose User Template" size="sm">
       <div class="space-y-2">
-        <p class="text-sm text-gray-600 mb-3">Select a user form to define which attributes are available for the new user.</p>
-        <div v-if="availableForms.length === 0" class="text-sm text-gray-400 py-4 text-center">
-          No user forms are linked to this realm. Configure user forms in the Realms settings first.
+        <p class="text-sm text-gray-600 mb-3">Select a user template to define which attributes are available for the new user.</p>
+        <div v-if="availableTemplates.length === 0" class="text-sm text-gray-400 py-4 text-center">
+          No user templates are linked to this realm. Configure user templates in the Realms settings first.
         </div>
         <button
-          v-for="uf in availableForms"
-          :key="uf.id"
-          @click="selectFormAndCreate(uf)"
+          v-for="ut in availableTemplates"
+          :key="ut.id"
+          @click="selectTemplateAndCreate(ut)"
           class="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
         >
-          <span class="font-medium text-gray-900 text-sm">{{ uf.formName }}</span>
-          <span class="text-xs text-gray-500 ml-2">({{ (uf.objectClassNames || []).join(', ') }})</span>
+          <span class="font-medium text-gray-900 text-sm">{{ ut.templateName }}</span>
+          <span class="text-xs text-gray-500 ml-2">({{ (ut.objectClassNames || []).join(', ') }})</span>
         </button>
       </div>
       <template #footer>
-        <button @click="showFormPicker = false" class="btn-secondary">Cancel</button>
+        <button @click="showTemplatePicker = false" class="btn-secondary">Cancel</button>
       </template>
     </AppModal>
 
     <!-- Create/Edit modal (step 2 of create, or edit) -->
     <AppModal v-model="showModal" :title="editingDn ? 'Edit User' : 'New User'" size="lg">
-      <UserForm :data="form" :is-edit="!!editingDn" :user-form-config="userFormConfig" :dir-id="dirId" @update="v => form = v" />
+      <UserForm :data="form" :is-edit="!!editingDn" :user-template-config="userTemplateConfig" :dir-id="dirId" @update="v => form = v" />
       <template #footer>
         <button @click="showModal = false" class="btn-secondary">Cancel</button>
         <button @click="save" :disabled="saving" class="btn-primary">{{ saving ? 'Saving…' : 'Save' }}</button>
@@ -138,7 +138,7 @@ import { useApi } from '@/composables/useApi'
 import * as usersApi from '@/api/users'
 import * as groupsApi from '@/api/groups'
 import { listRealms } from '@/api/realms'
-import { getUserForm } from '@/api/userForms'
+import { getUserTemplate } from '@/api/userTemplates'
 import DataTable from '@/components/DataTable.vue'
 import AppModal from '@/components/AppModal.vue'
 import FormField from '@/components/FormField.vue'
@@ -157,7 +157,7 @@ const users          = ref([])
 const filterText     = ref('')
 const baseDnOverride = ref('')
 const limit          = ref(PAGE_SIZE)
-const showFormPicker = ref(false)
+const showTemplatePicker = ref(false)
 const showModal      = ref(false)
 const showMove       = ref(false)
 const showDelete     = ref(false)
@@ -217,11 +217,11 @@ const cols = [
 const allRealms       = ref([])
 const selectedRealmId = ref(route.query.realmId || '')
 const realmData       = ref(null)
-const availableForms  = ref([])
-const userFormConfig  = ref(null)
+const availableTemplates  = ref([])
+const userTemplateConfig  = ref(null)
 
 const emptyForm = () => {
-  const rdnConfig = userFormConfig.value?.attributeConfigs?.find(a => a.rdn)
+  const rdnConfig = userTemplateConfig.value?.attributeConfigs?.find(a => a.rdn)
   return {
     parentDn: realmData.value?.userBaseDn || '',
     rdnAttribute: rdnConfig?.attributeName || 'uid',
@@ -256,26 +256,26 @@ function loadMore() { limit.value += 50; load() }
 
 function openCreate() {
   editingDn.value = null
-  userFormConfig.value = null
-  if (availableForms.value.length === 1) {
-    // Only one form available — skip the picker
-    selectFormAndCreate(availableForms.value[0])
-  } else if (availableForms.value.length > 1) {
-    showFormPicker.value = true
+  userTemplateConfig.value = null
+  if (availableTemplates.value.length === 1) {
+    // Only one template available — skip the picker
+    selectTemplateAndCreate(availableTemplates.value[0])
+  } else if (availableTemplates.value.length > 1) {
+    showTemplatePicker.value = true
   } else {
-    // No forms linked — open create dialog with fallback fields
+    // No templates linked — open create dialog with fallback fields
     form.value = emptyForm()
     showModal.value = true
   }
 }
 
-async function selectFormAndCreate(uf) {
-  showFormPicker.value = false
+async function selectTemplateAndCreate(ut) {
+  showTemplatePicker.value = false
   try {
-    const { data } = await getUserForm(uf.id)
-    userFormConfig.value = data
+    const { data } = await getUserTemplate(ut.id)
+    userTemplateConfig.value = data
   } catch {
-    userFormConfig.value = null
+    userTemplateConfig.value = null
   }
   form.value = emptyForm()
   showModal.value = true
@@ -285,18 +285,18 @@ async function openEdit(row) {
   editingDn.value = row.dn
   const attrs = row._raw?.attributes || {}
 
-  // Try to resolve a matching user form from the realm's linked forms
-  userFormConfig.value = null
+  // Try to resolve a matching user template from the realm's linked templates
+  userTemplateConfig.value = null
   const userOCs = (attrs.objectClass || attrs.objectclass || []).map(s => s.toLowerCase())
-  if (userOCs.length && availableForms.value.length) {
-    // Find the form whose objectClassNames best match the user's objectClasses
-    const match = availableForms.value.find(uf =>
-      (uf.objectClassNames || []).every(oc => userOCs.includes(oc.toLowerCase()))
+  if (userOCs.length && availableTemplates.value.length) {
+    // Find the template whose objectClassNames best match the user's objectClasses
+    const match = availableTemplates.value.find(ut =>
+      (ut.objectClassNames || []).every(oc => userOCs.includes(oc.toLowerCase()))
     )
     if (match) {
       try {
-        const { data } = await getUserForm(match.id)
-        userFormConfig.value = data
+        const { data } = await getUserTemplate(match.id)
+        userTemplateConfig.value = data
       } catch { /* fall back to raw edit */ }
     }
   }
@@ -332,9 +332,9 @@ async function save() {
       }
       // Include the RDN attribute in the attributes map
       attributes[f.rdnAttribute] = [f.rdnValue]
-      // Include objectClasses from the selected user form
-      if (userFormConfig.value?.objectClassNames?.length) {
-        attributes.objectClass = userFormConfig.value.objectClassNames
+      // Include objectClasses from the selected user template
+      if (userTemplateConfig.value?.objectClassNames?.length) {
+        attributes.objectClass = userTemplateConfig.value.objectClassNames
       }
       await usersApi.createUser(dirId, { dn, attributes })
       // Add user to any groups selected during creation
@@ -419,7 +419,7 @@ function selectRealm(realms) {
   const selected = match || realms[0]
   selectedRealmId.value = selected.id
   realmData.value = selected
-  availableForms.value = selected.userForms || []
+  availableTemplates.value = selected.userTemplates || []
 }
 
 async function loadRealmAndForms() {
@@ -434,7 +434,7 @@ function onRealmChange() {
   const realm = allRealms.value.find(r => r.id === selectedRealmId.value)
   if (realm) {
     realmData.value = realm
-    availableForms.value = realm.userForms || []
+    availableTemplates.value = realm.userTemplates || []
   }
   limit.value = PAGE_SIZE
   load()

@@ -1,6 +1,6 @@
 package com.ldapadmin.repository;
 
-import com.ldapadmin.entity.UserForm;
+import com.ldapadmin.entity.UserTemplate;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface UserFormRepository extends JpaRepository<UserForm, UUID> {
+public interface UserTemplateRepository extends JpaRepository<UserTemplate, UUID> {
 
-    List<UserForm> findAllByObjectClassNamesContaining(String objectClassName);
+    List<UserTemplate> findAllByObjectClassNamesContaining(String objectClassName);
 }

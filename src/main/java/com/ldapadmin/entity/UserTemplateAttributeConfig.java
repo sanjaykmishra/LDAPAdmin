@@ -9,21 +9,21 @@ import lombok.Setter;
 import java.util.UUID;
 
 /**
- * Specifies how a single LDAP attribute within a {@link UserForm} is presented
+ * Specifies how a single LDAP attribute within a {@link UserTemplate} is presented
  * and validated in the user creation and edit forms.
  */
 @Entity
 @Table(
-    name = "user_form_attribute_config",
+    name = "user_template_attribute_config",
     uniqueConstraints = @UniqueConstraint(
-        name = "uq_user_form_attribute",
-        columnNames = {"user_form_id", "attribute_name"}
+        name = "uq_user_template_attribute",
+        columnNames = {"user_template_id", "attribute_name"}
     )
 )
 @Getter
 @Setter
 @NoArgsConstructor
-public class UserFormAttributeConfig {
+public class UserTemplateAttributeConfig {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -31,8 +31,8 @@ public class UserFormAttributeConfig {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_form_id", nullable = false)
-    private UserForm userForm;
+    @JoinColumn(name = "user_template_id", nullable = false)
+    private UserTemplate userTemplate;
 
     /** LDAP attribute name as returned by schema discovery. */
     @Column(name = "attribute_name", nullable = false)

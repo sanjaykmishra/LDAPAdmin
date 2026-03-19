@@ -1,8 +1,8 @@
 package com.ldapadmin.controller;
 
-import com.ldapadmin.dto.userform.UserFormRequest;
-import com.ldapadmin.dto.userform.UserFormResponse;
-import com.ldapadmin.service.UserFormService;
+import com.ldapadmin.dto.usertemplate.UserTemplateRequest;
+import com.ldapadmin.dto.usertemplate.UserTemplateResponse;
+import com.ldapadmin.service.UserTemplateService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,46 +21,46 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * CRUD for user form definitions.
+ * CRUD for user template definitions.
  *
  * <pre>
- *   GET    /api/v1/user-forms              — list all forms
- *   POST   /api/v1/user-forms              — create
- *   GET    /api/v1/user-forms/{id}         — get
- *   PUT    /api/v1/user-forms/{id}         — update
- *   DELETE /api/v1/user-forms/{id}         — delete
+ *   GET    /api/v1/user-templates              — list all templates
+ *   POST   /api/v1/user-templates              — create
+ *   GET    /api/v1/user-templates/{id}         — get
+ *   PUT    /api/v1/user-templates/{id}         — update
+ *   DELETE /api/v1/user-templates/{id}         — delete
  * </pre>
  *
- * <p>User form management is restricted to superadmins.</p>
+ * <p>User template management is restricted to superadmins.</p>
  */
 @RestController
-@RequestMapping("/api/v1/user-forms")
+@RequestMapping("/api/v1/user-templates")
 @RequiredArgsConstructor
-public class UserFormController {
+public class UserTemplateController {
 
-    private final UserFormService service;
+    private final UserTemplateService service;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
-    public List<UserFormResponse> list() {
+    public List<UserTemplateResponse> list() {
         return service.list();
     }
 
     @PostMapping
     @PreAuthorize("hasRole('SUPERADMIN')")
-    public ResponseEntity<UserFormResponse> create(@Valid @RequestBody UserFormRequest req) {
+    public ResponseEntity<UserTemplateResponse> create(@Valid @RequestBody UserTemplateRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(req));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
-    public UserFormResponse get(@PathVariable UUID id) {
+    public UserTemplateResponse get(@PathVariable UUID id) {
         return service.get(id);
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('SUPERADMIN')")
-    public UserFormResponse update(@PathVariable UUID id, @Valid @RequestBody UserFormRequest req) {
+    public UserTemplateResponse update(@PathVariable UUID id, @Valid @RequestBody UserTemplateRequest req) {
         return service.update(id, req);
     }
 

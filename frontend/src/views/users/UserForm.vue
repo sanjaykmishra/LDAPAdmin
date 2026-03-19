@@ -40,7 +40,7 @@
         </div>
 
         <!-- Fallback RDN + DN row when no user form config -->
-        <div v-if="!userFormConfig" class="grid grid-cols-3 gap-3">
+        <div v-if="!userTemplateConfig" class="grid grid-cols-3 gap-3">
           <FormField label="RDN Attribute" v-model="local.rdnAttribute" placeholder="uid" required />
           <div class="col-span-2">
             <FormField
@@ -54,10 +54,10 @@
         </div>
 
         <!-- RDN Value when using fallback (no user form config) -->
-        <FormField v-if="!userFormConfig" label="RDN Value" v-model="local.rdnValue" placeholder="jsmith" required />
+        <FormField v-if="!userTemplateConfig" label="RDN Value" v-model="local.rdnValue" placeholder="jsmith" required />
 
         <!-- Dynamic fields from user form config (non-RDN attributes) -->
-        <template v-if="userFormConfig?.attributeConfigs?.length">
+        <template v-if="userTemplateConfig?.attributeConfigs?.length">
           <template v-for="(section, sIdx) in createSections" :key="sIdx">
             <fieldset v-if="section.fields.length" class="space-y-3">
               <legend v-if="section.name" class="text-sm font-semibold text-gray-800 pb-1 border-b border-gray-100 w-full mb-2">{{ section.name }}</legend>
@@ -83,7 +83,7 @@
         </template>
 
         <!-- Fallback: hardcoded fields when no user form config -->
-        <template v-if="!userFormConfig">
+        <template v-if="!userTemplateConfig">
           <FormField label="cn (Common Name)" v-model="local.attributes.cn" required />
           <FormField label="sn (Surname)" v-model="local.attributes.sn" />
           <FormField label="mail" v-model="local.attributes.mail" />
@@ -96,7 +96,7 @@
         <p class="text-xs text-gray-500 mb-3">Editing: <code class="bg-gray-100 px-1 rounded">{{ local.dn }}</code></p>
 
         <!-- When user form config is available, render structured fields -->
-        <template v-if="userFormConfig?.attributeConfigs?.length">
+        <template v-if="userTemplateConfig?.attributeConfigs?.length">
           <template v-for="(section, sIdx) in editSections" :key="sIdx">
             <fieldset v-if="section.fields.length" class="space-y-3">
               <legend v-if="section.name" class="text-sm font-semibold text-gray-800 pb-1 border-b border-gray-100 w-full mb-2">{{ section.name }}</legend>
@@ -217,7 +217,7 @@ import * as groupsApi from '@/api/groups'
 const props = defineProps({
   data: { type: Object, required: true },
   isEdit: Boolean,
-  userFormConfig: { type: Object, default: null },
+  userTemplateConfig: { type: Object, default: null },
   dirId: { type: String, default: null },
 })
 const emit = defineEmits(['update'])
@@ -252,17 +252,17 @@ const editableAttributes = computed(() => {
 
 /** Attributes from the form config to show in edit mode (excludes objectClass and hidden). */
 const editFormAttributes = computed(() => {
-  if (!props.userFormConfig?.attributeConfigs) return []
-  return props.userFormConfig.attributeConfigs.filter(
+  if (!props.userTemplateConfig?.attributeConfigs) return []
+  return props.userTemplateConfig.attributeConfigs.filter(
     a => !a.hidden && a.attributeName.toLowerCase() !== 'objectclass'
   )
 })
 
 /** Attributes present on the entry but NOT in the form config (edit mode overflow). */
 const extraEditAttributes = computed(() => {
-  if (!props.userFormConfig?.attributeConfigs) return {}
+  if (!props.userTemplateConfig?.attributeConfigs) return {}
   const configuredNames = new Set(
-    props.userFormConfig.attributeConfigs.map(a => a.attributeName.toLowerCase())
+    props.userTemplateConfig.attributeConfigs.map(a => a.attributeName.toLowerCase())
   )
   const result = {}
   for (const key of Object.keys(local.attributes)) {
@@ -290,8 +290,8 @@ function mapInputType(inputType) {
 
 /** The attribute marked as RDN in the user form config. */
 const rdnAttr = computed(() => {
-  if (!props.userFormConfig?.attributeConfigs) return null
-  return props.userFormConfig.attributeConfigs.find(a => a.rdn) || null
+  if (!props.userTemplateConfig?.attributeConfigs) return null
+  return props.userTemplateConfig.attributeConfigs.find(a => a.rdn) || null
 })
 
 /** Computed full DN based on RDN attribute, RDN value, and parent DN. */
@@ -305,8 +305,8 @@ const computedDn = computed(() => {
 
 /** All non-RDN, non-hidden attributes, preserving the order defined in the user form config. */
 const nonRdnAttributes = computed(() => {
-  if (!props.userFormConfig?.attributeConfigs) return []
-  return props.userFormConfig.attributeConfigs.filter(a => !a.rdn && !a.hidden && a.attributeName.toLowerCase() !== 'objectclass')
+  if (!props.userTemplateConfig?.attributeConfigs) return []
+  return props.userTemplateConfig.attributeConfigs.filter(a => !a.rdn && !a.hidden && a.attributeName.toLowerCase() !== 'objectclass')
 })
 
 /** Group non-RDN attributes into sections for create mode. */

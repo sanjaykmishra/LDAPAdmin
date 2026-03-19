@@ -15,19 +15,19 @@ public record RealmResponse(
         String name,
         String userBaseDn,
         String groupBaseDn,
-        List<UserFormEntry> userForms,
+        List<UserTemplateEntry> userTemplates,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
 
-    public record UserFormEntry(UUID id, String formName, List<String> objectClassNames) {}
+    public record UserTemplateEntry(UUID id, String templateName, List<String> objectClassNames) {}
 
     public static RealmResponse from(Realm r, List<RealmObjectclass> realmOcs) {
-        List<UserFormEntry> forms = realmOcs.stream()
-                .filter(oc -> oc.getUserForm() != null)
-                .map(oc -> new UserFormEntry(
-                        oc.getUserForm().getId(),
-                        oc.getUserForm().getFormName(),
-                        List.copyOf(oc.getUserForm().getObjectClassNames())))
+        List<UserTemplateEntry> templates = realmOcs.stream()
+                .filter(oc -> oc.getUserTemplate() != null)
+                .map(oc -> new UserTemplateEntry(
+                        oc.getUserTemplate().getId(),
+                        oc.getUserTemplate().getTemplateName(),
+                        List.copyOf(oc.getUserTemplate().getObjectClassNames())))
                 .toList();
 
         return new RealmResponse(
@@ -37,7 +37,7 @@ public record RealmResponse(
                 r.getName(),
                 r.getUserBaseDn(),
                 r.getGroupBaseDn(),
-                forms,
+                templates,
                 r.getCreatedAt(),
                 r.getUpdatedAt());
     }
