@@ -110,7 +110,7 @@ class UserFormServiceTest {
         when(configRepo.saveAll(any())).thenReturn(List.of(savedConfig));
 
         var configEntry = new UserFormRequest.AttributeConfigEntry(
-                "cn", "Common Name", true, true, "TEXT", true, null, null);
+                "cn", "Common Name", true, true, "TEXT", true, null, null, false);
 
         UserFormResponse resp = service.create(new UserFormRequest(
                 null, List.of("inetOrgPerson"), "Form", List.of(configEntry)));
@@ -175,7 +175,7 @@ class UserFormServiceTest {
         f.setObjectClassNames(new ArrayList<>(List.of("inetOrgPerson")));
         f.setFormName("Test");
         when(formRepo.findAll()).thenReturn(List.of(f));
-        when(configRepo.findAllByUserFormIdOrderByDisplayOrderAsc(formId)).thenReturn(List.of());
+        when(configRepo.findAllByUserFormId(formId)).thenReturn(List.of());
 
         List<UserFormResponse> result = service.list();
 

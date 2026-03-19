@@ -250,11 +250,11 @@ const editableAttributes = computed(() => {
   return result
 })
 
-/** Attributes from the form config to show in edit mode (excludes objectClass). */
+/** Attributes from the form config to show in edit mode (excludes objectClass and hidden). */
 const editFormAttributes = computed(() => {
   if (!props.userFormConfig?.attributeConfigs) return []
   return props.userFormConfig.attributeConfigs.filter(
-    a => a.attributeName.toLowerCase() !== 'objectclass'
+    a => !a.hidden && a.attributeName.toLowerCase() !== 'objectclass'
   )
 })
 
@@ -303,10 +303,10 @@ const computedDn = computed(() => {
   return `${attr}=${val},${base}`
 })
 
-/** All non-RDN attributes, preserving the order defined in the user form config. */
+/** All non-RDN, non-hidden attributes, preserving the order defined in the user form config. */
 const nonRdnAttributes = computed(() => {
   if (!props.userFormConfig?.attributeConfigs) return []
-  return props.userFormConfig.attributeConfigs.filter(a => !a.rdn && a.attributeName.toLowerCase() !== 'objectclass')
+  return props.userFormConfig.attributeConfigs.filter(a => !a.rdn && !a.hidden && a.attributeName.toLowerCase() !== 'objectclass')
 })
 
 /** Group non-RDN attributes into sections for create mode. */
