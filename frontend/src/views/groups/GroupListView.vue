@@ -22,7 +22,12 @@
     </div>
 
     <DataTable :columns="cols" :rows="groups" :loading="loading" row-key="dn">
-      <template #cell-dn="{ value }"><code class="text-xs">{{ value }}</code></template>
+      <template #cell-dn="{ value }">
+        <span class="inline-flex items-center gap-1">
+          <code class="text-xs">{{ value }}</code>
+          <CopyButton :text="value" />
+        </span>
+      </template>
       <template #cell-description="{ value }">
         <span class="text-gray-600 text-xs">{{ value }}</span>
       </template>
@@ -68,6 +73,23 @@
         <input v-model="newMemberDn" placeholder="member DN to add" @keyup.enter="addMember"
           class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         <button @click="addMember" class="btn-primary">Add</button>
+        <button @click="showBulkAdd = !showBulkAdd" class="btn-secondary">Bulk Add</button>
+      </div>
+      <div v-if="showBulkAdd" class="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Add multiple members (one DN per line)</label>
+        <textarea v-model="bulkMemberDns" rows="4" placeholder="cn=Alice,ou=Users,dc=example,dc=com&#10;cn=Bob,ou=Users,dc=example,dc=com"
+          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"></textarea>
+        <div v-if="bulkResult" class="mb-2 p-2 rounded-lg text-xs" :class="bulkResult.failed ? 'bg-amber-50 border border-amber-200 text-amber-800' : 'bg-green-50 border border-green-200 text-green-800'">
+          Added {{ bulkResult.added }}, failed {{ bulkResult.failed }}.
+          <ul v-if="bulkResult.errors?.length" class="mt-1 list-disc pl-4">
+            <li v-for="(e, i) in bulkResult.errors" :key="i">{{ e.memberValue }}: {{ e.error }}</li>
+          </ul>
+        </div>
+        <div class="flex justify-end">
+          <button @click="doBulkAdd" :disabled="bulkAdding || !bulkMemberDns.trim()" class="btn-primary text-xs">
+            {{ bulkAdding ? 'Adding…' : 'Add All' }}
+          </button>
+        </div>
       </div>
       <ul class="divide-y divide-gray-100 max-h-80 overflow-y-auto">
         <li v-for="dn in members" :key="dn" class="flex items-center justify-between py-2 text-sm">
@@ -93,6 +115,7 @@ import DataTable from '@/components/DataTable.vue'
 import AppModal from '@/components/AppModal.vue'
 import FormField from '@/components/FormField.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import CopyButton from '@/components/CopyButton.vue'
 
 const route = useRoute()
 const notif = useNotificationStore()
@@ -113,6 +136,10 @@ const saving        = ref(false)
 const allRealms     = ref([])
 const selectedRealmId = ref(route.query.realmId || '')
 const realmData     = ref(null)
+const showBulkAdd   = ref(false)
+const bulkMemberDns = ref('')
+const bulkAdding    = ref(false)
+const bulkResult    = ref(null)
 const createForm    = ref({ parentDn: '', cn: '', objectClass: 'groupOfNames', owner: '', description: '' })
 const editForm      = ref({ owner: '', description: '' })
 const editingDn     = ref(null)
@@ -206,6 +233,9 @@ function openMembers(row) {
   selectedGroup.value = row
   members.value       = [...row._members]
   newMemberDn.value   = ''
+  showBulkAdd.value   = false
+  bulkMemberDns.value = ''
+  bulkResult.value    = null
   showMembers.value   = true
 }
 
@@ -217,6 +247,29 @@ async function addMember() {
   )
   members.value.push(newMemberDn.value)
   newMemberDn.value = ''
+}
+
+async function doBulkAdd() {
+  const dns = bulkMemberDns.value.split('\n').map(s => s.trim()).filter(Boolean)
+  if (!dns.length) return
+  bulkAdding.value = true
+  bulkResult.value = null
+  try {
+    const { data } = await groupsApi.addGroupMembersBulk(dirId, selectedGroup.value.dn, {
+      memberAttribute: selectedGroup.value._memberAttr,
+      memberValues: dns,
+    })
+    bulkResult.value = data
+    // Refresh members list
+    for (const d of dns) {
+      if (!members.value.includes(d)) members.value.push(d)
+    }
+    if (data.added > 0) bulkMemberDns.value = ''
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  } finally {
+    bulkAdding.value = false
+  }
 }
 
 async function removeMember(dn) {

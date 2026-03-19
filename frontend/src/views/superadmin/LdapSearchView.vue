@@ -46,6 +46,12 @@
           {{ searching ? 'Searching…' : 'Search' }}
         </button>
         <button @click="clearForm" class="btn-secondary">Clear</button>
+        <button @click="promptSaveSearch" class="btn-secondary">Save Search</button>
+        <select v-if="savedSearches.length" @change="loadSavedSearch($event)" class="input w-48">
+          <option value="">-- Saved Searches --</option>
+          <option v-for="(s, i) in savedSearches" :key="i" :value="i">{{ s.name }}</option>
+        </select>
+        <button v-if="savedSearches.length" @click="clearSavedSearches" class="text-xs text-gray-400 hover:text-gray-600" title="Clear all saved searches">Clear saved</button>
       </div>
     </div>
 
@@ -112,6 +118,7 @@ import { searchEntries, exportLdif } from '@/api/browse'
 import DnPicker from '@/components/DnPicker.vue'
 
 const HISTORY_KEY = 'ldap-search-history'
+const SAVED_KEY   = 'ldap-saved-searches'
 const MAX_HISTORY = 10
 
 const router = useRouter()
@@ -133,6 +140,7 @@ const form = ref({
 })
 
 const history = ref(loadHistory())
+const savedSearches = ref(loadSavedSearches())
 
 const resultColumns = computed(() => {
   if (!results.value.length) return []
@@ -216,6 +224,34 @@ function loadFromHistory(h) {
 function clearHistory() {
   history.value = []
   try { localStorage.removeItem(HISTORY_KEY) } catch {}
+}
+
+function loadSavedSearches() {
+  try { return JSON.parse(localStorage.getItem(SAVED_KEY) || '[]') } catch { return [] }
+}
+
+function promptSaveSearch() {
+  const name = prompt('Name for this search:')
+  if (!name?.trim()) return
+  const entry = { name: name.trim(), baseDn: form.value.baseDn, scope: form.value.scope, filter: form.value.filter, attributes: form.value.attributes, limit: form.value.limit }
+  savedSearches.value = [...savedSearches.value.filter(s => s.name !== entry.name), entry]
+  try { localStorage.setItem(SAVED_KEY, JSON.stringify(savedSearches.value)) } catch {}
+}
+
+function loadSavedSearch(event) {
+  const idx = event.target.value
+  if (idx === '') return
+  const s = savedSearches.value[idx]
+  if (s) {
+    form.value = { ...form.value, ...s }
+    doSearch()
+  }
+  event.target.value = ''
+}
+
+function clearSavedSearches() {
+  savedSearches.value = []
+  try { localStorage.removeItem(SAVED_KEY) } catch {}
 }
 
 onMounted(async () => {

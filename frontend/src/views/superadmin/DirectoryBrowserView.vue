@@ -63,7 +63,10 @@
             <div class="flex items-end justify-between mb-4">
               <div class="flex-1 min-w-0">
                 <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Distinguished Name</p>
-                <p class="text-sm font-mono text-gray-900 bg-gray-50 px-3 py-2 rounded-lg break-all">{{ entryDetail.dn }}</p>
+                <div class="text-sm font-mono text-gray-900 bg-gray-50 px-3 py-2 rounded-lg break-all flex items-center gap-2">
+                  <span class="flex-1">{{ entryDetail.dn }}</span>
+                  <CopyButton :text="entryDetail.dn" />
+                </div>
               </div>
               <div class="ml-3 shrink-0 relative" ref="menuRef">
                 <button @click="showActionsMenu = !showActionsMenu"
@@ -236,6 +239,7 @@ import CreateEntryForm from '@/components/CreateEntryForm.vue'
 import EditEntryForm from '@/components/EditEntryForm.vue'
 import LdifImportModal from '@/components/LdifImportModal.vue'
 import DnPicker from '@/components/DnPicker.vue'
+import CopyButton from '@/components/CopyButton.vue'
 
 const notif = useNotificationStore()
 
