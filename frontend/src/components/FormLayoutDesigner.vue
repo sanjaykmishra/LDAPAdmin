@@ -18,7 +18,7 @@
     <div v-if="showPreview" class="border border-blue-200 bg-blue-50/30 rounded-xl p-4">
       <h4 class="text-sm font-semibold text-blue-800 mb-3">Form Preview</h4>
       <div class="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
-        <template v-for="(section, sIdx) in sections" :key="sIdx">
+        <template v-for="(section, sIdx) in sections" :key="section.id">
           <fieldset v-if="section.fields.length" class="space-y-3">
             <legend v-if="section.name" class="text-sm font-semibold text-gray-800 pb-1 border-b border-gray-100 w-full mb-2">{{ section.name }}</legend>
             <div class="grid grid-cols-3 gap-3">
@@ -49,7 +49,7 @@
     <div class="space-y-3">
       <div
         v-for="(section, sIdx) in sections"
-        :key="sIdx"
+        :key="section.id"
         class="border border-gray-200 rounded-xl overflow-hidden"
         :class="dragOverSection === sIdx ? 'ring-2 ring-blue-400' : ''"
         @dragover.prevent="onDragOverSection($event, sIdx)"
@@ -138,7 +138,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, watch } from 'vue'
 
 const props = defineProps({
   attributeConfigs: { type: Array, required: true },
@@ -146,6 +146,9 @@ const props = defineProps({
 const emit = defineEmits(['update:attributeConfigs'])
 
 const showPreview = ref(false)
+
+let sectionIdCounter = 0
+function nextSectionId() { return `section-${++sectionIdCounter}` }
 
 // ── Build sections from flat attribute list ──────────────────────────────────
 
@@ -156,13 +159,13 @@ function buildSections(attrs) {
   for (const attr of attrs) {
     const key = attr.sectionName || ''
     if (!map.has(key)) {
-      map.set(key, { name: key, fields: [] })
+      map.set(key, { id: nextSectionId(), name: key, fields: [] })
     }
     map.get(key).fields.push({ ...attr })
   }
   const result = Array.from(map.values())
   if (result.length === 0) {
-    result.push({ name: '', fields: [] })
+    result.push({ id: nextSectionId(), name: '', fields: [] })
   }
   return result
 }
@@ -170,12 +173,33 @@ function buildSections(attrs) {
 // Initialize from props
 sections.value = buildSections(props.attributeConfigs)
 
-// Watch for external changes to attributeConfigs
+// Watch for external changes to attributeConfigs (e.g. attributes added/removed on the Attributes tab).
+// Merge new attributes into existing sections rather than rebuilding, so empty sections survive.
+let syncing = false
 watch(() => props.attributeConfigs, (newConfigs) => {
-  // Only rebuild if the attributes themselves changed (not from our own sync)
-  const flat = flattenSections()
-  if (JSON.stringify(newConfigs.map(a => a.attributeName)) !== JSON.stringify(flat.map(a => a.attributeName))) {
-    sections.value = buildSections(newConfigs)
+  if (syncing) return
+
+  const currentNames = new Set(
+    sections.value.flatMap(s => s.fields.map(f => f.attributeName))
+  )
+  const incomingNames = new Set(newConfigs.map(a => a.attributeName))
+
+  // Nothing changed — skip
+  if (
+    currentNames.size === incomingNames.size &&
+    [...currentNames].every(n => incomingNames.has(n))
+  ) return
+
+  // Remove fields that were deleted on the Attributes tab
+  for (const section of sections.value) {
+    section.fields = section.fields.filter(f => incomingNames.has(f.attributeName))
+  }
+
+  // Add newly-added fields into the first section
+  for (const attr of newConfigs) {
+    if (!currentNames.has(attr.attributeName)) {
+      sections.value[0].fields.push({ ...attr })
+    }
   }
 }, { deep: true })
 
@@ -193,13 +217,16 @@ function flattenSections() {
 }
 
 function syncToParent() {
+  syncing = true
   emit('update:attributeConfigs', flattenSections())
+  // Allow the next tick to propagate before re-enabling the watch
+  setTimeout(() => { syncing = false }, 0)
 }
 
 // ── Section management ───────────────────────────────────────────────────────
 
 function addSection() {
-  sections.value.push({ name: '', fields: [] })
+  sections.value.push({ id: nextSectionId(), name: '', fields: [] })
 }
 
 function removeSection(idx) {
