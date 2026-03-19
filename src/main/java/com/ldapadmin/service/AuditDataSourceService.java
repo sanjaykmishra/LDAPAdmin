@@ -2,14 +2,21 @@ package com.ldapadmin.service;
 
 import com.ldapadmin.dto.audit.AuditSourceRequest;
 import com.ldapadmin.dto.audit.AuditSourceResponse;
+import com.ldapadmin.dto.directory.TestConnectionResult;
 import com.ldapadmin.entity.AuditDataSource;
+import com.ldapadmin.entity.enums.SslMode;
 import com.ldapadmin.exception.ResourceNotFoundException;
+import com.ldapadmin.ldap.SslHelper;
 import com.ldapadmin.repository.AuditDataSourceRepository;
+import com.unboundid.ldap.sdk.*;
+import com.unboundid.util.ssl.SSLUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -55,6 +62,61 @@ public class AuditDataSourceService {
     @Transactional
     public void delete(UUID id) {
         auditSourceRepo.delete(load(id));
+    }
+
+    // ── Test connection ────────────────────────────────────────────────────────
+
+    public TestConnectionResult testConnection(AuditSourceRequest req) {
+        Instant start = Instant.now();
+        try {
+            String bindDn = req.bindDn().trim();
+            String password = req.bindPassword();
+
+            LDAPConnectionOptions opts = new LDAPConnectionOptions();
+            opts.setConnectTimeoutMillis(10_000);
+            opts.setResponseTimeoutMillis(10_000L);
+
+            LDAPConnection conn;
+            if (req.sslMode() == SslMode.LDAPS) {
+                SSLUtil sslUtil = SslHelper.buildSslUtil(req.trustAllCerts(), req.trustedCertificatePem());
+                conn = new LDAPConnection(sslUtil.createSSLSocketFactory(),
+                        opts, req.host().trim(), req.port());
+            } else {
+                conn = new LDAPConnection(opts, req.host().trim(), req.port());
+                if (req.sslMode() == SslMode.STARTTLS) {
+                    SSLUtil sslUtil = SslHelper.buildSslUtil(req.trustAllCerts(), req.trustedCertificatePem());
+                    conn.processExtendedOperation(
+                            new com.unboundid.ldap.sdk.extensions.StartTLSExtendedRequest(
+                                    sslUtil.createSSLContext()));
+                }
+            }
+
+            try (conn) {
+                BindResult result = conn.bind(new SimpleBindRequest(bindDn, password));
+                long ms = Duration.between(start, Instant.now()).toMillis();
+
+                if (result.getResultCode() == ResultCode.SUCCESS) {
+                    // Verify changelog base DN is reachable
+                    String changelogDn = req.changelogBaseDn() != null
+                            ? req.changelogBaseDn().trim() : "cn=changelog";
+                    try {
+                        conn.search(new SearchRequest(changelogDn, SearchScope.BASE,
+                                "(objectClass=*)", "dn"));
+                    } catch (LDAPException ex) {
+                        return new TestConnectionResult(false,
+                                "Bind OK, but changelog base DN '" + changelogDn
+                                        + "' is not reachable: " + ex.getMessage(), ms);
+                    }
+                    return new TestConnectionResult(true,
+                            "Connection, bind, and changelog base DN verified", ms);
+                }
+                return new TestConnectionResult(false,
+                        "Bind failed: " + result.getResultCode().getName(), ms);
+            }
+        } catch (Exception ex) {
+            long ms = Duration.between(start, Instant.now()).toMillis();
+            return new TestConnectionResult(false, ex.getMessage(), ms);
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
