@@ -2,21 +2,21 @@
   <div class="p-6 max-w-5xl">
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">User Forms</h1>
+        <h1 class="text-2xl font-bold text-gray-900">User Templates</h1>
         <p class="text-sm text-gray-500 mt-1">Define how LDAP attributes are presented and validated in user creation and edit forms</p>
       </div>
-      <button @click="openCreate" class="btn-primary">+ New Form</button>
+      <button @click="openCreate" class="btn-primary">+ New Template</button>
     </div>
 
     <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
       <div v-if="loading" class="p-8 text-center text-gray-500 text-sm">Loading…</div>
-      <div v-else-if="forms.length === 0" class="p-8 text-center text-gray-400 text-sm">
-        No user forms configured. Create one to define attribute display rules for user entries.
+      <div v-else-if="templates.length === 0" class="p-8 text-center text-gray-400 text-sm">
+        No user templates configured. Create one to define attribute display rules for user entries.
       </div>
       <table v-else class="w-full text-sm">
         <thead class="bg-gray-50 border-b border-gray-100">
           <tr>
-            <th class="px-4 py-3 text-left font-medium text-gray-500">Form Name</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-500">Template Name</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Directory</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Object Classes</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Attributes</th>
@@ -24,13 +24,13 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-50">
-          <tr v-for="f in forms" :key="f.id" class="hover:bg-gray-50">
-            <td class="px-4 py-3 font-medium text-gray-900">{{ f.formName }}</td>
-            <td class="px-4 py-3 text-gray-600 text-xs">{{ dirName(f.directoryId) }}</td>
+          <tr v-for="t in templates" :key="t.id" class="hover:bg-gray-50">
+            <td class="px-4 py-3 font-medium text-gray-900">{{ t.templateName }}</td>
+            <td class="px-4 py-3 text-gray-600 text-xs">{{ dirName(t.directoryId) }}</td>
             <td class="px-4 py-3">
               <div class="flex flex-wrap gap-1">
                 <span
-                  v-for="oc in f.objectClassNames"
+                  v-for="oc in t.objectClassNames"
                   :key="oc"
                   class="text-xs bg-purple-50 text-purple-700 rounded px-1.5 py-0.5 font-mono"
                 >{{ oc }}</span>
@@ -39,16 +39,16 @@
             <td class="px-4 py-3">
               <div class="flex flex-wrap gap-1">
                 <span
-                  v-for="attr in f.attributeConfigs"
+                  v-for="attr in t.attributeConfigs"
                   :key="attr.id"
                   class="text-xs bg-blue-50 text-blue-700 rounded px-1.5 py-0.5"
                 >{{ attr.attributeName }}</span>
-                <span v-if="!f.attributeConfigs.length" class="text-xs text-gray-400">None</span>
+                <span v-if="!t.attributeConfigs.length" class="text-xs text-gray-400">None</span>
               </div>
             </td>
             <td class="px-4 py-3 text-right whitespace-nowrap">
-              <button @click="openEdit(f)" class="text-blue-600 hover:text-blue-800 text-xs font-medium mr-3">Edit</button>
-              <button @click="confirmDelete(f)" class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
+              <button @click="openEdit(t)" class="text-blue-600 hover:text-blue-800 text-xs font-medium mr-3">Edit</button>
+              <button @click="confirmDelete(t)" class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
             </td>
           </tr>
         </tbody>
@@ -56,7 +56,7 @@
     </div>
 
     <!-- Create/Edit modal -->
-    <AppModal v-model="showModal" :title="editing ? 'Edit User Form' : 'New User Form'" size="xl">
+    <AppModal v-model="showModal" :title="editing ? 'Edit User Template' : 'New User Template'" size="xl">
       <form @submit.prevent="save" class="space-y-4">
         <!-- Directory picker -->
         <div>
@@ -67,14 +67,14 @@
           </select>
         </div>
 
-        <FormField label="Form Name" v-model="form.formName" required placeholder="e.g. Standard User Form" />
+        <FormField label="Template Name" v-model="template.templateName" required placeholder="e.g. Standard User Template" />
 
         <!-- Object Classes section -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Object Classes <span class="text-red-500">*</span></label>
-          <div v-if="form.objectClassNames.length" class="flex flex-wrap gap-2 mb-2">
+          <div v-if="template.objectClassNames.length" class="flex flex-wrap gap-2 mb-2">
             <span
-              v-for="oc in form.objectClassNames"
+              v-for="oc in template.objectClassNames"
               :key="oc"
               class="inline-flex items-center gap-1 text-sm bg-purple-50 text-purple-700 rounded-lg px-2.5 py-1 font-mono"
             >
@@ -116,7 +116,7 @@
         <div v-show="modalTab === 'attributes'">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Attribute Configurations</label>
-            <div v-if="form.attributeConfigs.length" class="border border-gray-200 rounded-lg overflow-hidden mb-2">
+            <div v-if="template.attributeConfigs.length" class="border border-gray-200 rounded-lg overflow-hidden mb-2">
               <table class="w-full text-sm">
                 <thead class="bg-gray-50">
                   <tr>
@@ -131,7 +131,7 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                  <tr v-for="(attr, idx) in form.attributeConfigs" :key="idx">
+                  <tr v-for="(attr, idx) in template.attributeConfigs" :key="idx">
                     <td class="px-3 py-2">
                       <input v-model="attr.attributeName" placeholder="e.g. cn" class="input w-full" required disabled />
                     </td>
@@ -158,7 +158,7 @@
                     <td class="px-3 py-2 text-right">
                       <button
                         type="button"
-                        @click="form.attributeConfigs.splice(idx, 1)"
+                        @click="template.attributeConfigs.splice(idx, 1)"
                         :disabled="attr.requiredOnCreate || attr.rdn"
                         :class="attr.requiredOnCreate || attr.rdn ? 'text-gray-300 cursor-not-allowed' : 'text-red-500 hover:text-red-700'"
                         class="text-xs font-medium"
@@ -179,7 +179,7 @@
         <!-- Layout Designer tab -->
         <div v-show="modalTab === 'layout'">
           <FormLayoutDesigner
-            :attribute-configs="form.attributeConfigs"
+            :attribute-configs="template.attributeConfigs"
             @update:attribute-configs="onLayoutUpdate"
           />
         </div>
@@ -196,8 +196,8 @@
       <div v-if="showAddAttrPicker" class="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
         <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
           <h3 class="text-lg font-semibold text-gray-900 mb-2">Add Attributes</h3>
-          <p class="text-sm text-gray-600 mb-3">Select attributes to add to the form:</p>
-          <div v-if="availableAttrsForPicker.length === 0" class="text-sm text-gray-400 mb-4">All object class attributes are already in the form.</div>
+          <p class="text-sm text-gray-600 mb-3">Select attributes to add to the template:</p>
+          <div v-if="availableAttrsForPicker.length === 0" class="text-sm text-gray-400 mb-4">All object class attributes are already in the template.</div>
           <div v-else class="max-h-64 overflow-y-auto mb-4 border border-gray-200 rounded-lg divide-y divide-gray-100">
             <label
               v-for="attr in availableAttrsForPicker"
@@ -221,7 +221,7 @@
     <!-- Delete confirm -->
     <ConfirmDialog
       v-if="deleteTarget"
-      :message="`Delete form '${deleteTarget.formName}'? This will remove all attribute configurations and unlink it from any realms.`"
+      :message="`Delete template '${deleteTarget.templateName}'? This will remove all attribute configurations and unlink it from any realms.`"
       @confirm="doDelete"
       @cancel="deleteTarget = null"
     />
@@ -231,7 +231,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
-import { listUserForms, createUserForm, updateUserForm, deleteUserForm } from '@/api/userForms'
+import { listUserTemplates, createUserTemplate, updateUserTemplate, deleteUserTemplate } from '@/api/userTemplates'
 import { listDirectories } from '@/api/directories'
 import { listObjectClasses, getObjectClass } from '@/api/schema'
 import FormField from '@/components/FormField.vue'
@@ -245,7 +245,7 @@ const inputTypes = ['TEXT', 'TEXTAREA', 'PASSWORD', 'BOOLEAN', 'DATE', 'DATETIME
 
 const loading        = ref(false)
 const saving         = ref(false)
-const forms          = ref([])
+const templates      = ref([])
 const directories    = ref([])
 const objectClasses  = ref([])
 const loadingOCs     = ref(false)
@@ -257,7 +257,7 @@ const selectedDirId  = ref('')
 const ocToAdd        = ref('')
 const modalTab       = ref('attributes')
 
-const form = ref(emptyForm())
+const template = ref(emptyTemplate())
 
 /**
  * Per-objectClass schema cache.  Key = class name, value = { required: Set, optional: Set }.
@@ -265,9 +265,9 @@ const form = ref(emptyForm())
  */
 const ocSchemaCache = ref({})
 
-// When selected directory changes, sync to form and fetch object classes
+// When selected directory changes, sync to template and fetch object classes
 watch(selectedDirId, async (dirId) => {
-  form.value.directoryId = dirId || null
+  template.value.directoryId = dirId || null
   if (!dirId) {
     objectClasses.value = []
     return
@@ -284,9 +284,9 @@ watch(selectedDirId, async (dirId) => {
   }
 })
 
-/** Object classes not yet added to the form. */
+/** Object classes not yet added to the template. */
 const availableObjectClasses = computed(() => {
-  const added = new Set(form.value.objectClassNames.map(n => n.toLowerCase()))
+  const added = new Set(template.value.objectClassNames.map(n => n.toLowerCase()))
   return objectClasses.value.filter(oc => !added.has(oc.toLowerCase()))
 })
 
@@ -295,9 +295,9 @@ const availableObjectClasses = computed(() => {
 async function addObjectClass() {
   const oc = ocToAdd.value?.trim()
   if (!oc) return
-  if (form.value.objectClassNames.some(n => n.toLowerCase() === oc.toLowerCase())) return
+  if (template.value.objectClassNames.some(n => n.toLowerCase() === oc.toLowerCase())) return
 
-  form.value.objectClassNames.push(oc)
+  template.value.objectClassNames.push(oc)
   ocToAdd.value = ''
 
   // Fetch schema attributes for this class, add new ones
@@ -307,11 +307,11 @@ async function addObjectClass() {
 }
 
 async function removeObjectClass(oc) {
-  form.value.objectClassNames = form.value.objectClassNames.filter(n => n !== oc)
+  template.value.objectClassNames = template.value.objectClassNames.filter(n => n !== oc)
 
   // Build the set of attributes owned by the remaining classes
   const remainingAttrs = new Set()
-  for (const name of form.value.objectClassNames) {
+  for (const name of template.value.objectClassNames) {
     const cached = ocSchemaCache.value[name.toLowerCase()]
     if (cached) {
       cached.required.forEach(a => remainingAttrs.add(a.toLowerCase()))
@@ -327,7 +327,7 @@ async function removeObjectClass(oc) {
     removedCache.optional.forEach(a => removedAttrs.add(a.toLowerCase()))
 
     // Only remove attributes unique to the removed class
-    form.value.attributeConfigs = form.value.attributeConfigs.filter(attr => {
+    template.value.attributeConfigs = template.value.attributeConfigs.filter(attr => {
       const lower = attr.attributeName.toLowerCase()
       if (!removedAttrs.has(lower)) return true   // not from the removed class
       if (remainingAttrs.has(lower)) return true   // shared with a remaining class
@@ -347,8 +347,8 @@ async function fetchAndMergeAttributes(ocName) {
     const optional = new Set(data.optional || [])
     ocSchemaCache.value[ocName.toLowerCase()] = { required, optional }
 
-    // Determine which attributes are already in the form
-    const existing = new Set(form.value.attributeConfigs.map(a => a.attributeName.toLowerCase()))
+    // Determine which attributes are already in the template
+    const existing = new Set(template.value.attributeConfigs.map(a => a.attributeName.toLowerCase()))
 
     // Add required attributes that are new (insert at top, before first non-required)
     const newRequired = []
@@ -377,13 +377,13 @@ async function fetchAndMergeAttributes(ocName) {
     // Insert required before the first optional attribute, or at the start
     if (newRequired.length) {
       // Find the first non-required attribute index
-      const firstOptIdx = form.value.attributeConfigs.findIndex(a => !a.requiredOnCreate)
-      const insertIdx = firstOptIdx >= 0 ? firstOptIdx : form.value.attributeConfigs.length
-      form.value.attributeConfigs.splice(insertIdx, 0, ...newRequired)
+      const firstOptIdx = template.value.attributeConfigs.findIndex(a => !a.requiredOnCreate)
+      const insertIdx = firstOptIdx >= 0 ? firstOptIdx : template.value.attributeConfigs.length
+      template.value.attributeConfigs.splice(insertIdx, 0, ...newRequired)
     }
 
     // Append optional at the end
-    form.value.attributeConfigs.push(...newOptional)
+    template.value.attributeConfigs.push(...newOptional)
   } catch (e) {
     notif.error('Failed to load attributes for ' + ocName + ': ' + (e.response?.data?.detail || e.message))
   } finally {
@@ -395,7 +395,7 @@ async function fetchAndMergeAttributes(ocName) {
 const cachedSchemaAttrs = computed(() => {
   const result = []
   const seen = new Set()
-  for (const ocName of form.value.objectClassNames) {
+  for (const ocName of template.value.objectClassNames) {
     const cached = ocSchemaCache.value[ocName.toLowerCase()]
     if (!cached) continue
     for (const name of cached.required) {
@@ -419,26 +419,26 @@ const showAddAttrPicker       = ref(false)
 const availableAttrsForPicker = ref([])
 const pickerSelected          = ref([])
 
-function emptyForm() {
+function emptyTemplate() {
   return {
     directoryId: null,
-    formName: '',
+    templateName: '',
     objectClassNames: [],
     attributeConfigs: [],
   }
 }
 
 function onLayoutUpdate(updatedConfigs) {
-  // Merge layout changes (sectionName, columnSpan, order) back into the form
-  form.value.attributeConfigs = updatedConfigs.map(attr => {
+  // Merge layout changes (sectionName, columnSpan, order) back into the template
+  template.value.attributeConfigs = updatedConfigs.map(attr => {
     // Find existing config to preserve non-layout fields
-    const existing = form.value.attributeConfigs.find(a => a.attributeName === attr.attributeName)
+    const existing = template.value.attributeConfigs.find(a => a.attributeName === attr.attributeName)
     return existing ? { ...existing, sectionName: attr.sectionName || '', columnSpan: attr.columnSpan ?? 3 } : attr
   })
 }
 
 function setRdn(idx) {
-  form.value.attributeConfigs.forEach((attr, i) => {
+  template.value.attributeConfigs.forEach((attr, i) => {
     attr.rdn = i === idx
     if (attr.rdn) attr.requiredOnCreate = true
   })
@@ -452,7 +452,7 @@ function dirName(dirId) {
 
 function addAttribute() {
   const existing = new Set(
-    form.value.attributeConfigs.map(a => a.attributeName.toLowerCase())
+    template.value.attributeConfigs.map(a => a.attributeName.toLowerCase())
   )
   availableAttrsForPicker.value = cachedSchemaAttrs.value.filter(
     a => !existing.has(a.attributeName.toLowerCase())
@@ -465,7 +465,7 @@ function addSelectedAttributes() {
   for (const name of pickerSelected.value) {
     const attr = availableAttrsForPicker.value.find(a => a.attributeName === name)
     if (attr) {
-      form.value.attributeConfigs.push({
+      template.value.attributeConfigs.push({
         attributeName: attr.attributeName,
         customLabel: '',
         inputType: 'TEXT',
@@ -484,8 +484,8 @@ function addSelectedAttributes() {
 async function load() {
   loading.value = true
   try {
-    const [formsRes, dirsRes] = await Promise.all([listUserForms(), listDirectories()])
-    forms.value = formsRes.data
+    const [templatesRes, dirsRes] = await Promise.all([listUserTemplates(), listDirectories()])
+    templates.value = templatesRes.data
     directories.value = dirsRes.data
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
@@ -502,22 +502,22 @@ function openCreate() {
   objectClasses.value = []
   ocSchemaCache.value = {}
   modalTab.value = 'attributes'
-  form.value = emptyForm()
+  template.value = emptyTemplate()
   showModal.value = true
 }
 
-async function openEdit(f) {
-  editing.value = f.id
+async function openEdit(t) {
+  editing.value = t.id
   ocSchemaCache.value = {}
   modalTab.value = 'attributes'
   // Pre-seed objectClasses list so the dropdown has matching options
-  objectClasses.value = f.objectClassNames?.length ? [...f.objectClassNames] : []
-  selectedDirId.value = f.directoryId || ''
-  form.value = {
-    directoryId: f.directoryId || null,
-    formName: f.formName,
-    objectClassNames: [...(f.objectClassNames || [])],
-    attributeConfigs: (f.attributeConfigs || []).map(a => ({
+  objectClasses.value = t.objectClassNames?.length ? [...t.objectClassNames] : []
+  selectedDirId.value = t.directoryId || ''
+  template.value = {
+    directoryId: t.directoryId || null,
+    templateName: t.templateName,
+    objectClassNames: [...(t.objectClassNames || [])],
+    attributeConfigs: (t.attributeConfigs || []).map(a => ({
       attributeName: a.attributeName,
       customLabel: a.customLabel || '',
       inputType: a.inputType,
@@ -532,10 +532,10 @@ async function openEdit(f) {
   showModal.value = true
 
   // Pre-populate the schema cache for existing object classes
-  if (f.directoryId && f.objectClassNames?.length) {
-    for (const oc of f.objectClassNames) {
+  if (t.directoryId && t.objectClassNames?.length) {
+    for (const oc of t.objectClassNames) {
       try {
-        const { data } = await getObjectClass(f.directoryId, oc)
+        const { data } = await getObjectClass(t.directoryId, oc)
         ocSchemaCache.value[oc.toLowerCase()] = {
           required: new Set(data.required || []),
           optional: new Set(data.optional || []),
@@ -546,13 +546,13 @@ async function openEdit(f) {
 }
 
 async function save() {
-  if (!form.value.objectClassNames.length) {
+  if (!template.value.objectClassNames.length) {
     notif.error('At least one object class is required')
     return
   }
   // Validate exactly one RDN attribute
-  if (form.value.attributeConfigs.length > 0) {
-    const rdnCount = form.value.attributeConfigs.filter(a => a.rdn).length
+  if (template.value.attributeConfigs.length > 0) {
+    const rdnCount = template.value.attributeConfigs.filter(a => a.rdn).length
     if (rdnCount === 0) {
       notif.error('One attribute must be designated as the RDN attribute')
       return
@@ -561,11 +561,11 @@ async function save() {
   saving.value = true
   try {
     if (editing.value) {
-      await updateUserForm(editing.value, form.value)
-      notif.success('Form updated')
+      await updateUserTemplate(editing.value, template.value)
+      notif.success('Template updated')
     } else {
-      await createUserForm(form.value)
-      notif.success('Form created')
+      await createUserTemplate(template.value)
+      notif.success('Template created')
     }
     showModal.value = false
     await load()
@@ -576,12 +576,12 @@ async function save() {
   }
 }
 
-function confirmDelete(f) { deleteTarget.value = f }
+function confirmDelete(t) { deleteTarget.value = t }
 
 async function doDelete() {
   try {
-    await deleteUserForm(deleteTarget.value.id)
-    notif.success('Form deleted')
+    await deleteUserTemplate(deleteTarget.value.id)
+    notif.success('Template deleted')
     deleteTarget.value = null
     await load()
   } catch (e) {

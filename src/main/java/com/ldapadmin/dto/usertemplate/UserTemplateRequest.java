@@ -1,4 +1,4 @@
-package com.ldapadmin.dto.userform;
+package com.ldapadmin.dto.usertemplate;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -10,12 +10,12 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Create / update request for a user form and its attribute configs.
+ * Create / update request for a user template and its attribute configs.
  */
-public record UserFormRequest(
+public record UserTemplateRequest(
         UUID directoryId,
         @NotEmpty List<@NotBlank @Size(max = 255) String> objectClassNames,
-        @NotBlank @Size(max = 255) String formName,
+        @NotBlank @Size(max = 255) String templateName,
         List<@Valid AttributeConfigEntry> attributeConfigs) {
 
     public record AttributeConfigEntry(

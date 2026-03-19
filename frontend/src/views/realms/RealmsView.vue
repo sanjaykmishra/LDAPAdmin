@@ -20,7 +20,7 @@
             <th class="px-4 py-3 text-left font-medium text-gray-500">Name</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">User Base DN</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Group Base DN</th>
-            <th class="px-4 py-3 text-left font-medium text-gray-500">User Forms</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-500">User Templates</th>
             <th class="px-4 py-3"></th>
           </tr>
         </thead>
@@ -33,11 +33,11 @@
             <td class="px-4 py-3">
               <div class="flex flex-wrap gap-1">
                 <span
-                  v-for="uf in r.userForms"
-                  :key="uf.id"
+                  v-for="ut in r.userTemplates"
+                  :key="ut.id"
                   class="text-xs bg-blue-50 text-blue-700 rounded px-1.5 py-0.5"
-                >{{ uf.formName }}{{ uf.objectClassNames?.length ? ` (${uf.objectClassNames.join(', ')})` : '' }}</span>
-                <span v-if="!r.userForms?.length" class="text-xs text-gray-400">—</span>
+                >{{ ut.templateName }}{{ ut.objectClassNames?.length ? ` (${ut.objectClassNames.join(', ')})` : '' }}</span>
+                <span v-if="!r.userTemplates?.length" class="text-xs text-gray-400">—</span>
               </div>
             </td>
             <td class="px-4 py-3 text-right whitespace-nowrap">
@@ -69,27 +69,27 @@
           <FormField label="User Base DN" v-model="form.userBaseDn" required placeholder="ou=people,dc=example,dc=com" />
           <FormField label="Group Base DN" v-model="form.groupBaseDn" required placeholder="ou=groups,dc=example,dc=com" />
         </div>
-        <!-- User Forms multi-select -->
+        <!-- User Templates multi-select -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">User Forms</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">User Templates</label>
           <div class="border border-gray-300 rounded-lg p-2 max-h-48 overflow-y-auto space-y-1">
             <label
-              v-for="uf in userForms"
-              :key="uf.id"
+              v-for="ut in userTemplates"
+              :key="ut.id"
               class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer"
             >
               <input
                 type="checkbox"
-                :value="uf.id"
-                v-model="form.userFormIds"
+                :value="ut.id"
+                v-model="form.userTemplateIds"
                 class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
-              <span class="text-sm text-gray-800">{{ uf.formName }}</span>
-              <span v-if="uf.objectClassNames?.length" class="text-xs text-gray-400">({{ uf.objectClassNames.join(', ') }})</span>
+              <span class="text-sm text-gray-800">{{ ut.templateName }}</span>
+              <span v-if="ut.objectClassNames?.length" class="text-xs text-gray-400">({{ ut.objectClassNames.join(', ') }})</span>
             </label>
-            <p v-if="userForms.length === 0" class="text-xs text-gray-400 px-2 py-1">No user forms available. Create one first.</p>
+            <p v-if="userTemplates.length === 0" class="text-xs text-gray-400 px-2 py-1">No user templates available. Create one first.</p>
           </div>
-          <p class="text-xs text-gray-400 mt-1">Select the user forms available for creating users in this realm</p>
+          <p class="text-xs text-gray-400 mt-1">Select the user templates available for creating users in this realm</p>
         </div>
 
         <div class="flex justify-end gap-2 pt-2">
@@ -113,7 +113,7 @@
 import { ref, onMounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
 import { listAllRealms, createRealm, updateRealm, deleteRealm } from '@/api/realms'
-import { listUserForms } from '@/api/userForms'
+import { listUserTemplates } from '@/api/userTemplates'
 import { listDirectories } from '@/api/directories'
 import FormField from '@/components/FormField.vue'
 import AppModal from '@/components/AppModal.vue'
@@ -121,14 +121,14 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const notif = useNotificationStore()
 
-const loading      = ref(false)
-const saving       = ref(false)
-const realms       = ref([])
-const userForms    = ref([])
-const directories  = ref([])
-const showModal    = ref(false)
-const editing      = ref(null)
-const deleteTarget = ref(null)
+const loading        = ref(false)
+const saving         = ref(false)
+const realms         = ref([])
+const userTemplates  = ref([])
+const directories    = ref([])
+const showModal      = ref(false)
+const editing        = ref(null)
+const deleteTarget   = ref(null)
 
 const form = ref(emptyForm())
 
@@ -138,20 +138,20 @@ function emptyForm() {
     name: '',
     userBaseDn: '',
     groupBaseDn: '',
-    userFormIds: [],
+    userTemplateIds: [],
   }
 }
 
 async function load() {
   loading.value = true
   try {
-    const [realmsRes, formsRes, dirsRes] = await Promise.all([
+    const [realmsRes, templatesRes, dirsRes] = await Promise.all([
       listAllRealms(),
-      listUserForms(),
+      listUserTemplates(),
       listDirectories(),
     ])
     realms.value = realmsRes.data
-    userForms.value = formsRes.data
+    userTemplates.value = templatesRes.data
     directories.value = dirsRes.data
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
@@ -175,7 +175,7 @@ function openEdit(r) {
     name: r.name,
     userBaseDn: r.userBaseDn,
     groupBaseDn: r.groupBaseDn,
-    userFormIds: (r.userForms || []).map(uf => uf.id),
+    userTemplateIds: (r.userTemplates || []).map(ut => ut.id),
   }
   showModal.value = true
 }
@@ -188,7 +188,7 @@ async function save() {
       name: form.value.name,
       userBaseDn: form.value.userBaseDn,
       groupBaseDn: form.value.groupBaseDn,
-      userFormIds: form.value.userFormIds,
+      userTemplateIds: form.value.userTemplateIds,
     }
     if (editing.value) {
       await updateRealm(targetDirId, editing.value, payload)

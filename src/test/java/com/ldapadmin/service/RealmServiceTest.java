@@ -5,12 +5,12 @@ import com.ldapadmin.dto.realm.RealmResponse;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.Realm;
 import com.ldapadmin.entity.RealmObjectclass;
-import com.ldapadmin.entity.UserForm;
+import com.ldapadmin.entity.UserTemplate;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.repository.RealmObjectclassRepository;
 import com.ldapadmin.repository.RealmRepository;
-import com.ldapadmin.repository.UserFormRepository;
+import com.ldapadmin.repository.UserTemplateRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,7 +33,7 @@ class RealmServiceTest {
     @Mock private RealmRepository               realmRepo;
     @Mock private DirectoryConnectionRepository dirRepo;
     @Mock private RealmObjectclassRepository    realmOcRepo;
-    @Mock private UserFormRepository            userFormRepo;
+    @Mock private UserTemplateRepository        userTemplateRepo;
 
     private RealmService service;
 
@@ -42,7 +42,7 @@ class RealmServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new RealmService(realmRepo, dirRepo, realmOcRepo, userFormRepo);
+        service = new RealmService(realmRepo, dirRepo, realmOcRepo, userTemplateRepo);
         lenient().when(realmOcRepo.findAllByRealmId(any())).thenReturn(List.of());
     }
 
@@ -114,7 +114,7 @@ class RealmServiceTest {
     }
 
     @Test
-    void create_withUserForms_linksMultipleForms() {
+    void create_withUserTemplates_linksMultipleTemplates() {
         DirectoryConnection dir = mockDirectory();
         when(dirRepo.findById(dirId)).thenReturn(Optional.of(dir));
         when(realmRepo.save(any(Realm.class))).thenAnswer(inv -> {
@@ -123,22 +123,22 @@ class RealmServiceTest {
             return r;
         });
 
-        UUID formId1 = UUID.randomUUID();
-        UUID formId2 = UUID.randomUUID();
-        UserForm form1 = new UserForm();
-        form1.setId(formId1);
-        form1.setFormName("Person Form");
-        form1.setObjectClassNames(new java.util.ArrayList<>(List.of("inetOrgPerson")));
-        UserForm form2 = new UserForm();
-        form2.setId(formId2);
-        form2.setFormName("Service Account Form");
-        form2.setObjectClassNames(new java.util.ArrayList<>(List.of("account")));
-        when(userFormRepo.findById(formId1)).thenReturn(Optional.of(form1));
-        when(userFormRepo.findById(formId2)).thenReturn(Optional.of(form2));
+        UUID templateId1 = UUID.randomUUID();
+        UUID templateId2 = UUID.randomUUID();
+        UserTemplate template1 = new UserTemplate();
+        template1.setId(templateId1);
+        template1.setTemplateName("Person Template");
+        template1.setObjectClassNames(new java.util.ArrayList<>(List.of("inetOrgPerson")));
+        UserTemplate template2 = new UserTemplate();
+        template2.setId(templateId2);
+        template2.setTemplateName("Service Account Template");
+        template2.setObjectClassNames(new java.util.ArrayList<>(List.of("account")));
+        when(userTemplateRepo.findById(templateId1)).thenReturn(Optional.of(template1));
+        when(userTemplateRepo.findById(templateId2)).thenReturn(Optional.of(template2));
 
         RealmRequest req = new RealmRequest(
                 "employees", "ou=people,dc=corp,dc=com", "ou=groups,dc=corp,dc=com",
-                List.of(formId1, formId2));
+                List.of(templateId1, templateId2));
 
         service.create(dirId, req);
 

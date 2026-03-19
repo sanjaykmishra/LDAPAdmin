@@ -5,12 +5,12 @@ import com.ldapadmin.dto.realm.RealmResponse;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.Realm;
 import com.ldapadmin.entity.RealmObjectclass;
-import com.ldapadmin.entity.UserForm;
+import com.ldapadmin.entity.UserTemplate;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.repository.RealmObjectclassRepository;
 import com.ldapadmin.repository.RealmRepository;
-import com.ldapadmin.repository.UserFormRepository;
+import com.ldapadmin.repository.UserTemplateRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  * CRUD for realms.
  *
  * <p>A realm is a logical partition of a directory connection that defines the
- * LDAP subtrees used for user/group entries and links to one or more user forms
+ * LDAP subtrees used for user/group entries and links to one or more user templates
  * that drive the user creation UI.</p>
  */
 @Service
@@ -32,7 +32,7 @@ public class RealmService {
     private final RealmRepository               realmRepo;
     private final DirectoryConnectionRepository dirRepo;
     private final RealmObjectclassRepository    realmOcRepo;
-    private final UserFormRepository            userFormRepo;
+    private final UserTemplateRepository        userTemplateRepo;
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -61,7 +61,7 @@ public class RealmService {
         realm.setDirectory(dir);
         applyRequest(realm, req);
         realm = realmRepo.save(realm);
-        syncUserForms(realm, req.userFormIds());
+        syncUserTemplates(realm, req.userTemplateIds());
         return toResponse(realm);
     }
 
@@ -70,7 +70,7 @@ public class RealmService {
         Realm realm = requireRealm(directoryId, realmId);
         applyRequest(realm, req);
         realm = realmRepo.save(realm);
-        syncUserForms(realm, req.userFormIds());
+        syncUserTemplates(realm, req.userTemplateIds());
         return toResponse(realm);
     }
 
@@ -104,41 +104,41 @@ public class RealmService {
     }
 
     /**
-     * Syncs the realm_objectclasses entries that link a realm to user forms.
-     * Removes links to forms no longer in the list and adds new ones.
+     * Syncs the realm_objectclasses entries that link a realm to user templates.
+     * Removes links to templates no longer in the list and adds new ones.
      */
-    private void syncUserForms(Realm realm, List<UUID> userFormIds) {
+    private void syncUserTemplates(Realm realm, List<UUID> userTemplateIds) {
         List<RealmObjectclass> existing = realmOcRepo.findAllByRealmId(realm.getId());
-        List<UUID> desired = userFormIds != null ? userFormIds : List.of();
+        List<UUID> desired = userTemplateIds != null ? userTemplateIds : List.of();
 
-        // Index existing entries by user form id
-        Map<UUID, RealmObjectclass> existingByFormId = existing.stream()
-                .filter(oc -> oc.getUserForm() != null)
-                .collect(Collectors.toMap(oc -> oc.getUserForm().getId(), oc -> oc));
+        // Index existing entries by user template id
+        Map<UUID, RealmObjectclass> existingByTemplateId = existing.stream()
+                .filter(oc -> oc.getUserTemplate() != null)
+                .collect(Collectors.toMap(oc -> oc.getUserTemplate().getId(), oc -> oc));
 
         // Remove entries not in the desired list
         Set<UUID> desiredSet = new HashSet<>(desired);
-        for (var entry : existingByFormId.entrySet()) {
+        for (var entry : existingByTemplateId.entrySet()) {
             if (!desiredSet.contains(entry.getKey())) {
                 realmOcRepo.delete(entry.getValue());
             }
         }
 
         // Add new entries
-        for (UUID formId : desired) {
-            if (!existingByFormId.containsKey(formId)) {
-                UserForm form = userFormRepo.findById(formId)
-                        .orElseThrow(() -> new ResourceNotFoundException("UserForm", formId));
+        for (UUID templateId : desired) {
+            if (!existingByTemplateId.containsKey(templateId)) {
+                UserTemplate template = userTemplateRepo.findById(templateId)
+                        .orElseThrow(() -> new ResourceNotFoundException("UserTemplate", templateId));
                 RealmObjectclass oc = new RealmObjectclass();
                 oc.setRealm(realm);
-                oc.setUserForm(form);
+                oc.setUserTemplate(template);
                 realmOcRepo.save(oc);
             }
         }
 
-        // Remove entries with no user form link (orphans from old data)
+        // Remove entries with no user template link (orphans from old data)
         existing.stream()
-                .filter(oc -> oc.getUserForm() == null)
+                .filter(oc -> oc.getUserTemplate() == null)
                 .forEach(realmOcRepo::delete);
     }
 }

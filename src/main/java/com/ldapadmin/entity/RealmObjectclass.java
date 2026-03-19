@@ -8,7 +8,7 @@ import lombok.Setter;
 import java.util.UUID;
 
 /**
- * Associates a {@link Realm} with an LDAP objectClass and the {@link UserForm}
+ * Associates a {@link Realm} with an LDAP objectClass and the {@link UserTemplate}
  * used to create and edit user entries of that objectClass within the realm.
  */
 @Entity
@@ -34,8 +34,8 @@ public class RealmObjectclass {
     @Column(name = "object_class_id")
     private UUID objectClassId;
 
-    /** The form definition used to create and edit user entries for this objectClass. */
+    /** The template definition used to create and edit user entries for this objectClass. */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_form_id")
-    private UserForm userForm;
+    @JoinColumn(name = "user_template_id")
+    private UserTemplate userTemplate;
 }

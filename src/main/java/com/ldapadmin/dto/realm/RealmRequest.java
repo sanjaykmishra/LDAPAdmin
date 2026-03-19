@@ -13,5 +13,5 @@ public record RealmRequest(
         @NotBlank @Size(max = 255) String name,
         @NotBlank String userBaseDn,
         @NotBlank String groupBaseDn,
-        List<UUID> userFormIds) {
+        List<UUID> userTemplateIds) {
 }
