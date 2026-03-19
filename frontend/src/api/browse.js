@@ -38,6 +38,11 @@ export const importLdif = (dirId, file, conflictHandling = 'SKIP', dryRun = fals
   })
 }
 
+export const checkIntegrity = (dirId, baseDn, checks) =>
+  client.post(`${base(dirId)}/integrity-check`, null, {
+    params: { baseDn: baseDn || undefined, checks: checks.join(',') },
+  })
+
 export const browseObjectClasses = (dirId) =>
   client.get(`${base(dirId)}/schema/object-classes`)
 
