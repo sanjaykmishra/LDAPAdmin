@@ -3,8 +3,8 @@
     <h1 class="text-2xl font-bold text-gray-900 mb-6">LDAP Search</h1>
 
     <!-- Search form -->
-    <div class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
-      <div class="grid grid-cols-3 gap-4 mb-4">
+    <div class="bg-white border border-gray-200 rounded-xl p-5 mb-6" > 
+      <div class="grid grid-cols-4 gap-4 mb-4" style="grid-template-columns: 1fr 1fr 2.5fr .5fr ;">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
           <select v-model="form.directoryId" class="input w-full">
@@ -23,10 +23,14 @@
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Base DN</label>
           <DnPicker v-model="form.baseDn" :directory-id="form.directoryId" placeholder="dc=example,dc=com (optional)" />
+        </div>		
+		<div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Size Limit</label>
+          <input v-model.number="form.limit" type="number" min="1" max="1000" class="input w-full" />
         </div>
       </div>
 
-      <div class="grid gap-4 mb-4" style="grid-template-columns: 2fr 2fr 1fr;">
+      <div class="grid grid-cols-2 gap-4 mb-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">LDAP Filter</label>
           <input v-model="form.filter" class="input w-full" placeholder="(objectClass=inetOrgPerson)" @keyup.enter="doSearch" />
@@ -34,10 +38,6 @@
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Attributes <span class="text-gray-400 font-normal">(comma-separated, optional)</span></label>
           <input v-model="form.attributes" class="input w-full" placeholder="cn,mail,uid" />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Size Limit</label>
-          <input v-model.number="form.limit" type="number" min="1" max="1000" class="input w-full" />
         </div>
       </div>
 

@@ -44,5 +44,27 @@ services:
       - "8080:8080"
     restart: unless-stopped
 
+  openldap:
+    image: osixia/openldap:latest
+    container_name: openldap
+    ports:
+      - "389:389"
+      - "636:636"
+    environment:
+      LDAP_ORGANISATION: "My Company"
+      LDAP_DOMAIN: "example.com"
+      LDAP_BASE_DN: "dc=example,dc=com"
+      LDAP_ADMIN_PASSWORD: "admin"
+      LDAP_READONLY_USER: "true"
+      LDAP_READONLY_USER_PASSWORD: "readonly_password_456"
+      LDAP_LOG_LEVEL: "256"
+    volumes:
+      - ldap_data:/var/lib/ldap
+      - ldap_config:/etc/ldap/slapd.d
+    restart: unless-stopped
+    
 volumes:
   pgdata:
+  ldap_data:
+  ldap_config:
+
