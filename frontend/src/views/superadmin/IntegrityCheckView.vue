@@ -14,7 +14,7 @@
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Base DN</label>
-          <input v-model="form.baseDn" class="input w-full" placeholder="dc=example,dc=com (optional)" />
+          <DnPicker v-model="form.baseDn" :directory-id="form.directoryId" placeholder="dc=example,dc=com (optional)" />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Checks to Run</label>
@@ -88,6 +88,7 @@ import { useRouter } from 'vue-router'
 import { useNotificationStore } from '@/stores/notifications'
 import { listDirectories } from '@/api/directories'
 import { checkIntegrity } from '@/api/browse'
+import DnPicker from '@/components/DnPicker.vue'
 
 const router = useRouter()
 const notif  = useNotificationStore()

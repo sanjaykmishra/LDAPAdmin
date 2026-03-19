@@ -173,9 +173,9 @@
           <p class="text-sm text-gray-600 mb-1">Moving:</p>
           <p class="text-sm font-mono text-gray-900 bg-gray-50 px-3 py-2 rounded-lg break-all mb-3">{{ selectedDn }}</p>
           <label class="block text-sm font-medium text-gray-700 mb-1">New Parent DN</label>
-          <input v-model="moveTargetDn" type="text"
-                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
-                 placeholder="ou=People,dc=example,dc=com" />
+          <div class="mb-4">
+            <DnPicker v-model="moveTargetDn" :directory-id="selectedDirId" placeholder="ou=People,dc=example,dc=com" />
+          </div>
           <div v-if="moveError" class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{{ moveError }}</div>
           <div class="flex justify-end gap-3">
             <button @click="showMoveModal = false"
@@ -235,6 +235,7 @@ import DnTree from '@/components/DnTree.vue'
 import CreateEntryForm from '@/components/CreateEntryForm.vue'
 import EditEntryForm from '@/components/EditEntryForm.vue'
 import LdifImportModal from '@/components/LdifImportModal.vue'
+import DnPicker from '@/components/DnPicker.vue'
 
 const notif = useNotificationStore()
 
