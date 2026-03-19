@@ -22,6 +22,7 @@
 
         <!-- Node label -->
         <span class="truncate font-mono text-xs">{{ node.rdn || node.dn }}</span>
+        <span v-if="childrenMap.has(node.dn)" class="shrink-0 text-[10px] text-gray-400 bg-gray-100 rounded-full px-1.5 leading-4">{{ childrenMap.get(node.dn).length }}</span>
       </div>
 
       <!-- Children (lazy-loaded, recursive) -->

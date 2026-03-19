@@ -2,6 +2,9 @@ package com.ldapadmin.controller.directory;
 
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.auth.RequiresFeature;
+import com.ldapadmin.dto.ldap.BulkMemberRequest;
+import com.ldapadmin.dto.ldap.BulkMemberResult;
+import com.ldapadmin.dto.ldap.BulkMemberResult.BulkMemberError;
 import com.ldapadmin.dto.ldap.CreateEntryRequest;
 import com.ldapadmin.dto.ldap.LdapEntryResponse;
 import com.ldapadmin.dto.ldap.MemberRequest;
@@ -23,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -147,5 +151,29 @@ public class GroupController {
             @Valid @RequestBody MemberRequest req) {
         service.removeGroupMember(directoryId, principal, dn, req.memberAttribute(), req.memberValue());
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/members/bulk")
+    @RequiresFeature(FeatureKey.GROUP_MANAGE_MEMBERS)
+    public BulkMemberResult addMembersBulk(
+            @PathVariable UUID directoryId,
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @RequestParam String dn,
+            @Valid @RequestBody BulkMemberRequest req) {
+
+        int added = 0;
+        List<BulkMemberError> errors = new ArrayList<>();
+
+        for (String memberValue : req.memberValues()) {
+            try {
+                service.addGroupMember(directoryId, principal, dn, req.memberAttribute(), memberValue);
+                added++;
+            } catch (Exception e) {
+                String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                errors.add(new BulkMemberError(memberValue, msg));
+            }
+        }
+
+        return new BulkMemberResult(added, errors.size(), errors);
     }
 }
