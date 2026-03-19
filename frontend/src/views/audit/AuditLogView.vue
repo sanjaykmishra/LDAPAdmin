@@ -74,19 +74,23 @@ function clearFilters() {
 
 async function load(p = 0) {
   page.value = p
-  await call(async () => {
-    const params = {
-      page: p, size: pageSize,
-      directoryId:   dirId || undefined,
-      from:          filters.value.from  || undefined,
-      to:            filters.value.to    || undefined,
-      action:        filters.value.action || undefined,
-    }
-    const { data } = await getAuditLog(params)
-    const paged = data.content ? data : { content: data, totalPages: 1 }
-    events.value     = paged.content
-    totalPages.value = paged.totalPages || 1
-  })
+  try {
+    await call(async () => {
+      const params = {
+        page: p, size: pageSize,
+        directoryId:   dirId || undefined,
+        from:          filters.value.from  || undefined,
+        to:            filters.value.to    || undefined,
+        action:        filters.value.action || undefined,
+      }
+      const { data } = await getAuditLog(params)
+      const paged = data.content ? data : { content: data, totalPages: 1 }
+      events.value     = paged.content
+      totalPages.value = paged.totalPages || 1
+    })
+  } catch {
+    // Error already displayed by useApi — prevent unhandled rejection
+  }
 }
 
 onMounted(() => load(0))

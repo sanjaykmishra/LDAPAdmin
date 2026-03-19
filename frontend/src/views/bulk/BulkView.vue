@@ -43,7 +43,10 @@
     <section class="bg-white border border-gray-200 rounded-xl p-6 mb-6">
       <h2 class="text-lg font-semibold mb-4">Import Users from CSV</h2>
       <div class="space-y-3">
-        <FormField label="Parent DN" v-model="importForm.parentDn" placeholder="ou=people,dc=example,dc=com" required />
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Parent DN <span class="text-red-500">*</span></label>
+          <DnPicker v-model="importForm.parentDn" :directoryId="dirId" placeholder="ou=people,dc=example,dc=com" />
+        </div>
         <FormField label="Key Attribute (RDN)" v-model="importForm.targetKeyAttribute" placeholder="uid" />
         <FormField label="Conflict Handling" type="select" v-model="importForm.conflictHandling" :options="conflictOptions" />
         <div>
@@ -77,7 +80,10 @@
       <h2 class="text-lg font-semibold mb-4">Export Users to CSV</h2>
       <div class="space-y-3">
         <FormField label="LDAP Filter (optional)" v-model="exportForm.filter" placeholder="(objectClass=inetOrgPerson)" />
-        <FormField label="Base DN (optional)" v-model="exportForm.baseDn" />
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Base DN (optional)</label>
+          <DnPicker v-model="exportForm.baseDn" :directoryId="dirId" placeholder="dc=example,dc=com" />
+        </div>
         <FormField label="Attributes (comma-separated)" v-model="exportForm.attributes" placeholder="cn,mail,uid,sn" />
         <button @click="doExport" :disabled="exporting" class="btn-primary">
           {{ exporting ? 'Exporting…' : 'Download CSV' }}
@@ -145,6 +151,7 @@ import {
 } from '@/api/csvTemplates'
 import { downloadBlob } from '@/composables/useApi'
 import FormField from '@/components/FormField.vue'
+import DnPicker from '@/components/DnPicker.vue'
 import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
