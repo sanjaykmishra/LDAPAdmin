@@ -1,17 +1,17 @@
-package com.ldapadmin.dto.userform;
+package com.ldapadmin.dto.usertemplate;
 
-import com.ldapadmin.entity.UserForm;
-import com.ldapadmin.entity.UserFormAttributeConfig;
+import com.ldapadmin.entity.UserTemplate;
+import com.ldapadmin.entity.UserTemplateAttributeConfig;
 
 import java.util.List;
 import java.util.UUID;
 
-/** Read DTO for a user form with its attribute configs. */
-public record UserFormResponse(
+/** Read DTO for a user template with its attribute configs. */
+public record UserTemplateResponse(
         UUID id,
         UUID directoryId,
         List<String> objectClassNames,
-        String formName,
+        String templateName,
         List<AttributeConfigEntry> attributeConfigs) {
 
     public record AttributeConfigEntry(
@@ -26,7 +26,7 @@ public record UserFormResponse(
             int columnSpan,
             boolean hidden) {
 
-        public static AttributeConfigEntry from(UserFormAttributeConfig c) {
+        public static AttributeConfigEntry from(UserTemplateAttributeConfig c) {
             return new AttributeConfigEntry(
                     c.getId(),
                     c.getAttributeName(),
@@ -41,12 +41,12 @@ public record UserFormResponse(
         }
     }
 
-    public static UserFormResponse from(UserForm f, List<UserFormAttributeConfig> configs) {
-        return new UserFormResponse(
-                f.getId(),
-                f.getDirectoryConnection() != null ? f.getDirectoryConnection().getId() : null,
-                List.copyOf(f.getObjectClassNames()),
-                f.getFormName(),
+    public static UserTemplateResponse from(UserTemplate t, List<UserTemplateAttributeConfig> configs) {
+        return new UserTemplateResponse(
+                t.getId(),
+                t.getDirectoryConnection() != null ? t.getDirectoryConnection().getId() : null,
+                List.copyOf(t.getObjectClassNames()),
+                t.getTemplateName(),
                 configs.stream().map(AttributeConfigEntry::from).toList());
     }
 }

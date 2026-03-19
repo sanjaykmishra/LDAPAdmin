@@ -1,15 +1,15 @@
 package com.ldapadmin.service;
 
-import com.ldapadmin.dto.userform.UserFormRequest;
-import com.ldapadmin.dto.userform.UserFormResponse;
+import com.ldapadmin.dto.usertemplate.UserTemplateRequest;
+import com.ldapadmin.dto.usertemplate.UserTemplateResponse;
 import com.ldapadmin.entity.DirectoryConnection;
-import com.ldapadmin.entity.UserForm;
-import com.ldapadmin.entity.UserFormAttributeConfig;
+import com.ldapadmin.entity.UserTemplate;
+import com.ldapadmin.entity.UserTemplateAttributeConfig;
 import com.ldapadmin.entity.enums.InputType;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
-import com.ldapadmin.repository.UserFormAttributeConfigRepository;
-import com.ldapadmin.repository.UserFormRepository;
+import com.ldapadmin.repository.UserTemplateAttributeConfigRepository;
+import com.ldapadmin.repository.UserTemplateRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,20 +28,20 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class UserFormServiceTest {
+class UserTemplateServiceTest {
 
-    @Mock private UserFormRepository formRepo;
-    @Mock private UserFormAttributeConfigRepository configRepo;
+    @Mock private UserTemplateRepository templateRepo;
+    @Mock private UserTemplateAttributeConfigRepository configRepo;
     @Mock private DirectoryConnectionRepository directoryRepo;
 
-    private UserFormService service;
+    private UserTemplateService service;
 
-    private final UUID formId = UUID.randomUUID();
+    private final UUID templateId = UUID.randomUUID();
     private final UUID dirId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
-        service = new UserFormService(formRepo, configRepo, directoryRepo);
+        service = new UserTemplateService(templateRepo, configRepo, directoryRepo);
     }
 
     // ── create ──────────────────────────────────────────────────────────────
@@ -51,33 +51,33 @@ class UserFormServiceTest {
         DirectoryConnection dir = new DirectoryConnection();
         dir.setId(dirId);
         when(directoryRepo.findById(dirId)).thenReturn(Optional.of(dir));
-        when(formRepo.save(any())).thenAnswer(inv -> {
-            UserForm f = inv.getArgument(0);
-            f.setId(formId);
-            return f;
+        when(templateRepo.save(any())).thenAnswer(inv -> {
+            UserTemplate t = inv.getArgument(0);
+            t.setId(templateId);
+            return t;
         });
-        UserFormResponse resp = service.create(new UserFormRequest(
-                dirId, List.of("inetOrgPerson"), "Standard Form", List.of()));
+        UserTemplateResponse resp = service.create(new UserTemplateRequest(
+                dirId, List.of("inetOrgPerson"), "Standard Template", List.of()));
 
         assertThat(resp.directoryId()).isEqualTo(dirId);
-        ArgumentCaptor<UserForm> captor = ArgumentCaptor.forClass(UserForm.class);
-        verify(formRepo).save(captor.capture());
+        ArgumentCaptor<UserTemplate> captor = ArgumentCaptor.forClass(UserTemplate.class);
+        verify(templateRepo).save(captor.capture());
         assertThat(captor.getValue().getDirectoryConnection()).isEqualTo(dir);
     }
 
     @Test
     void create_withNullDirectoryId_setsNullDirectory() {
-        when(formRepo.save(any())).thenAnswer(inv -> {
-            UserForm f = inv.getArgument(0);
-            f.setId(formId);
-            return f;
+        when(templateRepo.save(any())).thenAnswer(inv -> {
+            UserTemplate t = inv.getArgument(0);
+            t.setId(templateId);
+            return t;
         });
-        UserFormResponse resp = service.create(new UserFormRequest(
-                null, List.of("inetOrgPerson"), "Standard Form", List.of()));
+        UserTemplateResponse resp = service.create(new UserTemplateRequest(
+                null, List.of("inetOrgPerson"), "Standard Template", List.of()));
 
         assertThat(resp.directoryId()).isNull();
-        ArgumentCaptor<UserForm> captor = ArgumentCaptor.forClass(UserForm.class);
-        verify(formRepo).save(captor.capture());
+        ArgumentCaptor<UserTemplate> captor = ArgumentCaptor.forClass(UserTemplate.class);
+        verify(templateRepo).save(captor.capture());
         assertThat(captor.getValue().getDirectoryConnection()).isNull();
         verify(directoryRepo, never()).findById(any());
     }
@@ -87,21 +87,21 @@ class UserFormServiceTest {
         UUID badId = UUID.randomUUID();
         when(directoryRepo.findById(badId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.create(new UserFormRequest(
-                badId, List.of("inetOrgPerson"), "Form", List.of())))
+        assertThatThrownBy(() -> service.create(new UserTemplateRequest(
+                badId, List.of("inetOrgPerson"), "Template", List.of())))
                 .isInstanceOf(ResourceNotFoundException.class);
 
-        verify(formRepo, never()).save(any());
+        verify(templateRepo, never()).save(any());
     }
 
     @Test
     void create_withAttributeConfigs_savesConfigs() {
-        when(formRepo.save(any())).thenAnswer(inv -> {
-            UserForm f = inv.getArgument(0);
-            f.setId(formId);
-            return f;
+        when(templateRepo.save(any())).thenAnswer(inv -> {
+            UserTemplate t = inv.getArgument(0);
+            t.setId(templateId);
+            return t;
         });
-        UserFormAttributeConfig savedConfig = new UserFormAttributeConfig();
+        UserTemplateAttributeConfig savedConfig = new UserTemplateAttributeConfig();
         savedConfig.setId(UUID.randomUUID());
         savedConfig.setAttributeName("cn");
         savedConfig.setInputType(InputType.TEXT);
@@ -109,11 +109,11 @@ class UserFormServiceTest {
         savedConfig.setEditableOnCreate(true);
         when(configRepo.saveAll(any())).thenReturn(List.of(savedConfig));
 
-        var configEntry = new UserFormRequest.AttributeConfigEntry(
+        var configEntry = new UserTemplateRequest.AttributeConfigEntry(
                 "cn", "Common Name", true, true, "TEXT", true, null, null, false);
 
-        UserFormResponse resp = service.create(new UserFormRequest(
-                null, List.of("inetOrgPerson"), "Form", List.of(configEntry)));
+        UserTemplateResponse resp = service.create(new UserTemplateRequest(
+                null, List.of("inetOrgPerson"), "Template", List.of(configEntry)));
 
         assertThat(resp.attributeConfigs()).hasSize(1);
         verify(configRepo).saveAll(any());
@@ -121,17 +121,17 @@ class UserFormServiceTest {
 
     @Test
     void create_withMultipleObjectClasses_storesAll() {
-        when(formRepo.save(any())).thenAnswer(inv -> {
-            UserForm f = inv.getArgument(0);
-            f.setId(formId);
-            return f;
+        when(templateRepo.save(any())).thenAnswer(inv -> {
+            UserTemplate t = inv.getArgument(0);
+            t.setId(templateId);
+            return t;
         });
-        UserFormResponse resp = service.create(new UserFormRequest(
-                null, List.of("inetOrgPerson", "posixAccount"), "Multi-Class Form", List.of()));
+        UserTemplateResponse resp = service.create(new UserTemplateRequest(
+                null, List.of("inetOrgPerson", "posixAccount"), "Multi-Class Template", List.of()));
 
         assertThat(resp.objectClassNames()).containsExactly("inetOrgPerson", "posixAccount");
-        ArgumentCaptor<UserForm> captor = ArgumentCaptor.forClass(UserForm.class);
-        verify(formRepo).save(captor.capture());
+        ArgumentCaptor<UserTemplate> captor = ArgumentCaptor.forClass(UserTemplate.class);
+        verify(templateRepo).save(captor.capture());
         assertThat(captor.getValue().getObjectClassNames()).containsExactly("inetOrgPerson", "posixAccount");
     }
 
@@ -139,19 +139,19 @@ class UserFormServiceTest {
 
     @Test
     void update_changesObjectClassNames() {
-        UserForm existing = new UserForm();
-        existing.setId(formId);
+        UserTemplate existing = new UserTemplate();
+        existing.setId(templateId);
         existing.setObjectClassNames(new ArrayList<>(List.of("person")));
-        existing.setFormName("Old");
-        when(formRepo.findById(formId)).thenReturn(Optional.of(existing));
+        existing.setTemplateName("Old");
+        when(templateRepo.findById(templateId)).thenReturn(Optional.of(existing));
 
         DirectoryConnection dir = new DirectoryConnection();
         dir.setId(dirId);
         when(directoryRepo.findById(dirId)).thenReturn(Optional.of(dir));
-        when(formRepo.save(any())).thenReturn(existing);
+        when(templateRepo.save(any())).thenReturn(existing);
 
-        service.update(formId, new UserFormRequest(
-                dirId, List.of("inetOrgPerson", "posixAccount"), "Updated Form", List.of()));
+        service.update(templateId, new UserTemplateRequest(
+                dirId, List.of("inetOrgPerson", "posixAccount"), "Updated Template", List.of()));
 
         assertThat(existing.getDirectoryConnection()).isEqualTo(dir);
         assertThat(existing.getObjectClassNames()).containsExactly("inetOrgPerson", "posixAccount");
@@ -159,28 +159,28 @@ class UserFormServiceTest {
 
     @Test
     void update_notFound_throwsResourceNotFound() {
-        when(formRepo.findById(formId)).thenReturn(Optional.empty());
+        when(templateRepo.findById(templateId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.update(formId, new UserFormRequest(
-                null, List.of("inetOrgPerson"), "Form", List.of())))
+        assertThatThrownBy(() -> service.update(templateId, new UserTemplateRequest(
+                null, List.of("inetOrgPerson"), "Template", List.of())))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     // ── list ────────────────────────────────────────────────────────────────
 
     @Test
-    void list_returnsMappedForms() {
-        UserForm f = new UserForm();
-        f.setId(formId);
-        f.setObjectClassNames(new ArrayList<>(List.of("inetOrgPerson")));
-        f.setFormName("Test");
-        when(formRepo.findAll()).thenReturn(List.of(f));
-        when(configRepo.findAllByUserFormId(formId)).thenReturn(List.of());
+    void list_returnsMappedTemplates() {
+        UserTemplate t = new UserTemplate();
+        t.setId(templateId);
+        t.setObjectClassNames(new ArrayList<>(List.of("inetOrgPerson")));
+        t.setTemplateName("Test");
+        when(templateRepo.findAll()).thenReturn(List.of(t));
+        when(configRepo.findAllByUserTemplateId(templateId)).thenReturn(List.of());
 
-        List<UserFormResponse> result = service.list();
+        List<UserTemplateResponse> result = service.list();
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).formName()).isEqualTo("Test");
+        assertThat(result.get(0).templateName()).isEqualTo("Test");
         assertThat(result.get(0).directoryId()).isNull();
     }
 
@@ -188,21 +188,21 @@ class UserFormServiceTest {
 
     @Test
     void delete_success() {
-        UserForm f = new UserForm();
-        f.setId(formId);
-        when(formRepo.findById(formId)).thenReturn(Optional.of(f));
+        UserTemplate t = new UserTemplate();
+        t.setId(templateId);
+        when(templateRepo.findById(templateId)).thenReturn(Optional.of(t));
 
-        service.delete(formId);
+        service.delete(templateId);
 
-        verify(configRepo).deleteAllByUserFormId(formId);
-        verify(formRepo).delete(f);
+        verify(configRepo).deleteAllByUserTemplateId(templateId);
+        verify(templateRepo).delete(t);
     }
 
     @Test
     void delete_notFound_throwsResourceNotFound() {
-        when(formRepo.findById(formId)).thenReturn(Optional.empty());
+        when(templateRepo.findById(templateId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.delete(formId))
+        assertThatThrownBy(() -> service.delete(templateId))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 }

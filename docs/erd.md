@@ -84,7 +84,7 @@ erDiagram
         uuid id PK
         uuid realm_id FK
         uuid object_class_id
-        uuid user_form_id FK
+        uuid user_template_id FK
     }
 
     ADMIN_REALM_ROLES {
@@ -104,16 +104,16 @@ erDiagram
         timestamptz created_at
     }
 
-    USER_FORM {
+    USER_TEMPLATE {
         uuid id PK
         uuid directory_id FK
         string object_class_name
-        string form_name
+        string template_name
     }
 
-    USER_FORM_ATTRIBUTE_CONFIG {
+    USER_TEMPLATE_ATTRIBUTE_CONFIG {
         uuid id PK
-        uuid user_form_id FK
+        uuid user_template_id FK
         string attribute_name
         string custom_label
         boolean required_on_create
@@ -237,11 +237,11 @@ erDiagram
     DIRECTORY_CONNECTIONS ||--o{ REALMS : "has"
     REALMS ||--o{ REALM_AUXILIARY_OBJECTCLASSES : "has"
     REALMS ||--o{ REALM_OBJECTCLASSES : "has"
-    REALM_OBJECTCLASSES }o--o| USER_FORM : "uses"
+    REALM_OBJECTCLASSES }o--o| USER_TEMPLATE : "uses"
 
-    %% User forms
-    USER_FORM }o--o| DIRECTORY_CONNECTIONS : "scoped to"
-    USER_FORM ||--o{ USER_FORM_ATTRIBUTE_CONFIG : "contains"
+    %% User templates
+    USER_TEMPLATE }o--o| DIRECTORY_CONNECTIONS : "scoped to"
+    USER_TEMPLATE ||--o{ USER_TEMPLATE_ATTRIBUTE_CONFIG : "contains"
 
     %% Admin permissions (realm-scoped)
     ACCOUNTS ||--o{ ADMIN_REALM_ROLES : "has"
