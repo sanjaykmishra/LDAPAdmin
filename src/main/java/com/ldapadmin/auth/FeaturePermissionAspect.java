@@ -58,8 +58,13 @@ public class FeaturePermissionAspect {
     }
 
     /**
-     * Finds the first {@link UUID}-typed parameter named {@code directoryId}
-     * in the intercepted method and returns its runtime value.
+     * Finds the {@link UUID} parameter that identifies the directory.
+     *
+     * <p>Resolution order:
+     * <ol>
+     *   <li>A parameter annotated with {@link DirectoryId}</li>
+     *   <li>A {@code UUID} parameter named {@code directoryId} (legacy fallback)</li>
+     * </ol>
      *
      * @throws IllegalStateException if no suitable parameter is found
      */
@@ -68,11 +73,20 @@ public class FeaturePermissionAspect {
         Parameter[]     parameters = sig.getMethod().getParameters();
         Object[]        args       = jp.getArgs();
 
+        // Prefer @DirectoryId annotation
+        for (int i = 0; i < parameters.length; i++) {
+            if (parameters[i].isAnnotationPresent(DirectoryId.class)) {
+                if (args[i] instanceof UUID uid) {
+                    return uid;
+                }
+            }
+        }
+
+        // Fallback: UUID parameter named "directoryId"
         for (int i = 0; i < parameters.length; i++) {
             Parameter p = parameters[i];
             if (UUID.class.equals(p.getType()) && "directoryId".equals(p.getName())) {
-                Object val = args[i];
-                if (val instanceof UUID uid) {
+                if (args[i] instanceof UUID uid) {
                     return uid;
                 }
             }
@@ -80,6 +94,7 @@ public class FeaturePermissionAspect {
 
         throw new IllegalStateException(
                 "@RequiresFeature method [" + sig.getMethod().getName()
-                + "] must have a UUID parameter named 'directoryId'");
+                + "] must have a UUID parameter annotated with @DirectoryId "
+                + "or named 'directoryId'");
     }
 }

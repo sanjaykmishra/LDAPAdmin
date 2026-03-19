@@ -2,6 +2,7 @@ package com.ldapadmin.controller.directory;
 
 import com.ldapadmin.auth.ApiRateLimiter;
 import com.ldapadmin.auth.AuthPrincipal;
+import com.ldapadmin.auth.DirectoryId;
 import com.ldapadmin.auth.RequiresFeature;
 import com.ldapadmin.dto.report.CreateScheduledReportJobRequest;
 import com.ldapadmin.dto.report.RunReportRequest;
@@ -66,7 +67,7 @@ public class ScheduledReportJobController {
     @GetMapping("/report-jobs")
     @RequiresFeature(FeatureKey.REPORTS_SCHEDULE)
     public Page<ScheduledReportJobDto> list(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @PageableDefault(size = 20) Pageable pageable) {
         return jobService.listByDirectory(directoryId, principal, pageable);
@@ -75,7 +76,7 @@ public class ScheduledReportJobController {
     @PostMapping("/report-jobs")
     @RequiresFeature(FeatureKey.REPORTS_SCHEDULE)
     public ResponseEntity<ScheduledReportJobDto> create(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody CreateScheduledReportJobRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -85,7 +86,7 @@ public class ScheduledReportJobController {
     @GetMapping("/report-jobs/{jobId}")
     @RequiresFeature(FeatureKey.REPORTS_SCHEDULE)
     public ScheduledReportJobDto get(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID jobId,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return jobService.getById(directoryId, jobId, principal);
@@ -94,7 +95,7 @@ public class ScheduledReportJobController {
     @PutMapping("/report-jobs/{jobId}")
     @RequiresFeature(FeatureKey.REPORTS_SCHEDULE)
     public ScheduledReportJobDto update(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID jobId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody CreateScheduledReportJobRequest req) {
@@ -104,7 +105,7 @@ public class ScheduledReportJobController {
     @DeleteMapping("/report-jobs/{jobId}")
     @RequiresFeature(FeatureKey.REPORTS_SCHEDULE)
     public ResponseEntity<Void> delete(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID jobId,
             @AuthenticationPrincipal AuthPrincipal principal) {
         jobService.delete(directoryId, jobId, principal);
@@ -114,7 +115,7 @@ public class ScheduledReportJobController {
     @PatchMapping("/report-jobs/{jobId}/enabled")
     @RequiresFeature(FeatureKey.REPORTS_SCHEDULE)
     public ScheduledReportJobDto setEnabled(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID jobId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam boolean enabled) {
@@ -129,7 +130,7 @@ public class ScheduledReportJobController {
     @PostMapping("/reports/run")
     @RequiresFeature(FeatureKey.REPORTS_RUN)
     public ResponseEntity<byte[]> run(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody RunReportRequest req) throws IOException {
 

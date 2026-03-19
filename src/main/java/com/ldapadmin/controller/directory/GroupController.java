@@ -1,6 +1,7 @@
 package com.ldapadmin.controller.directory;
 
 import com.ldapadmin.auth.AuthPrincipal;
+import com.ldapadmin.auth.DirectoryId;
 import com.ldapadmin.auth.RequiresFeature;
 import com.ldapadmin.dto.ldap.BulkMemberRequest;
 import com.ldapadmin.dto.ldap.BulkMemberResult;
@@ -57,7 +58,7 @@ public class GroupController {
 
     @GetMapping
     public List<LdapEntryResponse> search(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam(required = false) String filter,
             @RequestParam(required = false) String baseDn,
@@ -74,7 +75,7 @@ public class GroupController {
     @PostMapping
     @RequiresFeature(FeatureKey.GROUP_CREATE_DELETE)
     public ResponseEntity<LdapEntryResponse> create(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody CreateEntryRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -85,7 +86,7 @@ public class GroupController {
 
     @GetMapping("/entry")
     public LdapEntryResponse get(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn,
             @RequestParam(required = false, defaultValue = "") String attributes) {
@@ -97,7 +98,7 @@ public class GroupController {
     @PutMapping("/entry")
     @RequiresFeature(FeatureKey.GROUP_EDIT)
     public LdapEntryResponse update(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn,
             @Valid @RequestBody UpdateEntryRequest req) {
@@ -107,7 +108,7 @@ public class GroupController {
     @DeleteMapping("/entry")
     @RequiresFeature(FeatureKey.GROUP_CREATE_DELETE)
     public ResponseEntity<Void> delete(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn) {
         service.deleteGroup(directoryId, principal, dn);
@@ -124,7 +125,7 @@ public class GroupController {
      */
     @GetMapping("/members")
     public List<String> getMembers(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn,
             @RequestParam(defaultValue = "member") String memberAttribute) {
@@ -134,7 +135,7 @@ public class GroupController {
     @PostMapping("/members")
     @RequiresFeature(FeatureKey.GROUP_MANAGE_MEMBERS)
     public ResponseEntity<Void> addMember(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn,
             @Valid @RequestBody MemberRequest req) {
@@ -145,7 +146,7 @@ public class GroupController {
     @DeleteMapping("/members")
     @RequiresFeature(FeatureKey.GROUP_MANAGE_MEMBERS)
     public ResponseEntity<Void> removeMember(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn,
             @Valid @RequestBody MemberRequest req) {
@@ -156,7 +157,7 @@ public class GroupController {
     @PostMapping("/members/bulk")
     @RequiresFeature(FeatureKey.GROUP_MANAGE_MEMBERS)
     public BulkMemberResult addMembersBulk(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn,
             @Valid @RequestBody BulkMemberRequest req) {

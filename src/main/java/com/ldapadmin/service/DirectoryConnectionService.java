@@ -11,6 +11,7 @@ import com.ldapadmin.entity.DirectoryUserBaseDn;
 import com.ldapadmin.entity.enums.SslMode;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.ldap.LdapConnectionFactory;
+import com.ldapadmin.ldap.SslHelper;
 import com.ldapadmin.repository.AuditDataSourceRepository;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.repository.DirectoryGroupBaseDnRepository;
@@ -220,22 +221,6 @@ public class DirectoryConnectionService {
     }
 
     private SSLUtil buildTestSslUtil(TestConnectionRequest req) throws Exception {
-        if (req.trustAllCerts()) {
-            return new SSLUtil(new TrustAllTrustManager());
-        }
-        if (req.trustedCertificatePem() != null && !req.trustedCertificatePem().isBlank()) {
-            CertificateFactory cf = CertificateFactory.getInstance("X.509");
-            X509Certificate cert = (X509Certificate) cf.generateCertificate(
-                    new ByteArrayInputStream(
-                            req.trustedCertificatePem().getBytes(StandardCharsets.UTF_8)));
-            KeyStore ks = KeyStore.getInstance("JKS");
-            ks.load(null, null);
-            ks.setCertificateEntry("trusted-ca", cert);
-            javax.net.ssl.TrustManagerFactory tmf = javax.net.ssl.TrustManagerFactory.getInstance(
-                    javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm());
-            tmf.init(ks);
-            return new SSLUtil(tmf.getTrustManagers());
-        }
-        return new SSLUtil();
+        return SslHelper.buildSslUtil(req.trustAllCerts(), req.trustedCertificatePem());
     }
 }

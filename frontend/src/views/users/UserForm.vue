@@ -358,7 +358,7 @@ async function loadGroups() {
         : 'member',
     }))
     refreshMemberships()
-  } catch { /* best-effort */ }
+  } catch (e) { console.warn('Failed to load groups:', e) }
   finally { loadingGroups.value = false }
 }
 

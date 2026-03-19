@@ -268,7 +268,8 @@ watch(selectedOcs, async (ocs) => {
         }
       }
     }
-  } catch {
+  } catch (e) {
+    console.warn('Failed to load schema for object classes:', e)
     requiredAttrs.value = []
     optionalAttrs.value = []
   } finally {
@@ -325,7 +326,8 @@ onMounted(async () => {
   try {
     const { data } = await browseObjectClasses(props.directoryId)
     allObjectClasses.value = data
-  } catch {
+  } catch (e) {
+    console.warn('Failed to load object classes:', e)
     allObjectClasses.value = []
   } finally {
     loadingOcs.value = false

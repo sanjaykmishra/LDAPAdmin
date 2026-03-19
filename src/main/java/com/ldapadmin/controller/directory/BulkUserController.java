@@ -2,6 +2,7 @@ package com.ldapadmin.controller.directory;
 
 import com.ldapadmin.auth.ApiRateLimiter;
 import com.ldapadmin.auth.AuthPrincipal;
+import com.ldapadmin.auth.DirectoryId;
 import com.ldapadmin.auth.RequiresFeature;
 import com.ldapadmin.dto.csv.BulkImportRequest;
 import com.ldapadmin.dto.csv.BulkImportResult;
@@ -59,7 +60,7 @@ public class BulkUserController {
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @RequiresFeature(FeatureKey.BULK_IMPORT)
     public ResponseEntity<BulkImportResult> importUsers(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestPart("file") MultipartFile file,
             @RequestPart("request") @Valid BulkImportRequest request) throws IOException {
@@ -83,7 +84,7 @@ public class BulkUserController {
     @GetMapping(value = "/export", produces = "text/csv")
     @RequiresFeature(FeatureKey.BULK_EXPORT)
     public ResponseEntity<byte[]> exportUsers(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam(required = false) String filter,
             @RequestParam(required = false) String baseDn,

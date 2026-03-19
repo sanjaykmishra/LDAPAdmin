@@ -180,7 +180,9 @@ onMounted(async () => {
     if (!pickerValue.value && data.length) {
       pickerValue.value = data[0].id
     }
-  } catch { /* silently ignore */ }
+  } catch (e) {
+    console.warn('Failed to load realms:', e)
+  }
 })
 
 // Keep picker in sync when route dirId changes externally
