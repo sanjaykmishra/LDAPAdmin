@@ -95,29 +95,31 @@ public class SecurityConfig {
     /**
      * CORS policy for the REST API.
      *
-     * <p>The allowed origin <strong>must</strong> be set via the
-     * {@code CORS_ALLOWED_ORIGIN} environment variable (e.g.
-     * {@code https://ldapadmin.example.com}).  When unset, only
-     * same-origin requests are permitted (no CORS headers are sent),
-     * which is the correct default for single-origin deployments.</p>
+     * <p>When {@code CORS_ALLOWED_ORIGIN} is set, only that origin is
+     * permitted (with credentials).  When unset, no {@link CorsConfiguration}
+     * is registered, so Spring Security skips CORS processing entirely and
+     * the browser's default Same-Origin Policy applies — which is the correct
+     * default for single-origin deployments.</p>
+     *
+     * <p><strong>Important:</strong> registering a {@link CorsConfiguration}
+     * with an empty allowed-origins list causes Spring to reject any request
+     * that carries an {@code Origin} header (including same-site POSTs from
+     * some browsers and dev-proxy setups).  That is why we register nothing
+     * when the env var is absent.</p>
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         String allowedOrigin = System.getenv("CORS_ALLOWED_ORIGIN");
         if (allowedOrigin != null && !allowedOrigin.isBlank()) {
+            CorsConfiguration config = new CorsConfiguration();
             config.setAllowedOrigins(List.of(allowedOrigin));
             config.setAllowCredentials(true); // required for cookie-based auth
+            config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+            config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
+            config.setMaxAge(3600L);
+            source.registerCorsConfiguration("/api/v1/**", config);
         }
-        // When CORS_ALLOWED_ORIGIN is not set, no origins are allowed —
-        // browsers will reject cross-origin requests (fail-closed).
-        // Same-origin requests are unaffected because they don't trigger CORS.
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
-        config.setMaxAge(3600L);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/v1/**", config);
         return source;
     }
 }
