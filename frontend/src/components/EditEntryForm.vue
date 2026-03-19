@@ -8,7 +8,10 @@
     <!-- DN (read-only) -->
     <div class="mb-4">
       <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Distinguished Name</p>
-      <p class="text-sm font-mono text-gray-900 bg-gray-50 px-3 py-2 rounded-lg break-all">{{ dn }}</p>
+      <div class="text-sm font-mono text-gray-900 bg-gray-50 px-3 py-2 rounded-lg break-all flex items-center gap-2">
+        <span class="flex-1">{{ dn }}</span>
+        <CopyButton :text="dn" />
+      </div>
     </div>
 
     <p v-if="loadingSchema" class="text-xs text-gray-400 mb-3">Loading schema...</p>
@@ -73,6 +76,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { updateEntry, browseObjectClassesBulk } from '@/api/browse'
+import CopyButton from '@/components/CopyButton.vue'
 
 const props = defineProps({
   directoryId: { type: String, required: true },

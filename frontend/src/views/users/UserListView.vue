@@ -36,7 +36,10 @@
 
     <DataTable :columns="cols" :rows="users" :loading="loading" row-key="dn">
       <template #cell-dn="{ value }">
-        <code class="text-xs">{{ value }}</code>
+        <span class="inline-flex items-center gap-1">
+          <code class="text-xs">{{ value }}</code>
+          <CopyButton :text="value" />
+        </span>
       </template>
       <template #cell-enabled="{ value }">
         <span :class="value !== false ? 'badge-green' : 'badge-red'">
@@ -141,6 +144,7 @@ import AppModal from '@/components/AppModal.vue'
 import FormField from '@/components/FormField.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import UserForm from './UserForm.vue'
+import CopyButton from '@/components/CopyButton.vue'
 
 const PAGE_SIZE = 50
 
