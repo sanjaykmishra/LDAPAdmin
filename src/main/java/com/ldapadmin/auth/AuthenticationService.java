@@ -33,7 +33,6 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.Set;
 
 /**
  * Orchestrates the unified login flow for all accounts (superadmins and admins).
@@ -70,16 +69,9 @@ public class AuthenticationService {
             Account account = accountRepo.findByUsernameAndActiveTrue(req.username())
                     .orElseThrow(() -> new BadCredentialsException("Bad credentials"));
 
-            // Gate: reject if this account's auth type is not currently enabled.
-            // Default to allowing LOCAL when no settings exist or no auth types configured.
+            // Gate: reject if this account's auth type is not currently enabled
             settingsRepo.findFirstBy().ifPresent(settings -> {
-                Set<AccountType> enabled = settings.getEnabledAuthTypes();
-                if (enabled == null || enabled.isEmpty()) {
-                    // No auth types configured — only LOCAL is allowed by default
-                    if (account.getAuthType() != AccountType.LOCAL) {
-                        throw new BadCredentialsException("Bad credentials");
-                    }
-                } else if (!enabled.contains(account.getAuthType())) {
+                if (!settings.getEnabledAuthTypes().contains(account.getAuthType())) {
                     throw new BadCredentialsException("Bad credentials");
                 }
             });
