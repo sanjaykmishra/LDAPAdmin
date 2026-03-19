@@ -157,6 +157,7 @@ const sections = ref([])
 function buildSections(attrs) {
   const map = new Map()
   for (const attr of attrs) {
+    if (attr.hidden) continue
     const key = attr.sectionName || ''
     if (!map.has(key)) {
       map.set(key, { id: nextSectionId(), name: key, fields: [] })
@@ -182,7 +183,8 @@ watch(() => props.attributeConfigs, (newConfigs) => {
   const currentNames = new Set(
     sections.value.flatMap(s => s.fields.map(f => f.attributeName))
   )
-  const incomingNames = new Set(newConfigs.map(a => a.attributeName))
+  const visibleConfigs = newConfigs.filter(a => !a.hidden)
+  const incomingNames = new Set(visibleConfigs.map(a => a.attributeName))
 
   // Nothing changed — skip
   if (
@@ -195,8 +197,8 @@ watch(() => props.attributeConfigs, (newConfigs) => {
     section.fields = section.fields.filter(f => incomingNames.has(f.attributeName))
   }
 
-  // Add newly-added fields into the first section
-  for (const attr of newConfigs) {
+  // Add newly-added visible fields into the first section
+  for (const attr of visibleConfigs) {
     if (!currentNames.has(attr.attributeName)) {
       sections.value[0].fields.push({ ...attr })
     }

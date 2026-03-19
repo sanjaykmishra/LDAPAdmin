@@ -26,6 +26,7 @@ public record UserFormRequest(
             @NotNull String inputType,
             boolean rdn,
             @Size(max = 255) String sectionName,
-            Integer columnSpan) {
+            Integer columnSpan,
+            boolean hidden) {
     }
 }

@@ -23,7 +23,8 @@ public record UserFormResponse(
             String inputType,
             boolean rdn,
             String sectionName,
-            int columnSpan) {
+            int columnSpan,
+            boolean hidden) {
 
         public static AttributeConfigEntry from(UserFormAttributeConfig c) {
             return new AttributeConfigEntry(
@@ -35,7 +36,8 @@ public record UserFormResponse(
                     c.getInputType().name(),
                     c.isRdn(),
                     c.getSectionName(),
-                    c.getColumnSpan());
+                    c.getColumnSpan(),
+                    c.isHidden());
         }
     }
 

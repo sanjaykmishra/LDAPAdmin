@@ -123,6 +123,7 @@ public class UserFormService {
             c.setRdn(e.rdn());
             c.setSectionName(e.sectionName());
             c.setColumnSpan(e.columnSpan() != null ? e.columnSpan() : 3);
+            c.setHidden(e.hidden());
             configs.add(c);
         }
         return configRepo.saveAll(configs);

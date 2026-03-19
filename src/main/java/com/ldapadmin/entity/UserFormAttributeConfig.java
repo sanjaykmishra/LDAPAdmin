@@ -66,4 +66,8 @@ public class UserFormAttributeConfig {
     /** Number of grid columns this field spans (1–3 in a 3-column grid). Default 3 = full width. */
     @Column(name = "column_span", nullable = false)
     private int columnSpan = 3;
+
+    /** When {@code true} the attribute is excluded from the rendered form. */
+    @Column(name = "hidden", nullable = false)
+    private boolean hidden = false;
 }
