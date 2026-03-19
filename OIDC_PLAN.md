@@ -8,13 +8,25 @@ Add OIDC (OpenID Connect) as a third authentication method alongside LOCAL and L
 
 Auth provider configuration (OIDC issuer, LDAP server, etc.) stays at the **application level** in `ApplicationSettings` — these are per-deployment, not per-user. Every OIDC account authenticates against the same IdP.
 
-However, the current `adminAuthType` single-enum field should be refactored to a **set of enabled methods**, allowing multiple auth types to coexist (e.g. LOCAL for break-glass superadmin + OIDC for regular admins):
+### Current State: `adminAuthType` is Dead Code
+
+The `admin_auth_type` column exists in the `application_settings` DB table and is mapped to `ApplicationSettings.adminAuthType`, but **nothing reads it**:
+
+- `AuthenticationService.login()` decides LOCAL vs LDAP based on each `Account.authType`, not the global setting
+- No controller or DTO exposes it
+- The frontend Settings page (`SettingsView.vue`) has no authentication section at all — it only shows Branding, Session, SMTP, and S3
+
+This means the column can be dropped without any migration of existing behavior.
+
+### New Design: `enabledAuthTypes` Set
+
+Replace the unused single-enum field with a **set of enabled methods**, allowing multiple auth types to coexist (e.g. LOCAL for break-glass superadmin + OIDC for regular admins):
 
 ```java
-// Before: single choice
+// Remove (unused):
 private AccountType adminAuthType = AccountType.LOCAL;
 
-// After: multiple enabled methods
+// Add:
 @ElementCollection
 @CollectionTable(name = "enabled_auth_types", joinColumns = @JoinColumn(name = "settings_id"))
 @Enumerated(EnumType.STRING)
@@ -52,14 +64,14 @@ public enum AccountType {
 }
 ```
 
-### 2. Refactor `adminAuthType` to `enabledAuthTypes`
+### 2. Replace dead `adminAuthType` with `enabledAuthTypes`
 
 **File:** `src/main/java/com/ldapadmin/entity/ApplicationSettings.java`
 
-Replace the single `adminAuthType` enum with a set of enabled auth methods:
+The existing `adminAuthType` field is unused (no service, controller, or frontend reads it). Remove it and add the new set:
 
 ```java
-// Remove:
+// Remove (dead code):
 private AccountType adminAuthType = AccountType.LOCAL;
 
 // Add:
@@ -70,9 +82,9 @@ private AccountType adminAuthType = AccountType.LOCAL;
 private Set<AccountType> enabledAuthTypes = Set.of(AccountType.LOCAL);
 ```
 
-Update `AuthenticationService.login()` to check that the account's `authType` is in the enabled set before proceeding.
+Add an `enabledAuthTypes` gate in `AuthenticationService.login()` — reject login if the account's `authType` is not in the enabled set.
 
-Update the `/api/v1/settings/branding` response (or a new public endpoint) to expose the enabled auth types so the login page can render the correct UI.
+Expose `enabledAuthTypes` via the existing `/api/v1/settings/branding` response (already public/permitAll) so the login page can render the correct UI without an additional endpoint.
 
 ### 3. Add OIDC fields to `ApplicationSettings`
 
@@ -89,10 +101,10 @@ private String oidcUsernameClaim;      // claim to match against Account.usernam
 
 ### 4. DB migration
 
-- Create `enabled_auth_types` join table (replaces `admin_auth_type` column)
+- Drop `admin_auth_type` column from `application_settings` (dead code, nothing reads it)
+- Drop `chk_admin_auth_type` constraint
+- Create `enabled_auth_types` join table with a default `LOCAL` row
 - Add OIDC columns to `application_settings` table
-- Migrate existing `admin_auth_type` value into `enabled_auth_types` row
-- Drop `admin_auth_type` column
 
 ### 5. Add dependency
 
@@ -192,14 +204,26 @@ Add "Sign in with SSO" button (only visible when OIDC is configured):
 
 Need a small callback page/route to handle the redirect from the IdP.
 
-### 13. Frontend: Settings Page
+### 13. Frontend: Settings Page — New "Authentication" Section
 
-Add OIDC configuration section alongside existing LDAP auth settings:
+The settings page (`SettingsView.vue`) currently has no authentication section at all. Add a new **Authentication** section (alongside Branding, Session, SMTP, S3) with two subsections:
+
+**Enabled Auth Methods:**
+- Multi-select checkboxes for LOCAL, LDAP, OIDC
+- At least one method must remain enabled (validate client-side)
+
+**LDAP Auth Provider** (shown when LDAP is enabled):
+- Host, Port, SSL Mode, Trust All Certs, Trusted Cert PEM
+- Service Account Bind DN, Bind Password
+- User Search Base, Bind DN Pattern
+- These fields already exist on `ApplicationSettings` but were never exposed in the UI
+
+**OIDC Provider** (shown when OIDC is enabled):
 - Issuer URL
 - Client ID
 - Client Secret (password field with "saved" indicator)
-- Scopes
-- Username Claim
+- Scopes (default: "openid profile email")
+- Username Claim (default: "preferred_username")
 - Test button (validate discovery doc is reachable)
 
 ### 14. Frontend: Admin Management
@@ -223,7 +247,7 @@ Add `OIDC` option to auth type selector when creating/editing admin accounts.
 | Change | Files |
 |--------|-------|
 | New enum value | `AccountType.java` |
-| Refactor to enabled set | `ApplicationSettings.java` (`adminAuthType` → `enabledAuthTypes`) |
+| Drop dead field, add enabled set | `ApplicationSettings.java` (remove `adminAuthType`, add `enabledAuthTypes`) |
 | New entity fields | `ApplicationSettings.java` (OIDC provider config) |
 | Auth type gate | `AuthenticationService.java` (check account's type is enabled) |
 | New service | `OidcAuthenticationService.java` (new) |
@@ -232,8 +256,8 @@ Add `OIDC` option to auth type selector when creating/editing admin accounts.
 | Settings DTOs | `ApplicationSettingsRequest.java`, `ApplicationSettingsResponse.java` |
 | Settings service | `ApplicationSettingsService.java` |
 | Admin management | `AdminManagementService.java`, DTOs |
-| DB migration | New migration: `enabled_auth_types` table, OIDC columns, drop `admin_auth_type` |
+| DB migration | Drop dead `admin_auth_type` column, create `enabled_auth_types` table, add OIDC columns |
 | Frontend login | Login view (SSO button + callback route, driven by `enabledAuthTypes`) |
-| Frontend settings | Settings view (OIDC config + multi-select enabled auth types) |
+| Frontend settings | Settings view (new Authentication section: enabled methods, LDAP provider, OIDC provider) |
 | Frontend admin mgmt | Admin form (OIDC auth type option) |
 | Dependency | `pom.xml` / `build.gradle` (Nimbus JOSE+JWT) |
