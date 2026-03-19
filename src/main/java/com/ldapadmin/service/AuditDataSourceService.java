@@ -61,17 +61,18 @@ public class AuditDataSourceService {
 
     private void applyRequest(AuditDataSource src, AuditSourceRequest req,
                               String encryptedPassword) {
-        src.setDisplayName(req.displayName());
-        src.setHost(req.host());
+        src.setDisplayName(req.displayName().trim());
+        src.setHost(req.host().trim());
         src.setPort(req.port());
         src.setSslMode(req.sslMode());
         src.setTrustAllCerts(req.trustAllCerts());
         src.setTrustedCertificatePem(req.trustedCertificatePem());
-        src.setBindDn(req.bindDn());
+        src.setBindDn(req.bindDn().trim());
         src.setBindPasswordEncrypted(encryptedPassword);
         src.setChangelogBaseDn(req.changelogBaseDn() != null
-                ? req.changelogBaseDn() : "cn=changelog");
-        src.setBranchFilterDn(req.branchFilterDn());
+                ? req.changelogBaseDn().trim() : "cn=changelog");
+        src.setBranchFilterDn(req.branchFilterDn() != null
+                ? req.branchFilterDn().trim() : null);
         src.setEnabled(req.enabled());
     }
 
