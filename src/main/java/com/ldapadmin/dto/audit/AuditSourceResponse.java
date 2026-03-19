@@ -1,6 +1,7 @@
 package com.ldapadmin.dto.audit;
 
 import com.ldapadmin.entity.AuditDataSource;
+import com.ldapadmin.entity.enums.ChangelogFormat;
 import com.ldapadmin.entity.enums.SslMode;
 
 import java.time.OffsetDateTime;
@@ -16,6 +17,7 @@ public record AuditSourceResponse(
         String bindDn,
         String changelogBaseDn,
         String branchFilterDn,
+        ChangelogFormat changelogFormat,
         boolean enabled,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
@@ -31,6 +33,7 @@ public record AuditSourceResponse(
                 src.getBindDn(),
                 src.getChangelogBaseDn(),
                 src.getBranchFilterDn(),
+                src.getChangelogFormat(),
                 src.isEnabled(),
                 src.getCreatedAt(),
                 src.getUpdatedAt()

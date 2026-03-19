@@ -1,5 +1,6 @@
 package com.ldapadmin.dto.audit;
 
+import com.ldapadmin.entity.enums.ChangelogFormat;
 import com.ldapadmin.entity.enums.SslMode;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -24,5 +25,6 @@ public record AuditSourceRequest(
         String bindPassword,
         @NotBlank String changelogBaseDn,
         String branchFilterDn,
+        @NotNull ChangelogFormat changelogFormat,
         boolean enabled
 ) {}

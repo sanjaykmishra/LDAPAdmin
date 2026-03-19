@@ -4,10 +4,14 @@ import com.ldapadmin.dto.audit.AuditSourceRequest;
 import com.ldapadmin.dto.audit.AuditSourceResponse;
 import com.ldapadmin.dto.directory.TestConnectionResult;
 import com.ldapadmin.entity.AuditDataSource;
+import com.ldapadmin.entity.enums.ChangelogFormat;
 import com.ldapadmin.entity.enums.SslMode;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.ldap.LdapChangelogReader;
 import com.ldapadmin.ldap.SslHelper;
+import com.ldapadmin.ldap.changelog.AccesslogStrategy;
+import com.ldapadmin.ldap.changelog.ChangelogStrategy;
+import com.ldapadmin.ldap.changelog.DseeChangelogStrategy;
 import com.ldapadmin.repository.AuditDataSourceRepository;
 import com.unboundid.ldap.sdk.*;
 import com.unboundid.util.ssl.SSLUtil;
@@ -104,9 +108,17 @@ public class AuditDataSourceService {
                     // Verify changelog base DN is reachable
                     String changelogDn = req.changelogBaseDn() != null
                             ? req.changelogBaseDn().trim() : "cn=changelog";
+                    // Use a strategy-aware search to verify the changelog base is reachable
+                    // and that the configured format returns results
+                    ChangelogStrategy strategy = req.changelogFormat() == ChangelogFormat.OPENLDAP_ACCESSLOG
+                            ? new AccesslogStrategy() : new DseeChangelogStrategy();
+                    AuditDataSource probe = new AuditDataSource();
+                    probe.setChangelogBaseDn(changelogDn);
+                    probe.setChangelogFormat(req.changelogFormat());
+                    probe.setBranchFilterDn(req.branchFilterDn());
                     try {
-                        conn.search(new SearchRequest(changelogDn, SearchScope.BASE,
-                                "(objectClass=*)", "dn"));
+                        SearchRequest verifyReq = strategy.buildSearchRequest(probe, 1);
+                        conn.search(verifyReq);
                     } catch (LDAPException ex) {
                         return new TestConnectionResult(false,
                                 "Bind OK, but changelog base DN '" + changelogDn
@@ -140,6 +152,7 @@ public class AuditDataSourceService {
                 ? req.changelogBaseDn().trim() : "cn=changelog");
         src.setBranchFilterDn(req.branchFilterDn() != null
                 ? req.branchFilterDn().trim() : null);
+        src.setChangelogFormat(req.changelogFormat());
         src.setEnabled(req.enabled());
     }
 
