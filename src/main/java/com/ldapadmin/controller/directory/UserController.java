@@ -1,6 +1,7 @@
 package com.ldapadmin.controller.directory;
 
 import com.ldapadmin.auth.AuthPrincipal;
+import com.ldapadmin.auth.DirectoryId;
 import com.ldapadmin.auth.RequiresFeature;
 import com.ldapadmin.dto.ldap.CreateEntryRequest;
 import com.ldapadmin.dto.ldap.LdapEntryResponse;
@@ -72,7 +73,7 @@ public class UserController {
      */
     @GetMapping
     public List<LdapEntryResponse> search(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam(required = false) String filter,
             @RequestParam(required = false) String baseDn,
@@ -89,7 +90,7 @@ public class UserController {
     @PostMapping
     @RequiresFeature(FeatureKey.USER_CREATE)
     public ResponseEntity<LdapEntryResponse> create(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody CreateEntryRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -100,7 +101,7 @@ public class UserController {
 
     @GetMapping("/entry")
     public LdapEntryResponse get(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn,
             @RequestParam(required = false, defaultValue = "") String attributes) {
@@ -114,7 +115,7 @@ public class UserController {
     @PutMapping("/entry")
     @RequiresFeature(FeatureKey.USER_EDIT)
     public LdapEntryResponse update(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn,
             @Valid @RequestBody UpdateEntryRequest req) {
@@ -126,7 +127,7 @@ public class UserController {
     @DeleteMapping("/entry")
     @RequiresFeature(FeatureKey.USER_DELETE)
     public ResponseEntity<Void> delete(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn) {
         service.deleteUser(directoryId, principal, dn);
@@ -138,7 +139,7 @@ public class UserController {
     @PostMapping("/enable")
     @RequiresFeature(FeatureKey.USER_ENABLE_DISABLE)
     public ResponseEntity<Void> enable(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn) {
         service.enableUser(directoryId, principal, dn);
@@ -148,7 +149,7 @@ public class UserController {
     @PostMapping("/disable")
     @RequiresFeature(FeatureKey.USER_ENABLE_DISABLE)
     public ResponseEntity<Void> disable(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn) {
         service.disableUser(directoryId, principal, dn);
@@ -160,7 +161,7 @@ public class UserController {
     @PostMapping("/reset-password")
     @RequiresFeature(FeatureKey.USER_RESET_PASSWORD)
     public ResponseEntity<Void> resetPassword(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn,
             @Valid @RequestBody ResetPasswordLdapRequest req) {
@@ -173,7 +174,7 @@ public class UserController {
     @PostMapping("/move")
     @RequiresFeature(FeatureKey.USER_MOVE)
     public ResponseEntity<Void> move(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn,
             @Valid @RequestBody MoveUserRequest req) {

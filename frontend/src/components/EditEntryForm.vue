@@ -241,8 +241,8 @@ onMounted(async () => {
     }
     // Collect optional attrs for "Add attribute" picker
     schemaOptional.value = [...(data.required || []), ...(data.optional || [])]
-  } catch {
-    // Schema loading failure is non-fatal
+  } catch (e) {
+    console.warn('Schema loading failed (non-fatal):', e)
   } finally {
     loadingSchema.value = false
   }

@@ -274,7 +274,8 @@ async function selectTemplateAndCreate(ut) {
   try {
     const { data } = await getUserTemplate(ut.id)
     userTemplateConfig.value = data
-  } catch {
+  } catch (e) {
+    console.warn('Failed to load user template:', e)
     userTemplateConfig.value = null
   }
   form.value = emptyForm()
@@ -297,7 +298,7 @@ async function openEdit(row) {
       try {
         const { data } = await getUserTemplate(match.id)
         userTemplateConfig.value = data
-      } catch { /* fall back to raw edit */ }
+      } catch (e) { console.warn('Failed to load user template for edit:', e) }
     }
   }
 
@@ -345,7 +346,10 @@ async function save() {
             memberAttribute: pg.memberAttr,
             memberValue: dn,
           })
-        } catch { /* best-effort — user is created even if group add fails */ }
+        } catch (e) {
+            console.warn('Failed to add user to group', pg.dn, e)
+            notif.error(`Failed to add user to group: ${pg.dn}`)
+          }
       }
       notif.success(pending.length ? `User created and added to ${pending.length} group(s)` : 'User created')
     }
@@ -427,7 +431,9 @@ async function loadRealmAndForms() {
     const { data: realms } = await listRealms(dirId)
     allRealms.value = realms
     if (realms.length) selectRealm(realms)
-  } catch { /* realm loading is best-effort */ }
+  } catch (e) {
+    console.warn('Failed to load realms:', e)
+  }
 }
 
 function onRealmChange() {

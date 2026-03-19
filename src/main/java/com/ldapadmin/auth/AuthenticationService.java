@@ -13,6 +13,7 @@ import com.ldapadmin.repository.ApplicationSettingsRepository;
 import com.ldapadmin.service.EncryptionService;
 import com.unboundid.ldap.sdk.*;
 import com.unboundid.ldap.sdk.extensions.StartTLSExtendedRequest;
+import com.ldapadmin.ldap.SslHelper;
 import com.unboundid.util.ssl.SSLUtil;
 import com.unboundid.util.ssl.TrustAllTrustManager;
 import lombok.RequiredArgsConstructor;
@@ -173,23 +174,7 @@ public class AuthenticationService {
     }
 
     private SSLUtil buildSslUtil(boolean trustAllCerts, String trustedCertPem) throws Exception {
-        if (trustAllCerts) {
-            return new SSLUtil(new TrustAllTrustManager());
-        }
-        if (trustedCertPem != null && !trustedCertPem.isBlank()) {
-            CertificateFactory cf = CertificateFactory.getInstance("X.509");
-            Collection<? extends Certificate> certs = cf.generateCertificates(
-                    new ByteArrayInputStream(trustedCertPem.getBytes(StandardCharsets.UTF_8)));
-            KeyStore ts = KeyStore.getInstance("JKS");
-            ts.load(null, null);
-            int i = 0;
-            for (Certificate cert : certs) ts.setCertificateEntry("ca-" + i++, cert);
-            TrustManagerFactory tmf = TrustManagerFactory.getInstance(
-                    TrustManagerFactory.getDefaultAlgorithm());
-            tmf.init(ts);
-            return new SSLUtil(tmf.getTrustManagers());
-        }
-        return new SSLUtil();
+        return SslHelper.buildSslUtil(trustAllCerts, trustedCertPem);
     }
 
     // ── Response builder ──────────────────────────────────────────────────────

@@ -300,7 +300,7 @@ async function loadRealm() {
     const { data: realms } = await listRealms(dirId)
     allRealms.value = realms
     if (realms.length) selectRealm(realms)
-  } catch { /* best-effort */ }
+  } catch (e) { console.warn('Failed to load realms:', e) }
 }
 
 function onRealmChange() {

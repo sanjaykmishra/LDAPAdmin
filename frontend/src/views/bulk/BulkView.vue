@@ -181,7 +181,7 @@ async function loadTemplates() {
   try {
     const { data } = await listCsvTemplates(dirId)
     templates.value = data
-  } catch { /* silently ignore */ }
+  } catch (e) { console.warn('Failed to load CSV templates:', e) }
   finally { templatesLoading.value = false }
 }
 

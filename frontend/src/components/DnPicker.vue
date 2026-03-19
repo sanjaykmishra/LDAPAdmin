@@ -94,7 +94,8 @@ async function openPicker() {
       hasChildren: data.children.length > 0,
       _preloaded: data.children,
     }]
-  } catch {
+  } catch (e) {
+    console.warn('Failed to load directory tree:', e)
     treeNodes.value = []
   } finally {
     treeLoading.value = false

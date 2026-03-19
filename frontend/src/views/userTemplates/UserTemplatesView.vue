@@ -540,7 +540,7 @@ async function openEdit(t) {
           required: new Set(data.required || []),
           optional: new Set(data.optional || []),
         }
-      } catch { /* best-effort */ }
+      } catch (e) { console.warn('Failed to load object class schema:', e) }
     }
   }
 }

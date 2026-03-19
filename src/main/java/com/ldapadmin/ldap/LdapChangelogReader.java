@@ -205,26 +205,7 @@ public class LdapChangelogReader {
     }
 
     private SSLUtil buildSslUtil(AuditDataSource src) throws Exception {
-        if (src.isTrustAllCerts()) {
-            return new SSLUtil(new TrustAllTrustManager());
-        }
-        if (src.getTrustedCertificatePem() != null && !src.getTrustedCertificatePem().isBlank()) {
-            return new SSLUtil(buildPemTrustManagers(src.getTrustedCertificatePem()));
-        }
-        return new SSLUtil();
-    }
-
-    private TrustManager[] buildPemTrustManagers(String pem) throws Exception {
-        CertificateFactory cf = CertificateFactory.getInstance("X.509");
-        X509Certificate cert = (X509Certificate) cf.generateCertificate(
-                new ByteArrayInputStream(pem.getBytes(StandardCharsets.UTF_8)));
-        KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
-        ks.load(null, null);
-        ks.setCertificateEntry("ldap-audit-ca", cert);
-        TrustManagerFactory tmf = TrustManagerFactory.getInstance(
-                TrustManagerFactory.getDefaultAlgorithm());
-        tmf.init(ks);
-        return tmf.getTrustManagers();
+        return SslHelper.buildSslUtil(src.isTrustAllCerts(), src.getTrustedCertificatePem());
     }
 
     // ── Utilities ─────────────────────────────────────────────────────────────

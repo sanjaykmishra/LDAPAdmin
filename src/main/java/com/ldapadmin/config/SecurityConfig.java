@@ -58,6 +58,9 @@ public class SecurityConfig {
             // ── Security response headers ──────────────────────────────────────
             .headers(h -> h
                 .frameOptions(fo -> fo.deny())
+                .httpStrictTransportSecurity(hsts -> hsts
+                    .includeSubDomains(true)
+                    .maxAgeInSeconds(31536000))
                 .contentTypeOptions(cto -> {})
                 .contentSecurityPolicy(csp ->
                     csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"))
@@ -92,23 +95,23 @@ public class SecurityConfig {
     /**
      * CORS policy for the REST API.
      *
-     * <p>In production the allowed origin should be set via the
+     * <p>The allowed origin <strong>must</strong> be set via the
      * {@code CORS_ALLOWED_ORIGIN} environment variable (e.g.
-     * {@code https://ldapadmin.example.com}).  The default {@code *} is safe
-     * for same-origin deployments where the frontend is served by the same
-     * host, but must be tightened for split-origin setups.</p>
+     * {@code https://ldapadmin.example.com}).  When unset, only
+     * same-origin requests are permitted (no CORS headers are sent),
+     * which is the correct default for single-origin deployments.</p>
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        // Allow the configured frontend origin; falls back to same-origin ("*") if unset.
         String allowedOrigin = System.getenv("CORS_ALLOWED_ORIGIN");
         if (allowedOrigin != null && !allowedOrigin.isBlank()) {
             config.setAllowedOrigins(List.of(allowedOrigin));
             config.setAllowCredentials(true); // required for cookie-based auth
-        } else {
-            config.addAllowedOriginPattern("*");
         }
+        // When CORS_ALLOWED_ORIGIN is not set, no origins are allowed —
+        // browsers will reject cross-origin requests (fail-closed).
+        // Same-origin requests are unaffected because they don't trigger CORS.
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
         config.setMaxAge(3600L);
