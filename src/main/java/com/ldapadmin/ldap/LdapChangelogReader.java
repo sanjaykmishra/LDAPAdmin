@@ -66,6 +66,9 @@ public class LdapChangelogReader {
     /** Tracks consecutive poll failures per source for exponential backoff. */
     private final ConcurrentMap<UUID, Integer> consecutiveFailures = new ConcurrentHashMap<>();
 
+    /** Sources disabled at runtime due to configuration errors (e.g. invalid bind DN). */
+    private final Set<UUID> configErrors = ConcurrentHashMap.newKeySet();
+
     // ── Scheduler ─────────────────────────────────────────────────────────────
 
     @Scheduled(fixedDelayString = "${app.audit.changelog-poll-interval-ms:60000}",
@@ -80,6 +83,11 @@ public class LdapChangelogReader {
                 sources.stream().map(AuditDataSource::getId).collect(java.util.stream.Collectors.toSet()));
 
         for (AuditDataSource src : sources) {
+            // Skip sources that have been flagged with configuration errors
+            if (configErrors.contains(src.getId())) {
+                continue;
+            }
+
             int failures = consecutiveFailures.getOrDefault(src.getId(), 0);
             if (failures >= MAX_CONSECUTIVE_FAILURES) {
                 // Exponential backoff: skip 2^(failures-3) polls (i.e. 1, 2, 4, 8…)
@@ -95,6 +103,16 @@ public class LdapChangelogReader {
                 pollSource(src);
                 consecutiveFailures.remove(src.getId());
             } catch (Exception ex) {
+                // Check for configuration-level errors (invalid DN, bad credentials)
+                // and stop retrying — the admin needs to fix the source config
+                if (isConfigError(ex)) {
+                    configErrors.add(src.getId());
+                    log.error("Changelog polling disabled for source [{}] due to "
+                                    + "configuration error (fix the source config to re-enable): {}",
+                            src.getDisplayName(), ex.getMessage());
+                    continue;
+                }
+
                 int newCount = consecutiveFailures.merge(src.getId(), 1, Integer::sum);
                 if (newCount <= MAX_CONSECUTIVE_FAILURES) {
                     log.warn("Changelog poll failed for source [{}]: {}",
@@ -106,6 +124,24 @@ public class LdapChangelogReader {
                 }
             }
         }
+    }
+
+    /**
+     * Clear the config-error flag for a source so polling resumes.
+     * Called when an audit source is created or updated.
+     */
+    public void clearConfigError(UUID sourceId) {
+        configErrors.remove(sourceId);
+        consecutiveFailures.remove(sourceId);
+    }
+
+    private static boolean isConfigError(Exception ex) {
+        String msg = ex.getMessage();
+        if (msg == null) return false;
+        String lower = msg.toLowerCase();
+        return lower.contains("invalid dn")
+                || lower.contains("invalid credentials")
+                || lower.contains("no such object");
     }
 
     // ── Per-source poll ───────────────────────────────────────────────────────

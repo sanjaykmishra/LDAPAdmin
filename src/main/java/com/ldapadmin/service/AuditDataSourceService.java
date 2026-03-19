@@ -6,6 +6,7 @@ import com.ldapadmin.dto.directory.TestConnectionResult;
 import com.ldapadmin.entity.AuditDataSource;
 import com.ldapadmin.entity.enums.SslMode;
 import com.ldapadmin.exception.ResourceNotFoundException;
+import com.ldapadmin.ldap.LdapChangelogReader;
 import com.ldapadmin.ldap.SslHelper;
 import com.ldapadmin.repository.AuditDataSourceRepository;
 import com.unboundid.ldap.sdk.*;
@@ -27,6 +28,7 @@ public class AuditDataSourceService {
 
     private final AuditDataSourceRepository auditSourceRepo;
     private final EncryptionService         encryptionService;
+    private final LdapChangelogReader       changelogReader;
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
 
@@ -46,7 +48,9 @@ public class AuditDataSourceService {
         String encryptedPassword = encryptionService.encrypt(req.bindPassword());
         AuditDataSource src = new AuditDataSource();
         applyRequest(src, req, encryptedPassword);
-        return AuditSourceResponse.from(auditSourceRepo.save(src));
+        AuditSourceResponse resp = AuditSourceResponse.from(auditSourceRepo.save(src));
+        changelogReader.clearConfigError(resp.id());
+        return resp;
     }
 
     @Transactional
@@ -56,6 +60,7 @@ public class AuditDataSourceService {
                 ? encryptionService.encrypt(req.bindPassword())
                 : src.getBindPasswordEncrypted();
         applyRequest(src, req, encryptedPassword);
+        changelogReader.clearConfigError(id);
         return AuditSourceResponse.from(auditSourceRepo.save(src));
     }
 
