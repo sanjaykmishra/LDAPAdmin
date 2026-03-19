@@ -10,7 +10,7 @@ import java.util.UUID;
 @Repository
 public interface UserFormAttributeConfigRepository extends JpaRepository<UserFormAttributeConfig, UUID> {
 
-    List<UserFormAttributeConfig> findAllByUserFormIdOrderByDisplayOrderAsc(UUID userFormId);
+    List<UserFormAttributeConfig> findAllByUserFormId(UUID userFormId);
 
     void deleteAllByUserFormId(UUID userFormId);
 }

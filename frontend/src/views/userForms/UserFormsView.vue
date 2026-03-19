@@ -127,6 +127,7 @@
                     <th class="px-3 py-2 text-center text-xs font-medium text-gray-500">RDN</th>
                     <th class="px-3 py-2 text-center text-xs font-medium text-gray-500">Required</th>
                     <th class="px-3 py-2 text-center text-xs font-medium text-gray-500">Editable</th>
+                    <th class="px-3 py-2 text-center text-xs font-medium text-gray-500">Hidden</th>
                     <th class="px-3 py-2"></th>
                   </tr>
                 </thead>
@@ -167,6 +168,9 @@
                     </td>
                     <td class="px-3 py-2 text-center">
                       <input type="checkbox" v-model="attr.editableOnCreate" />
+                    </td>
+                    <td class="px-3 py-2 text-center">
+                      <input type="checkbox" v-model="attr.hidden" :disabled="attr.rdn" />
                     </td>
                     <td class="px-3 py-2 text-right">
                       <button
@@ -370,7 +374,7 @@ async function fetchAndMergeAttributes(ocName) {
         newRequired.push({
           attributeName: name, customLabel: '', inputType: 'TEXT',
           requiredOnCreate: true, editableOnCreate: true, rdn: false,
-          sectionName: '', columnSpan: 3,
+          sectionName: '', columnSpan: 3, hidden: false,
         })
       }
     }
@@ -382,7 +386,7 @@ async function fetchAndMergeAttributes(ocName) {
         newOptional.push({
           attributeName: name, customLabel: '', inputType: 'TEXT',
           requiredOnCreate: false, editableOnCreate: true, rdn: false,
-          sectionName: '', columnSpan: 3,
+          sectionName: '', columnSpan: 3, hidden: false,
         })
       }
     }
@@ -487,6 +491,7 @@ function addSelectedAttributes() {
         rdn: false,
         sectionName: '',
         columnSpan: 3,
+        hidden: false,
       })
     }
   }
@@ -546,6 +551,7 @@ async function openEdit(f) {
       rdn: a.rdn || false,
       sectionName: a.sectionName || '',
       columnSpan: a.columnSpan ?? 3,
+      hidden: a.hidden || false,
     })),
   }
   showModal.value = true
