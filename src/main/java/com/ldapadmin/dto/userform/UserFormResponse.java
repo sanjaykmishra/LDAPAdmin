@@ -21,7 +21,9 @@ public record UserFormResponse(
             boolean requiredOnCreate,
             boolean editableOnCreate,
             String inputType,
-            boolean rdn) {
+            boolean rdn,
+            String sectionName,
+            int columnSpan) {
 
         public static AttributeConfigEntry from(UserFormAttributeConfig c) {
             return new AttributeConfigEntry(
@@ -31,7 +33,9 @@ public record UserFormResponse(
                     c.isRequiredOnCreate(),
                     c.isEditableOnCreate(),
                     c.getInputType().name(),
-                    c.isRdn());
+                    c.isRdn(),
+                    c.getSectionName(),
+                    c.getColumnSpan());
         }
     }
 
