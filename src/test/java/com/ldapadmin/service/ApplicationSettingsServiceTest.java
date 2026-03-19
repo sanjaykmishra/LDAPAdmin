@@ -74,7 +74,9 @@ class ApplicationSettingsServiceTest {
         UpdateApplicationSettingsRequest req = new UpdateApplicationSettingsRequest(
                 "New App", null, null, null, 45,
                 "smtp.test.com", 587, null, null, "secret123", false,
-                null, null, null, null, null, 24);
+                null, null, null, null, null, 24,
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null);
 
         ApplicationSettingsDto dto = service.upsert(req);
 
@@ -114,7 +116,9 @@ class ApplicationSettingsServiceTest {
         UpdateApplicationSettingsRequest req = new UpdateApplicationSettingsRequest(
                 "My App", null, null, null, 30,
                 null, 587, null, null, "", false,  // empty string → clear
-                null, null, null, null, null, 24);
+                null, null, null, null, null, 24,
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null);
 
         service.upsert(req);
 
@@ -134,7 +138,9 @@ class ApplicationSettingsServiceTest {
         UpdateApplicationSettingsRequest req = new UpdateApplicationSettingsRequest(
                 "My App", null, null, null, 30,
                 null, 587, null, null, "newpass", false,
-                null, null, null, null, null, 24);
+                null, null, null, null, null, 24,
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null);
 
         service.upsert(req);
 
@@ -164,6 +170,8 @@ class ApplicationSettingsServiceTest {
                 "smtp.example.com", 587, "noreply@example.com", "user",
                 null,  // keep existing password
                 true,
-                null, null, null, null, null, 24);
+                null, null, null, null, null, 24,
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null);
     }
 }

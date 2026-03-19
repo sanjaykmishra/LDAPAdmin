@@ -51,14 +51,17 @@
           :options="[{ value: 'ADMIN', label: 'Admin' }, { value: 'SUPERADMIN', label: 'Superadmin' }]"
           hint="Superadmins have full platform access. Admins have realm-scoped permissions." />
         <FormField label="Auth type" v-model="form.authType" type="select" required
-          :options="[{ value: 'LOCAL', label: 'Local' }, { value: 'LDAP', label: 'LDAP' }]"
-          hint="LOCAL uses a portal password. LDAP authenticates against the configured LDAP directory." />
+          :options="[{ value: 'LOCAL', label: 'Local' }, { value: 'LDAP', label: 'LDAP' }, { value: 'OIDC', label: 'OIDC' }]"
+          hint="LOCAL uses a portal password. LDAP authenticates against the configured LDAP directory. OIDC authenticates via SSO." />
         <FormField v-if="form.authType === 'LOCAL'" label="Password" v-model="form.password" type="password"
           :placeholder="editing ? 'Leave blank to keep current' : 'Enter password'"
           :hint="editing ? 'Only fill in to change the password.' : 'Set the initial password for this account.'" />
         <FormField v-if="form.authType === 'LDAP'" label="LDAP DN" v-model="form.ldapDn"
           placeholder="e.g. uid=jdoe,ou=People,dc=example,dc=com"
           hint="Distinguished name used to bind against the LDAP auth directory." />
+        <p v-if="form.authType === 'OIDC'" class="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+          OIDC accounts are matched by username against the configured ID token claim. No password is needed.
+        </p>
         <div class="flex items-center gap-2 py-2">
           <input id="active-toggle" type="checkbox" v-model="form.active"
             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />

@@ -4,10 +4,14 @@ import com.ldapadmin.dto.settings.ApplicationSettingsDto;
 import com.ldapadmin.dto.settings.BrandingDto;
 import com.ldapadmin.dto.settings.UpdateApplicationSettingsRequest;
 import com.ldapadmin.entity.ApplicationSettings;
+import com.ldapadmin.entity.enums.AccountType;
 import com.ldapadmin.repository.ApplicationSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * CRUD for global application settings (singleton row in {@code application_settings}).
@@ -50,8 +54,9 @@ public class ApplicationSettingsService {
     public BrandingDto getBranding() {
         return settingsRepo.findFirstBy()
                 .map(s -> new BrandingDto(s.getAppName(), s.getLogoUrl(),
-                                          s.getPrimaryColour(), s.getSecondaryColour()))
-                .orElse(new BrandingDto("LDAP Portal", null, null, null));
+                                          s.getPrimaryColour(), s.getSecondaryColour(),
+                                          s.getEnabledAuthTypes()))
+                .orElse(new BrandingDto("LDAP Portal", null, null, null, Set.of(AccountType.LOCAL)));
     }
 
     /**
@@ -90,6 +95,30 @@ public class ApplicationSettingsService {
         s.setS3Region(req.s3Region());
         s.setS3PresignedUrlTtlHours(req.s3PresignedUrlTtlHours());
         applyPassword(req.s3SecretKey(), s::getS3SecretKeyEncrypted, s::setS3SecretKeyEncrypted);
+
+        // Authentication — enabled types
+        if (req.enabledAuthTypes() != null && !req.enabledAuthTypes().isEmpty()) {
+            s.getEnabledAuthTypes().clear();
+            s.getEnabledAuthTypes().addAll(req.enabledAuthTypes());
+        }
+
+        // LDAP auth provider
+        s.setLdapAuthHost(req.ldapAuthHost());
+        s.setLdapAuthPort(req.ldapAuthPort());
+        s.setLdapAuthSslMode(req.ldapAuthSslMode());
+        s.setLdapAuthTrustAllCerts(req.ldapAuthTrustAllCerts() != null && req.ldapAuthTrustAllCerts());
+        s.setLdapAuthTrustedCertPem(req.ldapAuthTrustedCertPem());
+        s.setLdapAuthBindDn(req.ldapAuthBindDn());
+        s.setLdapAuthUserSearchBase(req.ldapAuthUserSearchBase());
+        s.setLdapAuthBindDnPattern(req.ldapAuthBindDnPattern());
+        applyPassword(req.ldapAuthBindPassword(), s::getLdapAuthBindPasswordEnc, s::setLdapAuthBindPasswordEnc);
+
+        // OIDC auth provider
+        s.setOidcIssuerUrl(req.oidcIssuerUrl());
+        s.setOidcClientId(req.oidcClientId());
+        s.setOidcScopes(req.oidcScopes());
+        s.setOidcUsernameClaim(req.oidcUsernameClaim());
+        applyPassword(req.oidcClientSecret(), s::getOidcClientSecretEnc, s::setOidcClientSecretEnc);
     }
 
     /**
@@ -132,6 +161,24 @@ public class ApplicationSettingsService {
                 s.getS3SecretKeyEncrypted() != null,
                 s.getS3Region(),
                 s.getS3PresignedUrlTtlHours(),
+                // Authentication
+                s.getEnabledAuthTypes(),
+                // LDAP auth provider
+                s.getLdapAuthHost(),
+                s.getLdapAuthPort(),
+                s.getLdapAuthSslMode(),
+                s.isLdapAuthTrustAllCerts(),
+                s.getLdapAuthTrustedCertPem(),
+                s.getLdapAuthBindDn(),
+                s.getLdapAuthBindPasswordEnc() != null,
+                s.getLdapAuthUserSearchBase(),
+                s.getLdapAuthBindDnPattern(),
+                // OIDC auth provider
+                s.getOidcIssuerUrl(),
+                s.getOidcClientId(),
+                s.getOidcClientSecretEnc() != null,
+                s.getOidcScopes(),
+                s.getOidcUsernameClaim(),
                 s.getCreatedAt(),
                 s.getUpdatedAt());
     }
@@ -143,6 +190,12 @@ public class ApplicationSettingsService {
                 60,
                 null, 587, null, null, false, true,
                 null, null, null, false, null, 24,
+                // Authentication
+                Set.of(AccountType.LOCAL),
+                // LDAP auth provider
+                null, null, null, false, null, null, false, null, null,
+                // OIDC auth provider
+                null, null, false, "openid profile email", "preferred_username",
                 null, null);
     }
 }

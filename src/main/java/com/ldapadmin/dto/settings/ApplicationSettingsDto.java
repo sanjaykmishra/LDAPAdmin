@@ -1,6 +1,10 @@
 package com.ldapadmin.dto.settings;
 
+import com.ldapadmin.entity.enums.AccountType;
+import com.ldapadmin.entity.enums.SslMode;
+
 import java.time.OffsetDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -35,6 +39,27 @@ public record ApplicationSettingsDto(
         boolean s3SecretKeyConfigured,
         String s3Region,
         int s3PresignedUrlTtlHours,
+
+        // Authentication
+        Set<AccountType> enabledAuthTypes,
+
+        // LDAP auth provider
+        String ldapAuthHost,
+        Integer ldapAuthPort,
+        SslMode ldapAuthSslMode,
+        boolean ldapAuthTrustAllCerts,
+        String ldapAuthTrustedCertPem,
+        String ldapAuthBindDn,
+        boolean ldapAuthBindPasswordConfigured,
+        String ldapAuthUserSearchBase,
+        String ldapAuthBindDnPattern,
+
+        // OIDC auth provider
+        String oidcIssuerUrl,
+        String oidcClientId,
+        boolean oidcClientSecretConfigured,
+        String oidcScopes,
+        String oidcUsernameClaim,
 
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {}
