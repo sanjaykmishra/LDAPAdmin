@@ -4,6 +4,33 @@
 
 Add OIDC (OpenID Connect) as a third authentication method alongside LOCAL and LDAP for admin/superadmin users. Uses Authorization Code Flow (server-side). The browser redirects to the IdP, the IdP redirects back with a code, the backend exchanges it for tokens, matches the user to an Account, and issues the existing JWT cookie.
 
+## Architecture Decision: Auth Settings Scope
+
+Auth provider configuration (OIDC issuer, LDAP server, etc.) stays at the **application level** in `ApplicationSettings` — these are per-deployment, not per-user. Every OIDC account authenticates against the same IdP.
+
+However, the current `adminAuthType` single-enum field should be refactored to a **set of enabled methods**, allowing multiple auth types to coexist (e.g. LOCAL for break-glass superadmin + OIDC for regular admins):
+
+```java
+// Before: single choice
+private AccountType adminAuthType = AccountType.LOCAL;
+
+// After: multiple enabled methods
+@ElementCollection
+@CollectionTable(name = "enabled_auth_types", joinColumns = @JoinColumn(name = "settings_id"))
+@Enumerated(EnumType.STRING)
+@Column(name = "auth_type")
+private Set<AccountType> enabledAuthTypes = Set.of(AccountType.LOCAL);
+```
+
+The login page uses this set to decide which UI elements to show (password form, SSO button, or both). Each `Account` retains its own `authType` field to record which method that specific user authenticates with.
+
+| Setting | Level | Why |
+|---------|-------|-----|
+| OIDC issuer/clientId/secret | Application (`ApplicationSettings`) | Same IdP for all OIDC users |
+| LDAP host/port/bindDn | Application (`ApplicationSettings`) | Same LDAP server for all LDAP users |
+| Enabled auth methods | Application (`ApplicationSettings`) | Controls what the login page shows |
+| Which method a user uses | Account (`Account.authType`) | Per-user, allows mixed methods |
+
 ## What Stays the Same
 
 - JWT token format, claims, cookie handling
@@ -25,7 +52,29 @@ public enum AccountType {
 }
 ```
 
-### 2. Add OIDC fields to `ApplicationSettings`
+### 2. Refactor `adminAuthType` to `enabledAuthTypes`
+
+**File:** `src/main/java/com/ldapadmin/entity/ApplicationSettings.java`
+
+Replace the single `adminAuthType` enum with a set of enabled auth methods:
+
+```java
+// Remove:
+private AccountType adminAuthType = AccountType.LOCAL;
+
+// Add:
+@ElementCollection
+@CollectionTable(name = "enabled_auth_types", joinColumns = @JoinColumn(name = "settings_id"))
+@Enumerated(EnumType.STRING)
+@Column(name = "auth_type")
+private Set<AccountType> enabledAuthTypes = Set.of(AccountType.LOCAL);
+```
+
+Update `AuthenticationService.login()` to check that the account's `authType` is in the enabled set before proceeding.
+
+Update the `/api/v1/settings/branding` response (or a new public endpoint) to expose the enabled auth types so the login page can render the correct UI.
+
+### 3. Add OIDC fields to `ApplicationSettings`
 
 **File:** `src/main/java/com/ldapadmin/entity/ApplicationSettings.java`
 
@@ -38,12 +87,14 @@ private String oidcUsernameClaim;      // claim to match against Account.usernam
                                        // default: "preferred_username" or "email"
 ```
 
-### 3. DB migration
+### 4. DB migration
 
+- Create `enabled_auth_types` join table (replaces `admin_auth_type` column)
 - Add OIDC columns to `application_settings` table
-- Add `OIDC` to `account_type` enum (if using DB-level enum constraint)
+- Migrate existing `admin_auth_type` value into `enabled_auth_types` row
+- Drop `admin_auth_type` column
 
-### 4. Add dependency
+### 5. Add dependency
 
 **File:** `pom.xml` or `build.gradle`
 
@@ -58,7 +109,7 @@ private String oidcUsernameClaim;      // claim to match against Account.usernam
 
 Using Nimbus directly (rather than `spring-boot-starter-oauth2-client`) avoids pulling in session-based OAuth which conflicts with the stateless JWT design.
 
-### 5. Create `OidcAuthenticationService`
+### 6. Create `OidcAuthenticationService`
 
 **File:** `src/main/java/com/ldapadmin/auth/OidcAuthenticationService.java` (new)
 
@@ -77,7 +128,7 @@ Responsibilities:
 
 State/nonce storage: short-lived `ConcurrentHashMap<String, OidcState>` with TTL cleanup (or `@Cacheable` with expiry).
 
-### 6. Add OIDC endpoints to `AuthController`
+### 7. Add OIDC endpoints to `AuthController`
 
 **File:** `src/main/java/com/ldapadmin/controller/AuthController.java`
 
@@ -101,7 +152,7 @@ Completes the OIDC flow:
 7. If found → issue JWT cookie (same as existing login flow)
 8. If not found → 401 "No account linked to this identity"
 
-### 7. Update `SecurityConfig`
+### 8. Update `SecurityConfig`
 
 **File:** `src/main/java/com/ldapadmin/config/SecurityConfig.java`
 
@@ -111,19 +162,19 @@ Add OIDC endpoints to `permitAll` list:
 .requestMatchers(HttpMethod.POST, "/api/v1/auth/oidc/callback").permitAll()
 ```
 
-### 8. Update Settings DTOs
+### 9. Update Settings DTOs
 
 **Files:**
 - `ApplicationSettingsRequest.java` — add OIDC config fields
 - `ApplicationSettingsResponse.java` — add OIDC config fields (secret as boolean flag, not ciphertext)
 
-### 9. Update `ApplicationSettingsService`
+### 10. Update `ApplicationSettingsService`
 
 **File:** `src/main/java/com/ldapadmin/service/ApplicationSettingsService.java`
 
 Handle OIDC client secret encryption/decryption same as existing LDAP bind password pattern.
 
-### 10. Update Admin Management
+### 11. Update Admin Management
 
 **Files:**
 - `AdminManagementService.java` — allow creating accounts with `authType=OIDC` (no password required)
@@ -131,7 +182,7 @@ Handle OIDC client secret encryption/decryption same as existing LDAP bind passw
 
 Account linking: Superadmins create `Account` records with `authType=OIDC` and set the username to match the IdP claim. No self-registration — matches the existing LDAP admin pattern.
 
-### 11. Frontend: Login Page
+### 12. Frontend: Login Page
 
 Add "Sign in with SSO" button (only visible when OIDC is configured):
 1. Call `GET /api/v1/auth/oidc/authorize`
@@ -141,7 +192,7 @@ Add "Sign in with SSO" button (only visible when OIDC is configured):
 
 Need a small callback page/route to handle the redirect from the IdP.
 
-### 12. Frontend: Settings Page
+### 13. Frontend: Settings Page
 
 Add OIDC configuration section alongside existing LDAP auth settings:
 - Issuer URL
@@ -151,7 +202,7 @@ Add OIDC configuration section alongside existing LDAP auth settings:
 - Username Claim
 - Test button (validate discovery doc is reachable)
 
-### 13. Frontend: Admin Management
+### 14. Frontend: Admin Management
 
 Add `OIDC` option to auth type selector when creating/editing admin accounts.
 
@@ -172,15 +223,17 @@ Add `OIDC` option to auth type selector when creating/editing admin accounts.
 | Change | Files |
 |--------|-------|
 | New enum value | `AccountType.java` |
-| New entity fields | `ApplicationSettings.java` |
+| Refactor to enabled set | `ApplicationSettings.java` (`adminAuthType` → `enabledAuthTypes`) |
+| New entity fields | `ApplicationSettings.java` (OIDC provider config) |
+| Auth type gate | `AuthenticationService.java` (check account's type is enabled) |
 | New service | `OidcAuthenticationService.java` (new) |
 | New endpoints | `AuthController.java` |
 | Security config | `SecurityConfig.java` |
 | Settings DTOs | `ApplicationSettingsRequest.java`, `ApplicationSettingsResponse.java` |
 | Settings service | `ApplicationSettingsService.java` |
 | Admin management | `AdminManagementService.java`, DTOs |
-| DB migration | New Flyway/Liquibase migration script |
-| Frontend login | Login view (SSO button + callback route) |
-| Frontend settings | Settings view (OIDC config section) |
+| DB migration | New migration: `enabled_auth_types` table, OIDC columns, drop `admin_auth_type` |
+| Frontend login | Login view (SSO button + callback route, driven by `enabledAuthTypes`) |
+| Frontend settings | Settings view (OIDC config + multi-select enabled auth types) |
 | Frontend admin mgmt | Admin form (OIDC auth type option) |
 | Dependency | `pom.xml` / `build.gradle` (Nimbus JOSE+JWT) |
