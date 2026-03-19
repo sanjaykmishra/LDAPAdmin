@@ -41,7 +41,7 @@
     </DataTable>
 
     <!-- Create group -->
-    <AppModal v-model="showCreate" title="New Group" size="md">
+    <AppModal v-model="showCreate" title="New Group" size="lg">
       <div class="grid grid-cols-3 gap-3">
         <FormField label="Group Name (cn) (RDN)" v-model="createForm.cn" required />
         <div class="col-span-2">
@@ -300,7 +300,7 @@ async function loadRealm() {
     const { data: realms } = await listRealms(dirId)
     allRealms.value = realms
     if (realms.length) selectRealm(realms)
-  } catch { /* best-effort */ }
+  } catch (e) { console.warn('Failed to load realms:', e) }
 }
 
 function onRealmChange() {

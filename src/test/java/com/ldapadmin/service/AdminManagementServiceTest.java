@@ -239,13 +239,12 @@ class AdminManagementServiceTest {
     @Test
     void setFeaturePermissions_createsNewPermissions() {
         when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount("alice")));
-        when(featureRepo.findByAdminAccountIdAndFeatureKey(adminId, FeatureKey.USER_CREATE))
-                .thenReturn(Optional.empty());
         when(featureRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.setFeaturePermissions(adminId,
                 List.of(new FeaturePermissionRequest(FeatureKey.USER_CREATE, true)));
 
+        verify(featureRepo).deleteAllByAdminAccountId(adminId);
         ArgumentCaptor<AdminFeaturePermission> captor =
                 ArgumentCaptor.forClass(AdminFeaturePermission.class);
         verify(featureRepo).save(captor.capture());
@@ -254,21 +253,19 @@ class AdminManagementServiceTest {
     }
 
     @Test
-    void setFeaturePermissions_updatesExistingPermission() {
+    void setFeaturePermissions_deletesOldAndRecreates() {
         when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount("alice")));
-
-        AdminFeaturePermission existing = new AdminFeaturePermission();
-        existing.setId(UUID.randomUUID());
-        existing.setFeatureKey(FeatureKey.USER_DELETE);
-        existing.setEnabled(true);
-        when(featureRepo.findByAdminAccountIdAndFeatureKey(adminId, FeatureKey.USER_DELETE))
-                .thenReturn(Optional.of(existing));
-        when(featureRepo.save(any())).thenReturn(existing);
+        when(featureRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.setFeaturePermissions(adminId,
                 List.of(new FeaturePermissionRequest(FeatureKey.USER_DELETE, false)));
 
-        assertThat(existing.isEnabled()).isFalse();
+        verify(featureRepo).deleteAllByAdminAccountId(adminId);
+        ArgumentCaptor<AdminFeaturePermission> captor =
+                ArgumentCaptor.forClass(AdminFeaturePermission.class);
+        verify(featureRepo).save(captor.capture());
+        assertThat(captor.getValue().isEnabled()).isFalse();
+        assertThat(captor.getValue().getFeatureKey()).isEqualTo(FeatureKey.USER_DELETE);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

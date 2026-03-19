@@ -158,15 +158,15 @@ public class AdminManagementService {
     public void setFeaturePermissions(UUID adminId, List<FeaturePermissionRequest> permissions) {
         Account admin = requireAccount(adminId);
 
-        permissions.forEach(req -> {
-            AdminFeaturePermission fp = featureRepo
-                    .findByAdminAccountIdAndFeatureKey(adminId, req.featureKey())
-                    .orElseGet(AdminFeaturePermission::new);
+        // Delete all existing feature permissions, then re-create from the request.
+        // This prevents orphaned entries when features are removed from the list.
+        featureRepo.deleteAllByAdminAccountId(adminId);
+        featureRepo.flush();
 
-            if (fp.getId() == null) {
-                fp.setAdminAccount(admin);
-                fp.setFeatureKey(req.featureKey());
-            }
+        permissions.forEach(req -> {
+            AdminFeaturePermission fp = new AdminFeaturePermission();
+            fp.setAdminAccount(admin);
+            fp.setFeatureKey(req.featureKey());
             fp.setEnabled(req.enabled());
             featureRepo.save(fp);
         });

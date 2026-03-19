@@ -19,12 +19,13 @@ import java.lang.annotation.Target;
  * {@link PermissionService#requireFeature(AuthPrincipal, java.util.UUID, FeatureKey)}.
  * </p>
  *
- * <p>The target method <em>must</em> have a parameter of type {@link java.util.UUID}
- * named {@code directoryId} so that the aspect can resolve the directory scope.</p>
+ * <p>The target method <em>must</em> have a {@link java.util.UUID} parameter
+ * annotated with {@link DirectoryId} (or, as a legacy fallback, named
+ * {@code directoryId}) so the aspect can resolve the directory scope.</p>
  *
  * <pre>{@code
  * @RequiresFeature(FeatureKey.USER_CREATE)
- * public ResponseEntity<Void> createUser(@PathVariable UUID directoryId,
+ * public ResponseEntity<Void> createUser(@DirectoryId @PathVariable UUID directoryId,
  *                                        @RequestBody CreateUserRequest req) { ... }
  * }</pre>
  */

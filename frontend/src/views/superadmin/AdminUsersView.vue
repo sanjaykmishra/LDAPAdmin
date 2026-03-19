@@ -272,7 +272,7 @@ onMounted(async () => {
   try {
     const { data } = await myRealms()
     allRealms.value = data
-  } catch { /* ignore */ }
+  } catch (e) { console.warn('Failed to load realms:', e) }
 })
 
 // Realms not already assigned to this admin

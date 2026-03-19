@@ -147,7 +147,7 @@ async function resolveHomePath(auth) {
   try {
     const { data } = await myRealms()
     if (data.length) return `/directories/${data[0].directoryId}/users`
-  } catch { /* fall through */ }
+  } catch (e) { console.warn('Failed to resolve home path:', e) }
   return '/login'
 }
 

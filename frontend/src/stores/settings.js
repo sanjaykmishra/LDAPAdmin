@@ -26,8 +26,8 @@ export const useSettingsStore = defineStore('settings', () => {
       primaryColour.value    = data.primaryColour  || DEFAULT_PRIMARY
       secondaryColour.value  = data.secondaryColour || DEFAULT_SECONDARY
       enabledAuthTypes.value = data.enabledAuthTypes || ['LOCAL']
-    } catch {
-      // Use defaults on failure
+    } catch (e) {
+      console.warn('Failed to load branding settings:', e)
     }
     applyColours()
     loaded.value = true

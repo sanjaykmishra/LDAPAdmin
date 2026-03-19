@@ -83,7 +83,8 @@ async function toggle(node) {
       const updated = new Map(childrenMap.value)
       updated.set(node.dn, children)
       childrenMap.value = updated
-    } catch {
+    } catch (e) {
+      console.warn('Failed to load children for', node.dn, e)
       expanded.delete(node.dn)
     } finally {
       loading.delete(node.dn)

@@ -236,39 +236,7 @@ public class LdapConnectionFactory {
     }
 
     private SSLUtil buildSslUtil(DirectoryConnection dc) throws Exception {
-        if (dc.isTrustAllCerts()) {
-            return new SSLUtil(new TrustAllTrustManager());
-        }
-        if (dc.getTrustedCertificatePem() != null && !dc.getTrustedCertificatePem().isBlank()) {
-            TrustManager[] trustManagers = buildPemTrustManagers(dc.getTrustedCertificatePem());
-            return new SSLUtil(trustManagers);
-        }
-        // Use JVM default trust store
-        return new SSLUtil();
-    }
-
-    /**
-     * Builds trust managers from a PEM string that may contain one or more
-     * certificates (e.g. a root CA plus intermediate CAs).
-     * Previously only the first certificate was parsed; this now loads the
-     * full chain so intermediate-CA bundles work correctly.
-     */
-    private TrustManager[] buildPemTrustManagers(String pem) throws Exception {
-        CertificateFactory cf = CertificateFactory.getInstance("X.509");
-        Collection<? extends Certificate> certs = cf.generateCertificates(
-            new ByteArrayInputStream(pem.getBytes(StandardCharsets.UTF_8)));
-
-        KeyStore trustStore = KeyStore.getInstance("JKS");
-        trustStore.load(null, null);
-        int index = 0;
-        for (Certificate cert : certs) {
-            trustStore.setCertificateEntry("trusted-ca-" + index++, cert);
-        }
-
-        TrustManagerFactory tmf = TrustManagerFactory.getInstance(
-            TrustManagerFactory.getDefaultAlgorithm());
-        tmf.init(trustStore);
-        return tmf.getTrustManagers();
+        return SslHelper.buildSslUtil(dc.isTrustAllCerts(), dc.getTrustedCertificatePem());
     }
 
     // ── Functional interface ──────────────────────────────────────────────────
