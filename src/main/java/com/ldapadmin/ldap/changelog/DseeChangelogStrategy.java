@@ -7,10 +7,13 @@ import com.unboundid.ldap.sdk.SearchResultEntry;
 import com.unboundid.ldap.sdk.SearchScope;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoField;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -29,7 +32,14 @@ public class DseeChangelogStrategy implements ChangelogStrategy {
 
     /** GeneralizedTime format used in LDAP changeLog timestamps. */
     static final DateTimeFormatter GENERALIZED_TIME =
-            DateTimeFormatter.ofPattern("yyyyMMddHHmmss[.SSS][.SS][.S]'Z'");
+            new DateTimeFormatterBuilder()
+                    .appendPattern("yyyyMMddHHmmss")
+                    .optionalStart()
+                    .appendLiteral('.')
+                    .appendFraction(ChronoField.MILLI_OF_SECOND, 1, 3, false)
+                    .optionalEnd()
+                    .appendLiteral('Z')
+                    .toFormatter();
 
     @Override
     public SearchRequest buildSearchRequest(AuditDataSource src, int sizeLimit) throws LDAPException {
@@ -86,7 +96,7 @@ public class DseeChangelogStrategy implements ChangelogStrategy {
             return OffsetDateTime.now(ZoneOffset.UTC);
         }
         try {
-            return OffsetDateTime.parse(value, GENERALIZED_TIME);
+            return LocalDateTime.parse(value, GENERALIZED_TIME).atOffset(ZoneOffset.UTC);
         } catch (DateTimeParseException ex) {
             log.debug("Cannot parse changelog timestamp '{}', using now", value);
             return OffsetDateTime.now(ZoneOffset.UTC);
