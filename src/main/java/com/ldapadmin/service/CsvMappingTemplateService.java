@@ -73,6 +73,7 @@ public class CsvMappingTemplateService {
                 req.targetKeyAttribute() != null ? req.targetKeyAttribute() : "uid");
         template.setConflictHandling(
                 req.conflictHandling() != null ? req.conflictHandling() : ConflictHandling.SKIP);
+        template.setObjectClass(req.objectClass());
         template = templateRepo.save(template);
 
         List<CsvMappingTemplateEntry> entries = saveEntries(template, req.entries());
@@ -98,6 +99,9 @@ public class CsvMappingTemplateService {
         }
         if (req.conflictHandling() != null) {
             template.setConflictHandling(req.conflictHandling());
+        }
+        if (req.objectClass() != null) {
+            template.setObjectClass(req.objectClass());
         }
         template = templateRepo.save(template);
 
@@ -171,6 +175,7 @@ public class CsvMappingTemplateService {
                 t.getId(),
                 t.getDirectory().getId(),
                 t.getName(),
+                t.getObjectClass(),
                 t.getTargetKeyAttribute(),
                 t.getConflictHandling(),
                 entryDtos,

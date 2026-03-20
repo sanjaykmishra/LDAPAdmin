@@ -13,6 +13,7 @@ public record CsvMappingTemplateDto(
         UUID id,
         UUID directoryId,
         String name,
+        String objectClass,
         String targetKeyAttribute,
         ConflictHandling conflictHandling,
         List<CsvColumnMappingDto> entries,

@@ -4,6 +4,7 @@ import com.ldapadmin.auth.ApiRateLimiter;
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.auth.DirectoryId;
 import com.ldapadmin.auth.RequiresFeature;
+import com.ldapadmin.dto.csv.BulkImportPreviewResult;
 import com.ldapadmin.dto.csv.BulkImportRequest;
 import com.ldapadmin.dto.csv.BulkImportResult;
 import com.ldapadmin.entity.enums.FeatureKey;
@@ -56,6 +57,20 @@ public class BulkUserController {
 
     private final LdapOperationService service;
     private final ApiRateLimiter       rateLimiter;
+
+    @PostMapping(value = "/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RequiresFeature(FeatureKey.BULK_IMPORT)
+    public ResponseEntity<BulkImportPreviewResult> previewImport(
+            @DirectoryId @PathVariable UUID directoryId,
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @RequestPart("file") MultipartFile file,
+            @RequestPart("request") @Valid BulkImportRequest request) throws IOException {
+
+        rateLimiter.check(principal.username(), "bulk-import-preview");
+        BulkImportPreviewResult result = service.previewBulkImport(
+                directoryId, principal, file.getInputStream(), request);
+        return ResponseEntity.ok(result);
+    }
 
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @RequiresFeature(FeatureKey.BULK_IMPORT)

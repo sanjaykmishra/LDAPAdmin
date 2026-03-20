@@ -1,5 +1,7 @@
 package com.ldapadmin.service;
 
+import com.ldapadmin.dto.csv.BulkImportPreviewResult;
+import com.ldapadmin.dto.csv.BulkImportPreviewRow;
 import com.ldapadmin.dto.csv.BulkImportResult;
 import com.ldapadmin.dto.csv.BulkImportRowResult;
 import com.ldapadmin.dto.csv.CsvColumnMappingDto;
@@ -94,6 +96,52 @@ public class BulkUserService {
                 rowNum, created, updated, skipped, errors);
 
         return new BulkImportResult(rowNum, created, updated, skipped, errors, rowResults);
+    }
+
+    // ── Preview ───────────────────────────────────────────────────────────────
+
+    /**
+     * Parses {@code csvInput} and builds a preview of what would be imported,
+     * including computed DNs for each row. No LDAP writes are performed.
+     */
+    public BulkImportPreviewResult previewImport(InputStream csvInput,
+                                                  String parentDn,
+                                                  String targetKeyAttr,
+                                                  List<CsvColumnMappingDto> columnMappings) throws IOException {
+
+        Map<String, String> colToAttr = resolveColumnMap(columnMappings);
+        List<Map<String, String>> rows = CsvUtils.parse(csvInput);
+
+        List<BulkImportPreviewRow> previewRows = new ArrayList<>();
+        int rowNum = 0;
+
+        for (Map<String, String> row : rows) {
+            rowNum++;
+            Map<String, String> attrs = new LinkedHashMap<>();
+            for (Map.Entry<String, String> cell : row.entrySet()) {
+                String csvCol = cell.getKey();
+                String rawVal = cell.getValue();
+                if (rawVal == null || rawVal.isBlank()) continue;
+
+                String ldapAttr;
+                if (colToAttr.containsKey(csvCol)) {
+                    ldapAttr = colToAttr.get(csvCol);
+                    if (ldapAttr == null) continue;
+                } else {
+                    ldapAttr = csvCol;
+                }
+                attrs.put(ldapAttr, rawVal);
+            }
+
+            String keyValue = attrs.get(targetKeyAttr);
+            String dn = (keyValue != null && !keyValue.isBlank())
+                    ? buildDn(targetKeyAttr, keyValue, parentDn)
+                    : null;
+
+            previewRows.add(new BulkImportPreviewRow(rowNum, dn, attrs));
+        }
+
+        return new BulkImportPreviewResult(rowNum, previewRows);
     }
 
     // ── Export ────────────────────────────────────────────────────────────────
