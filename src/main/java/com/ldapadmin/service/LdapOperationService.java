@@ -2,6 +2,7 @@ package com.ldapadmin.service;
 
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.auth.PermissionService;
+import com.ldapadmin.dto.csv.BulkImportPreviewResult;
 import com.ldapadmin.dto.csv.BulkImportRequest;
 import com.ldapadmin.dto.csv.BulkImportResult;
 import com.ldapadmin.dto.csv.CsvColumnMappingDto;
@@ -278,6 +279,39 @@ public class LdapOperationService {
     }
 
     // ── Bulk import / export ──────────────────────────────────────────────────
+
+    /**
+     * Previews a bulk CSV import without writing to LDAP.
+     * Resolves template settings and returns computed DNs for each row.
+     */
+    public BulkImportPreviewResult previewBulkImport(UUID directoryId, AuthPrincipal principal,
+                                                      InputStream csvInput,
+                                                      BulkImportRequest req) throws IOException {
+        loadDirectory(directoryId, principal);
+        permissionService.requireDirectoryAccess(principal, directoryId);
+
+        String targetKeyAttr = "uid";
+        List<CsvColumnMappingDto> mappings = req.columnMappings() != null
+                ? new ArrayList<>(req.columnMappings()) : new ArrayList<>();
+
+        if (req.templateId() != null) {
+            CsvMappingTemplate template =
+                    csvTemplateService.loadTemplate(req.templateId(), directoryId, principal);
+            List<CsvMappingTemplateEntry> entries =
+                    csvTemplateService.loadEntries(req.templateId());
+            targetKeyAttr = template.getTargetKeyAttribute();
+            if (mappings.isEmpty()) {
+                mappings = entries.stream()
+                        .map(e -> new CsvColumnMappingDto(
+                                e.getCsvColumnName(), e.getLdapAttribute(), e.isIgnored()))
+                        .toList();
+            }
+        }
+
+        if (req.targetKeyAttribute() != null) targetKeyAttr = req.targetKeyAttribute();
+
+        return bulkUserService.previewImport(csvInput, req.parentDn(), targetKeyAttr, mappings);
+    }
 
     /**
      * Imports users from a CSV stream into the LDAP directory.
