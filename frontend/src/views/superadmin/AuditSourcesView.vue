@@ -18,6 +18,7 @@
             <th class="px-4 py-3 text-left font-medium text-gray-500">Host</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Port</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">SSL</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-500">Format</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Changelog DN</th>
             <th class="px-4 py-3 text-left font-medium text-gray-500">Enabled</th>
             <th class="px-4 py-3"></th>
@@ -29,6 +30,7 @@
             <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ s.host }}</td>
             <td class="px-4 py-3 text-gray-600">{{ s.port }}</td>
             <td class="px-4 py-3 text-gray-600 text-xs">{{ s.sslMode }}</td>
+            <td class="px-4 py-3 text-gray-600 text-xs">{{ formatLabels[s.changelogFormat] || s.changelogFormat }}</td>
             <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ s.changelogBaseDn }}</td>
             <td class="px-4 py-3">
               <span :class="s.enabled ? 'text-green-600' : 'text-gray-400'" class="text-xs font-medium">
@@ -61,7 +63,14 @@
           </div>
           <FormField label="Bind DN" v-model="form.bindDn" required />
           <FormField label="Bind Password" v-model="form.bindPassword" type="password" :placeholder="editing ? 'Leave blank to keep' : ''" />
-          <FormField label="Changelog Base DN" v-model="form.changelogBaseDn" placeholder="cn=changelog" required />
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Changelog Format</label>
+            <select v-model="form.changelogFormat" @change="onFormatChange" class="input w-full">
+              <option value="DSEE_CHANGELOG">Oracle DSEE / cn=changelog</option>
+              <option value="OPENLDAP_ACCESSLOG">OpenLDAP accesslog</option>
+            </select>
+          </div>
+          <FormField label="Changelog Base DN" v-model="form.changelogBaseDn" :placeholder="form.changelogFormat === 'OPENLDAP_ACCESSLOG' ? 'cn=accesslog' : 'cn=changelog'" required />
           <FormField label="Branch Filter DN" v-model="form.branchFilterDn" placeholder="optional" />
         </div>
         <div class="flex items-center gap-4">
@@ -121,11 +130,26 @@ const testResult   = ref(null)
 
 const form = ref(emptyForm())
 
+const formatLabels = {
+  DSEE_CHANGELOG: 'DSEE',
+  OPENLDAP_ACCESSLOG: 'accesslog',
+}
+
 function emptyForm() {
   return {
     displayName: '', host: '', port: 389, sslMode: 'NONE',
     trustAllCerts: false, bindDn: '', bindPassword: '',
-    changelogBaseDn: 'cn=changelog', branchFilterDn: '', enabled: true,
+    changelogBaseDn: 'cn=changelog', branchFilterDn: '',
+    changelogFormat: 'DSEE_CHANGELOG', enabled: true,
+  }
+}
+
+function onFormatChange() {
+  // Auto-switch the default base DN when toggling format
+  if (form.value.changelogFormat === 'OPENLDAP_ACCESSLOG' && form.value.changelogBaseDn === 'cn=changelog') {
+    form.value.changelogBaseDn = 'cn=accesslog'
+  } else if (form.value.changelogFormat === 'DSEE_CHANGELOG' && form.value.changelogBaseDn === 'cn=accesslog') {
+    form.value.changelogBaseDn = 'cn=changelog'
   }
 }
 
@@ -157,7 +181,7 @@ function openEdit(s) {
     displayName: s.displayName, host: s.host, port: s.port, sslMode: s.sslMode,
     trustAllCerts: s.trustAllCerts, bindDn: s.bindDn, bindPassword: '',
     changelogBaseDn: s.changelogBaseDn, branchFilterDn: s.branchFilterDn || '',
-    enabled: s.enabled,
+    changelogFormat: s.changelogFormat || 'DSEE_CHANGELOG', enabled: s.enabled,
   }
   showModal.value = true
 }

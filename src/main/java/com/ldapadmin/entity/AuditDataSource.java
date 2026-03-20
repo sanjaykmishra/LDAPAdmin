@@ -1,5 +1,6 @@
 package com.ldapadmin.entity;
 
+import com.ldapadmin.entity.enums.ChangelogFormat;
 import com.ldapadmin.entity.enums.SslMode;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -52,6 +53,11 @@ public class AuditDataSource {
     /** Base DN for changelog reads, e.g. {@code cn=changelog}. */
     @Column(name = "changelog_base_dn", nullable = false)
     private String changelogBaseDn = "cn=changelog";
+
+    /** Changelog format: DSEE ({@code cn=changelog}) or OpenLDAP accesslog. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "changelog_format", nullable = false, length = 25)
+    private ChangelogFormat changelogFormat = ChangelogFormat.DSEE_CHANGELOG;
 
     /** Optional: restrict changelog reads to entries under this targetDN subtree. */
     @Column(name = "branch_filter_dn")
