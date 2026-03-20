@@ -8,7 +8,7 @@
           <button @click="$emit('update:modelValue', false)" class="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
         </div>
         <!-- Body -->
-        <div class="px-6 py-4 overflow-y-auto max-h-[70vh]">
+        <div class="px-6 py-4 overflow-y-auto max-h-[80vh]">
           <slot />
         </div>
         <!-- Footer -->
