@@ -17,6 +17,15 @@ export const updateCsvTemplate = (dirId, templateId, data) =>
 export const deleteCsvTemplate = (dirId, templateId) =>
   client.delete(`${base(dirId)}/${templateId}`)
 
+export const previewCsv = (dirId, file, request) => {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('request', new Blob([JSON.stringify(request)], { type: 'application/json' }))
+  return client.post(`/directories/${dirId}/users/import/preview`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
 export const importCsv = (dirId, file, request) => {
   const form = new FormData()
   form.append('file', file)

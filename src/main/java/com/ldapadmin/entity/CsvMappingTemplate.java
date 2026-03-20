@@ -49,6 +49,10 @@ public class CsvMappingTemplate {
     @Column(name = "conflict_handling", nullable = false, length = 20)
     private ConflictHandling conflictHandling = ConflictHandling.PROMPT;
 
+    /** The LDAP objectClass whose attributes define the column mappings. */
+    @Column(name = "object_class")
+    private String objectClass;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

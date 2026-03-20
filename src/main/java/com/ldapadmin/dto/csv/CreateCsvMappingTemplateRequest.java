@@ -12,6 +12,8 @@ import java.util.List;
  */
 public record CreateCsvMappingTemplateRequest(
         @NotBlank String name,
+        /** LDAP objectClass whose attributes define the column mappings. */
+        String objectClass,
         /** LDAP attribute used to match CSV rows against existing directory entries (default: uid). */
         String targetKeyAttribute,
         /** Default conflict resolution when a matching entry already exists. */
