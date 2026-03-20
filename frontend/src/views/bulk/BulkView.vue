@@ -11,17 +11,21 @@
           <DnPicker v-model="importForm.parentDn" :directoryId="dirId" placeholder="ou=people,dc=example,dc=com" />
         </div>
 
-        <!-- Template picker + New Template button (80/20 layout) -->
-        <div class="grid grid-cols-5 gap-3">
-          <div class="col-span-4">
+        <!-- Template picker + New Template + Delete button -->
+        <div class="grid grid-cols-10 gap-3 items-end">
+          <div class="col-span-7">
             <label class="block text-sm font-medium text-gray-700 mb-1">Import Template <span class="text-red-500">*</span></label>
             <select v-model="selectedTemplateId" class="input w-full" @change="onTemplateSelected">
               <option value="">— Select a template —</option>
               <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
             </select>
           </div>
-          <div class="flex items-end">
-            <button @click="openCreateTemplate" class="btn-sm-primary w-full whitespace-nowrap">+ New Template</button>
+          <div class="col-span-2">
+            <button @click="openCreateTemplate" class="btn-primary w-full whitespace-nowrap">+ New Template</button>
+          </div>
+          <div class="col-span-1">
+            <button @click="confirmDeleteTemplate(selectedTemplate)" :disabled="!selectedTemplate"
+              class="btn-danger w-full" title="Delete selected template">&times;</button>
           </div>
         </div>
 
@@ -29,7 +33,13 @@
         <div v-if="selectedTemplate" class="grid grid-cols-3 gap-3">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Object Class</label>
-            <input :value="selectedTemplate.objectClass || '—'" disabled class="input w-full bg-gray-50 text-gray-500" />
+            <div class="input w-full bg-gray-50 text-gray-500 min-h-[38px]">
+              <span v-if="!selectedTemplate.objectClass">—</span>
+              <span v-else class="flex flex-wrap gap-1">
+                <span v-for="oc in selectedTemplate.objectClass.split(',')" :key="oc"
+                  class="inline-block bg-blue-100 text-blue-700 text-xs px-1.5 py-0.5 rounded">{{ oc }}</span>
+              </span>
+            </div>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">RDN Attribute</label>
@@ -115,16 +125,16 @@
     </section>
 
     <!-- Template create/edit modal -->
-    <AppModal v-model="showTemplateModal" :title="editTemplate ? 'Edit Template' : 'New Template'" size="lg">
+    <AppModal v-model="showTemplateModal" :title="editTemplate ? 'Edit Template' : 'New Template'" size="xl">
       <form @submit.prevent="saveTemplate" class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <FormField label="Template Name" v-model="templateForm.name" required />
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Object Class <span class="text-red-500">*</span></label>
-            <select v-model="templateForm.objectClass" class="input w-full" @change="onObjectClassChange">
-              <option value="">— Select —</option>
+            <select multiple v-model="templateForm.objectClasses" class="input w-full h-24" @change="onObjectClassChange">
               <option v-for="oc in objectClasses" :key="oc" :value="oc">{{ oc }}</option>
             </select>
+            <p class="text-xs text-gray-400 mt-0.5">Hold Ctrl/Cmd to select multiple</p>
           </div>
         </div>
         <div class="grid grid-cols-2 gap-4">
@@ -147,13 +157,15 @@
           <div v-if="templateForm.entries.length === 0 && !loadingOcAttrs" class="text-sm text-gray-400 text-center py-3">
             Select an object class to populate attribute mappings.
           </div>
-          <div v-else class="space-y-2 max-h-64 overflow-y-auto">
+          <div v-else class="space-y-2 max-h-96 overflow-y-scroll pr-2">
             <div v-for="(e, i) in templateForm.entries" :key="i" class="flex gap-2 items-center">
               <input v-model="e.csvColumn" placeholder="CSV column" class="input flex-1 text-xs" :class="{ 'border-red-300': e._required && !e.csvColumn }" />
               <span class="text-gray-400">→</span>
               <input :value="e.ldapAttribute" disabled class="input flex-1 text-xs bg-gray-50 text-gray-500" />
-              <span v-if="e._required" class="text-red-500 text-xs font-medium whitespace-nowrap">required</span>
-              <button v-if="!e._required" type="button" @click="removeTemplateEntry(i)" class="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>
+              <div class="w-16 flex-shrink-0 flex justify-start">
+                <span v-if="e._required" class="text-red-500 text-xs font-medium">required</span>
+                <button v-else type="button" @click="removeTemplateEntry(i)" class="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>
+              </div>
             </div>
           </div>
         </div>
@@ -182,7 +194,7 @@ import {
   importCsv, exportCsv, previewCsv,
   listCsvTemplates, createCsvTemplate, updateCsvTemplate, deleteCsvTemplate,
 } from '@/api/csvTemplates'
-import { listObjectClasses, getObjectClass } from '@/api/schema'
+import { listObjectClasses, getObjectClassesBulk } from '@/api/schema'
 import { downloadBlob } from '@/composables/useApi'
 import FormField from '@/components/FormField.vue'
 import DnPicker from '@/components/DnPicker.vue'
@@ -213,7 +225,7 @@ const editTemplate        = ref(null)
 const templateSaving      = ref(false)
 const deleteTemplateTarget = ref(null)
 const templateForm = ref({
-  name: '', objectClass: '', targetKeyAttribute: 'uid', conflictHandling: 'SKIP', entries: []
+  name: '', objectClasses: [], targetKeyAttribute: 'uid', conflictHandling: 'SKIP', entries: []
 })
 
 // ObjectClass picker state
@@ -231,8 +243,7 @@ const canImport = computed(() => {
 
 const canSaveTemplate = computed(() => {
   const f = templateForm.value
-  if (!f.name || !f.objectClass) return false
-  // All required entries must have a csvColumn
+  if (!f.name || f.objectClasses.length === 0) return false
   return f.entries.filter(e => e._required).every(e => e.csvColumn && e.csvColumn.trim())
 })
 
@@ -275,7 +286,7 @@ function onTemplateSelected() {
 function openCreateTemplate() {
   editTemplate.value = null
   templateForm.value = {
-    name: '', objectClass: '', targetKeyAttribute: 'uid', conflictHandling: 'SKIP', entries: []
+    name: '', objectClasses: [], targetKeyAttribute: 'uid', conflictHandling: 'SKIP', entries: []
   }
   showTemplateModal.value = true
 }
@@ -284,7 +295,7 @@ function openEditTemplate(t) {
   editTemplate.value = t
   templateForm.value = {
     name: t.name,
-    objectClass: t.objectClass || '',
+    objectClasses: t.objectClass ? t.objectClass.split(',') : [],
     targetKeyAttribute: t.targetKeyAttribute,
     conflictHandling: t.conflictHandling,
     entries: (t.entries ?? []).map(e => ({ ...e, _required: false })),
@@ -293,19 +304,21 @@ function openEditTemplate(t) {
 }
 
 async function onObjectClassChange() {
-  const oc = templateForm.value.objectClass
-  if (!oc) {
+  const ocs = templateForm.value.objectClasses
+  if (ocs.length === 0) {
     templateForm.value.entries = []
     return
   }
   loadingOcAttrs.value = true
   try {
-    const { data } = await getObjectClass(dirId, oc)
+    const { data } = await getObjectClassesBulk(dirId, ocs)
     const entries = []
     for (const attr of (data.required || [])) {
+      if (attr.toLowerCase() === 'objectclass') continue
       entries.push({ csvColumn: '', ldapAttribute: attr, ignored: false, _required: true })
     }
     for (const attr of (data.optional || [])) {
+      if (attr.toLowerCase() === 'objectclass') continue
       entries.push({ csvColumn: '', ldapAttribute: attr, ignored: false, _required: false })
     }
     templateForm.value.entries = entries
@@ -323,7 +336,7 @@ async function saveTemplate() {
   try {
     const payload = {
       name: templateForm.value.name,
-      objectClass: templateForm.value.objectClass,
+      objectClass: templateForm.value.objectClasses.join(','),
       targetKeyAttribute: templateForm.value.targetKeyAttribute,
       conflictHandling: templateForm.value.conflictHandling,
       entries: templateForm.value.entries
@@ -346,20 +359,23 @@ async function saveTemplate() {
   }
 }
 
-function confirmDeleteTemplate(t) { deleteTemplateTarget.value = t }
+function confirmDeleteTemplate(t) {
+  if (!t) return
+  deleteTemplateTarget.value = t
+}
 
 async function doDeleteTemplate() {
+  const target = deleteTemplateTarget.value
+  deleteTemplateTarget.value = null
   try {
-    await deleteCsvTemplate(dirId, deleteTemplateTarget.value.id)
+    await deleteCsvTemplate(dirId, target.id)
     notif.success('Template deleted')
-    deleteTemplateTarget.value = null
-    if (selectedTemplateId.value === deleteTemplateTarget.value?.id) {
+    if (selectedTemplateId.value === target.id) {
       selectedTemplateId.value = ''
     }
     await loadTemplates()
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
-    deleteTemplateTarget.value = null
   }
 }
 
@@ -437,6 +453,6 @@ async function doExport() {
 @reference "tailwindcss";
 .btn-primary    { @apply px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50; }
 .btn-secondary  { @apply px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50; }
-.btn-sm-primary { @apply px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700; }
+.btn-danger     { @apply px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-30; }
 .input          { @apply border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500; }
 </style>
