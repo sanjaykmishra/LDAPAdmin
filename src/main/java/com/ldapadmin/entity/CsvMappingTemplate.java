@@ -53,6 +53,10 @@ public class CsvMappingTemplate {
     @Column(name = "object_class")
     private String objectClass;
 
+    /** Whether to treat the first row of the CSV as column headers (true) or data (false). */
+    @Column(name = "skip_header_row", nullable = false)
+    private boolean skipHeaderRow = true;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

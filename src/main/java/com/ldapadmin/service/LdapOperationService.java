@@ -310,7 +310,9 @@ public class LdapOperationService {
 
         if (req.targetKeyAttribute() != null) targetKeyAttr = req.targetKeyAttribute();
 
-        return bulkUserService.previewImport(csvInput, req.parentDn(), targetKeyAttr, mappings);
+        boolean skipHeader = resolveSkipHeaderRow(req.skipHeaderRow(), req.templateId(), directoryId, principal);
+
+        return bulkUserService.previewImport(csvInput, req.parentDn(), targetKeyAttr, mappings, skipHeader);
     }
 
     /**
@@ -351,8 +353,10 @@ public class LdapOperationService {
         if (req.targetKeyAttribute() != null)  targetKeyAttr    = req.targetKeyAttribute();
         if (req.conflictHandling()    != null)  conflictHandling = req.conflictHandling();
 
+        boolean skipHeader = resolveSkipHeaderRow(req.skipHeaderRow(), req.templateId(), directoryId, principal);
+
         BulkImportResult result = bulkUserService.importCsv(
-                dc, csvInput, req.parentDn(), targetKeyAttr, conflictHandling, mappings);
+                dc, csvInput, req.parentDn(), targetKeyAttr, conflictHandling, mappings, skipHeader);
 
         auditService.record(principal, directoryId, AuditAction.USER_CREATE, req.parentDn(),
                 Map.of("operation", "bulkImport",
@@ -387,6 +391,17 @@ public class LdapOperationService {
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    private boolean resolveSkipHeaderRow(Boolean requestValue, UUID templateId,
+                                          UUID directoryId, AuthPrincipal principal) {
+        if (requestValue != null) return requestValue;
+        if (templateId != null) {
+            CsvMappingTemplate template =
+                    csvTemplateService.loadTemplate(templateId, directoryId, principal);
+            return template.isSkipHeaderRow();
+        }
+        return true; // default: first row is headers
+    }
 
     private DirectoryConnection loadDirectory(UUID directoryId, AuthPrincipal principal) {
         DirectoryConnection dc = dirRepo.findById(directoryId)

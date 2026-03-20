@@ -97,9 +97,81 @@ public final class CsvUtils {
             return Collections.emptyList();
         }
 
-        String[] headers = rawRows.get(0);
+        return assembleRowMaps(rawRows, true);
+    }
+
+    /**
+     * Parses a UTF-8 CSV stream, optionally treating the first row as headers.
+     *
+     * @param hasHeaderRow when {@code true} the first row supplies column names;
+     *                     when {@code false} synthetic names ({@code Column 1}, {@code Column 2}, …)
+     *                     are generated and all rows are treated as data
+     */
+    public static List<Map<String, String>> parse(InputStream input, boolean hasHeaderRow)
+            throws IOException {
+        BufferedReader reader = new BufferedReader(
+                new InputStreamReader(input, StandardCharsets.UTF_8));
+
+        List<String[]> rawRows = new ArrayList<>();
+        StringBuilder logical = new StringBuilder();
+        boolean inQuote = false;
+
+        String physLine;
+        while ((physLine = reader.readLine()) != null) {
+            if (logical.length() > 0 || !physLine.isBlank()) {
+                if (logical.length() > 0) {
+                    logical.append('\n');
+                }
+                logical.append(physLine);
+
+                for (int i = 0; i < physLine.length(); i++) {
+                    if (physLine.charAt(i) == '"') {
+                        if (i + 1 < physLine.length() && physLine.charAt(i + 1) == '"') {
+                            i++;
+                        } else {
+                            inQuote = !inQuote;
+                        }
+                    }
+                }
+
+                if (!inQuote) {
+                    String logicalRow = logical.toString();
+                    logical.setLength(0);
+                    if (!logicalRow.isBlank()) {
+                        rawRows.add(parseRow(logicalRow));
+                    }
+                }
+            }
+        }
+        if (logical.length() > 0) {
+            rawRows.add(parseRow(logical.toString()));
+        }
+
+        return assembleRowMaps(rawRows, hasHeaderRow);
+    }
+
+    private static List<Map<String, String>> assembleRowMaps(List<String[]> rawRows,
+                                                              boolean hasHeaderRow) {
+        if (rawRows.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        String[] headers;
+        int dataStart;
+        if (hasHeaderRow) {
+            headers = rawRows.get(0);
+            dataStart = 1;
+        } else {
+            int maxCols = rawRows.stream().mapToInt(r -> r.length).max().orElse(0);
+            headers = new String[maxCols];
+            for (int c = 0; c < maxCols; c++) {
+                headers[c] = "Column " + (c + 1);
+            }
+            dataStart = 0;
+        }
+
         List<Map<String, String>> result = new ArrayList<>();
-        for (int r = 1; r < rawRows.size(); r++) {
+        for (int r = dataStart; r < rawRows.size(); r++) {
             String[] row = rawRows.get(r);
             Map<String, String> map = new LinkedHashMap<>();
             for (int c = 0; c < headers.length; c++) {

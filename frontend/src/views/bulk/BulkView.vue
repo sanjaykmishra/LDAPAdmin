@@ -11,21 +11,34 @@
           <DnPicker v-model="importForm.parentDn" :directoryId="dirId" placeholder="ou=people,dc=example,dc=com" />
         </div>
 
-        <!-- Template picker + New Template + Delete button -->
-        <div class="grid grid-cols-10 gap-3 items-end">
-          <div class="col-span-7">
+        <!-- Template picker + actions dropdown -->
+        <div class="flex gap-3 items-end">
+          <div class="flex-1">
             <label class="block text-sm font-medium text-gray-700 mb-1">Import Template <span class="text-red-500">*</span></label>
             <select v-model="selectedTemplateId" class="input w-full" @change="onTemplateSelected">
               <option value="">— Select a template —</option>
               <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
             </select>
           </div>
-          <div class="col-span-2">
-            <button @click="openCreateTemplate" class="btn-primary w-full whitespace-nowrap">+ New Template</button>
-          </div>
-          <div class="col-span-1">
-            <button @click="confirmDeleteTemplate(selectedTemplate)" :disabled="!selectedTemplate"
-              class="btn-danger w-full" title="Delete selected template">&times;</button>
+          <div class="relative" ref="menuRef">
+            <button @click="showTemplateMenu = !showTemplateMenu" class="btn-primary whitespace-nowrap flex items-center gap-1">
+              Template <span class="text-xs">&#9660;</span>
+            </button>
+            <div v-if="showTemplateMenu" class="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1">
+              <button @click="menuAction('add')" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                Add Template
+              </button>
+              <button @click="menuAction('edit')" :disabled="!selectedTemplate"
+                class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                :class="selectedTemplate ? 'text-gray-700' : 'text-gray-300 cursor-not-allowed'">
+                Edit Template
+              </button>
+              <button @click="menuAction('delete')" :disabled="!selectedTemplate"
+                class="w-full text-left px-4 py-2 text-sm hover:bg-red-50"
+                :class="selectedTemplate ? 'text-red-600' : 'text-gray-300 cursor-not-allowed'">
+                Delete Template
+              </button>
+            </div>
           </div>
         </div>
 
@@ -127,18 +140,25 @@
     <!-- Template create/edit modal -->
     <AppModal v-model="showTemplateModal" :title="editTemplate ? 'Edit Template' : 'New Template'" size="xl">
       <form @submit.prevent="saveTemplate" class="space-y-4">
-        <div class="grid grid-cols-2 gap-4">
-          <FormField label="Template Name" v-model="templateForm.name" required />
+        <div class="grid grid-cols-2 gap-4 items-end">
+          <div class="space-y-3">
+            <FormField label="Template Name" v-model="templateForm.name" required />
+            <FormField label="RDN Attribute" v-model="templateForm.targetKeyAttribute" placeholder="uid" />
+          </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Object Class <span class="text-red-500">*</span></label>
-            <select multiple v-model="templateForm.objectClasses" class="input w-full h-24" @change="onObjectClassChange">
-              <option v-for="oc in objectClasses" :key="oc" :value="oc">{{ oc }}</option>
-            </select>
-            <p class="text-xs text-gray-400 mt-0.5">Hold Ctrl/Cmd to select multiple</p>
+            <div class="border border-gray-300 rounded-lg max-h-36 overflow-y-auto p-2 space-y-1">
+              <label v-for="oc in objectClasses" :key="oc"
+                class="flex items-center gap-2 px-1 py-0.5 text-sm hover:bg-gray-50 rounded cursor-pointer">
+                <input type="checkbox" :value="oc" v-model="templateForm.objectClasses"
+                  @change="onObjectClassChange" class="rounded text-blue-600" />
+                {{ oc }}
+              </label>
+              <p v-if="objectClasses.length === 0" class="text-xs text-gray-400 text-center py-2">No object classes available</p>
+            </div>
           </div>
         </div>
         <div class="grid grid-cols-2 gap-4">
-          <FormField label="RDN Attribute" v-model="templateForm.targetKeyAttribute" placeholder="uid" />
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Conflict Handling</label>
             <select v-model="templateForm.conflictHandling" class="input w-full">
@@ -146,6 +166,12 @@
               <option value="OVERWRITE">Overwrite existing</option>
               <option value="PROMPT">Prompt (treat as skip)</option>
             </select>
+          </div>
+          <div class="flex items-end pb-1">
+            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input type="checkbox" v-model="templateForm.skipHeaderRow" class="rounded text-blue-600" />
+              CSV first row is header (skip on import)
+            </label>
           </div>
         </div>
 
@@ -187,7 +213,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useNotificationStore } from '@/stores/notifications'
 import {
@@ -215,6 +241,26 @@ const previewResult = ref(null)
 const importForm = ref({ parentDn: '' })
 const exportForm = ref({ filter: '', baseDn: '', attributes: 'cn,mail,uid' })
 
+// ── Template actions dropdown ─────────────────────────────────────────────────
+
+const showTemplateMenu = ref(false)
+const menuRef = ref(null)
+
+function onClickOutside(e) {
+  if (menuRef.value && !menuRef.value.contains(e.target)) {
+    showTemplateMenu.value = false
+  }
+}
+onMounted(() => document.addEventListener('click', onClickOutside))
+onBeforeUnmount(() => document.removeEventListener('click', onClickOutside))
+
+function menuAction(action) {
+  showTemplateMenu.value = false
+  if (action === 'add') openCreateTemplate()
+  else if (action === 'edit' && selectedTemplate.value) openEditTemplate(selectedTemplate.value)
+  else if (action === 'delete' && selectedTemplate.value) confirmDeleteTemplate(selectedTemplate.value)
+}
+
 // ── Templates ─────────────────────────────────────────────────────────────────
 
 const templatesLoading    = ref(false)
@@ -225,7 +271,8 @@ const editTemplate        = ref(null)
 const templateSaving      = ref(false)
 const deleteTemplateTarget = ref(null)
 const templateForm = ref({
-  name: '', objectClasses: [], targetKeyAttribute: 'uid', conflictHandling: 'SKIP', entries: []
+  name: '', objectClasses: [], targetKeyAttribute: 'uid', conflictHandling: 'SKIP',
+  skipHeaderRow: true, entries: []
 })
 
 // ObjectClass picker state
@@ -286,7 +333,8 @@ function onTemplateSelected() {
 function openCreateTemplate() {
   editTemplate.value = null
   templateForm.value = {
-    name: '', objectClasses: [], targetKeyAttribute: 'uid', conflictHandling: 'SKIP', entries: []
+    name: '', objectClasses: [], targetKeyAttribute: 'uid', conflictHandling: 'SKIP',
+    skipHeaderRow: true, entries: []
   }
   showTemplateModal.value = true
 }
@@ -298,6 +346,7 @@ function openEditTemplate(t) {
     objectClasses: t.objectClass ? t.objectClass.split(',') : [],
     targetKeyAttribute: t.targetKeyAttribute,
     conflictHandling: t.conflictHandling,
+    skipHeaderRow: t.skipHeaderRow !== false,
     entries: (t.entries ?? []).map(e => ({ ...e, _required: false })),
   }
   showTemplateModal.value = true
@@ -312,14 +361,19 @@ async function onObjectClassChange() {
   loadingOcAttrs.value = true
   try {
     const { data } = await getObjectClassesBulk(dirId, ocs)
+    // Preserve existing csvColumn values where the ldapAttribute still exists
+    const existingMap = {}
+    for (const e of templateForm.value.entries) {
+      if (e.csvColumn) existingMap[e.ldapAttribute] = e.csvColumn
+    }
     const entries = []
     for (const attr of (data.required || [])) {
       if (attr.toLowerCase() === 'objectclass') continue
-      entries.push({ csvColumn: '', ldapAttribute: attr, ignored: false, _required: true })
+      entries.push({ csvColumn: existingMap[attr] || '', ldapAttribute: attr, ignored: false, _required: true })
     }
     for (const attr of (data.optional || [])) {
       if (attr.toLowerCase() === 'objectclass') continue
-      entries.push({ csvColumn: '', ldapAttribute: attr, ignored: false, _required: false })
+      entries.push({ csvColumn: existingMap[attr] || '', ldapAttribute: attr, ignored: false, _required: false })
     }
     templateForm.value.entries = entries
   } catch (e) {
@@ -339,6 +393,7 @@ async function saveTemplate() {
       objectClass: templateForm.value.objectClasses.join(','),
       targetKeyAttribute: templateForm.value.targetKeyAttribute,
       conflictHandling: templateForm.value.conflictHandling,
+      skipHeaderRow: templateForm.value.skipHeaderRow,
       entries: templateForm.value.entries
         .filter(e => e.csvColumn && e.csvColumn.trim())
         .map(e => ({ csvColumn: e.csvColumn, ldapAttribute: e.ldapAttribute, ignored: false })),
@@ -394,6 +449,7 @@ function buildImportRequest() {
     parentDn: importForm.value.parentDn,
     targetKeyAttribute: t.targetKeyAttribute,
     conflictHandling: t.conflictHandling,
+    skipHeaderRow: t.skipHeaderRow !== false,
     columnMappings: [],
   }
 }
@@ -453,6 +509,5 @@ async function doExport() {
 @reference "tailwindcss";
 .btn-primary    { @apply px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50; }
 .btn-secondary  { @apply px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50; }
-.btn-danger     { @apply px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-30; }
 .input          { @apply border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500; }
 </style>

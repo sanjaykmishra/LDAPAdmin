@@ -77,7 +77,7 @@ class BulkUserServiceTest {
                 "ou=people,dc=example,dc=com",
                 "uid",
                 ConflictHandling.SKIP,
-                List.of());
+                List.of(), true);
 
         assertThat(result.totalRows()).isEqualTo(1);
         assertThat(result.created()).isEqualTo(1);
@@ -106,7 +106,7 @@ class BulkUserServiceTest {
                 "ou=people,dc=example,dc=com",
                 "uid",
                 ConflictHandling.SKIP,
-                List.of());
+                List.of(), true);
 
         assertThat(result.skipped()).isEqualTo(1);
         assertThat(result.created()).isEqualTo(0);
@@ -126,7 +126,7 @@ class BulkUserServiceTest {
                 "ou=people,dc=example,dc=com",
                 "uid",
                 ConflictHandling.OVERWRITE,
-                List.of());
+                List.of(), true);
 
         assertThat(result.updated()).isEqualTo(1);
         assertThat(result.rows().get(0).status()).isEqualTo(BulkImportRowResult.Status.UPDATED);
@@ -143,7 +143,7 @@ class BulkUserServiceTest {
                 "ou=people,dc=example,dc=com",
                 "uid",
                 ConflictHandling.SKIP,
-                List.of());
+                List.of(), true);
 
         assertThat(result.errors()).isEqualTo(1);
         assertThat(result.rows().get(0).status()).isEqualTo(BulkImportRowResult.Status.ERROR);
@@ -169,7 +169,7 @@ class BulkUserServiceTest {
                 "ou=p,dc=example,dc=com",
                 "uid",
                 ConflictHandling.SKIP,
-                List.of());
+                List.of(), true);
 
         assertThat(result.totalRows()).isEqualTo(3);
         assertThat(result.created()).isEqualTo(2);
@@ -189,7 +189,7 @@ class BulkUserServiceTest {
                 new CsvColumnMappingDto("Full Name", "cn", false));
 
         service.importCsv(dc, csv(csvContent),
-                "ou=people,dc=example,dc=com", "uid", ConflictHandling.SKIP, mappings);
+                "ou=people,dc=example,dc=com", "uid", ConflictHandling.SKIP, mappings, true);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, List<String>>> captor = ArgumentCaptor.forClass(Map.class);
@@ -210,7 +210,7 @@ class BulkUserServiceTest {
                 new CsvColumnMappingDto("cn",       "cn",   false));
 
         service.importCsv(dc, csv(csvContent),
-                "ou=people,dc=example,dc=com", "uid", ConflictHandling.SKIP, mappings);
+                "ou=people,dc=example,dc=com", "uid", ConflictHandling.SKIP, mappings, true);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, List<String>>> captor = ArgumentCaptor.forClass(Map.class);

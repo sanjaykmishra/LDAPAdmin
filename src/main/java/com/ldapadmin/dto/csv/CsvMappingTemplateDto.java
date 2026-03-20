@@ -16,6 +16,7 @@ public record CsvMappingTemplateDto(
         String objectClass,
         String targetKeyAttribute,
         ConflictHandling conflictHandling,
+        boolean skipHeaderRow,
         List<CsvColumnMappingDto> entries,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {

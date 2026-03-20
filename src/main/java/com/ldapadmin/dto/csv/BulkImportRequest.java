@@ -31,6 +31,8 @@ public record BulkImportRequest(
         String targetKeyAttribute,
         /** How to handle rows whose key value already exists in the directory. Overrides template default. */
         ConflictHandling conflictHandling,
+        /** Whether to treat the first CSV row as headers (true, default) or data (false). */
+        Boolean skipHeaderRow,
         /** Ad-hoc column mappings. When non-empty these override any template entries. */
         @Valid List<CsvColumnMappingDto> columnMappings) {
 }

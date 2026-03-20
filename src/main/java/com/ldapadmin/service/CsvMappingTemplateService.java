@@ -74,6 +74,7 @@ public class CsvMappingTemplateService {
         template.setConflictHandling(
                 req.conflictHandling() != null ? req.conflictHandling() : ConflictHandling.SKIP);
         template.setObjectClass(req.objectClass());
+        template.setSkipHeaderRow(req.skipHeaderRow() != null ? req.skipHeaderRow() : true);
         template = templateRepo.save(template);
 
         List<CsvMappingTemplateEntry> entries = saveEntries(template, req.entries());
@@ -102,6 +103,9 @@ public class CsvMappingTemplateService {
         }
         if (req.objectClass() != null) {
             template.setObjectClass(req.objectClass());
+        }
+        if (req.skipHeaderRow() != null) {
+            template.setSkipHeaderRow(req.skipHeaderRow());
         }
         template = templateRepo.save(template);
 
@@ -178,6 +182,7 @@ public class CsvMappingTemplateService {
                 t.getObjectClass(),
                 t.getTargetKeyAttribute(),
                 t.getConflictHandling(),
+                t.isSkipHeaderRow(),
                 entryDtos,
                 t.getCreatedAt(),
                 t.getUpdatedAt());
