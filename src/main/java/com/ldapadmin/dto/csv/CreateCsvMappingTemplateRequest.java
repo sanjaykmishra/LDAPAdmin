@@ -18,5 +18,7 @@ public record CreateCsvMappingTemplateRequest(
         String targetKeyAttribute,
         /** Default conflict resolution when a matching entry already exists. */
         ConflictHandling conflictHandling,
+        /** Whether to treat the first CSV row as headers (true, default) or data (false). */
+        Boolean skipHeaderRow,
         @NotNull @Valid List<CsvColumnMappingDto> entries) {
 }

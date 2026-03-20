@@ -73,10 +73,11 @@ public class BulkUserService {
                                       String parentDn,
                                       String targetKeyAttr,
                                       ConflictHandling conflictHandling,
-                                      List<CsvColumnMappingDto> columnMappings) throws IOException {
+                                      List<CsvColumnMappingDto> columnMappings,
+                                      boolean skipHeaderRow) throws IOException {
 
         Map<String, String> colToAttr = resolveColumnMap(columnMappings);
-        List<Map<String, String>> rows = CsvUtils.parse(csvInput);
+        List<Map<String, String>> rows = CsvUtils.parse(csvInput, skipHeaderRow);
 
         List<BulkImportRowResult> rowResults = new ArrayList<>();
         int rowNum = 0;
@@ -107,10 +108,11 @@ public class BulkUserService {
     public BulkImportPreviewResult previewImport(InputStream csvInput,
                                                   String parentDn,
                                                   String targetKeyAttr,
-                                                  List<CsvColumnMappingDto> columnMappings) throws IOException {
+                                                  List<CsvColumnMappingDto> columnMappings,
+                                                  boolean skipHeaderRow) throws IOException {
 
         Map<String, String> colToAttr = resolveColumnMap(columnMappings);
-        List<Map<String, String>> rows = CsvUtils.parse(csvInput);
+        List<Map<String, String>> rows = CsvUtils.parse(csvInput, skipHeaderRow);
 
         List<BulkImportPreviewRow> previewRows = new ArrayList<>();
         int rowNum = 0;
