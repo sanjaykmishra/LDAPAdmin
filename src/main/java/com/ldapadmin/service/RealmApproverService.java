@@ -53,7 +53,7 @@ public class RealmApproverService {
         if (isLdapAuthEnabled()) {
             return getLdapGroupApprovers(realmId);
         }
-        return approverRepo.findAllByRealmId(realmId).stream()
+        return approverRepo.findAllByRealmIdWithAccount(realmId).stream()
                 .map(RealmApprover::getAdminAccount)
                 .toList();
     }
