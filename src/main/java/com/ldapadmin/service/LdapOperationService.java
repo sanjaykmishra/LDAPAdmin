@@ -17,6 +17,8 @@ import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.entity.enums.ConflictHandling;
 import com.ldapadmin.exception.ResourceNotFoundException;
+import com.ldapadmin.ldap.LdapBrowseService;
+import com.ldapadmin.ldap.LdapBrowseService.BrowseResult;
 import com.ldapadmin.ldap.LdapGroupService;
 import com.ldapadmin.ldap.LdapSchemaService;
 import com.ldapadmin.ldap.LdapSchemaService.AttributeTypeInfo;
@@ -59,12 +61,21 @@ public class LdapOperationService {
 
     private final DirectoryConnectionRepository dirRepo;
     private final PermissionService             permissionService;
+    private final LdapBrowseService             browseService;
     private final LdapUserService               userService;
     private final LdapGroupService              groupService;
     private final LdapSchemaService             schemaService;
     private final AuditService                  auditService;
     private final BulkUserService               bulkUserService;
     private final CsvMappingTemplateService     csvTemplateService;
+
+    // ── Browse ────────────────────────────────────────────────────────────────
+
+    public BrowseResult browse(UUID directoryId, AuthPrincipal principal, String dn) {
+        DirectoryConnection dc = loadDirectory(directoryId, principal);
+        permissionService.requireDirectoryAccess(principal, directoryId);
+        return browseService.browse(dc, dn);
+    }
 
     // ── Schema ────────────────────────────────────────────────────────────────
 

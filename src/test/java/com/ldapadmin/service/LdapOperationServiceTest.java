@@ -10,6 +10,7 @@ import com.ldapadmin.dto.ldap.MoveUserRequest;
 import com.ldapadmin.dto.ldap.UpdateEntryRequest;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.exception.ResourceNotFoundException;
+import com.ldapadmin.ldap.LdapBrowseService;
 import com.ldapadmin.ldap.LdapGroupService;
 import com.ldapadmin.ldap.LdapSchemaService;
 import com.ldapadmin.ldap.LdapUserService;
@@ -43,6 +44,7 @@ class LdapOperationServiceTest {
 
     @Mock private DirectoryConnectionRepository dirRepo;
     @Mock private PermissionService             permissionService;
+    @Mock private LdapBrowseService             browseService;
     @Mock private LdapUserService               userService;
     @Mock private LdapGroupService              groupService;
     @Mock private LdapSchemaService             schemaService;
@@ -58,8 +60,8 @@ class LdapOperationServiceTest {
     @BeforeEach
     void setUp() {
         service = new LdapOperationService(
-                dirRepo, permissionService, userService, groupService, schemaService,
-                auditService, bulkUserService, csvTemplateService);
+                dirRepo, permissionService, browseService, userService, groupService,
+                schemaService, auditService, bulkUserService, csvTemplateService);
     }
 
     // ── Directory loading ─────────────────────────────────────────────────────
