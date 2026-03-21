@@ -22,7 +22,7 @@
       <div class="space-y-3">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Parent DN <span class="text-red-500">*</span></label>
-          <DnPicker v-model="importForm.parentDn" :directoryId="dirId" />
+          <DnPicker v-model="importForm.parentDn" :directoryId="dirId" :superadmin="false" />
         </div>
 
         <!-- Template picker + actions dropdown -->
@@ -142,7 +142,7 @@
         <FormField label="LDAP Filter (optional)" v-model="exportForm.filter" placeholder="(objectClass=inetOrgPerson)" />
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Base DN (optional)</label>
-          <DnPicker v-model="exportForm.baseDn" :directoryId="dirId" placeholder="dc=example,dc=com" />
+          <DnPicker v-model="exportForm.baseDn" :directoryId="dirId" :superadmin="false" placeholder="dc=example,dc=com" />
         </div>
         <FormField label="Attributes (comma-separated)" v-model="exportForm.attributes" placeholder="cn,mail,uid,sn" />
         <button @click="doExport" :disabled="exporting" class="btn-primary">
