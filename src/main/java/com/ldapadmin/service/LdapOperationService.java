@@ -341,6 +341,7 @@ public class LdapOperationService {
         // Defaults — may be overridden by template or request fields
         String            targetKeyAttr    = "uid";
         ConflictHandling  conflictHandling = ConflictHandling.SKIP;
+        List<String>      objectClasses    = List.of();
         List<CsvColumnMappingDto> mappings = req.columnMappings() != null
                 ? new ArrayList<>(req.columnMappings()) : new ArrayList<>();
 
@@ -351,6 +352,9 @@ public class LdapOperationService {
                     csvTemplateService.loadEntries(req.templateId());
             targetKeyAttr    = template.getTargetKeyAttribute();
             conflictHandling = template.getConflictHandling();
+            if (template.getObjectClass() != null && !template.getObjectClass().isBlank()) {
+                objectClasses = List.of(template.getObjectClass().split(","));
+            }
             // Template entries are used only when the request carries no ad-hoc mappings
             if (mappings.isEmpty()) {
                 mappings = entries.stream()
@@ -367,7 +371,8 @@ public class LdapOperationService {
         boolean skipHeader = resolveSkipHeaderRow(req.skipHeaderRow(), req.templateId(), directoryId, principal);
 
         BulkImportResult result = bulkUserService.importCsv(
-                dc, csvInput, req.parentDn(), targetKeyAttr, conflictHandling, mappings, skipHeader);
+                dc, csvInput, req.parentDn(), targetKeyAttr, conflictHandling, mappings,
+                objectClasses, skipHeader);
 
         auditService.record(principal, directoryId, AuditAction.USER_CREATE, req.parentDn(),
                 Map.of("operation", "bulkImport",
