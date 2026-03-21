@@ -228,9 +228,9 @@
               <input v-model="e.csvColumn" placeholder="CSV column" class="input flex-1 text-xs" :class="{ 'border-red-300': e._required && !e.csvColumn }" />
               <span class="text-gray-400">→</span>
               <input :value="e.ldapAttribute" disabled class="input flex-1 text-xs bg-gray-50 text-gray-500" />
-              <div class="w-16 flex-shrink-0 flex items-center gap-1">
-                <button type="button" @click="removeTemplateEntry(i)" class="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>
-                <span v-if="e._required" class="text-red-500 text-xs font-medium">req</span>
+              <div class="w-8 flex-shrink-0 flex justify-center">
+                <span v-if="e._required" class="text-red-500 text-sm font-bold">*</span>
+                <button v-else type="button" @click="removeTemplateEntry(i)" class="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>
               </div>
             </div>
           </div>
@@ -352,7 +352,8 @@ const canImport = computed(() => {
 
 const canSaveTemplate = computed(() => {
   const f = templateForm.value
-  return f.name && f.objectClasses.length > 0
+  if (!f.name || f.objectClasses.length === 0) return false
+  return f.entries.filter(e => e._required).every(e => e.csvColumn && e.csvColumn.trim())
 })
 
 function conflictLabel(val) {
