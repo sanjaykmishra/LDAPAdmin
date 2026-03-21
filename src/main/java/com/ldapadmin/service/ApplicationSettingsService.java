@@ -48,6 +48,15 @@ public class ApplicationSettingsService {
     }
 
     /**
+     * Returns the underlying entity for internal service use (e.g. LDAP auth connections).
+     * Falls back to a default entity if no settings row exists.
+     */
+    @Transactional(readOnly = true)
+    public ApplicationSettings getEntity() {
+        return settingsRepo.findFirstBy().orElseGet(ApplicationSettings::new);
+    }
+
+    /**
      * Returns only the branding subset of the settings (public / unauthenticated).
      */
     @Transactional(readOnly = true)

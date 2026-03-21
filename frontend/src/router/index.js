@@ -61,6 +61,13 @@ const router = createRouter({
           component: () => import('@/views/reports/ReportJobsView.vue'),
         },
 
+        // Pending Approvals
+        {
+          path: 'directories/:dirId/approvals',
+          name: 'approvals',
+          component: () => import('@/views/approvals/PendingApprovalsView.vue'),
+        },
+
         // Schema Browser (superadmin)
         {
           path: 'superadmin/schema',

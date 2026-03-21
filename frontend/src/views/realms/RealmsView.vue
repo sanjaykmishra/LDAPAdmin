@@ -92,6 +92,38 @@
           <p class="text-xs text-gray-400 mt-1">Select the user templates available for creating users in this realm</p>
         </div>
 
+        <!-- Approval Workflow (only shown when editing) -->
+        <div v-if="editing" class="border-t border-gray-200 pt-4 mt-4">
+          <h3 class="text-sm font-semibold text-gray-800 mb-3">Approval Workflow</h3>
+          <label class="flex items-center gap-2 mb-3">
+            <input type="checkbox" v-model="approvalEnabled"
+              class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+            <span class="text-sm text-gray-700">Require approval for user creation</span>
+          </label>
+
+          <div v-if="approvalEnabled">
+            <div v-if="ldapAuthEnabled" class="space-y-2">
+              <FormField label="Approver Group DN" v-model="approverGroupDn"
+                placeholder="cn=ldap-approvers,ou=groups,dc=example,dc=com" />
+              <p class="text-xs text-gray-400">Members of this LDAP group will be able to approve user creation requests</p>
+            </div>
+            <div v-else class="space-y-2">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Approvers</label>
+              <div class="border border-gray-300 rounded-lg p-2 max-h-48 overflow-y-auto space-y-1">
+                <label v-for="admin in availableAdmins" :key="admin.id"
+                  class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer">
+                  <input type="checkbox" :value="admin.id" v-model="selectedApproverIds"
+                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  <span class="text-sm text-gray-800">{{ admin.username }}</span>
+                  <span v-if="admin.email" class="text-xs text-gray-400">{{ admin.email }}</span>
+                </label>
+                <p v-if="availableAdmins.length === 0" class="text-xs text-gray-400 px-2">No admin accounts available</p>
+              </div>
+              <p class="text-xs text-gray-400">Select admin accounts that can approve user creation in this realm</p>
+            </div>
+          </div>
+        </div>
+
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" @click="showModal = false" class="btn-secondary">Cancel</button>
           <button type="submit" :disabled="saving" class="btn-primary">{{ saving ? 'Saving…' : 'Save' }}</button>
@@ -115,6 +147,8 @@ import { useNotificationStore } from '@/stores/notifications'
 import { listAllRealms, createRealm, updateRealm, deleteRealm } from '@/api/realms'
 import { listUserTemplates } from '@/api/userTemplates'
 import { listDirectories } from '@/api/directories'
+import { getRealmSettings, updateRealmSettings, getRealmApprovers, setRealmApprovers, getApprovalConfig } from '@/api/approvals'
+import { listAdmins } from '@/api/adminManagement'
 import FormField from '@/components/FormField.vue'
 import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -131,6 +165,13 @@ const editing        = ref(null)
 const deleteTarget   = ref(null)
 
 const form = ref(emptyForm())
+
+// Approval workflow state
+const approvalEnabled = ref(false)
+const approverGroupDn = ref('')
+const ldapAuthEnabled = ref(false)
+const selectedApproverIds = ref([])
+const availableAdmins = ref([])
 
 function emptyForm() {
   return {
@@ -168,7 +209,7 @@ function openCreate() {
   showModal.value = true
 }
 
-function openEdit(r) {
+async function openEdit(r) {
   editing.value = r.id
   form.value = {
     directoryId: r.directoryId,
@@ -178,6 +219,32 @@ function openEdit(r) {
     userTemplateIds: (r.userTemplates || []).map(ut => ut.id),
   }
   showModal.value = true
+
+  // Load approval config
+  try {
+    const [settingsRes, configRes] = await Promise.all([
+      getRealmSettings(r.directoryId, r.id),
+      getApprovalConfig(r.directoryId, r.id),
+    ])
+    const settings = settingsRes.data.settings || {}
+    approvalEnabled.value = settings['approval.user_create.enabled'] === 'true'
+    approverGroupDn.value = settings['approval.approver_group_dn'] || ''
+    ldapAuthEnabled.value = configRes.data.ldapAuthEnabled || false
+
+    if (ldapAuthEnabled.value) {
+      selectedApproverIds.value = []
+    } else {
+      const [approversRes, adminsRes] = await Promise.all([
+        getRealmApprovers(r.directoryId, r.id),
+        listAdmins(),
+      ])
+      selectedApproverIds.value = (approversRes.data || []).map(a => a.accountId)
+      availableAdmins.value = adminsRes.data || []
+    }
+  } catch (e) {
+    console.warn('Failed to load approval config:', e)
+    approvalEnabled.value = false
+  }
 }
 
 async function save() {
@@ -192,6 +259,25 @@ async function save() {
     }
     if (editing.value) {
       await updateRealm(targetDirId, editing.value, payload)
+
+      // Save approval settings
+      const approvalSettings = {
+        'approval.user_create.enabled': approvalEnabled.value ? 'true' : 'false',
+      }
+      if (ldapAuthEnabled.value && approvalEnabled.value) {
+        approvalSettings['approval.approver_group_dn'] = approverGroupDn.value
+      }
+      await updateRealmSettings(targetDirId, editing.value, approvalSettings)
+
+      // Save approvers if not LDAP auth mode
+      if (!ldapAuthEnabled.value && approvalEnabled.value) {
+        try {
+          await setRealmApprovers(targetDirId, editing.value, selectedApproverIds.value)
+        } catch (e) {
+          console.warn('Failed to save approvers:', e)
+        }
+      }
+
       notif.success('Realm updated')
     } else {
       await createRealm(targetDirId, payload)

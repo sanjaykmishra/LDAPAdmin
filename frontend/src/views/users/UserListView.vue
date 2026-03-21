@@ -14,6 +14,9 @@
             <option v-for="r in allRealms" :key="r.id" :value="r.id">{{ r.name }}</option>
           </select>
         </div>
+        <button v-if="selectedDns.size > 0" @click="openBulkUpdate" class="btn-secondary">
+          Bulk Update ({{ selectedDns.size }})
+        </button>
         <button @click="openCreate" class="btn-primary">+ New User</button>
       </div>
     </div>
@@ -29,7 +32,8 @@
       <button @click="search" class="btn-primary">Search</button>
     </div>
 
-    <DataTable :columns="cols" :rows="users" :loading="loading" row-key="dn">
+    <DataTable :columns="cols" :rows="users" :loading="loading" row-key="dn"
+      selectable v-model:selectedKeys="selectedDns">
       <template #cell-dn="{ value }">
         <span class="inline-flex items-center gap-1">
           <code class="text-xs">{{ value }}</code>
@@ -121,6 +125,48 @@
       </template>
     </AppModal>
 
+    <!-- Bulk Attribute Update modal -->
+    <AppModal v-model="showBulkUpdate" title="Bulk Attribute Update" size="lg">
+      <div class="space-y-4">
+        <p class="text-sm text-gray-600">
+          Apply attribute changes to <strong>{{ selectedDns.size }}</strong> selected user(s).
+        </p>
+        <div v-for="(mod, i) in bulkMods" :key="i" class="flex gap-2 items-end">
+          <div class="flex-1">
+            <label v-if="i === 0" class="block text-xs font-medium text-gray-600 mb-1">Operation</label>
+            <select v-model="mod.operation" class="input w-full">
+              <option value="REPLACE">Set (replace)</option>
+              <option value="ADD">Add value</option>
+              <option value="DELETE">Remove value</option>
+            </select>
+          </div>
+          <div class="flex-1">
+            <label v-if="i === 0" class="block text-xs font-medium text-gray-600 mb-1">Attribute</label>
+            <input v-model="mod.attribute" placeholder="e.g. department" class="input w-full" />
+          </div>
+          <div class="flex-[2]">
+            <label v-if="i === 0" class="block text-xs font-medium text-gray-600 mb-1">Value(s)</label>
+            <input v-model="mod.value" :placeholder="mod.operation === 'DELETE' ? '(leave empty to remove all)' : 'e.g. Engineering'" class="input w-full" />
+          </div>
+          <button @click="bulkMods.splice(i, 1)" class="text-red-400 hover:text-red-600 text-lg leading-none pb-2"
+            :class="{ 'invisible': bulkMods.length <= 1 }">&times;</button>
+        </div>
+        <button @click="addBulkMod" class="text-sm text-blue-600 hover:text-blue-800">+ Add another modification</button>
+        <div v-if="bulkResult" class="p-3 rounded-lg text-sm" :class="bulkResult.errors ? 'bg-amber-50 border border-amber-200' : 'bg-green-50 border border-green-200'">
+          <p><strong>{{ bulkResult.updated }}</strong> updated, <strong>{{ bulkResult.errors }}</strong> errors</p>
+          <ul v-if="bulkResult.failures?.length" class="mt-1 space-y-0.5">
+            <li v-for="f in bulkResult.failures" :key="f.dn" class="text-xs text-red-600">{{ f.dn }}: {{ f.message }}</li>
+          </ul>
+        </div>
+      </div>
+      <template #footer>
+        <button @click="showBulkUpdate = false" class="btn-secondary">Close</button>
+        <button @click="doBulkUpdate" :disabled="bulkUpdating || !canBulkUpdate" class="btn-primary">
+          {{ bulkUpdating ? 'Updating…' : 'Apply Changes' }}
+        </button>
+      </template>
+    </AppModal>
+
     <ConfirmDialog v-model="showDelete" title="Delete User" :message="`Delete '${deleteTarget?.dn}'?`" confirm-label="Delete" danger @confirm="doDelete" />
   </div>
 </template>
@@ -151,6 +197,7 @@ const dirId          = route.params.dirId
 const users          = ref([])
 const filterText     = ref('')
 const limit          = ref(PAGE_SIZE)
+const selectedDns    = ref(new Set())
 const showTemplatePicker = ref(false)
 const showModal      = ref(false)
 const showMove       = ref(false)
@@ -331,21 +378,26 @@ async function save() {
       if (userTemplateConfig.value?.objectClassNames?.length) {
         attributes.objectClass = userTemplateConfig.value.objectClassNames
       }
-      await usersApi.createUser(dirId, { dn, attributes })
-      // Add user to any groups selected during creation
-      const pending = f._pendingGroups || []
-      for (const pg of pending) {
-        try {
-          await groupsApi.addGroupMember(dirId, pg.dn, {
-            memberAttribute: pg.memberAttr,
-            memberValue: dn,
-          })
-        } catch (e) {
-            console.warn('Failed to add user to group', pg.dn, e)
-            notif.error(`Failed to add user to group: ${pg.dn}`)
-          }
+      const createRes = await usersApi.createUser(dirId, { dn, attributes })
+      if (createRes.status === 202) {
+        // Approval workflow intercepted — user creation is pending approval
+        notif.success('User creation submitted for approval')
+      } else {
+        // Add user to any groups selected during creation
+        const pending = f._pendingGroups || []
+        for (const pg of pending) {
+          try {
+            await groupsApi.addGroupMember(dirId, pg.dn, {
+              memberAttribute: pg.memberAttr,
+              memberValue: dn,
+            })
+          } catch (e) {
+              console.warn('Failed to add user to group', pg.dn, e)
+              notif.error(`Failed to add user to group: ${pg.dn}`)
+            }
+        }
+        notif.success(pending.length ? `User created and added to ${pending.length} group(s)` : 'User created')
       }
-      notif.success(pending.length ? `User created and added to ${pending.length} group(s)` : 'User created')
     }
     showModal.value = false
     await load()
@@ -399,6 +451,59 @@ async function doResetPassword() {
     resetPwError.value = e.response?.data?.detail || e.message
   } finally {
     saving.value = false
+  }
+}
+
+// ── Bulk Attribute Update ────────────────────────────────────────────────────
+
+const showBulkUpdate = ref(false)
+const bulkUpdating   = ref(false)
+const bulkResult     = ref(null)
+const bulkMods       = ref([{ operation: 'REPLACE', attribute: '', value: '' }])
+
+const canBulkUpdate = computed(() =>
+  bulkMods.value.some(m => m.attribute && m.attribute.trim())
+)
+
+function addBulkMod() {
+  bulkMods.value.push({ operation: 'REPLACE', attribute: '', value: '' })
+}
+
+function openBulkUpdate() {
+  bulkMods.value = [{ operation: 'REPLACE', attribute: '', value: '' }]
+  bulkResult.value = null
+  showBulkUpdate.value = true
+}
+
+async function doBulkUpdate() {
+  bulkUpdating.value = true
+  bulkResult.value = null
+  try {
+    const modifications = bulkMods.value
+      .filter(m => m.attribute && m.attribute.trim())
+      .map(m => ({
+        operation: m.operation,
+        attribute: m.attribute.trim(),
+        values: m.value ? m.value.split('|').map(v => v.trim()).filter(Boolean) : [],
+      }))
+    const { data } = await usersApi.bulkUpdateAttributes(dirId, {
+      dns: [...selectedDns.value],
+      modifications,
+    })
+    bulkResult.value = data
+    if (data.errors === 0) {
+      notif.success(`${data.updated} user(s) updated successfully`)
+      showBulkUpdate.value = false
+      selectedDns.value = new Set()
+      await load()
+    } else {
+      notif.warn(`${data.updated} updated, ${data.errors} failed`)
+      await load()
+    }
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  } finally {
+    bulkUpdating.value = false
   }
 }
 
