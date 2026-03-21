@@ -2,13 +2,27 @@
   <div class="p-6 max-w-3xl">
     <h1 class="text-2xl font-bold text-gray-900 mb-6">Bulk Import / Export</h1>
 
-    <!-- Import section -->
-    <section class="bg-white border border-gray-200 rounded-xl p-6 mb-6">
+    <!-- Tabs -->
+    <div class="flex border-b border-gray-200 mb-0">
+      <button @click="activeTab = 'import'"
+        class="px-5 py-2.5 text-sm font-medium -mb-px"
+        :class="activeTab === 'import' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'">
+        Import
+      </button>
+      <button @click="activeTab = 'export'"
+        class="px-5 py-2.5 text-sm font-medium -mb-px"
+        :class="activeTab === 'export' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'">
+        Export
+      </button>
+    </div>
+
+    <!-- Import tab -->
+    <section v-if="activeTab === 'import'" class="bg-white border border-gray-200 border-t-0 rounded-b-xl p-6">
       <h2 class="text-lg font-semibold mb-4">Import Users from CSV</h2>
       <div class="space-y-3">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Parent DN <span class="text-red-500">*</span></label>
-          <DnPicker v-model="importForm.parentDn" :directoryId="dirId" placeholder="ou=people,dc=example,dc=com" />
+          <DnPicker v-model="importForm.parentDn" :directoryId="dirId" />
         </div>
 
         <!-- Template picker + actions dropdown -->
@@ -121,8 +135,8 @@
       </div>
     </section>
 
-    <!-- Export section -->
-    <section class="bg-white border border-gray-200 rounded-xl p-6">
+    <!-- Export tab -->
+    <section v-if="activeTab === 'export'" class="bg-white border border-gray-200 border-t-0 rounded-b-xl p-6">
       <h2 class="text-lg font-semibold mb-4">Export Users to CSV</h2>
       <div class="space-y-3">
         <FormField label="LDAP Filter (optional)" v-model="exportForm.filter" placeholder="(objectClass=inetOrgPerson)" />
@@ -147,14 +161,40 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Object Class <span class="text-red-500">*</span></label>
-            <div class="border border-gray-300 rounded-lg max-h-36 overflow-y-auto p-2 space-y-1">
-              <label v-for="oc in objectClasses" :key="oc"
-                class="flex items-center gap-2 px-1 py-0.5 text-sm hover:bg-gray-50 rounded cursor-pointer">
-                <input type="checkbox" :value="oc" v-model="templateForm.objectClasses"
-                  @change="onObjectClassChange" class="rounded text-blue-600" />
-                {{ oc }}
-              </label>
-              <p v-if="objectClasses.length === 0" class="text-xs text-gray-400 text-center py-2">No object classes available</p>
+            <div class="flex items-stretch gap-0">
+              <!-- Selected list -->
+              <div class="flex-1">
+                <div class="text-xs text-gray-500 mb-1">Selected</div>
+                <div class="border border-gray-300 rounded-l-lg h-36 overflow-y-auto">
+                  <div v-for="oc in templateForm.objectClasses" :key="oc"
+                    @click="selectedOcHighlight = oc"
+                    class="px-2 py-1 text-sm cursor-pointer"
+                    :class="selectedOcHighlight === oc ? 'bg-blue-100 text-blue-800' : 'hover:bg-gray-50'">
+                    {{ oc }}
+                  </div>
+                  <p v-if="templateForm.objectClasses.length === 0" class="text-xs text-gray-400 text-center py-4">None</p>
+                </div>
+              </div>
+              <!-- Add / Remove buttons -->
+              <div class="flex flex-col items-center justify-center gap-1 px-2">
+                <button type="button" @click="addObjectClass" :disabled="!availableOcHighlight"
+                  class="w-8 h-8 flex items-center justify-center rounded border border-gray-300 text-sm hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed">◀</button>
+                <button type="button" @click="removeObjectClass" :disabled="!selectedOcHighlight"
+                  class="w-8 h-8 flex items-center justify-center rounded border border-gray-300 text-sm hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed">▶</button>
+              </div>
+              <!-- Available list -->
+              <div class="flex-1">
+                <div class="text-xs text-gray-500 mb-1">Available</div>
+                <div class="border border-gray-300 rounded-r-lg h-36 overflow-y-auto">
+                  <div v-for="oc in availableObjectClasses" :key="oc"
+                    @click="availableOcHighlight = oc"
+                    class="px-2 py-1 text-sm cursor-pointer"
+                    :class="availableOcHighlight === oc ? 'bg-blue-100 text-blue-800' : 'hover:bg-gray-50'">
+                    {{ oc }}
+                  </div>
+                  <p v-if="availableObjectClasses.length === 0" class="text-xs text-gray-400 text-center py-4">None</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -188,8 +228,8 @@
               <input v-model="e.csvColumn" placeholder="CSV column" class="input flex-1 text-xs" :class="{ 'border-red-300': e._required && !e.csvColumn }" />
               <span class="text-gray-400">→</span>
               <input :value="e.ldapAttribute" disabled class="input flex-1 text-xs bg-gray-50 text-gray-500" />
-              <div class="w-16 flex-shrink-0 flex justify-start">
-                <span v-if="e._required" class="text-red-500 text-xs font-medium">required</span>
+              <div class="w-8 flex-shrink-0 flex justify-center">
+                <span v-if="e._required" class="text-red-500 text-sm font-bold">*</span>
                 <button v-else type="button" @click="removeTemplateEntry(i)" class="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>
               </div>
             </div>
@@ -231,6 +271,7 @@ const route = useRoute()
 const notif = useNotificationStore()
 const dirId = route.params.dirId
 
+const activeTab    = ref('import')
 const importing    = ref(false)
 const previewing   = ref(false)
 const exporting    = ref(false)
@@ -276,8 +317,29 @@ const templateForm = ref({
 })
 
 // ObjectClass picker state
-const objectClasses   = ref([])
-const loadingOcAttrs  = ref(false)
+const objectClasses       = ref([])
+const loadingOcAttrs      = ref(false)
+const selectedOcHighlight = ref(null)
+const availableOcHighlight = ref(null)
+
+const availableObjectClasses = computed(() =>
+  objectClasses.value.filter(oc => !templateForm.value.objectClasses.includes(oc))
+)
+
+function addObjectClass() {
+  if (!availableOcHighlight.value) return
+  templateForm.value.objectClasses.push(availableOcHighlight.value)
+  availableOcHighlight.value = null
+  onObjectClassChange()
+}
+
+function removeObjectClass() {
+  if (!selectedOcHighlight.value) return
+  const idx = templateForm.value.objectClasses.indexOf(selectedOcHighlight.value)
+  if (idx >= 0) templateForm.value.objectClasses.splice(idx, 1)
+  selectedOcHighlight.value = null
+  onObjectClassChange()
+}
 
 const selectedTemplate = computed(() => {
   if (!selectedTemplateId.value) return null
@@ -332,6 +394,8 @@ function onTemplateSelected() {
 
 function openCreateTemplate() {
   editTemplate.value = null
+  selectedOcHighlight.value = null
+  availableOcHighlight.value = null
   templateForm.value = {
     name: '', objectClasses: [], targetKeyAttribute: 'uid', conflictHandling: 'SKIP',
     skipHeaderRow: true, entries: []
@@ -341,6 +405,8 @@ function openCreateTemplate() {
 
 function openEditTemplate(t) {
   editTemplate.value = t
+  selectedOcHighlight.value = null
+  availableOcHighlight.value = null
   templateForm.value = {
     name: t.name,
     objectClasses: t.objectClass ? t.objectClass.split(',') : [],
