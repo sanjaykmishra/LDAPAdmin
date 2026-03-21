@@ -18,19 +18,28 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
     /**
      * Paginated, multi-filter query. All filter params are optional (null = no filter).
      */
-    @Query("""
-            SELECT e FROM AuditEvent e
-            WHERE (:directoryId IS NULL OR e.directoryId = :directoryId)
-              AND (:actorId     IS NULL OR e.actorId     = :actorId)
-              AND (:action      IS NULL OR e.action      = :action)
-              AND (:from        IS NULL OR e.occurredAt >= :from)
-              AND (:to          IS NULL OR e.occurredAt <= :to)
-            ORDER BY e.occurredAt DESC
-            """)
+    @Query(value = """
+            SELECT * FROM audit_events e
+            WHERE (:directoryId IS NULL OR e.directory_id = CAST(:directoryId AS UUID))
+              AND (:actorId     IS NULL OR e.actor_id     = CAST(:actorId AS UUID))
+              AND (CAST(:action AS VARCHAR) IS NULL OR e.action = CAST(:action AS VARCHAR))
+              AND (CAST(:from AS TIMESTAMPTZ) IS NULL OR e.occurred_at >= CAST(:from AS TIMESTAMPTZ))
+              AND (CAST(:to AS TIMESTAMPTZ)   IS NULL OR e.occurred_at <= CAST(:to AS TIMESTAMPTZ))
+            ORDER BY e.occurred_at DESC
+            """,
+            countQuery = """
+            SELECT COUNT(*) FROM audit_events e
+            WHERE (:directoryId IS NULL OR e.directory_id = CAST(:directoryId AS UUID))
+              AND (:actorId     IS NULL OR e.actor_id     = CAST(:actorId AS UUID))
+              AND (CAST(:action AS VARCHAR) IS NULL OR e.action = CAST(:action AS VARCHAR))
+              AND (CAST(:from AS TIMESTAMPTZ) IS NULL OR e.occurred_at >= CAST(:from AS TIMESTAMPTZ))
+              AND (CAST(:to AS TIMESTAMPTZ)   IS NULL OR e.occurred_at <= CAST(:to AS TIMESTAMPTZ))
+            """,
+            nativeQuery = true)
     Page<AuditEvent> findAll(
             @Param("directoryId") UUID directoryId,
             @Param("actorId")     UUID actorId,
-            @Param("action")      AuditAction action,
+            @Param("action")      String action,
             @Param("from")        OffsetDateTime from,
             @Param("to")          OffsetDateTime to,
             Pageable pageable);
