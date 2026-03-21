@@ -7,6 +7,8 @@ import com.ldapadmin.dto.csv.BulkImportRequest;
 import com.ldapadmin.dto.csv.BulkImportResult;
 import com.ldapadmin.dto.csv.CsvColumnMappingDto;
 import com.ldapadmin.dto.ldap.AttributeModification;
+import com.ldapadmin.dto.ldap.BulkAttributeUpdateRequest;
+import com.ldapadmin.dto.ldap.BulkAttributeUpdateResult;
 import com.ldapadmin.dto.ldap.CreateEntryRequest;
 import com.ldapadmin.dto.ldap.LdapEntryResponse;
 import com.ldapadmin.dto.ldap.MoveUserRequest;
@@ -28,6 +30,7 @@ import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.unboundid.ldap.sdk.Modification;
 import com.unboundid.ldap.sdk.ModificationType;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -56,6 +59,7 @@ import java.util.UUID;
  * (which carry no feature annotation) are performed here directly.</p>
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class LdapOperationService {
 
@@ -169,6 +173,41 @@ public class LdapOperationService {
                 Map.of("modifiedAttributes", req.modifications().stream()
                         .map(AttributeModification::attribute).toList()));
         return result;
+    }
+
+    public BulkAttributeUpdateResult bulkUpdateAttributes(UUID directoryId, AuthPrincipal principal,
+                                                           BulkAttributeUpdateRequest req) {
+        DirectoryConnection dc = loadDirectory(directoryId, principal);
+
+        List<Modification> mods = req.modifications().stream()
+                .map(m -> new Modification(
+                        toModType(m.operation()),
+                        m.attribute(),
+                        m.values() == null ? new String[0]
+                                : m.values().toArray(new String[0])))
+                .toList();
+
+        int updated = 0;
+        List<BulkAttributeUpdateResult.BulkUpdateError> failures = new ArrayList<>();
+
+        for (String dn : req.dns()) {
+            try {
+                userService.updateUser(dc, dn, mods);
+                updated++;
+            } catch (Exception e) {
+                log.warn("Bulk attribute update failed for DN {}: {}", dn, e.getMessage());
+                failures.add(new BulkAttributeUpdateResult.BulkUpdateError(dn, e.getMessage()));
+            }
+        }
+
+        auditService.record(principal, directoryId, AuditAction.BULK_ATTRIBUTE_UPDATE, null,
+                Map.of("totalDns", req.dns().size(),
+                        "updated", updated,
+                        "errors", failures.size(),
+                        "modifiedAttributes", req.modifications().stream()
+                                .map(AttributeModification::attribute).toList()));
+
+        return new BulkAttributeUpdateResult(updated, failures.size(), failures);
     }
 
     public void deleteUser(UUID directoryId, AuthPrincipal principal, String dn) {

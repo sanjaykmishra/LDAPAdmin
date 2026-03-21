@@ -3,12 +3,18 @@ package com.ldapadmin.controller.directory;
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.auth.DirectoryId;
 import com.ldapadmin.auth.RequiresFeature;
+import com.ldapadmin.dto.ldap.BulkAttributeUpdateRequest;
+import com.ldapadmin.dto.ldap.BulkAttributeUpdateResult;
 import com.ldapadmin.dto.ldap.CreateEntryRequest;
 import com.ldapadmin.dto.ldap.LdapEntryResponse;
 import com.ldapadmin.dto.ldap.MoveUserRequest;
 import com.ldapadmin.dto.ldap.ResetPasswordLdapRequest;
 import com.ldapadmin.dto.ldap.UpdateEntryRequest;
+import com.ldapadmin.entity.PendingApproval;
+import com.ldapadmin.entity.Realm;
+import com.ldapadmin.entity.enums.ApprovalRequestType;
 import com.ldapadmin.entity.enums.FeatureKey;
+import com.ldapadmin.service.ApprovalWorkflowService;
 import com.ldapadmin.service.LdapOperationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +32,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -59,6 +67,7 @@ public class UserController {
     private static final int MAX_LIMIT      = 2000;
 
     private final LdapOperationService service;
+    private final ApprovalWorkflowService approvalService;
 
     // ── Search ────────────────────────────────────────────────────────────────
 
@@ -89,10 +98,23 @@ public class UserController {
 
     @PostMapping
     @RequiresFeature(FeatureKey.USER_CREATE)
-    public ResponseEntity<LdapEntryResponse> create(
+    public ResponseEntity<?> create(
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody CreateEntryRequest req) {
+
+        // Check if approval is required for the matching realm
+        Optional<Realm> realm = approvalService.findRealmForDn(directoryId, req.dn());
+        if (realm.isPresent() && approvalService.isApprovalRequired(realm.get().getId())) {
+            PendingApproval pa = approvalService.submitForApproval(
+                    directoryId, realm.get().getId(), principal,
+                    ApprovalRequestType.USER_CREATE, req);
+            return ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body(Map.of(
+                            "message", "User creation submitted for approval",
+                            "approvalId", pa.getId()));
+        }
+
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(service.createUser(directoryId, principal, req));
     }
@@ -167,6 +189,17 @@ public class UserController {
             @Valid @RequestBody ResetPasswordLdapRequest req) {
         service.resetPassword(directoryId, principal, dn, req.newPassword());
         return ResponseEntity.noContent().build();
+    }
+
+    // ── Bulk Attribute Update ───────────────────────────────────────────────────
+
+    @PostMapping("/bulk-update")
+    @RequiresFeature(FeatureKey.BULK_ATTRIBUTE_UPDATE)
+    public BulkAttributeUpdateResult bulkUpdate(
+            @DirectoryId @PathVariable UUID directoryId,
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @Valid @RequestBody BulkAttributeUpdateRequest req) {
+        return service.bulkUpdateAttributes(directoryId, principal, req);
     }
 
     // ── Move ──────────────────────────────────────────────────────────────────

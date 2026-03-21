@@ -65,6 +65,11 @@
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V10M10 16V4M15 16v-4"/></svg>
               Reports
             </RouterLink>
+            <RouterLink :to="{ path: `/directories/${currentDirId}/approvals` }" class="nav-item">
+              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-4z"/><path d="M7 10l2 2 4-4"/></svg>
+              Approvals
+              <span v-if="pendingCount > 0" class="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{{ pendingCount }}</span>
+            </RouterLink>
           </template>
 
         </template>
@@ -137,6 +142,7 @@ import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSettingsStore } from '@/stores/settings'
 import { myRealms } from '@/api/auth'
+import { countPendingApprovals } from '@/api/approvals'
 
 const auth     = useAuthStore()
 const settings = useSettingsStore()
@@ -148,6 +154,7 @@ const route  = useRoute()
 const realms       = ref([])   // flat list of authorized realms (admin only)
 const pickerValue  = ref('')   // realm id
 const showNoRealms = ref(false)
+const pendingCount = ref(0)
 
 // Derive the directory id from the selected realm
 const currentDirId = computed(() => {
@@ -194,12 +201,21 @@ watch(() => route.params.dirId, (dirId) => {
 })
 
 // Navigate when user picks a different realm
-const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports']
+const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'approvals']
 watch(currentDirId, (newDirId) => {
   if (!newDirId || newDirId === route.params.dirId) return
   const section = dirSections.includes(route.name) ? route.name : 'users'
   router.push({ path: `/directories/${newDirId}/${section}`, query: { realmId: pickerValue.value } })
 })
+
+// Load pending approval count for the current directory
+watch(currentDirId, async (newDirId) => {
+  if (!newDirId) { pendingCount.value = 0; return }
+  try {
+    const { data } = await countPendingApprovals(newDirId)
+    pendingCount.value = data.pending || 0
+  } catch { pendingCount.value = 0 }
+}, { immediate: true })
 
 async function handleNoRealmsOk() {
   showNoRealms.value = false

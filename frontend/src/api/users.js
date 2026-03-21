@@ -28,3 +28,6 @@ export const moveUser = (dirId, dn, data) =>
 
 export const resetPassword = (dirId, dn, newPassword) =>
   client.post(`${base(dirId)}/reset-password`, { newPassword }, { params: { dn } })
+
+export const bulkUpdateAttributes = (dirId, data) =>
+  client.post(`${base(dirId)}/bulk-update`, data)

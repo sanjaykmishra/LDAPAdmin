@@ -7,11 +7,16 @@ import com.ldapadmin.auth.RequiresFeature;
 import com.ldapadmin.dto.csv.BulkImportPreviewResult;
 import com.ldapadmin.dto.csv.BulkImportRequest;
 import com.ldapadmin.dto.csv.BulkImportResult;
+import com.ldapadmin.entity.PendingApproval;
+import com.ldapadmin.entity.Realm;
+import com.ldapadmin.entity.enums.ApprovalRequestType;
 import com.ldapadmin.entity.enums.FeatureKey;
+import com.ldapadmin.service.ApprovalWorkflowService;
 import com.ldapadmin.service.LdapOperationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,6 +32,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -56,6 +63,7 @@ import java.util.UUID;
 public class BulkUserController {
 
     private final LdapOperationService service;
+    private final ApprovalWorkflowService approvalService;
     private final ApiRateLimiter       rateLimiter;
 
     @PostMapping(value = "/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -74,13 +82,30 @@ public class BulkUserController {
 
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @RequiresFeature(FeatureKey.BULK_IMPORT)
-    public ResponseEntity<BulkImportResult> importUsers(
+    public ResponseEntity<?> importUsers(
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestPart("file") MultipartFile file,
             @RequestPart("request") @Valid BulkImportRequest request) throws IOException {
 
         rateLimiter.check(principal.username(), "bulk-import");
+
+        // Check if approval is required for the target realm
+        Optional<Realm> realm = approvalService.findRealmForDn(directoryId, request.parentDn());
+        if (realm.isPresent() && approvalService.isApprovalRequired(realm.get().getId())) {
+            // Store the import request as the payload (CSV content is Base64-encoded in the payload)
+            Map<String, Object> payload = Map.of(
+                    "request", request,
+                    "csvContent", java.util.Base64.getEncoder().encodeToString(file.getBytes()));
+            PendingApproval pa = approvalService.submitForApproval(
+                    directoryId, realm.get().getId(), principal,
+                    ApprovalRequestType.BULK_IMPORT, payload);
+            return ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body(Map.of(
+                            "message", "Bulk import submitted for approval",
+                            "approvalId", pa.getId()));
+        }
+
         BulkImportResult result = service.bulkImportUsers(
                 directoryId, principal, file.getInputStream(), request);
         return ResponseEntity.ok(result);

@@ -27,6 +27,8 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
 
     boolean existsByUsername(String username);
 
+    List<Account> findAllByAuthType(AccountType authType);
+
     long countByRoleAndAuthTypeAndActiveTrue(AccountRole role, AccountType authType);
 
     long countByRoleAndAuthTypeAndActiveTrueAndIdNot(AccountRole role, AccountType authType, UUID id);
