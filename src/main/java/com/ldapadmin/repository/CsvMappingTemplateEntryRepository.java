@@ -2,6 +2,8 @@ package com.ldapadmin.repository;
 
 import com.ldapadmin.entity.CsvMappingTemplateEntry;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -15,5 +17,7 @@ public interface CsvMappingTemplateEntryRepository extends JpaRepository<CsvMapp
 
     Optional<CsvMappingTemplateEntry> findByTemplateIdAndCsvColumnName(UUID templateId, String csvColumnName);
 
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("DELETE FROM CsvMappingTemplateEntry e WHERE e.template.id = :templateId")
     void deleteAllByTemplateId(UUID templateId);
 }
