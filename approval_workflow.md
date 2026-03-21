@@ -190,23 +190,15 @@ public class ApprovalNotificationService {
 | Pending reminder | All approvers for the realm | "[LDAPAdmin] Reminder: {count} pending approvals — {realm name}" | Count of pending requests, link to review |
 
 **Implementation notes:**
-- Uses existing `ApplicationSettingsService` to read SMTP config (`smtpHost`,
-  `smtpPort`, `smtpSenderAddress`, `smtpUsername`, `smtpPasswordEncrypted`, `smtpUseTls`)
+- Uses the existing SMTP configuration already in the `application_settings`
+  table and `ApplicationSettings` entity (`smtpHost`, `smtpPort`,
+  `smtpSenderAddress`, `smtpUsername`, `smtpPasswordEncrypted`, `smtpUseTls`)
+  — no new config fields needed
 - Email sending is `@Async` so it does not block the approval workflow
-- Requires that admin accounts (the approvers) have an `email` field — see
-  Account entity changes below
+- Uses the existing `email` column on the `accounts` table for recipient addresses
 - If SMTP is not configured, log a warning and skip email sending gracefully
 - Pending reminders are triggered by a `@Scheduled` cron (configurable,
   default: daily at 9:00 AM)
-
-### Account entity change
-Add an optional `email` field to the `Account` entity / `accounts` table:
-
-```sql
-ALTER TABLE accounts ADD COLUMN email VARCHAR(255);
-```
-
-This allows the system to send notification emails to approvers and requesters.
 
 ### Integration with existing user creation
 
@@ -297,7 +289,7 @@ export const rejectRequest = (dirId, id, reason) =>
 ## 6. Implementation Order
 
 1. **Database migration** — new tables (`realm_settings`, `realm_approvers`,
-   `pending_approvals`) + `email` column on `accounts`
+   `pending_approvals`)
 2. **Entities + Repositories** — `RealmSetting`, `RealmApprover`, `PendingApproval`
 3. **RealmSettingService** — per-realm config
 4. **RealmApproverService** — approver management
