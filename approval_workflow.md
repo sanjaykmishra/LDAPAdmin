@@ -7,9 +7,26 @@ The workflow is configurable per-realm, including which users are approvers.
 Email notifications are sent to approvers when new requests are submitted and
 to requesters when their requests are approved or rejected.
 
-**Key design decision:** Approver designation is part of realm configuration
-(not a feature permission). Each realm maintains its own list of approver
-accounts, configured by a superadmin.
+**Key design decision — approver designation:**
+
+Approver designation is part of realm configuration (not a feature permission).
+The mechanism depends on whether LDAP authentication is enabled for the
+application:
+
+- **LDAP auth enabled:** Approvers for a realm are determined by membership in
+  a configurable LDAP group. The group DN is stored as a realm setting
+  (`approval.approver_group_dn`). Group membership is checked at runtime against
+  the LDAP auth server (the same server used for admin login, configured in
+  `application_settings`). The admin's `ldapDn` is matched against the group's
+  `member` / `uniqueMember` / `memberUid` attributes.
+
+- **LDAP auth not enabled (LOCAL/OIDC only):** Approvers are designated
+  explicitly via the `realm_approvers` table, managed by a superadmin.
+
+This dual approach lets organisations with a central LDAP directory manage
+approver membership in their existing directory (group changes take effect
+immediately without touching LDAPAdmin config), while deployments without
+LDAP auth can still use the feature with manual assignment.
 
 ---
 
@@ -30,10 +47,16 @@ CREATE TABLE realm_settings (
 );
 ```
 
-Initial key: `approval.user_create.enabled` → `true` / `false`
+Settings keys used by this feature:
+
+| Key | Values | Description |
+|-----|--------|-------------|
+| `approval.user_create.enabled` | `true` / `false` | Whether approval is required for user creation in this realm |
+| `approval.approver_group_dn` | LDAP group DN | DN of the LDAP group whose members are approvers (LDAP auth mode only) |
 
 ### New table: `realm_approvers`
-Designates which admin accounts can approve requests for a given realm.
+Fallback approver designation for non-LDAP auth deployments. Used only when
+LDAP auth is **not** enabled in `application_settings.enabled_auth_types`.
 
 ```sql
 CREATE TABLE realm_approvers (
@@ -75,7 +98,8 @@ CREATE INDEX idx_pa_realm_status ON pending_approvals (realm_id, status);
 ```
 
 **Note:** No new `FeatureKey` is needed. Approval rights are determined by
-membership in the `realm_approvers` table, not by a feature permission flag.
+LDAP group membership (when LDAP auth is enabled) or by the `realm_approvers`
+table (when LDAP auth is not enabled).
 
 ---
 
@@ -111,12 +135,64 @@ membership in the `realm_approvers` table, not by a feature permission flag.
 - `getSetting(realmId, key)` → Optional<String>
 - `setSetting(realmId, key, value)`
 - `isApprovalRequired(realmId)` → boolean (convenience)
+- `getApproverGroupDn(realmId)` → Optional<String> (convenience)
 
 ### `RealmApproverService`
-- `getApprovers(realmId)` → List<Account>
-- `setApprovers(realmId, List<UUID> accountIds)` — replaces the full list
-- `isApprover(realmId, accountId)` → boolean
-- `getRealmsWhereApprover(accountId)` → List<Realm> (for filtering views)
+
+Unified service that abstracts the two approver resolution strategies. The
+service checks `ApplicationSettingsService` to determine which strategy is
+active.
+
+```java
+@Service
+public class RealmApproverService {
+
+    // Determine if the caller is an approver for the given realm.
+    // - LDAP auth enabled: opens a one-shot connection to the LDAP auth server,
+    //   reads the group DN from realm setting `approval.approver_group_dn`,
+    //   and checks whether the account's ldapDn is a member of that group.
+    // - LDAP auth not enabled: checks the realm_approvers table.
+    boolean isApprover(UUID realmId, UUID accountId);
+
+    // Return the list of approver accounts for a realm.
+    // - LDAP auth enabled: reads the LDAP group membership and matches DNs
+    //   against accounts with authType=LDAP. Returns only accounts that
+    //   exist in the accounts table (i.e. provisioned admins).
+    // - LDAP auth not enabled: returns accounts from realm_approvers table.
+    List<Account> getApprovers(UUID realmId);
+
+    // Return the realms where the given account is an approver.
+    // - LDAP auth enabled: iterates realms that have an approver_group_dn
+    //   configured and checks membership for each.
+    // - LDAP auth not enabled: queries realm_approvers table.
+    List<Realm> getRealmsWhereApprover(UUID accountId);
+
+    // Manual approver management (only used when LDAP auth is not enabled).
+    // Throws IllegalStateException if LDAP auth is enabled.
+    void setApprovers(UUID realmId, List<UUID> accountIds);
+}
+```
+
+**LDAP group membership check implementation:**
+
+```java
+private boolean isLdapGroupMember(String groupDn, String memberDn) {
+    ApplicationSettings settings = appSettingsService.get();
+    // Open one-shot connection to LDAP auth server using:
+    //   settings.getLdapAuthHost(), getLdapAuthPort(), getLdapAuthSslMode(),
+    //   getLdapAuthBindDn(), getLdapAuthBindPasswordEnc() (decrypted)
+    // Read the group entry at groupDn
+    // Check member/uniqueMember attributes for memberDn match
+    // Also check memberUid for uid-based match (extract uid from memberDn)
+    // Return true if found
+}
+```
+
+- Uses the same LDAP auth server connection config that `AuthenticationService`
+  uses for admin login — no additional LDAP connection configuration needed
+- Binds with the service account (`ldapAuthBindDn` / `ldapAuthBindPasswordEnc`)
+  to read group membership, since the auth server may not allow anonymous reads
+- Connection is one-shot (not pooled) — approval checks are infrequent
 
 ### `ApprovalWorkflowService`
 ```java
@@ -143,7 +219,8 @@ public class ApprovalWorkflowService {
 **Approve flow:**
 1. Load the `PendingApproval` record
 2. Verify approver ≠ requester (optional policy — configurable)
-3. Verify approver is in `realm_approvers` for the request's realm
+3. Verify approver via `realmApproverService.isApprover()` (delegates to
+   LDAP group check or table check depending on auth mode)
 4. Deserialise the payload
 5. Execute the LDAP create via `LdapOperationService`
 6. Update status → APPROVED, set `reviewedBy` and `reviewedAt`
@@ -152,7 +229,7 @@ public class ApprovalWorkflowService {
 
 **Reject flow:**
 1. Load the `PendingApproval` record
-2. Verify approver is in `realm_approvers` for the request's realm
+2. Verify approver via `realmApproverService.isApprover()`
 3. Update status → REJECTED, set `rejectReason`, `reviewedBy`, `reviewedAt`
 4. Audit the action
 5. Send rejection notification email to requester
@@ -199,6 +276,8 @@ public class ApprovalNotificationService {
 - If SMTP is not configured, log a warning and skip email sending gracefully
 - Pending reminders are triggered by a `@Scheduled` cron (configurable,
   default: daily at 9:00 AM)
+- `notifyApproversOfNewRequest()` calls `realmApproverService.getApprovers()`
+  to resolve the recipient list (works for both LDAP and table-based modes)
 
 ### Integration with existing user creation
 
@@ -229,7 +308,8 @@ Modify `BulkUserController.importUsers()`:
 | POST   | `/{id}/reject` | Reject with reason body | Caller must be approver for the approval's realm |
 
 Access is enforced by checking `realmApproverService.isApprover(realmId, principal.getAccountId())`
-in each endpoint — no feature permission flag is used.
+in each endpoint. This delegates to the correct strategy (LDAP group or table)
+automatically.
 
 ### `RealmSettingController` — extend existing RealmController
 
@@ -239,6 +319,11 @@ in each endpoint — no feature permission flag is used.
 | PUT    | `/realms/{realmId}/settings` | Update realm settings | SUPERADMIN |
 
 ### Approver management — extend existing RealmController
+
+These endpoints are only active when LDAP auth is **not** enabled. When LDAP
+auth is enabled, approver management is done in the LDAP directory itself
+(managing group membership), so these endpoints return **409 Conflict** with a
+message indicating that approvers are managed via LDAP group membership.
 
 | Method | Path | Description | Permission |
 |--------|------|-------------|------------|
@@ -276,9 +361,14 @@ export const rejectRequest = (dirId, id, reason) =>
 
 ### Realm settings UI
 - Add toggle in realm edit form: "Require approval for user creation"
-- Add multi-select to pick approvers from the list of admin accounts that have
-  access to this realm (i.e. have an `AdminRealmRole` row for this realm)
-- Show selected approvers with their username and email
+- **LDAP auth enabled:** Show a text input for the approver group DN
+  (`approval.approver_group_dn`). Optionally add a "Browse" button that lets
+  the superadmin pick a group from the LDAP auth server. Display the current
+  group members (read-only) resolved from the LDAP group for verification.
+- **LDAP auth not enabled:** Show a multi-select to pick approvers from the
+  list of admin accounts that have access to this realm (i.e. have an
+  `AdminRealmRole` row for this realm). Show selected approvers with their
+  username and email.
 
 ### Navigation
 - Add "Pending Approvals" nav item (visible when user is an approver for any realm)
@@ -291,16 +381,18 @@ export const rejectRequest = (dirId, id, reason) =>
 1. **Database migration** — new tables (`realm_settings`, `realm_approvers`,
    `pending_approvals`)
 2. **Entities + Repositories** — `RealmSetting`, `RealmApprover`, `PendingApproval`
-3. **RealmSettingService** — per-realm config
-4. **RealmApproverService** — approver management
+3. **RealmSettingService** — per-realm config (including `approver_group_dn`)
+4. **RealmApproverService** — dual-mode approver resolution (LDAP group / table)
 5. **ApprovalWorkflowService** — core approval logic
 6. **ApprovalNotificationService** — email notifications
 7. **ApprovalController** — REST endpoints for approvals
 8. **Realm approver endpoints** — add approver management to RealmController
+   (with 409 guard when LDAP auth is enabled)
 9. **Modify UserController** — intercept creates when approval required
 10. **Modify BulkUserController** — intercept imports when approval required
 11. **Frontend API + PendingApprovalsView** — approval UI
 12. **Frontend user create handling** — handle 202 responses
-13. **Realm settings UI** — toggle + approver picker in realm edit form
+13. **Realm settings UI** — toggle + approver group DN (LDAP) or approver
+    picker (non-LDAP) in realm edit form
 14. **Scheduled reminder emails** — cron job for pending approval reminders
-15. **Tests** — service + controller tests
+15. **Tests** — service + controller tests (both LDAP and table-based modes)
