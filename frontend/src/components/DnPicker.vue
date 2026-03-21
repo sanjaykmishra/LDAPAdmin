@@ -64,13 +64,14 @@
 
 <script setup>
 import { ref } from 'vue'
-import { browse } from '@/api/browse'
+import { browse, directoryBrowse } from '@/api/browse'
 import DnTree from '@/components/DnTree.vue'
 
 const props = defineProps({
   modelValue:  { type: String, default: '' },
   directoryId: { type: String, default: '' },
   placeholder: { type: String, default: 'dc=example,dc=com' },
+  superadmin:  { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -85,9 +86,10 @@ async function openPicker() {
   showPicker.value = true
   pickerSelectedDn.value = props.modelValue || ''
 
+  const browseFn = props.superadmin ? browse : directoryBrowse
   treeLoading.value = true
   try {
-    const { data } = await browse(props.directoryId)
+    const { data } = await browseFn(props.directoryId)
     treeNodes.value = [{
       dn: data.dn,
       rdn: data.dn,
@@ -109,7 +111,8 @@ async function loadChildren(dn) {
     delete rootNode._preloaded
     return children
   }
-  const { data } = await browse(props.directoryId, dn)
+  const browseFn = props.superadmin ? browse : directoryBrowse
+  const { data } = await browseFn(props.directoryId, dn)
   return data.children
 }
 

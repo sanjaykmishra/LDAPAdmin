@@ -5,6 +5,9 @@ const base = (dirId) => `/superadmin/directories/${dirId}/browse`
 export const browse = (dirId, dn) =>
   client.get(base(dirId), { params: { dn: dn || undefined } })
 
+export const directoryBrowse = (dirId, dn) =>
+  client.get(`/directories/${dirId}/browse`, { params: { dn: dn || undefined } })
+
 export const createEntry = (dirId, data) =>
   client.post(base(dirId), data)
 
