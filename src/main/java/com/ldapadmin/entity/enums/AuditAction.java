@@ -33,6 +33,11 @@ public enum AuditAction {
     LDIF_IMPORT          ("ldif.import"),
     INTEGRITY_CHECK      ("integrity.check"),
 
+    // ── Approval workflow ──────────────────────────────────────────────────────
+    APPROVAL_SUBMITTED   ("approval.submitted"),
+    APPROVAL_APPROVED    ("approval.approved"),
+    APPROVAL_REJECTED    ("approval.rejected"),
+
     // ── Changelog-sourced (raw LDAP changelog entry) ──────────────────────────
     LDAP_CHANGE          ("ldap.change");
 

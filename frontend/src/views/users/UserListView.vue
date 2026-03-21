@@ -331,21 +331,26 @@ async function save() {
       if (userTemplateConfig.value?.objectClassNames?.length) {
         attributes.objectClass = userTemplateConfig.value.objectClassNames
       }
-      await usersApi.createUser(dirId, { dn, attributes })
-      // Add user to any groups selected during creation
-      const pending = f._pendingGroups || []
-      for (const pg of pending) {
-        try {
-          await groupsApi.addGroupMember(dirId, pg.dn, {
-            memberAttribute: pg.memberAttr,
-            memberValue: dn,
-          })
-        } catch (e) {
-            console.warn('Failed to add user to group', pg.dn, e)
-            notif.error(`Failed to add user to group: ${pg.dn}`)
-          }
+      const createRes = await usersApi.createUser(dirId, { dn, attributes })
+      if (createRes.status === 202) {
+        // Approval workflow intercepted — user creation is pending approval
+        notif.success('User creation submitted for approval')
+      } else {
+        // Add user to any groups selected during creation
+        const pending = f._pendingGroups || []
+        for (const pg of pending) {
+          try {
+            await groupsApi.addGroupMember(dirId, pg.dn, {
+              memberAttribute: pg.memberAttr,
+              memberValue: dn,
+            })
+          } catch (e) {
+              console.warn('Failed to add user to group', pg.dn, e)
+              notif.error(`Failed to add user to group: ${pg.dn}`)
+            }
+        }
+        notif.success(pending.length ? `User created and added to ${pending.length} group(s)` : 'User created')
       }
-      notif.success(pending.length ? `User created and added to ${pending.length} group(s)` : 'User created')
     }
     showModal.value = false
     await load()
