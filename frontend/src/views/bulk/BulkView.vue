@@ -540,10 +540,17 @@ async function doConfirmImport() {
   importing.value = true
   importResult.value = null
   try {
-    const { data } = await importCsv(dirId, importFile.value, buildImportRequest())
-    importResult.value = data
-    previewResult.value = null
-    notif.success(`Import done: ${data.created} created, ${data.errors} errors`)
+    const resp = await importCsv(dirId, importFile.value, buildImportRequest())
+    const data = resp.data
+    if (resp.status === 202 || data.approvalId) {
+      // Import submitted for approval
+      previewResult.value = null
+      notif.success('Bulk import submitted for approval. An approver will review your request.')
+    } else {
+      importResult.value = data
+      previewResult.value = null
+      notif.success(`Import done: ${data.created} created, ${data.errors} errors`)
+    }
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
   } finally {

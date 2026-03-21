@@ -2,6 +2,7 @@ package com.ldapadmin.service;
 
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.dto.approval.PendingApprovalResponse;
+import com.ldapadmin.dto.csv.BulkImportRequest;
 import com.ldapadmin.dto.ldap.CreateEntryRequest;
 import com.ldapadmin.dto.ldap.LdapEntryResponse;
 import com.ldapadmin.entity.Account;
@@ -15,6 +16,7 @@ import com.ldapadmin.repository.AccountRepository;
 import com.ldapadmin.repository.PendingApprovalRepository;
 import com.ldapadmin.repository.RealmRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -133,6 +135,8 @@ public class ApprovalWorkflowService {
         // Execute the actual LDAP operation
         if (pa.getRequestType() == ApprovalRequestType.USER_CREATE) {
             executeUserCreate(pa, approver);
+        } else if (pa.getRequestType() == ApprovalRequestType.BULK_IMPORT) {
+            executeBulkImport(pa, approver);
         }
 
         pa.setStatus(ApprovalStatus.APPROVED);
@@ -188,6 +192,22 @@ public class ApprovalWorkflowService {
             ldapOperationService.createUser(pa.getDirectoryId(), approver, req);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to deserialize user creation payload", e);
+        }
+    }
+
+    private void executeBulkImport(PendingApproval pa, AuthPrincipal approver) {
+        try {
+            JsonNode root = objectMapper.readTree(pa.getPayload());
+            BulkImportRequest req = objectMapper.treeToValue(root.get("request"), BulkImportRequest.class);
+            String csvBase64 = root.get("csvContent").asText();
+            byte[] csvBytes = java.util.Base64.getDecoder().decode(csvBase64);
+            ldapOperationService.bulkImportUsers(
+                    pa.getDirectoryId(), approver,
+                    new java.io.ByteArrayInputStream(csvBytes), req);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to deserialize bulk import payload", e);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Failed to execute bulk import", e);
         }
     }
 

@@ -3,6 +3,8 @@ package com.ldapadmin.controller.directory;
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.auth.DirectoryId;
 import com.ldapadmin.auth.RequiresFeature;
+import com.ldapadmin.dto.ldap.BulkAttributeUpdateRequest;
+import com.ldapadmin.dto.ldap.BulkAttributeUpdateResult;
 import com.ldapadmin.dto.ldap.CreateEntryRequest;
 import com.ldapadmin.dto.ldap.LdapEntryResponse;
 import com.ldapadmin.dto.ldap.MoveUserRequest;
@@ -187,6 +189,17 @@ public class UserController {
             @Valid @RequestBody ResetPasswordLdapRequest req) {
         service.resetPassword(directoryId, principal, dn, req.newPassword());
         return ResponseEntity.noContent().build();
+    }
+
+    // ── Bulk Attribute Update ───────────────────────────────────────────────────
+
+    @PostMapping("/bulk-update")
+    @RequiresFeature(FeatureKey.BULK_ATTRIBUTE_UPDATE)
+    public BulkAttributeUpdateResult bulkUpdate(
+            @DirectoryId @PathVariable UUID directoryId,
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @Valid @RequestBody BulkAttributeUpdateRequest req) {
+        return service.bulkUpdateAttributes(directoryId, principal, req);
     }
 
     // ── Move ──────────────────────────────────────────────────────────────────
