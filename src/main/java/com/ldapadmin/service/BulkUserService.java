@@ -74,6 +74,7 @@ public class BulkUserService {
                                       String targetKeyAttr,
                                       ConflictHandling conflictHandling,
                                       List<CsvColumnMappingDto> columnMappings,
+                                      List<String> objectClasses,
                                       boolean skipHeaderRow) throws IOException {
 
         Map<String, String> colToAttr = resolveColumnMap(columnMappings);
@@ -85,7 +86,7 @@ public class BulkUserService {
         for (Map<String, String> row : rows) {
             rowNum++;
             rowResults.add(processRow(dc, row, colToAttr, targetKeyAttr,
-                    parentDn, conflictHandling, rowNum));
+                    parentDn, conflictHandling, objectClasses, rowNum));
         }
 
         long created = countByStatus(rowResults, BulkImportRowResult.Status.CREATED);
@@ -222,9 +223,16 @@ public class BulkUserService {
                                            String targetKeyAttr,
                                            String parentDn,
                                            ConflictHandling conflictHandling,
+                                           List<String> objectClasses,
                                            int rowNum) {
         // Build ldapAttribute→[value] map from the CSV row
         Map<String, List<String>> attrMap = new LinkedHashMap<>();
+
+        // Inject objectClass values from the template
+        if (objectClasses != null && !objectClasses.isEmpty()) {
+            attrMap.put("objectClass", objectClasses);
+        }
+
         for (Map.Entry<String, String> cell : row.entrySet()) {
             String csvCol  = cell.getKey();
             String rawVal  = cell.getValue();
