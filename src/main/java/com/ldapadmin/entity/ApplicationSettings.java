@@ -45,6 +45,12 @@ public class ApplicationSettings {
     @Column(name = "secondary_colour", length = 20)
     private String secondaryColour;
 
+    // ── Approval workflow ──────────────────────────────────────────────────────
+
+    /** When true, superadmins bypass approval and their requests are auto-approved. */
+    @Column(name = "superadmin_bypass_approval", nullable = false)
+    private boolean superadminBypassApproval = false;
+
     // ── Session ───────────────────────────────────────────────────────────────
 
     @Column(name = "session_timeout_minutes", nullable = false)

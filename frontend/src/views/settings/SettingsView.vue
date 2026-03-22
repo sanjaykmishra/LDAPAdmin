@@ -44,6 +44,16 @@
         </div>
       </section>
 
+      <!-- Approval Workflow -->
+      <section class="bg-white border border-gray-200 rounded-xl p-6">
+        <h2 class="text-base font-semibold text-gray-900 mb-3">Approval Workflow</h2>
+        <div class="flex items-center gap-2">
+          <input type="checkbox" id="superadminBypass" v-model="form.superadminBypassApproval" class="rounded" />
+          <label for="superadminBypass" class="text-sm text-gray-700">Superadmins bypass approval workflow</label>
+        </div>
+        <p class="text-xs text-gray-400 mt-1">When enabled, requests submitted by superadmins are auto-approved immediately. An audit record is still created.</p>
+      </section>
+
       <!-- Session -->
       <section class="bg-white border border-gray-200 rounded-xl p-6">
         <h2 class="text-base font-semibold text-gray-900 mb-3">Session</h2>
@@ -205,6 +215,7 @@ const form = ref({
   logoUrl: '',
   primaryColour: '#3b82f6',
   secondaryColour: '#64748b',
+  superadminBypassApproval: false,
   sessionTimeoutMinutes: 60,
   smtpHost: '',
   smtpPort: 587,
@@ -248,6 +259,7 @@ async function loadSettings() {
       logoUrl:                data.logoUrl ?? '',
       primaryColour:          data.primaryColour ?? '#3b82f6',
       secondaryColour:        data.secondaryColour ?? '#64748b',
+      superadminBypassApproval: data.superadminBypassApproval ?? false,
       sessionTimeoutMinutes:  data.sessionTimeoutMinutes ?? 60,
       smtpHost:               data.smtpHost ?? '',
       smtpPort:               data.smtpPort ?? 587,
@@ -300,6 +312,7 @@ async function doSave() {
       logoUrl:               form.value.logoUrl   || null,
       primaryColour:         form.value.primaryColour   || null,
       secondaryColour:       form.value.secondaryColour || null,
+      superadminBypassApproval: form.value.superadminBypassApproval,
       sessionTimeoutMinutes: form.value.sessionTimeoutMinutes,
       smtpHost:              form.value.smtpHost   || null,
       smtpPort:              form.value.smtpPort   || null,
