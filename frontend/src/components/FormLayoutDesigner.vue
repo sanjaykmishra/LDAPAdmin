@@ -276,6 +276,17 @@ function buildSections(attrs) {
   if (result.length === 0) {
     result.push({ id: nextSectionId(), name: '', fields: [] })
   }
+  // Ensure RDN field is always first in the first section
+  for (let s = 0; s < result.length; s++) {
+    const rdnIdx = result[s].fields.findIndex(f => f.rdn)
+    if (rdnIdx > 0) {
+      const [rdnF] = result[s].fields.splice(rdnIdx, 1)
+      result[0].fields.unshift(rdnF)
+      break
+    } else if (rdnIdx === 0 && s === 0) {
+      break // already in the right place
+    }
+  }
   return result
 }
 
@@ -399,10 +410,26 @@ function onDragLeaveSection() {
 function onDropSection(e, targetSIdx) {
   if (!dragField.value || !dragSource.value) return
   const { sIdx: srcSIdx, fIdx: srcFIdx } = dragSource.value
+
   // Remove from source
   const [moved] = sections.value[srcSIdx].fields.splice(srcFIdx, 1)
-  // Add to target section at the end
-  sections.value[targetSIdx].fields.push(moved)
+
+  // Determine insert position based on drop Y coordinate relative to field cards
+  const targetFields = sections.value[targetSIdx].fields
+  let insertIdx = targetFields.length // default: append at end
+  const sectionEl = e.currentTarget.querySelector('.grid')
+  if (sectionEl) {
+    const fieldCards = sectionEl.querySelectorAll('[draggable="true"]')
+    for (let i = 0; i < fieldCards.length; i++) {
+      const rect = fieldCards[i].getBoundingClientRect()
+      if (e.clientY < rect.top + rect.height / 2) {
+        insertIdx = i
+        break
+      }
+    }
+  }
+
+  sections.value[targetSIdx].fields.splice(insertIdx, 0, moved)
   dragOverSection.value = null
   syncToParent()
   onDragEnd()
@@ -416,13 +443,20 @@ function onDropField(e, targetSIdx, targetFIdx) {
   if (!dragField.value || !dragSource.value) return
   const { sIdx: srcSIdx, fIdx: srcFIdx } = dragSource.value
 
+  // Dropping on self — nothing to do
+  if (srcSIdx === targetSIdx && srcFIdx === targetFIdx) {
+    onDragEnd()
+    return
+  }
+
   // Remove from source
   const [moved] = sections.value[srcSIdx].fields.splice(srcFIdx, 1)
 
-  // Adjust target index if same section and source was before target
+  // Adjust target index: when same section and source was before target,
+  // the splice shifted everything after source down by 1
   let insertIdx = targetFIdx
   if (srcSIdx === targetSIdx && srcFIdx < targetFIdx) {
-    insertIdx = targetFIdx
+    insertIdx = targetFIdx - 1
   }
 
   // Insert at target position
