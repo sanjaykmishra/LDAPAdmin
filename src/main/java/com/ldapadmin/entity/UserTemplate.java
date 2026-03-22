@@ -48,4 +48,8 @@ public class UserTemplate {
     /** Human-readable name that distinguishes this template from others. */
     @Column(name = "template_name", nullable = false)
     private String templateName;
+
+    /** Whether to display the computed DN field on user create/edit forms. */
+    @Column(name = "show_dn_field", nullable = false)
+    private boolean showDnField = true;
 }

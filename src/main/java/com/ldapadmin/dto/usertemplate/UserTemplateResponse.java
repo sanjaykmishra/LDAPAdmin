@@ -12,6 +12,7 @@ public record UserTemplateResponse(
         UUID directoryId,
         List<String> objectClassNames,
         String templateName,
+        boolean showDnField,
         List<AttributeConfigEntry> attributeConfigs) {
 
     public record AttributeConfigEntry(
@@ -47,6 +48,7 @@ public record UserTemplateResponse(
                 t.getDirectoryConnection() != null ? t.getDirectoryConnection().getId() : null,
                 List.copyOf(t.getObjectClassNames()),
                 t.getTemplateName(),
+                t.isShowDnField(),
                 configs.stream().map(AttributeConfigEntry::from).toList());
     }
 }

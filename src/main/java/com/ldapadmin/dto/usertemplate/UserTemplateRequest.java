@@ -16,6 +16,7 @@ public record UserTemplateRequest(
         UUID directoryId,
         @NotEmpty List<@NotBlank @Size(max = 255) String> objectClassNames,
         @NotBlank @Size(max = 255) String templateName,
+        boolean showDnField,
         List<@Valid AttributeConfigEntry> attributeConfigs) {
 
     public record AttributeConfigEntry(
