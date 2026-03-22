@@ -206,11 +206,24 @@ public class UserController {
 
     @PostMapping("/move")
     @RequiresFeature(FeatureKey.USER_MOVE)
-    public ResponseEntity<Void> move(
+    public ResponseEntity<?> move(
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn,
             @Valid @RequestBody MoveUserRequest req) {
+
+        Optional<Realm> realm = approvalService.findRealmForDn(directoryId, dn);
+        if (realm.isPresent() && approvalService.isMoveApprovalRequired(realm.get().getId())) {
+            PendingApproval pa = approvalService.submitForApproval(
+                    directoryId, realm.get().getId(), principal,
+                    ApprovalRequestType.USER_MOVE,
+                    Map.of("dn", dn, "request", req));
+            return ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body(Map.of(
+                            "message", "User move submitted for approval",
+                            "approvalId", pa.getId()));
+        }
+
         service.moveUser(directoryId, principal, dn, req);
         return ResponseEntity.noContent().build();
     }

@@ -241,11 +241,15 @@ function openMembers(row) {
 
 async function addMember() {
   if (!newMemberDn.value.trim()) return
-  await call(
+  const res = await call(
     () => groupsApi.addGroupMember(dirId, selectedGroup.value.dn, { memberAttribute: selectedGroup.value._memberAttr, memberValue: newMemberDn.value }),
-    { successMsg: 'Member added' }
   )
-  members.value.push(newMemberDn.value)
+  if (res?.status === 202) {
+    notif.success('Group member addition submitted for approval')
+  } else {
+    notif.success('Member added')
+    members.value.push(newMemberDn.value)
+  }
   newMemberDn.value = ''
 }
 
