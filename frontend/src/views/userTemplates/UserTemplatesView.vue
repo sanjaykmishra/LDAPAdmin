@@ -357,7 +357,7 @@ async function fetchAndMergeAttributes(ocName) {
         newRequired.push({
           attributeName: name, customLabel: '', inputType: 'TEXT',
           requiredOnCreate: true, editableOnCreate: true, rdn: false,
-          sectionName: '', columnSpan: 3, hidden: false,
+          sectionName: '', columnSpan: 3, hidden: name.toLowerCase() === 'objectclass',
         })
       }
     }
@@ -369,7 +369,7 @@ async function fetchAndMergeAttributes(ocName) {
         newOptional.push({
           attributeName: name, customLabel: '', inputType: 'TEXT',
           requiredOnCreate: false, editableOnCreate: true, rdn: false,
-          sectionName: '', columnSpan: 3, hidden: false,
+          sectionName: '', columnSpan: 3, hidden: name.toLowerCase() === 'objectclass',
         })
       }
     }
@@ -474,7 +474,7 @@ function addSelectedAttributes() {
         rdn: false,
         sectionName: '',
         columnSpan: 3,
-        hidden: false,
+        hidden: attr.attributeName.toLowerCase() === 'objectclass',
       })
     }
   }
