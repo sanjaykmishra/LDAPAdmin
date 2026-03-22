@@ -260,6 +260,15 @@ const local = reactive({
   attributes: { ...(props.data.attributes || {}) }
 })
 
+// Ensure SELECT fields have their defaultValue applied even if emptyForm() missed them
+if (!props.isEdit && props.userTemplateConfig?.attributeConfigs) {
+  for (const attr of props.userTemplateConfig.attributeConfigs) {
+    if (attr.inputType === 'SELECT' && attr.defaultValue && !local.attributes[attr.attributeName]) {
+      local.attributes[attr.attributeName] = attr.defaultValue
+    }
+  }
+}
+
 const activeTab       = ref('attributes')
 const loadingGroups   = ref(false)
 const memberGroups    = ref([])
