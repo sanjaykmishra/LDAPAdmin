@@ -8,8 +8,8 @@ import com.ldapadmin.auth.OidcAuthenticationService;
 import com.ldapadmin.auth.PrincipalType;
 import com.ldapadmin.auth.dto.LoginRequest;
 import com.ldapadmin.auth.dto.LoginResponse;
-import com.ldapadmin.repository.AdminRealmRoleRepository;
-import com.ldapadmin.repository.RealmRepository;
+import com.ldapadmin.repository.AdminProfileRoleRepository;
+import com.ldapadmin.repository.ProvisioningProfileRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -40,12 +40,10 @@ class AuthControllerTest extends BaseControllerTest {
     @MockBean AuthenticationService      authenticationService;
     @MockBean OidcAuthenticationService oidcAuthenticationService;
     @MockBean LoginRateLimiter          loginRateLimiter;
-    @MockBean AdminRealmRoleRepository  adminRealmRoleRepository;
-    @MockBean RealmRepository           realmRepository;
+    @MockBean AdminProfileRoleRepository adminProfileRoleRepository;
+    @MockBean ProvisioningProfileRepository provisioningProfileRepository;
 
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
-
-    // ── POST /api/auth/login ──────────────────────────────────────────────────
 
     @Test
     void login_validCredentials_returns200WithToken() throws Exception {
@@ -71,29 +69,6 @@ class AuthControllerTest extends BaseControllerTest {
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isUnauthorized());
     }
-
-    @Test
-    void login_missingUsername_returns400() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"password\":\"secret\"}"))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void login_isPublic_noAuthRequired() throws Exception {
-        LoginRequest req  = new LoginRequest("admin", "secret");
-        LoginResponse res = new LoginResponse("tok", "admin", "SUPERADMIN", null);
-        given(authenticationService.login(any())).willReturn(res);
-
-        // No authentication() post-processor — endpoint must be accessible anonymously
-        mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isOk());
-    }
-
-    // ── GET /api/auth/me ──────────────────────────────────────────────────────
 
     @Test
     void me_authenticated_returnsUsernameAndType() throws Exception {

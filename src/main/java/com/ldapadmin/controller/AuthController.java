@@ -8,10 +8,10 @@ import com.ldapadmin.auth.PrincipalType;
 import com.ldapadmin.auth.dto.LoginRequest;
 import com.ldapadmin.auth.dto.LoginResponse;
 import com.ldapadmin.config.AppProperties;
-import com.ldapadmin.entity.AdminRealmRole;
-import com.ldapadmin.entity.Realm;
-import com.ldapadmin.repository.AdminRealmRoleRepository;
-import com.ldapadmin.repository.RealmRepository;
+import com.ldapadmin.entity.AdminProfileRole;
+import com.ldapadmin.entity.ProvisioningProfile;
+import com.ldapadmin.repository.AdminProfileRoleRepository;
+import com.ldapadmin.repository.ProvisioningProfileRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -39,10 +39,10 @@ import java.util.UUID;
  * Authentication endpoints.
  *
  * <pre>
- *   POST /api/auth/login      — issue a JWT (set as httpOnly cookie; body carries principal info)
- *   POST /api/auth/logout     — clear the JWT cookie
- *   GET  /api/auth/me         — return current principal info
- *   GET  /api/auth/me/realms  — return realms the current principal is authorized for
+ *   POST /api/auth/login         — issue a JWT (set as httpOnly cookie; body carries principal info)
+ *   POST /api/auth/logout        — clear the JWT cookie
+ *   GET  /api/auth/me            — return current principal info
+ *   GET  /api/auth/me/profiles   — return profiles the current principal is authorized for
  * </pre>
  */
 @RestController
@@ -56,13 +56,9 @@ public class AuthController {
     private final OidcAuthenticationService oidcAuthenticationService;
     private final LoginRateLimiter          rateLimiter;
     private final AppProperties             appProperties;
-    private final AdminRealmRoleRepository  realmRoleRepo;
-    private final RealmRepository           realmRepo;
+    private final AdminProfileRoleRepository profileRoleRepo;
+    private final ProvisioningProfileRepository profileRepo;
 
-    /**
-     * Authenticates the caller, sets an httpOnly JWT cookie, and returns
-     * principal info (token is excluded from the response body via @JsonIgnore).
-     */
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(
             @Valid @RequestBody LoginRequest req,
@@ -73,7 +69,6 @@ public class AuthController {
 
         LoginResponse resp = authenticationService.login(req);
 
-        // Token goes into an httpOnly cookie — not accessible to JavaScript
         ResponseCookie cookie = ResponseCookie.from(JWT_COOKIE, resp.token())
                 .httpOnly(true)
                 .secure(appProperties.getCookie().isSecure())
@@ -86,10 +81,6 @@ public class AuthController {
         return ResponseEntity.ok(resp);
     }
 
-    /**
-     * Clears the JWT cookie, effectively logging the user out.
-     * Permitted without authentication so expired sessions can also log out.
-     */
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletResponse response) {
         ResponseCookie cookie = ResponseCookie.from(JWT_COOKIE, "")
@@ -103,9 +94,6 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Returns the username, account type, and id of the currently authenticated principal.
-     */
     @GetMapping("/me")
     public ResponseEntity<Map<String, String>> me(
             @AuthenticationPrincipal AuthPrincipal principal) {
@@ -123,15 +111,10 @@ public class AuthController {
 
     // ── OIDC endpoints ─────────────────────────────────────────────────────
 
-    /**
-     * Initiates the OIDC Authorization Code Flow.
-     * Returns the IdP authorization URL for the frontend to redirect to.
-     */
     @GetMapping("/oidc/authorize")
     public ResponseEntity<Map<String, String>> oidcAuthorize(HttpServletRequest request) {
         rateLimiter.check(request);
 
-        // Build redirect_uri from the current request origin
         String redirectUri = buildOidcRedirectUri(request);
 
         OidcAuthenticationService.AuthorizeResult result =
@@ -143,10 +126,6 @@ public class AuthController {
         return ResponseEntity.ok(body);
     }
 
-    /**
-     * Completes the OIDC flow: exchanges the authorization code for tokens,
-     * validates the ID token, and issues a JWT cookie.
-     */
     @PostMapping("/oidc/callback")
     public ResponseEntity<LoginResponse> oidcCallback(
             @RequestBody Map<String, String> body,
@@ -165,7 +144,6 @@ public class AuthController {
         OidcAuthenticationService.OidcLoginResult result =
                 oidcAuthenticationService.handleCallback(code, state);
 
-        // Set JWT cookie — same as regular login
         ResponseCookie cookie = ResponseCookie.from(JWT_COOKIE, result.token())
                 .httpOnly(true)
                 .secure(appProperties.getCookie().isSecure())
@@ -194,35 +172,35 @@ public class AuthController {
     }
 
     /**
-     * Returns the realms that the current principal is authorized to access.
-     * Superadmins see all realms; admins see only realms with an assigned realm role.
+     * Returns the profiles that the current principal is authorized to access.
+     * Superadmins see all profiles; admins see only profiles with an assigned profile role.
      */
-    @GetMapping("/me/realms")
+    @GetMapping("/me/profiles")
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> myRealms(
+    public List<Map<String, Object>> myProfiles(
             @AuthenticationPrincipal AuthPrincipal principal) {
 
         if (principal == null) {
             throw new BadCredentialsException("Not authenticated");
         }
 
-        List<Realm> realms;
+        List<ProvisioningProfile> profiles;
 
         if (principal.type() == PrincipalType.SUPERADMIN) {
-            realms = realmRepo.findAll();
+            profiles = profileRepo.findAll();
         } else {
-            realms = realmRoleRepo.findAllByAdminAccountId(principal.id()).stream()
-                    .map(AdminRealmRole::getRealm)
+            profiles = profileRoleRepo.findAllByAdminAccountId(principal.id()).stream()
+                    .map(AdminProfileRole::getProfile)
                     .toList();
         }
 
-        return realms.stream()
-                .sorted(Comparator.comparing(Realm::getName, String.CASE_INSENSITIVE_ORDER))
-                .map(r -> {
+        return profiles.stream()
+                .sorted(Comparator.comparing(ProvisioningProfile::getName, String.CASE_INSENSITIVE_ORDER))
+                .map(p -> {
                     Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("id", r.getId());
-                    m.put("name", r.getName());
-                    m.put("directoryId", r.getDirectory().getId());
+                    m.put("id", p.getId());
+                    m.put("name", p.getName());
+                    m.put("directoryId", p.getDirectory().getId());
                     return m;
                 })
                 .toList();

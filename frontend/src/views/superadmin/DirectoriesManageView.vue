@@ -118,7 +118,7 @@
     <!-- Delete confirm -->
     <ConfirmDialog
       v-if="deleteTarget"
-      :message="`Delete directory '${deleteTarget.displayName}'? All associated realms and configuration will be removed.`"
+      :message="`Delete directory '${deleteTarget.displayName}'? All associated profiles and configuration will be removed.`"
       @confirm="doDelete"
       @cancel="deleteTarget = null"
     />

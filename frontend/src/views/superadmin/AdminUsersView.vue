@@ -49,7 +49,7 @@
         <FormField label="Email" v-model="form.email" type="email" placeholder="Optional" />
         <FormField label="Role" v-model="form.role" type="select" required
           :options="[{ value: 'ADMIN', label: 'Admin' }, { value: 'SUPERADMIN', label: 'Superadmin' }]"
-          hint="Superadmins have full platform access. Admins have realm-scoped permissions." />
+          hint="Superadmins have full platform access. Admins have profile-scoped permissions." />
         <FormField label="Auth type" v-model="form.authType" type="select" required
           :options="[{ value: 'LOCAL', label: 'Local' }, { value: 'LDAP', label: 'LDAP' }, { value: 'OIDC', label: 'OIDC' }]"
           hint="LOCAL uses a portal password. LDAP authenticates against the configured LDAP directory. OIDC authenticates via SSO." />
@@ -81,46 +81,46 @@
       <div v-if="permsLoading" class="py-8 text-center text-sm text-gray-400">Loading…</div>
       <div v-else-if="perms" class="space-y-4 text-sm">
 
-        <!-- Realm roles -->
+        <!-- Profile roles -->
         <section>
           <div class="flex items-center justify-between mb-2">
-            <h3 class="font-semibold text-gray-700">Realm roles</h3>
+            <h3 class="font-semibold text-gray-700">Profile roles</h3>
           </div>
-          <div v-if="perms.realmRoles.length === 0" class="text-gray-400 mb-2">None assigned.</div>
+          <div v-if="perms.profileRoles.length === 0" class="text-gray-400 mb-2">None assigned.</div>
           <table v-else class="w-full text-xs border border-gray-100 rounded-lg overflow-hidden mb-2">
             <thead class="bg-gray-50">
               <tr>
-                <th class="px-3 py-2 text-left text-gray-500 font-medium">Realm</th>
+                <th class="px-3 py-2 text-left text-gray-500 font-medium">Profile</th>
                 <th class="px-3 py-2 text-left text-gray-500 font-medium">Role</th>
                 <th class="px-3 py-2"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-50">
-              <tr v-for="r in perms.realmRoles" :key="r.realmId" class="hover:bg-gray-50">
-                <td class="px-3 py-2 text-gray-700">{{ r.realmName }}</td>
+              <tr v-for="r in perms.profileRoles" :key="r.profileId" class="hover:bg-gray-50">
+                <td class="px-3 py-2 text-gray-700">{{ r.profileName }}</td>
                 <td class="px-3 py-2">
-                  <select :value="r.baseRole" @change="changeRealmRole(r.realmId, $event.target.value)" class="input text-xs py-1">
+                  <select :value="r.baseRole" @change="changeProfileRole(r.profileId, $event.target.value)" class="input text-xs py-1">
                     <option value="ADMIN">ADMIN</option>
                     <option value="READ_ONLY">READ_ONLY</option>
                   </select>
                 </td>
                 <td class="px-3 py-2 text-right">
-                  <button @click="doRemoveRealmRole(r.realmId)" class="text-red-500 hover:text-red-700 text-xs font-medium">Remove</button>
+                  <button @click="doRemoveProfileRole(r.profileId)" class="text-red-500 hover:text-red-700 text-xs font-medium">Remove</button>
                 </td>
               </tr>
             </tbody>
           </table>
-          <!-- Add realm role -->
+          <!-- Add profile role -->
           <div class="flex items-center gap-2">
-            <select v-model="newRealmId" class="input text-xs py-1 flex-1">
-              <option value="" disabled>— Add realm —</option>
-              <option v-for="r in availableRealms" :key="r.id" :value="r.id">{{ r.name }}</option>
+            <select v-model="newProfileId" class="input text-xs py-1 flex-1">
+              <option value="" disabled>— Add profile —</option>
+              <option v-for="p in availableProfiles" :key="p.id" :value="p.id">{{ p.name }}</option>
             </select>
-            <select v-model="newRealmRole" class="input text-xs py-1">
+            <select v-model="newProfileRole" class="input text-xs py-1">
               <option value="ADMIN">ADMIN</option>
               <option value="READ_ONLY">READ_ONLY</option>
             </select>
-            <button @click="doAddRealmRole" :disabled="!newRealmId" class="btn-primary btn-sm px-3 py-1 disabled:opacity-50">Add</button>
+            <button @click="doAddProfileRole" :disabled="!newProfileId" class="btn-primary btn-sm px-3 py-1 disabled:opacity-50">Add</button>
           </div>
         </section>
 
@@ -163,8 +163,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notifications'
 import { listAdmins, createAdmin, updateAdmin, deleteAdmin, getPermissions } from '@/api/adminManagement'
-import { setRealmRole, removeRealmRole, setFeaturePermissions, clearFeaturePermission } from '@/api/adminPermissions'
-import { myRealms } from '@/api/auth'
+import { setProfileRole, removeProfileRole, setFeaturePermissions, clearFeaturePermission } from '@/api/adminPermissions'
+import { listAllProfiles } from '@/api/profiles'
 import DataTable from '@/components/DataTable.vue'
 import AppModal from '@/components/AppModal.vue'
 import FormField from '@/components/FormField.vue'
@@ -265,25 +265,25 @@ async function doDelete() {
   }
 }
 
-// ── All realms (for the realm picker in permissions dialog) ──────────────────
-const allRealms = ref([])
+// ── All profiles (for the profile picker in permissions dialog) ──────────────
+const allProfiles = ref([])
 
 onMounted(async () => {
   try {
-    const { data } = await myRealms()
-    allRealms.value = data
-  } catch (e) { console.warn('Failed to load realms:', e) }
+    const { data } = await listAllProfiles()
+    allProfiles.value = data
+  } catch (e) { console.warn('Failed to load profiles:', e) }
 })
 
-// Realms not already assigned to this admin
-const availableRealms = computed(() => {
-  if (!perms.value) return allRealms.value
-  const assigned = new Set(perms.value.realmRoles.map(r => r.realmId))
-  return allRealms.value.filter(r => !assigned.has(r.id))
+// Profiles not already assigned to this admin
+const availableProfiles = computed(() => {
+  if (!perms.value) return allProfiles.value
+  const assigned = new Set(perms.value.profileRoles.map(r => r.profileId))
+  return allProfiles.value.filter(p => !assigned.has(p.id))
 })
 
-const newRealmId   = ref('')
-const newRealmRole = ref('ADMIN')
+const newProfileId   = ref('')
+const newProfileRole = ref('ADMIN')
 const allFeatureKeys = [
   'USER_CREATE', 'USER_EDIT', 'USER_DELETE', 'USER_ENABLE_DISABLE', 'USER_MOVE',
   'GROUP_MANAGE_MEMBERS', 'GROUP_CREATE_DELETE',
@@ -300,8 +300,8 @@ function featureState(fk) {
 async function openPermissions(row) {
   permsTarget.value = row
   perms.value = null
-  newRealmId.value = ''
-  newRealmRole.value = 'ADMIN'
+  newProfileId.value = ''
+  newProfileRole.value = 'ADMIN'
   showPerms.value = true
   permsLoading.value = true
   try {
@@ -324,29 +324,29 @@ async function reloadPerms() {
   }
 }
 
-async function doAddRealmRole() {
-  if (!newRealmId.value) return
+async function doAddProfileRole() {
+  if (!newProfileId.value) return
   try {
-    await setRealmRole(permsTarget.value.id, { realmId: newRealmId.value, baseRole: newRealmRole.value })
-    newRealmId.value = ''
+    await setProfileRole(permsTarget.value.id, { profileId: newProfileId.value, baseRole: newProfileRole.value })
+    newProfileId.value = ''
     await reloadPerms()
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
   }
 }
 
-async function changeRealmRole(realmId, baseRole) {
+async function changeProfileRole(profileId, baseRole) {
   try {
-    await setRealmRole(permsTarget.value.id, { realmId, baseRole })
+    await setProfileRole(permsTarget.value.id, { profileId, baseRole })
     await reloadPerms()
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
   }
 }
 
-async function doRemoveRealmRole(realmId) {
+async function doRemoveProfileRole(profileId) {
   try {
-    await removeRealmRole(permsTarget.value.id, realmId)
+    await removeProfileRole(permsTarget.value.id, profileId)
     await reloadPerms()
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)

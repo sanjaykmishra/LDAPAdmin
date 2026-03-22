@@ -1,0 +1,108 @@
+package com.ldapadmin.dto.profile;
+
+import com.ldapadmin.entity.ProfileAttributeConfig;
+import com.ldapadmin.entity.ProfileGroupAssignment;
+import com.ldapadmin.entity.ProvisioningProfile;
+
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+
+public record ProfileResponse(
+        UUID id,
+        UUID directoryId,
+        String directoryName,
+        String name,
+        String description,
+        String targetOuDn,
+        List<String> objectClassNames,
+        String rdnAttribute,
+        boolean showDnField,
+        boolean enabled,
+        boolean selfRegistrationAllowed,
+        List<AttributeConfigEntry> attributeConfigs,
+        List<GroupAssignmentEntry> groupAssignments,
+        OffsetDateTime createdAt,
+        OffsetDateTime updatedAt) {
+
+    public record AttributeConfigEntry(
+            UUID id,
+            String attributeName,
+            String customLabel,
+            String inputType,
+            boolean requiredOnCreate,
+            boolean editableOnCreate,
+            boolean editableOnUpdate,
+            boolean selfServiceEdit,
+            String defaultValue,
+            String computedExpression,
+            String validationRegex,
+            String validationMessage,
+            String allowedValues,
+            Integer minLength,
+            Integer maxLength,
+            String sectionName,
+            int columnSpan,
+            int displayOrder,
+            boolean hidden) {
+
+        public static AttributeConfigEntry from(ProfileAttributeConfig c) {
+            return new AttributeConfigEntry(
+                    c.getId(),
+                    c.getAttributeName(),
+                    c.getCustomLabel(),
+                    c.getInputType().name(),
+                    c.isRequiredOnCreate(),
+                    c.isEditableOnCreate(),
+                    c.isEditableOnUpdate(),
+                    c.isSelfServiceEdit(),
+                    c.getDefaultValue(),
+                    c.getComputedExpression(),
+                    c.getValidationRegex(),
+                    c.getValidationMessage(),
+                    c.getAllowedValues(),
+                    c.getMinLength(),
+                    c.getMaxLength(),
+                    c.getSectionName(),
+                    c.getColumnSpan(),
+                    c.getDisplayOrder(),
+                    c.isHidden());
+        }
+    }
+
+    public record GroupAssignmentEntry(
+            UUID id,
+            String groupDn,
+            String memberAttribute,
+            int displayOrder) {
+
+        public static GroupAssignmentEntry from(ProfileGroupAssignment g) {
+            return new GroupAssignmentEntry(
+                    g.getId(),
+                    g.getGroupDn(),
+                    g.getMemberAttribute(),
+                    g.getDisplayOrder());
+        }
+    }
+
+    public static ProfileResponse from(ProvisioningProfile p,
+                                        List<ProfileAttributeConfig> configs,
+                                        List<ProfileGroupAssignment> groups) {
+        return new ProfileResponse(
+                p.getId(),
+                p.getDirectory().getId(),
+                p.getDirectory().getDisplayName(),
+                p.getName(),
+                p.getDescription(),
+                p.getTargetOuDn(),
+                List.copyOf(p.getObjectClassNames()),
+                p.getRdnAttribute(),
+                p.isShowDnField(),
+                p.isEnabled(),
+                p.isSelfRegistrationAllowed(),
+                configs.stream().map(AttributeConfigEntry::from).toList(),
+                groups.stream().map(GroupAssignmentEntry::from).toList(),
+                p.getCreatedAt(),
+                p.getUpdatedAt());
+    }
+}

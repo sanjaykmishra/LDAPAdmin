@@ -8,5 +8,7 @@ public enum InputType {
     DATE,
     DATETIME,
     MULTI_VALUE,
-    DN_LOOKUP
+    DN_LOOKUP,
+    SELECT,
+    HIDDEN_FIXED
 }

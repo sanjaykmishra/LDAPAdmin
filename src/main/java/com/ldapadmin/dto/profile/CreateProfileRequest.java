@@ -1,0 +1,46 @@
+package com.ldapadmin.dto.profile;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
+
+import java.util.List;
+
+public record CreateProfileRequest(
+        @NotBlank @Size(max = 255) String name,
+        @Size(max = 2000) String description,
+        @NotBlank @Size(max = 500) String targetOuDn,
+        @NotEmpty List<@NotBlank String> objectClassNames,
+        @NotBlank @Size(max = 100) String rdnAttribute,
+        boolean showDnField,
+        boolean enabled,
+        boolean selfRegistrationAllowed,
+        List<@Valid AttributeConfigEntry> attributeConfigs,
+        List<@Valid GroupAssignmentEntry> groupAssignments) {
+
+    public record AttributeConfigEntry(
+            @NotBlank @Size(max = 100) String attributeName,
+            @Size(max = 255) String customLabel,
+            @NotBlank String inputType,
+            boolean requiredOnCreate,
+            boolean editableOnCreate,
+            boolean editableOnUpdate,
+            boolean selfServiceEdit,
+            @Size(max = 500) String defaultValue,
+            @Size(max = 500) String computedExpression,
+            @Size(max = 500) String validationRegex,
+            @Size(max = 255) String validationMessage,
+            String allowedValues,
+            Integer minLength,
+            Integer maxLength,
+            @Size(max = 100) String sectionName,
+            Integer columnSpan,
+            boolean hidden) {
+    }
+
+    public record GroupAssignmentEntry(
+            @NotBlank @Size(max = 500) String groupDn,
+            @Size(max = 50) String memberAttribute) {
+    }
+}

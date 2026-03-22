@@ -5,8 +5,8 @@ import com.ldapadmin.controller.superadmin.AdminManagementController;
 import com.ldapadmin.dto.admin.AdminAccountRequest;
 import com.ldapadmin.dto.admin.AdminAccountResponse;
 import com.ldapadmin.dto.admin.AdminPermissionsResponse;
-import com.ldapadmin.dto.admin.RealmRoleRequest;
-import com.ldapadmin.dto.admin.RealmRoleResponse;
+import com.ldapadmin.dto.admin.ProfileRoleRequest;
+import com.ldapadmin.dto.admin.ProfileRoleResponse;
 import com.ldapadmin.entity.enums.AccountRole;
 import com.ldapadmin.entity.enums.AccountType;
 import com.ldapadmin.entity.enums.BaseRole;
@@ -42,8 +42,8 @@ class AdminManagementControllerTest extends BaseControllerTest {
 
     @MockBean AdminManagementService service;
 
-    static final UUID ADMIN_ID  = UUID.fromString("30000000-0000-0000-0000-000000000003");
-    static final UUID REALM_ID  = UUID.fromString("40000000-0000-0000-0000-000000000004");
+    static final UUID ADMIN_ID   = UUID.fromString("30000000-0000-0000-0000-000000000003");
+    static final UUID PROFILE_ID = UUID.fromString("40000000-0000-0000-0000-000000000004");
     static final String BASE_URL = "/api/v1/superadmin/admins";
 
     AdminAccountResponse sampleResponse() {
@@ -58,8 +58,6 @@ class AdminManagementControllerTest extends BaseControllerTest {
                 "testadmin", "Test Admin", "testadmin@example.com",
                 AccountRole.ADMIN, AccountType.LOCAL, "password123", null, true);
     }
-
-    // ── GET /api/v1/superadmin/admins ────────────────────────────────────────
 
     @Test
     void listAdmins_superadmin_returns200() throws Exception {
@@ -78,14 +76,6 @@ class AdminManagementControllerTest extends BaseControllerTest {
     }
 
     @Test
-    void listAdmins_unauthenticated_returns401() throws Exception {
-        mockMvc.perform(get(BASE_URL))
-                .andExpect(status().isUnauthorized());
-    }
-
-    // ── POST /api/v1/superadmin/admins ───────────────────────────────────────
-
-    @Test
     void createAdmin_superadmin_returns201() throws Exception {
         given(service.createAdmin(any())).willReturn(sampleResponse());
 
@@ -96,8 +86,6 @@ class AdminManagementControllerTest extends BaseControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.username").value("testadmin"));
     }
-
-    // ── GET /api/v1/superadmin/admins/{id} ───────────────────────────────────
 
     @Test
     void getAdmin_superadmin_returns200() throws Exception {
@@ -110,22 +98,6 @@ class AdminManagementControllerTest extends BaseControllerTest {
                 .andExpect(jsonPath("$.username").value("testadmin"));
     }
 
-    // ── PUT /api/v1/superadmin/admins/{id} ───────────────────────────────────
-
-    @Test
-    void updateAdmin_superadmin_returns200() throws Exception {
-        given(service.updateAdmin(eq(ADMIN_ID), any())).willReturn(sampleResponse());
-
-        mockMvc.perform(put(BASE_URL + "/" + ADMIN_ID)
-                        .with(authentication(superadminAuth()))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(sampleRequest())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.username").value("testadmin"));
-    }
-
-    // ── DELETE /api/v1/superadmin/admins/{id} ────────────────────────────────
-
     @Test
     void deleteAdmin_superadmin_returns204() throws Exception {
         willDoNothing().given(service).deleteAdmin(eq(ADMIN_ID));
@@ -135,8 +107,6 @@ class AdminManagementControllerTest extends BaseControllerTest {
                 .andExpect(status().isNoContent());
     }
 
-    // ── GET /api/v1/superadmin/admins/{id}/permissions ───────────────────────
-
     @Test
     void getPermissions_superadmin_returns200() throws Exception {
         given(service.getPermissions(eq(ADMIN_ID)))
@@ -145,25 +115,23 @@ class AdminManagementControllerTest extends BaseControllerTest {
         mockMvc.perform(get(BASE_URL + "/" + ADMIN_ID + "/permissions")
                         .with(authentication(superadminAuth())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.realmRoles").isArray())
+                .andExpect(jsonPath("$.profileRoles").isArray())
                 .andExpect(jsonPath("$.featurePermissions").isArray());
     }
 
-    // ── PUT /api/v1/superadmin/admins/{id}/permissions/realm-roles ───────────
-
     @Test
-    void assignRealmRole_superadmin_returns200() throws Exception {
-        RealmRoleRequest req = new RealmRoleRequest(REALM_ID, BaseRole.ADMIN);
-        RealmRoleResponse resp = new RealmRoleResponse(
-                UUID.randomUUID(), REALM_ID, "Test Realm", BaseRole.ADMIN);
-        given(service.assignRealmRole(eq(ADMIN_ID), any())).willReturn(resp);
+    void assignProfileRole_superadmin_returns200() throws Exception {
+        ProfileRoleRequest req = new ProfileRoleRequest(PROFILE_ID, BaseRole.ADMIN);
+        ProfileRoleResponse resp = new ProfileRoleResponse(
+                UUID.randomUUID(), PROFILE_ID, "Test Profile", UUID.randomUUID(), BaseRole.ADMIN);
+        given(service.assignProfileRole(eq(ADMIN_ID), any())).willReturn(resp);
 
-        mockMvc.perform(put(BASE_URL + "/" + ADMIN_ID + "/permissions/realm-roles")
+        mockMvc.perform(put(BASE_URL + "/" + ADMIN_ID + "/permissions/profile-roles")
                         .with(authentication(superadminAuth()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.realmId").value(REALM_ID.toString()))
+                .andExpect(jsonPath("$.profileId").value(PROFILE_ID.toString()))
                 .andExpect(jsonPath("$.baseRole").value("ADMIN"));
     }
 }

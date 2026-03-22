@@ -9,8 +9,8 @@ export const logout = () =>
 export const me = () =>
   client.get('/auth/me')
 
-export const myRealms = () =>
-  client.get('/auth/me/realms')
+export const myProfiles = () =>
+  client.get('/auth/me/profiles')
 
 export const oidcAuthorize = () =>
   client.get('/auth/oidc/authorize')

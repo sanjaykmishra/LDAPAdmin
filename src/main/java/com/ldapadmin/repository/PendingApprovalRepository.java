@@ -11,7 +11,7 @@ import java.util.UUID;
 @Repository
 public interface PendingApprovalRepository extends JpaRepository<PendingApproval, UUID> {
 
-    List<PendingApproval> findAllByRealmIdAndStatus(UUID realmId, ApprovalStatus status);
+    List<PendingApproval> findAllByProfileIdAndStatus(UUID profileId, ApprovalStatus status);
 
     List<PendingApproval> findAllByDirectoryIdAndStatus(UUID directoryId, ApprovalStatus status);
 
@@ -19,7 +19,7 @@ public interface PendingApprovalRepository extends JpaRepository<PendingApproval
 
     List<PendingApproval> findAllByRequestedByOrderByCreatedAtDesc(UUID requestedBy);
 
-    long countByRealmIdAndStatus(UUID realmId, ApprovalStatus status);
+    long countByProfileIdAndStatus(UUID profileId, ApprovalStatus status);
 
     long countByDirectoryIdAndStatus(UUID directoryId, ApprovalStatus status);
 }

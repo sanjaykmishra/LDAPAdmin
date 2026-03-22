@@ -51,16 +51,16 @@
 
           <div v-if="form.directoryId">
             <label class="block text-sm font-medium text-gray-700 mb-1">Realm *</label>
-            <select v-model="form.realmId" required
+            <select v-model="form.profileId" required
               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-              <option value="">-- select realm --</option>
-              <option v-for="realm in realms" :key="realm.id" :value="realm.id">{{ realm.name }}</option>
+              <option value="">-- select profile --</option>
+              <option v-for="p in profiles" :key="p.id" :value="p.id">{{ p.name }}</option>
             </select>
           </div>
         </div>
 
-        <!-- Step 2: User details (shown after realm selected) -->
-        <template v-if="form.realmId">
+        <!-- Step 2: User details (shown after profile selected) -->
+        <template v-if="form.profileId">
           <hr class="border-gray-200" />
           <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Account Details</h2>
 
@@ -133,7 +133,7 @@ const submitted = ref(false)
 
 const form = reactive({
   directoryId: '',
-  realmId: '',
+  profileId: '',
   givenName: '',
   sn: '',
   uid: '',
@@ -147,9 +147,9 @@ const directories = ref([
   { id: 'dir-1', displayName: 'Corporate LDAP' },
 ])
 
-const realms = ref([
-  { id: 'realm-1', name: 'Employees' },
-  { id: 'realm-2', name: 'Contractors' },
+const profiles = ref([
+  { id: 'profile-1', name: 'Employees' },
+  { id: 'profile-2', name: 'Contractors' },
 ])
 
 async function handleSubmit() {

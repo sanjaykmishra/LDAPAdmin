@@ -5,8 +5,8 @@ import com.ldapadmin.dto.admin.AdminAccountResponse;
 import com.ldapadmin.dto.admin.AdminPermissionsResponse;
 
 import com.ldapadmin.dto.admin.FeaturePermissionRequest;
-import com.ldapadmin.dto.admin.RealmRoleRequest;
-import com.ldapadmin.dto.admin.RealmRoleResponse;
+import com.ldapadmin.dto.admin.ProfileRoleRequest;
+import com.ldapadmin.dto.admin.ProfileRoleResponse;
 import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.service.AdminManagementService;
 import jakarta.validation.Valid;
@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Admin account management and four-dimensional permission assignment.
+ * Admin account management and permission assignment.
  *
  * <pre>
  *   GET    /api/v1/superadmin/admins                                       — list
@@ -36,8 +36,8 @@ import java.util.UUID;
  *   PUT    /api/v1/superadmin/admins/{id}                                  — update
  *   DELETE /api/v1/superadmin/admins/{id}                                  — delete
  *   GET    /api/v1/superadmin/admins/{id}/permissions                      — all dims
- *   PUT    /api/v1/superadmin/admins/{id}/permissions/realm-roles          — dim 1+2
- *   DELETE /api/v1/superadmin/admins/{id}/permissions/realm-roles/{realmId}
+ *   PUT    /api/v1/superadmin/admins/{id}/permissions/profile-roles        — dim 1+2
+ *   DELETE /api/v1/superadmin/admins/{id}/permissions/profile-roles/{profileId}
  *   PUT    /api/v1/superadmin/admins/{id}/permissions/features             — dim 3
  *   DELETE /api/v1/superadmin/admins/{id}/permissions/features/{key}       — clear override
  * </pre>
@@ -86,19 +86,19 @@ public class AdminManagementController {
         return service.getPermissions(adminId);
     }
 
-    // ── Dimension 1+2: realm roles ────────────────────────────────────────────
+    // ── Dimension 1+2: profile roles ──────────────────────────────────────────
 
-    @PutMapping("/{adminId}/permissions/realm-roles")
-    public RealmRoleResponse assignRealmRole(
+    @PutMapping("/{adminId}/permissions/profile-roles")
+    public ProfileRoleResponse assignProfileRole(
             @PathVariable UUID adminId,
-            @Valid @RequestBody RealmRoleRequest req) {
-        return service.assignRealmRole(adminId, req);
+            @Valid @RequestBody ProfileRoleRequest req) {
+        return service.assignProfileRole(adminId, req);
     }
 
-    @DeleteMapping("/{adminId}/permissions/realm-roles/{realmId}")
-    public ResponseEntity<Void> removeRealmRole(@PathVariable UUID adminId,
-                                                @PathVariable UUID realmId) {
-        service.removeRealmRole(adminId, realmId);
+    @DeleteMapping("/{adminId}/permissions/profile-roles/{profileId}")
+    public ResponseEntity<Void> removeProfileRole(@PathVariable UUID adminId,
+                                                   @PathVariable UUID profileId) {
+        service.removeProfileRole(adminId, profileId);
         return ResponseEntity.noContent().build();
     }
 

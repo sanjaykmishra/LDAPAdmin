@@ -110,7 +110,7 @@ import { useRoute } from 'vue-router'
 import { useNotificationStore } from '@/stores/notifications'
 import { useApi } from '@/composables/useApi'
 import * as groupsApi from '@/api/groups'
-import { listRealms } from '@/api/realms'
+import { listProfiles } from '@/api/profiles'
 import DataTable from '@/components/DataTable.vue'
 import AppModal from '@/components/AppModal.vue'
 import FormField from '@/components/FormField.vue'
@@ -133,9 +133,9 @@ const deleteTarget  = ref(null)
 const members       = ref([])
 const newMemberDn   = ref('')
 const saving        = ref(false)
-const allRealms     = ref([])
-const selectedRealmId = ref(route.query.realmId || '')
-const realmData     = ref(null)
+const allProfiles     = ref([])
+const selectedProfileId = ref('')
+const profileData     = ref(null)
 const showBulkAdd   = ref(false)
 const bulkMemberDns = ref('')
 const bulkAdding    = ref(false)
@@ -161,7 +161,7 @@ async function load() {
   await call(async () => {
     const { data } = await groupsApi.searchGroups(dirId, {
       filter: filterText.value || undefined,
-      baseDn: realmData.value?.groupBaseDn || undefined,
+      baseDn: profileData.value?.targetOuDn || undefined,
     })
     const entries = Array.isArray(data) ? data : (data?.entries || [])
     groups.value = entries.map(e => ({
@@ -196,7 +196,7 @@ async function doCreate() {
 
 function openCreate() {
   createForm.value = {
-    parentDn: realmData.value?.groupBaseDn || '',
+    parentDn: profileData.value?.targetOuDn || '',
     cn: '',
     objectClass: 'groupOfNames',
     owner: '',
@@ -290,31 +290,25 @@ async function doDelete() {
   await load()
 }
 
-function selectRealm(realms) {
-  const match = selectedRealmId.value
-    ? realms.find(r => r.id === selectedRealmId.value)
-    : null
-  const selected = match || realms[0]
-  selectedRealmId.value = selected.id
-  realmData.value = selected
-}
-
-async function loadRealm() {
+async function loadProfiles() {
   try {
-    const { data: realms } = await listRealms(dirId)
-    allRealms.value = realms
-    if (realms.length) selectRealm(realms)
-  } catch (e) { console.warn('Failed to load realms:', e) }
+    const { data: profiles } = await listProfiles(dirId)
+    allProfiles.value = profiles
+    if (profiles.length === 1) {
+      selectedProfileId.value = profiles[0].id
+      profileData.value = profiles[0]
+    }
+  } catch (e) { console.warn('Failed to load profiles:', e) }
 }
 
-function onRealmChange() {
-  const realm = allRealms.value.find(r => r.id === selectedRealmId.value)
-  if (realm) realmData.value = realm
+function onProfileChange() {
+  const p = allProfiles.value.find(p => p.id === selectedProfileId.value)
+  profileData.value = p || null
   load()
 }
 
 onMounted(async () => {
-  await loadRealm()
+  await loadProfiles()
   load()
 })
 </script>
