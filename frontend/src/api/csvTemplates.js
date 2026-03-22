@@ -37,3 +37,27 @@ export const importCsv = (dirId, file, request) => {
 
 export const exportCsv = (dirId, params) =>
   client.get(`/directories/${dirId}/users/export`, { params, responseType: 'blob' })
+
+// ── Group bulk import/export ─────────────────────────────────────────────────
+
+export const previewGroupCsv = (dirId, file, request) => {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('request', new Blob([JSON.stringify(request)], { type: 'application/json' }))
+  return client.post(`/directories/${dirId}/groups/import/preview`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+export const importGroupCsv = (dirId, file, request, memberAttribute = 'member', objectClass = 'groupOfNames') => {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('request', new Blob([JSON.stringify(request)], { type: 'application/json' }))
+  return client.post(`/directories/${dirId}/groups/import`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    params: { memberAttribute, objectClass }
+  })
+}
+
+export const exportGroupCsv = (dirId, params) =>
+  client.get(`/directories/${dirId}/groups/export`, { params, responseType: 'blob' })

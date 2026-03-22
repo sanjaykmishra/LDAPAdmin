@@ -167,3 +167,8 @@ async function loadDecisions() {
 
 onMounted(loadDecisions)
 </script>
+
+<style scoped>
+@reference "tailwindcss";
+.btn-secondary { @apply px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50; }
+</style>

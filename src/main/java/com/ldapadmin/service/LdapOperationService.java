@@ -71,6 +71,7 @@ public class LdapOperationService {
     private final LdapSchemaService             schemaService;
     private final AuditService                  auditService;
     private final BulkUserService               bulkUserService;
+    private final BulkGroupService              bulkGroupService;
     private final CsvMappingTemplateService     csvTemplateService;
 
     // ── Browse ────────────────────────────────────────────────────────────────
@@ -443,6 +444,94 @@ public class LdapOperationService {
         }
 
         return bulkUserService.exportCsv(dc, filter, baseDn, effectiveAttrs);
+    }
+
+    // ── Bulk group import / export ───────────────────────────────────────────
+
+    public BulkImportPreviewResult previewBulkGroupImport(UUID directoryId, AuthPrincipal principal,
+                                                           InputStream csvInput,
+                                                           BulkImportRequest req) throws IOException {
+        loadDirectory(directoryId, principal);
+        permissionService.requireDirectoryAccess(principal, directoryId);
+
+        List<CsvColumnMappingDto> mappings = req.columnMappings() != null
+                ? new ArrayList<>(req.columnMappings()) : new ArrayList<>();
+
+        if (req.templateId() != null) {
+            List<CsvMappingTemplateEntry> entries =
+                    csvTemplateService.loadEntries(req.templateId());
+            if (mappings.isEmpty()) {
+                mappings = entries.stream()
+                        .map(e -> new CsvColumnMappingDto(
+                                e.getCsvColumnName(), e.getLdapAttribute(), e.isIgnored()))
+                        .toList();
+            }
+        }
+
+        boolean skipHeader = resolveSkipHeaderRow(req.skipHeaderRow(), req.templateId(), directoryId, principal);
+
+        return bulkGroupService.previewImport(csvInput, req.parentDn(), mappings, skipHeader);
+    }
+
+    public BulkImportResult bulkImportGroups(UUID directoryId, AuthPrincipal principal,
+                                              InputStream csvInput,
+                                              BulkImportRequest req,
+                                              String memberAttribute,
+                                              String objectClass) throws IOException {
+        DirectoryConnection dc = loadDirectory(directoryId, principal);
+        permissionService.requireDirectoryAccess(principal, directoryId);
+
+        ConflictHandling  conflictHandling = ConflictHandling.SKIP;
+        List<String>      objectClasses    = (objectClass != null && !objectClass.isBlank())
+                ? List.of(objectClass.split(",")) : List.of("groupOfNames");
+        List<CsvColumnMappingDto> mappings = req.columnMappings() != null
+                ? new ArrayList<>(req.columnMappings()) : new ArrayList<>();
+
+        if (req.templateId() != null) {
+            CsvMappingTemplate template =
+                    csvTemplateService.loadTemplate(req.templateId(), directoryId, principal);
+            List<CsvMappingTemplateEntry> entries =
+                    csvTemplateService.loadEntries(req.templateId());
+            conflictHandling = template.getConflictHandling();
+            if (template.getObjectClass() != null && !template.getObjectClass().isBlank()) {
+                objectClasses = List.of(template.getObjectClass().split(","));
+            }
+            if (mappings.isEmpty()) {
+                mappings = entries.stream()
+                        .map(e -> new CsvColumnMappingDto(
+                                e.getCsvColumnName(), e.getLdapAttribute(), e.isIgnored()))
+                        .toList();
+            }
+        }
+
+        if (req.conflictHandling() != null) conflictHandling = req.conflictHandling();
+
+        boolean skipHeader = resolveSkipHeaderRow(req.skipHeaderRow(), req.templateId(), directoryId, principal);
+
+        String effectiveMemberAttr = (memberAttribute != null && !memberAttribute.isBlank())
+                ? memberAttribute : "member";
+
+        BulkImportResult result = bulkGroupService.importCsv(
+                dc, csvInput, req.parentDn(), conflictHandling, mappings,
+                objectClasses, effectiveMemberAttr, skipHeader);
+
+        auditService.record(principal, directoryId, AuditAction.GROUP_BULK_IMPORT, req.parentDn(),
+                Map.of("operation", "bulkGroupImport",
+                       "created",   result.created(),
+                       "updated",   result.updated(),
+                       "skipped",   result.skipped(),
+                       "errors",    result.errors()));
+        return result;
+    }
+
+    public byte[] bulkExportGroups(UUID directoryId, AuthPrincipal principal,
+                                    String filter, String baseDn,
+                                    String memberAttribute,
+                                    List<String> attributes) throws IOException {
+        DirectoryConnection dc = loadDirectory(directoryId, principal);
+        permissionService.requireDirectoryAccess(principal, directoryId);
+
+        return bulkGroupService.exportCsv(dc, filter, baseDn, memberAttribute, attributes);
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

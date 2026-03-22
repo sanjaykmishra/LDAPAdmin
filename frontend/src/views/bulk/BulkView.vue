@@ -1,6 +1,20 @@
 <template>
   <div class="p-6 max-w-3xl">
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Bulk Import / Export</h1>
+    <h1 class="text-2xl font-bold text-gray-900 mb-4">Bulk Import / Export</h1>
+
+    <!-- Entity type selector -->
+    <div class="flex gap-2 mb-4">
+      <button @click="entityType = 'users'"
+        :class="['px-4 py-1.5 text-sm rounded-lg border transition-colors',
+          entityType === 'users' ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium' : 'border-gray-200 text-gray-600 hover:bg-gray-50']">
+        Users
+      </button>
+      <button @click="entityType = 'groups'"
+        :class="['px-4 py-1.5 text-sm rounded-lg border transition-colors',
+          entityType === 'groups' ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium' : 'border-gray-200 text-gray-600 hover:bg-gray-50']">
+        Groups
+      </button>
+    </div>
 
     <!-- Tabs -->
     <div class="flex border-b border-gray-200 mb-0">
@@ -16,8 +30,8 @@
       </button>
     </div>
 
-    <!-- Import tab -->
-    <section v-if="activeTab === 'import'" class="bg-white border border-gray-200 border-t-0 rounded-b-xl p-6">
+    <!-- Import tab — Users -->
+    <section v-if="activeTab === 'import' && entityType === 'users'" class="bg-white border border-gray-200 border-t-0 rounded-b-xl p-6">
       <h2 class="text-lg font-semibold mb-3">Import Users from CSV</h2>
       <div class="space-y-2">
         <div>
@@ -135,8 +149,8 @@
       </div>
     </section>
 
-    <!-- Export tab -->
-    <section v-if="activeTab === 'export'" class="bg-white border border-gray-200 border-t-0 rounded-b-xl p-6">
+    <!-- Export tab — Users -->
+    <section v-if="activeTab === 'export' && entityType === 'users'" class="bg-white border border-gray-200 border-t-0 rounded-b-xl p-6">
       <h2 class="text-lg font-semibold mb-3">Export Users to CSV</h2>
       <div class="space-y-2">
         <FormField label="LDAP Filter (optional)" v-model="exportForm.filter" placeholder="(objectClass=inetOrgPerson)" />
@@ -147,6 +161,120 @@
         <FormField label="Attributes (comma-separated)" v-model="exportForm.attributes" placeholder="cn,mail,uid,sn" />
         <button @click="doExport" :disabled="exporting" class="btn-primary">
           {{ exporting ? 'Exporting…' : 'Download CSV' }}
+        </button>
+      </div>
+    </section>
+
+    <!-- Import tab — Groups -->
+    <section v-if="activeTab === 'import' && entityType === 'groups'" class="bg-white border border-gray-200 border-t-0 rounded-b-xl p-6">
+      <h2 class="text-lg font-semibold mb-3">Import Groups from CSV</h2>
+      <div class="space-y-2">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Parent DN <span class="text-red-500">*</span></label>
+          <DnPicker v-model="groupImportForm.parentDn" :directoryId="dirId" :superadmin="false" />
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Object Class</label>
+            <select v-model="groupImportForm.objectClass" class="input w-full">
+              <option value="groupOfNames">groupOfNames</option>
+              <option value="groupOfUniqueNames">groupOfUniqueNames</option>
+              <option value="posixGroup">posixGroup</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Member Attribute</label>
+            <input :value="groupMemberAttr" disabled class="input w-full bg-gray-50 text-gray-500" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Conflict Handling</label>
+          <select v-model="groupImportForm.conflictHandling" class="input w-full">
+            <option value="SKIP">Skip existing</option>
+            <option value="OVERWRITE">Overwrite existing</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">CSV File <span class="text-red-500">*</span></label>
+          <input type="file" accept=".csv,text/csv" @change="onGroupFileChange"
+            class="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+        </div>
+        <p class="text-xs text-gray-500">
+          CSV columns: <code>cn</code> (required), <code>description</code>, <code>owner</code>, <code>members</code> (pipe-separated DNs).
+          First row must be a header row.
+        </p>
+        <button @click="doGroupPreview" :disabled="!canGroupImport || groupPreviewing" class="btn-primary">
+          {{ groupPreviewing ? 'Loading preview…' : 'Preview Import' }}
+        </button>
+      </div>
+
+      <!-- Preview -->
+      <div v-if="groupPreviewResult" class="mt-4">
+        <div class="p-4 rounded-lg bg-blue-50 border border-blue-200 text-sm mb-3">
+          <p class="font-medium text-blue-800 mb-2">Preview: {{ groupPreviewResult.totalRows }} groups to import</p>
+          <div class="max-h-64 overflow-auto">
+            <table class="w-full text-xs">
+              <thead class="bg-blue-100 sticky top-0">
+                <tr>
+                  <th class="px-2 py-1 text-left font-medium text-blue-700">#</th>
+                  <th class="px-2 py-1 text-left font-medium text-blue-700">Computed DN</th>
+                  <th class="px-2 py-1 text-left font-medium text-blue-700">Attributes</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-blue-100">
+                <tr v-for="row in groupPreviewResult.rows" :key="row.rowNumber">
+                  <td class="px-2 py-1 text-gray-600">{{ row.rowNumber }}</td>
+                  <td class="px-2 py-1 font-mono text-gray-800">{{ row.computedDn || '(missing cn)' }}</td>
+                  <td class="px-2 py-1 text-gray-600">{{ formatAttrs(row.attributes) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="flex gap-2 mt-3">
+            <button @click="doGroupConfirmImport" :disabled="groupImporting" class="btn-primary">
+              {{ groupImporting ? 'Importing…' : 'Confirm Import' }}
+            </button>
+            <button @click="groupPreviewResult = null" class="btn-secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Import result -->
+      <div v-if="groupImportResult" class="mt-4 p-4 rounded-lg bg-gray-50 border border-gray-200 text-sm">
+        <div class="grid grid-cols-4 gap-2 mb-3">
+          <div class="text-center"><p class="text-2xl font-bold text-green-600">{{ groupImportResult.created }}</p><p class="text-xs text-gray-500">Created</p></div>
+          <div class="text-center"><p class="text-2xl font-bold text-blue-600">{{ groupImportResult.updated }}</p><p class="text-xs text-gray-500">Updated</p></div>
+          <div class="text-center"><p class="text-2xl font-bold text-yellow-600">{{ groupImportResult.skipped }}</p><p class="text-xs text-gray-500">Skipped</p></div>
+          <div class="text-center"><p class="text-2xl font-bold text-red-600">{{ groupImportResult.errors }}</p><p class="text-xs text-gray-500">Errors</p></div>
+        </div>
+        <ul v-if="groupImportResult.rows?.filter(r => r.status === 'ERROR').length" class="space-y-1">
+          <li v-for="r in groupImportResult.rows.filter(r => r.status === 'ERROR')" :key="r.rowNumber" class="text-red-600 text-xs">
+            Row {{ r.rowNumber }}: {{ r.message }}
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Export tab — Groups -->
+    <section v-if="activeTab === 'export' && entityType === 'groups'" class="bg-white border border-gray-200 border-t-0 rounded-b-xl p-6">
+      <h2 class="text-lg font-semibold mb-3">Export Groups to CSV</h2>
+      <div class="space-y-2">
+        <FormField label="LDAP Filter (optional)" v-model="groupExportForm.filter" placeholder="(objectClass=groupOfNames)" />
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Base DN (optional)</label>
+          <DnPicker v-model="groupExportForm.baseDn" :directoryId="dirId" :superadmin="false" placeholder="ou=groups,dc=example,dc=com" />
+        </div>
+        <FormField label="Attributes (comma-separated)" v-model="groupExportForm.attributes" placeholder="cn,description,owner" />
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Member Attribute</label>
+          <select v-model="groupExportForm.memberAttribute" class="input w-full">
+            <option value="member">member</option>
+            <option value="uniqueMember">uniqueMember</option>
+            <option value="memberUid">memberUid</option>
+          </select>
+        </div>
+        <button @click="doGroupExport" :disabled="groupExporting" class="btn-primary">
+          {{ groupExporting ? 'Exporting…' : 'Download CSV' }}
         </button>
       </div>
     </section>
@@ -259,6 +387,7 @@ import { useNotificationStore } from '@/stores/notifications'
 import {
   importCsv, exportCsv, previewCsv,
   listCsvTemplates, createCsvTemplate, updateCsvTemplate, deleteCsvTemplate,
+  previewGroupCsv, importGroupCsv, exportGroupCsv,
 } from '@/api/csvTemplates'
 import { listObjectClasses, getObjectClassesBulk } from '@/api/schema'
 import { downloadBlob } from '@/composables/useApi'
@@ -271,6 +400,7 @@ const route = useRoute()
 const notif = useNotificationStore()
 const dirId = route.params.dirId
 
+const entityType   = ref('users')
 const activeTab    = ref('import')
 const importing    = ref(false)
 const previewing   = ref(false)
@@ -281,6 +411,25 @@ const previewResult = ref(null)
 
 const importForm = ref({ parentDn: '' })
 const exportForm = ref({ filter: '', baseDn: '', attributes: 'cn,mail,uid' })
+
+// ── Group bulk state ─────────────────────────────────────────────────────────
+const groupImporting    = ref(false)
+const groupPreviewing   = ref(false)
+const groupExporting    = ref(false)
+const groupImportFile   = ref(null)
+const groupImportResult = ref(null)
+const groupPreviewResult = ref(null)
+const groupImportForm = ref({
+  parentDn: '',
+  objectClass: 'groupOfNames',
+  conflictHandling: 'SKIP',
+})
+const groupExportForm = ref({
+  filter: '',
+  baseDn: '',
+  attributes: 'cn,description,owner',
+  memberAttribute: 'member',
+})
 
 // ── Template actions dropdown ─────────────────────────────────────────────────
 
@@ -574,6 +723,90 @@ async function doExport() {
     notif.error(e.response?.data?.detail || e.message)
   } finally {
     exporting.value = false
+  }
+}
+
+// ── Group import / export ────────────────────────────────────────────────────
+
+const MEMBER_ATTR_MAP = {
+  groupOfNames: 'member',
+  groupOfUniqueNames: 'uniqueMember',
+  posixGroup: 'memberUid',
+}
+
+const groupMemberAttr = computed(() =>
+  MEMBER_ATTR_MAP[groupImportForm.value.objectClass] || 'member'
+)
+
+const canGroupImport = computed(() =>
+  groupImportFile.value && groupImportForm.value.parentDn
+)
+
+function onGroupFileChange(e) {
+  groupImportFile.value = e.target.files[0] || null
+  groupPreviewResult.value = null
+  groupImportResult.value = null
+}
+
+function buildGroupImportRequest() {
+  return {
+    parentDn: groupImportForm.value.parentDn,
+    conflictHandling: groupImportForm.value.conflictHandling,
+    skipHeaderRow: true,
+    columnMappings: [],
+  }
+}
+
+async function doGroupPreview() {
+  if (!canGroupImport.value) return
+  groupPreviewing.value = true
+  groupPreviewResult.value = null
+  groupImportResult.value = null
+  try {
+    const { data } = await previewGroupCsv(dirId, groupImportFile.value, buildGroupImportRequest())
+    groupPreviewResult.value = data
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  } finally {
+    groupPreviewing.value = false
+  }
+}
+
+async function doGroupConfirmImport() {
+  if (!canGroupImport.value) return
+  groupImporting.value = true
+  groupImportResult.value = null
+  try {
+    const req = buildGroupImportRequest()
+    const resp = await importGroupCsv(
+      dirId, groupImportFile.value, req,
+      groupMemberAttr.value, groupImportForm.value.objectClass
+    )
+    groupImportResult.value = resp.data
+    groupPreviewResult.value = null
+    notif.success(`Import done: ${resp.data.created} created, ${resp.data.errors} errors`)
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  } finally {
+    groupImporting.value = false
+  }
+}
+
+async function doGroupExport() {
+  groupExporting.value = true
+  try {
+    const params = {
+      filter:          groupExportForm.value.filter     || undefined,
+      baseDn:          groupExportForm.value.baseDn     || undefined,
+      attributes:      groupExportForm.value.attributes || undefined,
+      memberAttribute: groupExportForm.value.memberAttribute,
+    }
+    const { data } = await exportGroupCsv(dirId, params)
+    downloadBlob(data, 'groups.csv')
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  } finally {
+    groupExporting.value = false
   }
 }
 </script>
