@@ -51,8 +51,8 @@ public class AccessReviewScheduler {
 
         // 2. Send deadline reminders for campaigns approaching deadline
         OffsetDateTime reminderThreshold = OffsetDateTime.now().plusDays(reminderDays);
-        List<AccessReviewCampaign> approaching = campaignRepo.findByStatusAndDeadlineBefore(
-                CampaignStatus.ACTIVE, reminderThreshold);
+        List<AccessReviewCampaign> approaching = new java.util.ArrayList<>(
+                campaignRepo.findByStatusAndDeadlineBefore(CampaignStatus.ACTIVE, reminderThreshold));
 
         // Filter out already expired ones (they were just processed above)
         approaching.removeAll(overdue);

@@ -23,6 +23,7 @@ public enum AuditAction {
     GROUP_DELETE         ("group.delete"),
     GROUP_MEMBER_ADD     ("group.member_add"),
     GROUP_MEMBER_REMOVE  ("group.member_remove"),
+    GROUP_BULK_IMPORT    ("group.bulk_import"),
 
     // ── Generic entry operations (superadmin browser) ─────────────────────────
     ENTRY_CREATE         ("entry.create"),
