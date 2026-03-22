@@ -23,6 +23,7 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
             WHERE (:directoryId IS NULL OR e.directory_id = CAST(:directoryId AS UUID))
               AND (:actorId     IS NULL OR e.actor_id     = CAST(:actorId AS UUID))
               AND (CAST(:action AS VARCHAR) IS NULL OR e.action = CAST(:action AS VARCHAR))
+              AND (CAST(:targetDn AS VARCHAR) IS NULL OR e.target_dn = CAST(:targetDn AS VARCHAR))
               AND (CAST(:from AS TIMESTAMPTZ) IS NULL OR e.occurred_at >= CAST(:from AS TIMESTAMPTZ))
               AND (CAST(:to AS TIMESTAMPTZ)   IS NULL OR e.occurred_at <= CAST(:to AS TIMESTAMPTZ))
             ORDER BY e.occurred_at DESC
@@ -32,6 +33,7 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
             WHERE (:directoryId IS NULL OR e.directory_id = CAST(:directoryId AS UUID))
               AND (:actorId     IS NULL OR e.actor_id     = CAST(:actorId AS UUID))
               AND (CAST(:action AS VARCHAR) IS NULL OR e.action = CAST(:action AS VARCHAR))
+              AND (CAST(:targetDn AS VARCHAR) IS NULL OR e.target_dn = CAST(:targetDn AS VARCHAR))
               AND (CAST(:from AS TIMESTAMPTZ) IS NULL OR e.occurred_at >= CAST(:from AS TIMESTAMPTZ))
               AND (CAST(:to AS TIMESTAMPTZ)   IS NULL OR e.occurred_at <= CAST(:to AS TIMESTAMPTZ))
             """,
@@ -40,6 +42,7 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
             @Param("directoryId") UUID directoryId,
             @Param("actorId")     UUID actorId,
             @Param("action")      String action,
+            @Param("targetDn")    String targetDn,
             @Param("from")        OffsetDateTime from,
             @Param("to")          OffsetDateTime to,
             Pageable pageable);
