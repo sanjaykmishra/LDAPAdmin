@@ -490,6 +490,14 @@ const selfServiceAttributeConfigs = computed({
 
 const layoutMode = ref('admin')
 
+// Fixed modal height based on attribute count so switching tabs doesn't resize
+const modalHeight = computed(() => {
+  const count = profile.value.attributeConfigs.length
+  if (count <= 6) return '50vh'
+  if (count <= 12) return '60vh'
+  return '70vh'
+})
+
 const modalTabs = [
   { id: 'general', label: 'General' },
   { id: 'attributes', label: 'Attributes' },
@@ -549,7 +557,7 @@ function toggleApprover(accountId) {
     <div v-else class="text-gray-500">No provisioning profiles configured.</div>
 
     <!-- Create/Edit Modal -->
-    <AppModal v-model="showModal" :title="editing ? 'Edit Profile' : 'Create Profile'" size="xl">
+    <AppModal v-model="showModal" :title="editing ? 'Edit Profile' : 'Create Profile'" size="xl" :fixedHeight="modalHeight">
       <div class="space-y-4">
         <!-- Tab Navigation -->
         <div class="flex border-b gap-1">
