@@ -34,14 +34,14 @@ public class UserTemplateService {
     @Transactional(readOnly = true)
     public List<UserTemplateResponse> list() {
         return templateRepo.findAll().stream()
-                .map(t -> UserTemplateResponse.from(t, configRepo.findAllByUserTemplateId(t.getId())))
+                .map(t -> UserTemplateResponse.from(t, configRepo.findAllByUserTemplateIdOrderByDisplayOrderAsc(t.getId())))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public UserTemplateResponse get(UUID id) {
         UserTemplate template = requireTemplate(id);
-        return UserTemplateResponse.from(template, configRepo.findAllByUserTemplateId(id));
+        return UserTemplateResponse.from(template, configRepo.findAllByUserTemplateIdOrderByDisplayOrderAsc(id));
     }
 
     @Transactional
@@ -126,6 +126,7 @@ public class UserTemplateService {
             c.setSectionName(e.sectionName());
             c.setColumnSpan(e.columnSpan() != null ? e.columnSpan() : 3);
             c.setHidden(e.hidden());
+            c.setDisplayOrder(i);
             configs.add(c);
         }
         return configRepo.saveAll(configs);

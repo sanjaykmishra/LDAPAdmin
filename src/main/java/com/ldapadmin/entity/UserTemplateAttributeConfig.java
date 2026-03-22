@@ -70,4 +70,8 @@ public class UserTemplateAttributeConfig {
     /** When {@code true} the attribute is excluded from the rendered form. */
     @Column(name = "hidden", nullable = false)
     private boolean hidden = false;
+
+    /** Explicit display ordering (0-based). Preserved by the layout designer. */
+    @Column(name = "display_order", nullable = false)
+    private int displayOrder = 0;
 }
