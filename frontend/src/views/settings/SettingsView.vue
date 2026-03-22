@@ -6,6 +6,21 @@
 
     <form v-else @submit.prevent="doSave" class="space-y-4">
 
+      <!-- Theme -->
+      <section class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
+        <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-3">Theme</h2>
+        <div class="flex gap-3">
+          <button v-for="opt in themeOptions" :key="opt.value"
+            @click="setTheme(opt.value)"
+            :class="['px-4 py-2 rounded-lg text-sm font-medium border transition-colors',
+              theme === opt.value
+                ? 'bg-blue-50 dark:bg-blue-900 border-blue-300 dark:border-blue-600 text-blue-700 dark:text-blue-300'
+                : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700']">
+            {{ opt.label }}
+          </button>
+        </div>
+      </section>
+
       <!-- Branding -->
       <section class="bg-white border border-gray-200 rounded-xl p-6">
         <h2 class="text-base font-semibold text-gray-900 mb-3">Branding</h2>
@@ -168,8 +183,16 @@
 import { ref, onMounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
 import { useSettingsStore } from '@/stores/settings'
+import { useTheme } from '@/composables/useTheme'
 import { getSettings, updateSettings } from '@/api/settings'
 import FormField from '@/components/FormField.vue'
+
+const { theme, setTheme } = useTheme()
+const themeOptions = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'System' },
+]
 
 const notif         = useNotificationStore()
 const settingsStore = useSettingsStore()

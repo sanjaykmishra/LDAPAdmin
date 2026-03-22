@@ -12,7 +12,9 @@
         ]"
       >
         <span class="flex-1">{{ n.message }}</span>
-        <button @click="store.remove(n.id)" class="opacity-70 hover:opacity-100">✕</button>
+        <button v-if="n.onUndo" @click="store.undo(n.id)"
+          class="underline font-semibold hover:opacity-80 shrink-0">Undo</button>
+        <button @click="store.remove(n.id)" class="opacity-70 hover:opacity-100 shrink-0">✕</button>
       </div>
     </TransitionGroup>
   </div>

@@ -13,8 +13,9 @@
       <button @click="clearFilters" class="btn-secondary">Clear</button>
     </div>
 
-    <DataTable :columns="cols" :rows="events" :loading="loading" row-key="id">
-      <template #cell-occurredAt="{ value }">{{ fmtDate(value) }}</template>
+    <DataTable :columns="cols" :rows="events" :loading="loading" row-key="id"
+      empty-text="No audit events found" empty-icon="clipboard">
+      <template #cell-occurredAt="{ value }"><RelativeTime :value="value" /></template>
       <template #cell-action="{ value }">
         <span class="badge-gray">{{ value }}</span>
       </template>
@@ -37,6 +38,7 @@ import { useApi } from '@/composables/useApi'
 import { getAuditLog } from '@/api/audit'
 import DataTable from '@/components/DataTable.vue'
 import FormField from '@/components/FormField.vue'
+import RelativeTime from '@/components/RelativeTime.vue'
 
 const route = useRoute()
 const { loading, call } = useApi()
