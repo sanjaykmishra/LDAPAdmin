@@ -56,7 +56,7 @@ public class ProvisioningProfile {
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
         name = "profile_object_classes",
-        joinColumns = @JoinColumn(name = "provisioning_profile_id")
+        joinColumns = @JoinColumn(name = "profile_id")
     )
     @Column(name = "object_class_name")
     private List<String> objectClassNames = new ArrayList<>();

@@ -20,8 +20,8 @@ CREATE TABLE provisioning_profiles (
 );
 
 CREATE TABLE profile_object_classes (
-    provisioning_profile_id UUID NOT NULL REFERENCES provisioning_profiles(id) ON DELETE CASCADE,
-    object_class_name       VARCHAR(255) NOT NULL
+    profile_id        UUID NOT NULL REFERENCES provisioning_profiles(id) ON DELETE CASCADE,
+    object_class_name VARCHAR(255) NOT NULL
 );
 
 CREATE TABLE profile_attribute_configs (
@@ -98,9 +98,12 @@ CREATE TABLE admin_profile_roles (
     UNIQUE(admin_account_id, profile_id)
 );
 
--- 2. Update pending_approvals to reference profile instead of realm ----------
+-- 2. Update pending_approvals: add profile_id, drop realm_id -----------------
 
+ALTER TABLE pending_approvals DROP CONSTRAINT IF EXISTS fk_pa_realm;
+DROP INDEX IF EXISTS idx_pa_realm_status;
 ALTER TABLE pending_approvals ADD COLUMN profile_id UUID REFERENCES provisioning_profiles(id);
+ALTER TABLE pending_approvals DROP COLUMN IF EXISTS realm_id;
 
 -- 3. Drop old tables ----------------------------------------------------------
 

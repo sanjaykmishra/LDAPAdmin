@@ -111,8 +111,8 @@ public class ApprovalNotificationService {
     public void sendPendingReminders() {
         List<ProvisioningProfile> allProfiles = profileRepo.findAll();
         for (ProvisioningProfile profile : allProfiles) {
-            long pendingCount = approvalRepo.countByDirectoryIdAndStatus(
-                    profile.getDirectory().getId(), ApprovalStatus.PENDING);
+            long pendingCount = approvalRepo.countByProfileIdAndStatus(
+                    profile.getId(), ApprovalStatus.PENDING);
             if (pendingCount == 0) continue;
 
             List<Account> approvers = approverRepo.findAllByProfileIdWithAccount(profile.getId()).stream()

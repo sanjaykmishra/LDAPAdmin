@@ -37,6 +37,7 @@ public class ProvisioningProfileService {
     private final ProfileApproverRepository          approverRepo;
     private final DirectoryConnectionRepository      dirRepo;
     private final AccountRepository                  accountRepo;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     private static final Pattern EXPRESSION_VAR = Pattern.compile("\\$\\{(\\w+)}");
 
@@ -58,6 +59,11 @@ public class ProvisioningProfileService {
     @Transactional(readOnly = true)
     public ProfileResponse get(UUID profileId) {
         return toResponse(requireProfile(profileId));
+    }
+
+    @Transactional(readOnly = true)
+    public ProfileResponse get(UUID directoryId, UUID profileId) {
+        return toResponse(requireProfileInDirectory(directoryId, profileId));
     }
 
     @Transactional
@@ -83,8 +89,8 @@ public class ProvisioningProfileService {
     }
 
     @Transactional
-    public ProfileResponse update(UUID profileId, UpdateProfileRequest req) {
-        ProvisioningProfile profile = requireProfile(profileId);
+    public ProfileResponse update(UUID directoryId, UUID profileId, UpdateProfileRequest req) {
+        ProvisioningProfile profile = requireProfileInDirectory(directoryId, profileId);
 
         // Check name uniqueness if changed
         if (!profile.getName().equals(req.name()) &&
@@ -111,14 +117,14 @@ public class ProvisioningProfileService {
     }
 
     @Transactional
-    public void delete(UUID profileId) {
-        ProvisioningProfile profile = requireProfile(profileId);
+    public void delete(UUID directoryId, UUID profileId) {
+        ProvisioningProfile profile = requireProfileInDirectory(directoryId, profileId);
         profileRepo.delete(profile);
     }
 
     @Transactional
-    public ProfileResponse clone(UUID profileId, String newName) {
-        ProvisioningProfile source = requireProfile(profileId);
+    public ProfileResponse clone(UUID directoryId, UUID profileId, String newName) {
+        ProvisioningProfile source = requireProfileInDirectory(directoryId, profileId);
 
         if (profileRepo.existsByDirectoryIdAndName(source.getDirectory().getId(), newName)) {
             throw new ConflictException(
@@ -337,6 +343,7 @@ public class ProvisioningProfileService {
     /**
      * Validates attribute values against profile attribute configs.
      */
+    @Transactional(readOnly = true)
     public void validateAttributes(UUID profileId, Map<String, List<String>> attributes) {
         List<ProfileAttributeConfig> configs =
                 attrConfigRepo.findAllByProfileIdOrderByDisplayOrderAsc(profileId);
@@ -377,11 +384,20 @@ public class ProvisioningProfileService {
 
             // Allowed values check
             if (config.getAllowedValues() != null && !config.getAllowedValues().isBlank()) {
-                // Parse JSON array of allowed values
-                if (!config.getAllowedValues().contains("\"" + value + "\"")) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                            "Attribute [" + config.getAttributeName()
-                                    + "] value is not in the allowed values list");
+                try {
+                    List<String> allowed = objectMapper.readValue(config.getAllowedValues(),
+                            objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
+                    if (!allowed.contains(value)) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                "Attribute [" + config.getAttributeName()
+                                        + "] value is not in the allowed values list");
+                    }
+                } catch (ResponseStatusException rse) {
+                    throw rse;
+                } catch (Exception e) {
+                    log.warn("Failed to parse allowed values JSON for attribute [{}]: {}",
+                            config.getAttributeName(), e.getMessage());
+                }
                 }
             }
         }
@@ -390,6 +406,7 @@ public class ProvisioningProfileService {
     /**
      * Applies defaults, computed expressions, and fixed values to the attribute map.
      */
+    @Transactional(readOnly = true)
     public void applyDefaults(UUID profileId, Map<String, List<String>> attributes) {
         List<ProfileAttributeConfig> configs =
                 attrConfigRepo.findAllByProfileIdOrderByDisplayOrderAsc(profileId);
@@ -434,6 +451,11 @@ public class ProvisioningProfileService {
 
     private ProvisioningProfile requireProfile(UUID profileId) {
         return profileRepo.findById(profileId)
+                .orElseThrow(() -> new ResourceNotFoundException("ProvisioningProfile", profileId));
+    }
+
+    private ProvisioningProfile requireProfileInDirectory(UUID directoryId, UUID profileId) {
+        return profileRepo.findByIdAndDirectoryId(profileId, directoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProvisioningProfile", profileId));
     }
 

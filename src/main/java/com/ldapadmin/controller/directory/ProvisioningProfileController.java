@@ -61,7 +61,7 @@ public class ProvisioningProfileController {
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
     public ProfileResponse get(@PathVariable UUID directoryId,
                                 @PathVariable UUID profileId) {
-        return service.get(profileId);
+        return service.get(directoryId, profileId);
     }
 
     @PutMapping("/api/v1/directories/{directoryId}/profiles/{profileId}")
@@ -69,14 +69,14 @@ public class ProvisioningProfileController {
     public ProfileResponse update(@PathVariable UUID directoryId,
                                    @PathVariable UUID profileId,
                                    @Valid @RequestBody UpdateProfileRequest req) {
-        return service.update(profileId, req);
+        return service.update(directoryId, profileId, req);
     }
 
     @DeleteMapping("/api/v1/directories/{directoryId}/profiles/{profileId}")
     @PreAuthorize("hasRole('SUPERADMIN')")
     public ResponseEntity<Void> delete(@PathVariable UUID directoryId,
                                         @PathVariable UUID profileId) {
-        service.delete(profileId);
+        service.delete(directoryId, profileId);
         return ResponseEntity.noContent().build();
     }
 
@@ -91,7 +91,7 @@ public class ProvisioningProfileController {
             return ResponseEntity.badRequest().build();
         }
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(service.clone(profileId, newName));
+                .body(service.clone(directoryId, profileId, newName));
     }
 
     // ── Lifecycle Policy ──────────────────────────────────────────────────────

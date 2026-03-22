@@ -62,21 +62,21 @@
       <button @click="loadMore" :disabled="loading" class="btn-secondary">Load more</button>
     </div>
 
-    <!-- Form picker modal (step 1 of create) -->
-    <AppModal v-model="showTemplatePicker" title="Choose User Template" size="sm">
+    <!-- Profile picker modal (step 1 of create) -->
+    <AppModal v-model="showTemplatePicker" title="Choose Profile" size="sm">
       <div class="space-y-2">
-        <p class="text-sm text-gray-600 mb-3">Select a user template to define which attributes are available for the new user.</p>
-        <div v-if="availableTemplates.length === 0" class="text-sm text-gray-400 py-4 text-center">
+        <p class="text-sm text-gray-600 mb-3">Select a provisioning profile to define which attributes are available for the new user.</p>
+        <div v-if="allProfiles.length === 0" class="text-sm text-gray-400 py-4 text-center">
           No provisioning profiles are configured for this directory. Create a profile in the Profiles settings first.
         </div>
         <button
-          v-for="ut in availableTemplates"
-          :key="ut.id"
-          @click="selectTemplateAndCreate(ut)"
+          v-for="p in allProfiles"
+          :key="p.id"
+          @click="selectProfileAndCreate(p)"
           class="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
         >
-          <span class="font-medium text-gray-900 text-sm">{{ ut.templateName }}</span>
-          <span class="text-xs text-gray-500 ml-2">({{ (ut.objectClassNames || []).join(', ') }})</span>
+          <span class="font-medium text-gray-900 text-sm">{{ p.name }}</span>
+          <span class="text-xs text-gray-500 ml-2">({{ (p.objectClassNames || []).join(', ') }})</span>
         </button>
       </div>
       <template #footer>
@@ -293,7 +293,7 @@ async function load() {
 
 function loadMore() { limit.value += 50; load() }
 
-function openCreate() {
+async function openCreate() {
   editingDn.value = null
   profileConfig.value = null
   if (allProfiles.value.length === 1) {

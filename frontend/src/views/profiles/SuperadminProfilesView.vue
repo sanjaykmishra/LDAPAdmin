@@ -166,7 +166,7 @@ async function save() {
     if (editing.value) {
       await updateProfile(selectedDirId.value, editing.value, profile.value)
       // Save lifecycle
-      if (lifecycle.value.expiresAfterDays) {
+      if (lifecycle.value.expiresAfterDays != null) {
         await setLifecyclePolicy(editing.value, lifecycle.value)
       }
       // Save approval config
@@ -176,7 +176,7 @@ async function save() {
     } else {
       const { data } = await createProfile(selectedDirId.value, profile.value)
       // Save lifecycle if configured
-      if (lifecycle.value.expiresAfterDays) {
+      if (lifecycle.value.expiresAfterDays != null) {
         await setLifecyclePolicy(data.id, lifecycle.value)
       }
       // Save approval config

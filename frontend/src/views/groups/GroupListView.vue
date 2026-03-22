@@ -3,11 +3,12 @@
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Groups</h1>
       <div class="flex items-center gap-2">
-        <div v-if="allRealms.length > 1" class="flex items-center gap-2">
-          <label class="text-sm text-gray-600 font-medium">Realm:</label>
-          <select v-model="selectedRealmId" @change="onRealmChange"
+        <div v-if="allProfiles.length > 1" class="flex items-center gap-2">
+          <label class="text-sm text-gray-600 font-medium">Profile:</label>
+          <select v-model="selectedProfileId" @change="onProfileChange"
             class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option v-for="r in allRealms" :key="r.id" :value="r.id">{{ r.name }}</option>
+            <option value="">All</option>
+            <option v-for="p in allProfiles" :key="p.id" :value="p.id">{{ p.name }}</option>
           </select>
         </div>
         <button @click="openCreate" class="btn-primary">+ New Group</button>
