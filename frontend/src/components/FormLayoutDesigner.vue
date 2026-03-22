@@ -18,7 +18,29 @@
     <div v-if="showPreview" class="border border-blue-200 bg-blue-50/30 rounded-xl p-4">
       <h4 class="text-sm font-semibold text-blue-800 mb-3">Form Preview</h4>
       <div class="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
-        <template v-for="(section, sIdx) in sections" :key="section.id">
+        <!-- Row 1: RDN (1/3) + Computed DN (2/3) -->
+        <div v-if="rdnField" class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              {{ rdnField.customLabel || rdnField.attributeName }}
+              <span class="text-red-500">*</span>
+              <span class="text-xs bg-amber-100 text-amber-700 rounded px-1 ml-1">RDN</span>
+            </label>
+            <div class="w-full h-9 border border-gray-200 rounded-lg bg-gray-50"></div>
+          </div>
+          <div class="col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              DN
+              <span class="text-xs bg-gray-100 text-gray-500 rounded px-1 ml-1">computed</span>
+            </label>
+            <div class="w-full h-9 border border-gray-200 rounded-lg bg-gray-100 flex items-center px-3 text-xs text-gray-400 italic">
+              {{ rdnField.attributeName }}=…,ou=…,dc=…
+            </div>
+          </div>
+        </div>
+
+        <!-- Remaining sections (non-RDN fields) -->
+        <template v-for="(section, sIdx) in previewSections" :key="section.id">
           <fieldset v-if="section.fields.length" class="space-y-3">
             <legend v-if="section.name" class="text-sm font-semibold text-gray-800 pb-1 border-b border-gray-100 w-full mb-2">{{ section.name }}</legend>
             <div class="grid grid-cols-3 gap-3">
@@ -30,7 +52,6 @@
                 <label class="block text-sm font-medium text-gray-700 mb-1">
                   {{ field.customLabel || field.attributeName }}
                   <span v-if="field.requiredOnCreate" class="text-red-500">*</span>
-                  <span v-if="field.rdn" class="text-xs bg-amber-100 text-amber-700 rounded px-1 ml-1">RDN</span>
                 </label>
                 <div v-if="field.inputType === 'TEXTAREA' || field.inputType === 'MULTI_VALUE'" class="w-full h-16 border border-gray-200 rounded-lg bg-gray-50"></div>
                 <div v-else-if="field.inputType === 'BOOLEAN'" class="flex items-center gap-2">
@@ -42,6 +63,40 @@
             </div>
           </fieldset>
         </template>
+      </div>
+    </div>
+
+    <!-- Row 1: RDN + Computed DN (fixed, not draggable) -->
+    <div v-if="rdnField" class="border border-amber-200 bg-amber-50/30 rounded-xl overflow-hidden">
+      <div class="flex items-center gap-2 px-3 py-2 bg-amber-50 border-b border-amber-100">
+        <span class="text-xs font-semibold text-amber-700">Row 1 — RDN + DN</span>
+        <span class="text-[10px] text-amber-500">(always first row, not draggable)</span>
+      </div>
+      <div class="p-2">
+        <div class="grid grid-cols-3 gap-2">
+          <!-- RDN field (1/3) -->
+          <div class="flex items-center gap-2 px-3 py-2 bg-white border border-amber-200 rounded-lg">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span class="text-sm font-medium text-gray-800 truncate">{{ rdnField.customLabel || rdnField.attributeName }}</span>
+                <span class="text-[10px] font-mono text-gray-400" v-if="rdnField.customLabel">{{ rdnField.attributeName }}</span>
+                <span class="text-[10px] bg-amber-100 text-amber-700 rounded px-1 font-medium">RDN</span>
+                <span class="text-red-400 text-xs">*</span>
+              </div>
+              <div class="text-[10px] text-gray-400">{{ rdnField.inputType }} · 1/3 width</div>
+            </div>
+          </div>
+          <!-- Computed DN (2/3) -->
+          <div class="col-span-2 flex items-center gap-2 px-3 py-2 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span class="text-sm font-medium text-gray-500">DN</span>
+                <span class="text-[10px] bg-gray-100 text-gray-500 rounded px-1 font-medium">computed</span>
+              </div>
+              <div class="text-[10px] text-gray-400">Auto-generated from RDN · 2/3 width</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -67,7 +122,7 @@
             class="flex-1 bg-transparent text-sm font-medium text-gray-700 placeholder-gray-400 focus:outline-none"
             @input="syncToParent"
           />
-          <span class="text-xs text-gray-400">{{ section.fields.length }} field{{ section.fields.length !== 1 ? 's' : '' }}</span>
+          <span class="text-xs text-gray-400">{{ nonRdnFields(section).length }} field{{ nonRdnFields(section).length !== 1 ? 's' : '' }}</span>
           <button
             v-if="sections.length > 1"
             type="button"
@@ -79,13 +134,16 @@
 
         <!-- Fields in section -->
         <div class="p-2 min-h-[48px]">
-          <div v-if="section.fields.length === 0" class="text-center text-xs text-gray-400 py-3">
+          <div v-if="nonRdnFields(section).length === 0" class="text-center text-xs text-gray-400 py-3">
             Drag fields here or add attributes above
           </div>
           <div class="grid grid-cols-3 gap-2">
-            <div
+            <template
               v-for="(field, fIdx) in section.fields"
               :key="field.attributeName"
+            >
+            <div
+              v-if="!field.rdn"
               :style="{ gridColumn: `span ${field.columnSpan || 3}` }"
               :class="[
                 dragField?.attributeName === field.attributeName ? 'opacity-30' : '',
@@ -130,6 +188,7 @@
                 >{{ span }}</button>
               </div>
             </div>
+            </template>
           </div>
         </div>
       </div>
@@ -138,7 +197,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 const props = defineProps({
   attributeConfigs: { type: Array, required: true },
@@ -162,7 +221,12 @@ function buildSections(attrs) {
     if (!map.has(key)) {
       map.set(key, { id: nextSectionId(), name: key, fields: [] })
     }
-    map.get(key).fields.push({ ...attr })
+    const field = { ...attr }
+    // RDN field defaults to 1/3 width (shown in fixed row 1 alongside computed DN)
+    if (field.rdn && !field.columnSpan) {
+      field.columnSpan = 1
+    }
+    map.get(key).fields.push(field)
   }
   const result = Array.from(map.values())
   if (result.length === 0) {
@@ -170,6 +234,23 @@ function buildSections(attrs) {
   }
   return result
 }
+
+/** The RDN field, shown in the fixed row 1 (not part of draggable sections). */
+const rdnField = computed(() => {
+  for (const section of sections.value) {
+    const f = section.fields.find(f => f.rdn)
+    if (f) return f
+  }
+  return null
+})
+
+/** Sections with the RDN field excluded (for preview and section editor). */
+const previewSections = computed(() =>
+  sections.value.map(s => ({
+    ...s,
+    fields: s.fields.filter(f => !f.rdn),
+  }))
+)
 
 // Initialize from props
 sections.value = buildSections(props.attributeConfigs)
@@ -223,6 +304,11 @@ function syncToParent() {
   emit('update:attributeConfigs', flattenSections())
   // Allow the next tick to propagate before re-enabling the watch
   setTimeout(() => { syncing = false }, 0)
+}
+
+/** Return non-RDN fields for a section (RDN is shown in the fixed row 1). */
+function nonRdnFields(section) {
+  return section.fields.filter(f => !f.rdn)
 }
 
 // ── Section management ───────────────────────────────────────────────────────
