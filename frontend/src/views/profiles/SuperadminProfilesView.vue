@@ -108,6 +108,7 @@ function openCreate() {
   ocSchemaCache.value = {}
   selectedDirId.value = directories.value.length > 0 ? directories.value[0].id : null
   modalTab.value = 'general'
+  layoutMode.value = 'admin'
   showModal.value = true
 }
 
@@ -123,14 +124,17 @@ async function openEdit(p) {
       attributeName: a.attributeName, customLabel: a.customLabel || '',
       inputType: a.inputType, requiredOnCreate: a.requiredOnCreate,
       editableOnCreate: a.editableOnCreate, editableOnUpdate: a.editableOnUpdate,
-      selfServiceEdit: a.selfServiceEdit, defaultValue: a.defaultValue || '',
+      selfServiceEdit: a.selfServiceEdit, selfRegistrationEdit: a.selfRegistrationEdit,
+      defaultValue: a.defaultValue || '',
       computedExpression: a.computedExpression || '',
       validationRegex: a.validationRegex || '', validationMessage: a.validationMessage || '',
       allowedValues: a.allowedValues || '', minLength: a.minLength,
       maxLength: a.maxLength, sectionName: a.sectionName || '',
       columnSpan: a.columnSpan, hidden: a.hidden,
       registrationSectionName: a.registrationSectionName || '',
-      registrationColumnSpan: a.registrationColumnSpan, registrationDisplayOrder: a.registrationDisplayOrder
+      registrationColumnSpan: a.registrationColumnSpan, registrationDisplayOrder: a.registrationDisplayOrder,
+      selfServiceSectionName: a.selfServiceSectionName || '',
+      selfServiceColumnSpan: a.selfServiceColumnSpan, selfServiceDisplayOrder: a.selfServiceDisplayOrder
     })),
     groupAssignments: p.groupAssignments.map(g => ({
       groupDn: g.groupDn, memberAttribute: g.memberAttribute
@@ -296,10 +300,12 @@ async function addObjectClass() {
           attributeName: attr, customLabel: '', inputType: isObjClass ? 'HIDDEN_FIXED' : 'TEXT',
           requiredOnCreate: required.includes(attr), editableOnCreate: !isObjClass,
           editableOnUpdate: !isObjClass, selfServiceEdit: !isObjClass && isSelfServiceEditable(attr),
+          selfRegistrationEdit: false,
           defaultValue: '', computedExpression: '', validationRegex: '',
           validationMessage: '', allowedValues: '', minLength: null,
           maxLength: null, sectionName: '', columnSpan: 3, hidden: isObjClass,
-          registrationSectionName: '', registrationColumnSpan: 3, registrationDisplayOrder: 0
+          registrationSectionName: '', registrationColumnSpan: 3, registrationDisplayOrder: 0,
+          selfServiceSectionName: '', selfServiceColumnSpan: 3, selfServiceDisplayOrder: 0
         })
       }
     }
@@ -396,23 +402,19 @@ const layoutAttributeConfigs = computed({
   }
 })
 
-// Registration layout: only self-service-editable, non-hidden fields,
-// mapping registration-specific layout properties to sectionName/columnSpan
-// so FormLayoutDesigner can manage them independently.
+// Registration layout: self-registration-enabled fields, defaulting to admin layout values.
 const registrationAttributeConfigs = computed({
   get() {
     return profile.value.attributeConfigs
-      .filter(a => a.selfServiceEdit && !a.hidden && a.inputType !== 'HIDDEN_FIXED')
+      .filter(a => a.selfRegistrationEdit && !a.hidden && a.inputType !== 'HIDDEN_FIXED')
       .map(a => ({
         ...a,
         rdn: a.attributeName === profile.value.rdnAttribute,
-        // Present registration layout fields as sectionName/columnSpan for the designer
-        sectionName: a.registrationSectionName || '',
-        columnSpan: a.registrationColumnSpan ?? 3,
+        sectionName: a.registrationSectionName || a.sectionName || '',
+        columnSpan: a.registrationColumnSpan ?? a.columnSpan ?? 3,
       }))
   },
   set(val) {
-    // Write back registration layout properties to the main attributeConfigs
     const lookup = new Map(val.map((v, i) => [v.attributeName, { ...v, registrationDisplayOrder: i }]))
     profile.value.attributeConfigs = profile.value.attributeConfigs.map(a => {
       const updated = lookup.get(a.attributeName)
@@ -429,18 +431,45 @@ const registrationAttributeConfigs = computed({
   }
 })
 
-const modalTabs = computed(() => {
-  const tabs = [
-    { id: 'general', label: 'General' },
-    { id: 'attributes', label: 'Attributes' },
-    { id: 'admin-layout', label: 'Admin Layout' },
-    { id: 'registration-layout', label: 'Self-registration Layout' },
-    { id: 'groups', label: 'Groups' },
-    { id: 'lifecycle', label: 'Lifecycle' },
-    { id: 'approval', label: 'Approval' },
-  ]
-  return tabs
+// Self-service layout: self-service-editable fields, defaulting to admin layout values.
+const selfServiceAttributeConfigs = computed({
+  get() {
+    return profile.value.attributeConfigs
+      .filter(a => a.selfServiceEdit && !a.hidden && a.inputType !== 'HIDDEN_FIXED')
+      .map(a => ({
+        ...a,
+        rdn: a.attributeName === profile.value.rdnAttribute,
+        sectionName: a.selfServiceSectionName || a.sectionName || '',
+        columnSpan: a.selfServiceColumnSpan ?? a.columnSpan ?? 3,
+      }))
+  },
+  set(val) {
+    const lookup = new Map(val.map((v, i) => [v.attributeName, { ...v, selfServiceDisplayOrder: i }]))
+    profile.value.attributeConfigs = profile.value.attributeConfigs.map(a => {
+      const updated = lookup.get(a.attributeName)
+      if (updated) {
+        return {
+          ...a,
+          selfServiceSectionName: updated.sectionName || '',
+          selfServiceColumnSpan: updated.columnSpan ?? 3,
+          selfServiceDisplayOrder: updated.selfServiceDisplayOrder,
+        }
+      }
+      return a
+    })
+  }
 })
+
+const layoutMode = ref('admin')
+
+const modalTabs = [
+  { id: 'general', label: 'General' },
+  { id: 'attributes', label: 'Attributes' },
+  { id: 'layout', label: 'Layout' },
+  { id: 'groups', label: 'Groups' },
+  { id: 'lifecycle', label: 'Lifecycle' },
+  { id: 'approval', label: 'Approval' },
+]
 
 function toggleApprover(accountId) {
   const idx = profileApprovers.value.indexOf(accountId)
@@ -453,7 +482,7 @@ function toggleApprover(accountId) {
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Provisioning Profiles</h1>
-      <button class="btn-primary" @click="openCreate">Create Profile</button>
+      <button class="btn-primary" @click="openCreate">+ Create Profile</button>
     </div>
 
     <div v-if="loading" class="text-gray-500">Loading…</div>
@@ -549,12 +578,9 @@ function toggleApprover(accountId) {
               </label>
               <select v-model="profile.rdnAttribute" class="input w-full"
                 :disabled="profile.objectClassNames.length === 0">
-                <option value="">Select RDN attribute…</option>
+                <option value="">{{ profile.objectClassNames.length === 0 ? 'Add an object class first' : 'Select RDN attribute…' }}</option>
                 <option v-for="attr in rdnCandidates" :key="attr" :value="attr">{{ attr }}</option>
               </select>
-              <p v-if="profile.objectClassNames.length === 0" class="text-xs text-gray-400 mt-1">
-                Add an object class first
-              </p>
             </div>
           </div>
           <div class="flex gap-6">
@@ -626,30 +652,62 @@ function toggleApprover(accountId) {
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.editableOnCreate" /> Editable (create)</label>
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.editableOnUpdate" /> Editable (update)</label>
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.selfServiceEdit" /> Self-service</label>
+              <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.selfRegistrationEdit" /> Self-registration</label>
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.hidden" /> Hidden</label>
             </div>
           </div>
         </div>
 
-        <!-- Admin Layout Tab -->
-        <div v-if="modalTab === 'admin-layout'">
+        <!-- Layout Tab -->
+        <div v-if="modalTab === 'layout'" class="space-y-3">
+          <!-- Segmented control -->
+          <div class="inline-flex rounded-md border border-gray-300 text-sm">
+            <button v-for="mode in [
+              { id: 'admin', label: 'Admin' },
+              { id: 'self-service', label: 'Self-service' },
+              { id: 'registration', label: 'Self-registration' }
+            ]" :key="mode.id"
+              :class="['px-4 py-1.5 font-medium transition-colors first:rounded-l-md last:rounded-r-md',
+                layoutMode === mode.id
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'text-gray-600 hover:bg-gray-50']"
+              @click="layoutMode = mode.id">
+              {{ mode.label }}
+            </button>
+          </div>
+
+          <!-- Admin layout -->
           <FormLayoutDesigner
+            v-if="layoutMode === 'admin'"
             v-model:attributeConfigs="layoutAttributeConfigs"
             v-model:showDnField="profile.showDnField"
           />
-        </div>
 
-        <!-- Self-registration Layout Tab -->
-        <div v-if="modalTab === 'registration-layout'">
-          <div v-if="registrationAttributeConfigs.length === 0" class="text-gray-500 text-sm py-4">
-            No self-service-editable attributes configured. Mark attributes as "Self-service" on the Attributes tab to include them in the registration form.
-          </div>
-          <FormLayoutDesigner
-            v-else
-            v-model:attributeConfigs="registrationAttributeConfigs"
-            :showDnField="false"
-            :hideDnToggle="true"
-          />
+          <!-- Self-service layout -->
+          <template v-else-if="layoutMode === 'self-service'">
+            <div v-if="selfServiceAttributeConfigs.length === 0" class="text-gray-500 text-sm py-4">
+              No self-service attributes configured. Mark attributes as "Self-service" on the Attributes tab to include them here.
+            </div>
+            <FormLayoutDesigner
+              v-else
+              v-model:attributeConfigs="selfServiceAttributeConfigs"
+              :showDnField="false"
+              :hideDnToggle="true"
+            />
+          </template>
+
+          <!-- Self-registration layout -->
+          <template v-else-if="layoutMode === 'registration'">
+            <div v-if="registrationAttributeConfigs.length === 0" class="text-gray-500 text-sm py-4">
+              No self-registration attributes configured. Mark attributes as "Self-registration" on the Attributes tab to include them here.
+            </div>
+            <FormLayoutDesigner
+              v-else
+              v-model:attributeConfigs="registrationAttributeConfigs"
+              :showDnField="false"
+              :hideDnToggle="true"
+            />
+          </template>
         </div>
 
         <!-- Groups Tab -->
