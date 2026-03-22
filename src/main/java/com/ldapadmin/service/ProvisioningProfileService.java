@@ -503,6 +503,9 @@ public class ProvisioningProfileService {
             c.setColumnSpan(e.columnSpan() != null ? e.columnSpan() : 3);
             c.setDisplayOrder(i);
             c.setHidden(e.hidden());
+            c.setRegistrationSectionName(e.registrationSectionName());
+            c.setRegistrationColumnSpan(e.registrationColumnSpan() != null ? e.registrationColumnSpan() : 3);
+            c.setRegistrationDisplayOrder(i);
             attrConfigRepo.save(c);
         }
     }

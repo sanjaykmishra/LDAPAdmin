@@ -36,7 +36,9 @@ public record CreateProfileRequest(
             Integer maxLength,
             @Size(max = 100) String sectionName,
             Integer columnSpan,
-            boolean hidden) {
+            boolean hidden,
+            @Size(max = 100) String registrationSectionName,
+            Integer registrationColumnSpan) {
     }
 
     public record GroupAssignmentEntry(

@@ -7,7 +7,7 @@
         <span class="text-xs text-gray-400">Drag fields to reorder. Use column spans to control width.</span>
       </div>
       <div class="flex items-center gap-2">
-        <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+        <label v-if="!hideDnToggle" class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
           <input type="checkbox" v-model="localShowDnField" class="rounded" />
           Show DN field on form
         </label>
@@ -257,6 +257,7 @@ import { ref, reactive, computed, watch } from 'vue'
 const props = defineProps({
   attributeConfigs: { type: Array, required: true },
   showDnField: { type: Boolean, default: true },
+  hideDnToggle: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:attributeConfigs', 'update:showDnField'])
 
