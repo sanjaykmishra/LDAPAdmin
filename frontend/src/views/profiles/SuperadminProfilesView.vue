@@ -263,6 +263,19 @@ const ocToAdd = ref('')
 // Track which attributes are required by the schema (cannot uncheck required or remove)
 const schemaRequiredAttrs = ref(new Set())
 
+// Attributes commonly safe for users to self-edit
+const SELF_SERVICE_EDITABLE_ATTRS = new Set([
+  'givenname', 'sn', 'displayname', 'cn', 'preferredlanguage',
+  'mail', 'telephonenumber', 'mobile', 'facsimiletelephonenumber', 'pager',
+  'street', 'l', 'st', 'postalcode', 'postaladdress', 'co',
+  'title', 'description',
+  'jpegphoto', 'labeleduri', 'homephone',
+])
+
+function isSelfServiceEditable(attrName) {
+  return SELF_SERVICE_EDITABLE_ATTRS.has(attrName.toLowerCase())
+}
+
 async function addObjectClass() {
   if (!ocToAdd.value) return
   profile.value.objectClassNames.push(ocToAdd.value)
@@ -280,7 +293,7 @@ async function addObjectClass() {
         profile.value.attributeConfigs.push({
           attributeName: attr, customLabel: '', inputType: isObjClass ? 'HIDDEN_FIXED' : 'TEXT',
           requiredOnCreate: required.includes(attr), editableOnCreate: !isObjClass,
-          editableOnUpdate: !isObjClass, selfServiceEdit: false,
+          editableOnUpdate: !isObjClass, selfServiceEdit: !isObjClass && isSelfServiceEditable(attr),
           defaultValue: '', computedExpression: '', validationRegex: '',
           validationMessage: '', allowedValues: '', minLength: null,
           maxLength: null, sectionName: '', columnSpan: 3, hidden: isObjClass
