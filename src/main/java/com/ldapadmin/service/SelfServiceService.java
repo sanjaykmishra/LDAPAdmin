@@ -20,9 +20,11 @@ import com.ldapadmin.repository.RegistrationRequestRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.unboundid.ldap.sdk.BindResult;
+import com.unboundid.ldap.sdk.Filter;
 import com.unboundid.ldap.sdk.LDAPConnection;
 import com.unboundid.ldap.sdk.Modification;
 import com.unboundid.ldap.sdk.ModificationType;
+import com.unboundid.ldap.sdk.RDN;
 import com.unboundid.ldap.sdk.ResultCode;
 import com.unboundid.ldap.sdk.SimpleBindRequest;
 import lombok.RequiredArgsConstructor;
@@ -137,7 +139,7 @@ public class SelfServiceService {
 
     // ── Profile update ───────────────────────────────────────────────────────
 
-    @Transactional(readOnly = true)
+    @Transactional
     public void updateProfile(AuthPrincipal principal, Map<String, List<String>> updates) {
         requireSelfService(principal);
         DirectoryConnection dc = requireDirectory(principal.directoryId());
@@ -221,8 +223,10 @@ public class SelfServiceService {
         DirectoryConnection dc = requireDirectory(principal.directoryId());
 
         // Search for groups containing this user as a member
-        String memberFilter = "(|(member=" + principal.dn() + ")"
-                + "(uniqueMember=" + principal.dn() + "))";
+        // Escape the DN value to prevent LDAP filter injection
+        String escapedDn = Filter.encodeValue(principal.dn());
+        String memberFilter = "(|(member=" + escapedDn + ")"
+                + "(uniqueMember=" + escapedDn + "))";
         List<LdapGroup> groups = ldapGroupService.searchGroups(
                 dc, memberFilter, dc.getBaseDn(), "cn", "description");
 
@@ -299,6 +303,14 @@ public class SelfServiceService {
                     "Self-service is not enabled for this directory");
         }
 
+        // Check for duplicate pending registration
+        if (registrationRepo.existsByEmailAndProfileIdAndStatusIn(
+                req.email(), profile.getId(),
+                List.of(RegistrationStatus.PENDING_VERIFICATION, RegistrationStatus.PENDING_APPROVAL))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "A registration request for this email is already pending");
+        }
+
         // Validate attributes against profile config
         profileService.validateAttributes(profile.getId(), req.attributes());
 
@@ -324,8 +336,8 @@ public class SelfServiceService {
         regReq = registrationRepo.save(regReq);
 
         // TODO: Send verification email via ApprovalNotificationService or EmailService
-        log.info("Registration request {} created for email {} — verification token: {}",
-                regReq.getId(), req.email(), token);
+        log.info("Registration request {} created for email {}", regReq.getId(), req.email());
+        log.debug("Verification token for request {}: {}", regReq.getId(), token);
 
         return new RegistrationSubmitResponse(regReq.getId(), "PENDING_VERIFICATION");
     }
@@ -345,6 +357,7 @@ public class SelfServiceService {
         if (regReq.getVerificationExpires() != null
                 && regReq.getVerificationExpires().isBefore(OffsetDateTime.now())) {
             regReq.setStatus(RegistrationStatus.EXPIRED);
+            regReq.setVerificationToken(null);
             registrationRepo.save(regReq);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Verification token has expired");
@@ -435,7 +448,8 @@ public class SelfServiceService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "RDN attribute [" + profile.getRdnAttribute() + "] is required");
             }
-            String dn = profile.getRdnAttribute() + "=" + rdnValue + "," + profile.getTargetOuDn();
+            // Use UnboundID RDN to properly escape special DN characters
+            String dn = new RDN(profile.getRdnAttribute(), rdnValue) + "," + profile.getTargetOuDn();
 
             // Add objectClasses
             attributes.put("objectClass", profile.getObjectClassNames());

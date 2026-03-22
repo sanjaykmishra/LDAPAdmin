@@ -212,6 +212,7 @@ async function onDirectoryChange() {
   formData.profileId = ''
   profiles.value = []
   formFields.value = []
+  errorMsg.value = ''
   if (!formData.directoryId) return
   try {
     const { data } = await listRegistrationProfiles(formData.directoryId)
@@ -221,6 +222,7 @@ async function onDirectoryChange() {
 
 async function onProfileChange() {
   formFields.value = []
+  errorMsg.value = ''
   Object.keys(attributeValues).forEach(k => delete attributeValues[k])
   if (!formData.profileId) return
 

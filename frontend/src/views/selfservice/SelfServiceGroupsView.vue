@@ -8,6 +8,11 @@
     <!-- Loading -->
     <div v-if="loading" class="text-center text-gray-500 text-sm py-8">Loading groups...</div>
 
+    <!-- Error -->
+    <div v-else-if="errorMsg" class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+      {{ errorMsg }}
+    </div>
+
     <template v-else>
       <!-- Search -->
       <div class="mb-4">
@@ -55,14 +60,17 @@ import { getGroups } from '@/api/selfservice'
 
 const search = ref('')
 const loading = ref(true)
+const errorMsg = ref('')
 const groups = ref([])
 
 onMounted(async () => {
   try {
     const { data } = await getGroups()
     groups.value = data
-  } catch {
-    // handled by 401 interceptor
+  } catch (e) {
+    if (e.response?.status !== 401) {
+      errorMsg.value = e.response?.data?.detail || 'Failed to load groups'
+    }
   } finally {
     loading.value = false
   }

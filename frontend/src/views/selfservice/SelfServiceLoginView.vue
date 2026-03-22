@@ -61,11 +61,12 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { listRegistrationDirectories } from '@/api/selfservice'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 
 const loading = ref(false)
@@ -93,7 +94,7 @@ async function handleLogin() {
   loading.value = true
   try {
     await auth.selfServiceLogin(form.directoryId, form.username, form.password)
-    router.push('/self-service/profile')
+    router.push(route.query.redirect || '/self-service/profile')
   } catch (e) {
     errorMsg.value = e.response?.data?.detail || 'Invalid username or password'
   } finally {

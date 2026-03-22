@@ -1,8 +1,10 @@
 package com.ldapadmin.repository;
 
 import com.ldapadmin.entity.RegistrationRequest;
+import com.ldapadmin.entity.enums.RegistrationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -13,4 +15,7 @@ public interface RegistrationRequestRepository extends JpaRepository<Registratio
     Optional<RegistrationRequest> findByIdAndEmail(UUID id, String email);
 
     Optional<RegistrationRequest> findByPendingApprovalId(UUID pendingApprovalId);
+
+    boolean existsByEmailAndProfileIdAndStatusIn(String email, UUID profileId,
+                                                  Collection<RegistrationStatus> statuses);
 }

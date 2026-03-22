@@ -109,8 +109,6 @@ public class SelfServiceController {
         return selfServiceService.verifyEmail(token);
     }
 
-    public record StatusCheckRequest(@NotBlank @Email String email) {}
-
     @GetMapping("/register/status/{requestId}")
     public RegistrationStatusResponse getRegistrationStatus(
             @PathVariable UUID requestId,
