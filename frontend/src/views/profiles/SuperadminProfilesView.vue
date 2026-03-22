@@ -399,6 +399,55 @@ function canRemoveAttribute(attr) {
   return !isRdnAttribute(attr) && !isSchemaRequired(attr)
 }
 
+// Available attributes from selected object classes that haven't been added yet
+const showAttrPicker = ref(false)
+const attrPickerSelection = ref([])
+
+const availableAttributes = computed(() => {
+  const added = new Set(profile.value.attributeConfigs.map(a => a.attributeName.toLowerCase()))
+  const attrs = []
+  for (const ocName of profile.value.objectClassNames) {
+    const cached = ocSchemaCache.value[ocName]
+    if (!cached) continue
+    for (const attr of [...cached.required, ...cached.optional]) {
+      if (attr.toLowerCase() !== 'objectclass' && !added.has(attr.toLowerCase())) {
+        attrs.push(attr)
+        added.add(attr.toLowerCase()) // dedupe across OCs
+      }
+    }
+  }
+  return attrs.sort()
+})
+
+function toggleAttrPickerSelection(attr) {
+  const idx = attrPickerSelection.value.indexOf(attr)
+  if (idx >= 0) attrPickerSelection.value.splice(idx, 1)
+  else attrPickerSelection.value.push(attr)
+}
+
+function toggleAttrPicker() {
+  attrPickerSelection.value = []
+  showAttrPicker.value = !showAttrPicker.value
+}
+
+function addSelectedAttributes() {
+  for (const name of attrPickerSelection.value) {
+    profile.value.attributeConfigs.push({
+      attributeName: name, customLabel: guessLabel(name), inputType: 'TEXT',
+      requiredOnCreate: false, editableOnCreate: true,
+      editableOnUpdate: true, selfServiceEdit: false,
+      selfRegistrationEdit: false,
+      defaultValue: '', computedExpression: '', validationRegex: '',
+      validationMessage: '', allowedValues: '', minLength: null,
+      maxLength: null, sectionName: '', columnSpan: 6, hidden: false,
+      registrationSectionName: null, registrationColumnSpan: null, registrationDisplayOrder: null,
+      selfServiceSectionName: null, selfServiceColumnSpan: null, selfServiceDisplayOrder: null
+    })
+  }
+  attrPickerSelection.value = []
+  showAttrPicker.value = false
+}
+
 // Helper: determine which fields to show based on input type
 function showFieldFor(inputType, fieldName) {
   const rules = {
@@ -489,6 +538,11 @@ const selfServiceAttributeConfigs = computed({
 })
 
 const layoutMode = ref('admin')
+
+// Reset layout mode if self-registration is turned off while viewing that layout
+watch(() => profile.value.selfRegistrationAllowed, (allowed) => {
+  if (!allowed && layoutMode.value === 'registration') layoutMode.value = 'admin'
+})
 
 // Fixed modal height based on attribute count so switching tabs doesn't resize
 const modalHeight = computed(() => {
@@ -630,6 +684,31 @@ function toggleApprover(accountId) {
 
         <!-- Attributes Tab -->
         <div v-if="modalTab === 'attributes'" class="space-y-3">
+          <div>
+            <button class="btn-secondary text-sm" :disabled="availableAttributes.length === 0" @click="toggleAttrPicker">
+              {{ showAttrPicker ? 'Cancel' : 'Add Attributes' }}
+            </button>
+            <div v-if="showAttrPicker" class="mt-2 border rounded-lg p-3 space-y-2 bg-gray-50">
+              <div v-if="availableAttributes.length === 0" class="text-gray-500 text-sm">
+                All attributes from the selected object classes have been added.
+              </div>
+              <template v-else>
+                <div class="text-xs text-gray-500 mb-1">Select attributes to add:</div>
+                <div class="max-h-48 overflow-y-auto space-y-1">
+                  <label v-for="attr in availableAttributes" :key="attr"
+                    class="flex items-center gap-2 text-sm p-1 hover:bg-white rounded cursor-pointer">
+                    <input type="checkbox"
+                      :checked="attrPickerSelection.includes(attr)"
+                      @change="toggleAttrPickerSelection(attr)" />
+                    <span class="font-mono text-xs">{{ attr }}</span>
+                  </label>
+                </div>
+                <button class="btn-primary text-sm mt-2" :disabled="attrPickerSelection.length === 0" @click="addSelectedAttributes">
+                  Add {{ attrPickerSelection.length }} attribute{{ attrPickerSelection.length !== 1 ? 's' : '' }}
+                </button>
+              </template>
+            </div>
+          </div>
           <div v-if="profile.attributeConfigs.length === 0" class="text-gray-500 text-sm">
             Add object classes in the General tab to populate attributes.
           </div>
@@ -687,7 +766,7 @@ function toggleApprover(accountId) {
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.editableOnCreate" /> Editable (create)</label>
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.editableOnUpdate" /> Editable (update)</label>
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.selfServiceEdit" /> Self-service</label>
-              <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.selfRegistrationEdit" /> Self-registration</label>
+              <label v-if="profile.selfRegistrationAllowed" class="flex items-center gap-1"><input type="checkbox" v-model="attr.selfRegistrationEdit" /> Self-registration</label>
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.hidden" /> Hidden</label>
             </div>
           </div>
@@ -700,7 +779,7 @@ function toggleApprover(accountId) {
             <button v-for="mode in [
               { id: 'admin', label: 'Admin' },
               { id: 'self-service', label: 'Self-service' },
-              { id: 'registration', label: 'Self-registration' }
+              ...(profile.selfRegistrationAllowed ? [{ id: 'registration', label: 'Self-registration' }] : [])
             ]" :key="mode.id"
               :class="['px-4 py-1.5 font-medium transition-colors first:rounded-l-md last:rounded-r-md',
                 layoutMode === mode.id
