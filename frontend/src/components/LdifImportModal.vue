@@ -1,6 +1,6 @@
 <template>
   <AppModal v-model="visible" title="Import LDIF" size="lg">
-    <div class="space-y-4">
+    <div class="space-y-2">
       <!-- File picker with drag-and-drop -->
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">LDIF File</label>

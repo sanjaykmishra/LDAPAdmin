@@ -1,15 +1,15 @@
 <template>
   <div class="p-6 max-w-3xl">
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Application Settings</h1>
+    <h1 class="text-2xl font-bold text-gray-900 mb-4">Application Settings</h1>
 
     <div v-if="loading" class="text-gray-500 text-sm">Loading…</div>
 
-    <form v-else @submit.prevent="doSave" class="space-y-6">
+    <form v-else @submit.prevent="doSave" class="space-y-4">
 
       <!-- Branding -->
       <section class="bg-white border border-gray-200 rounded-xl p-6">
-        <h2 class="text-base font-semibold text-gray-900 mb-4">Branding</h2>
-        <div class="grid grid-cols-2 gap-4">
+        <h2 class="text-base font-semibold text-gray-900 mb-3">Branding</h2>
+        <div class="grid grid-cols-2 gap-3">
           <FormField label="Application Name" v-model="form.appName" required />
           <FormField label="Logo URL" v-model="form.logoUrl" placeholder="https://…/logo.png" />
           <div>
@@ -31,7 +31,7 @@
 
       <!-- Session -->
       <section class="bg-white border border-gray-200 rounded-xl p-6">
-        <h2 class="text-base font-semibold text-gray-900 mb-4">Session</h2>
+        <h2 class="text-base font-semibold text-gray-900 mb-3">Session</h2>
         <div class="max-w-xs">
           <FormField label="Session Timeout (minutes)" v-model.number="form.sessionTimeoutMinutes" type="number" required />
         </div>
@@ -39,10 +39,10 @@
 
       <!-- Authentication -->
       <section class="bg-white border border-gray-200 rounded-xl p-6">
-        <h2 class="text-base font-semibold text-gray-900 mb-4">Authentication</h2>
+        <h2 class="text-base font-semibold text-gray-900 mb-3">Authentication</h2>
 
         <!-- Enabled auth methods -->
-        <div class="mb-6">
+        <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-2">Enabled login methods</label>
           <div class="flex gap-6">
             <label v-for="t in ['LOCAL', 'LDAP', 'OIDC']" :key="t" class="flex items-center gap-2">
@@ -55,9 +55,9 @@
         </div>
 
         <!-- LDAP Auth Provider -->
-        <div v-if="form.enabledAuthTypes.includes('LDAP')" class="border-t border-gray-100 pt-4 mb-4">
+        <div v-if="form.enabledAuthTypes.includes('LDAP')" class="border-t border-gray-100 pt-4 mb-3">
           <h3 class="text-sm font-semibold text-gray-700 mb-3">LDAP Auth Provider</h3>
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-2 gap-3">
             <FormField label="Host" v-model="form.ldapAuthHost" placeholder="ldap.example.com" />
             <FormField label="Port" v-model.number="form.ldapAuthPort" type="number" placeholder="389" />
             <FormField label="SSL Mode" v-model="form.ldapAuthSslMode" type="select"
@@ -89,7 +89,7 @@
         <!-- OIDC Provider -->
         <div v-if="form.enabledAuthTypes.includes('OIDC')" class="border-t border-gray-100 pt-4">
           <h3 class="text-sm font-semibold text-gray-700 mb-3">OIDC Provider</h3>
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-2 gap-3">
             <div class="col-span-2">
               <FormField label="Issuer URL" v-model="form.oidcIssuerUrl"
                 placeholder="https://accounts.google.com"
@@ -110,8 +110,8 @@
 
       <!-- SMTP -->
       <section class="bg-white border border-gray-200 rounded-xl p-6">
-        <h2 class="text-base font-semibold text-gray-900 mb-4">SMTP (Email Delivery)</h2>
-        <div class="grid grid-cols-2 gap-4">
+        <h2 class="text-base font-semibold text-gray-900 mb-3">SMTP (Email Delivery)</h2>
+        <div class="grid grid-cols-2 gap-3">
           <FormField label="SMTP Host" v-model="form.smtpHost" placeholder="smtp.example.com" />
           <FormField label="SMTP Port" v-model.number="form.smtpPort" type="number" placeholder="587" />
           <FormField label="Sender Address" v-model="form.smtpSenderAddress" placeholder="noreply@example.com" />
@@ -136,8 +136,8 @@
 
       <!-- S3 -->
       <section class="bg-white border border-gray-200 rounded-xl p-6">
-        <h2 class="text-base font-semibold text-gray-900 mb-4">S3 (Report Storage)</h2>
-        <div class="grid grid-cols-2 gap-4">
+        <h2 class="text-base font-semibold text-gray-900 mb-3">S3 (Report Storage)</h2>
+        <div class="grid grid-cols-2 gap-3">
           <FormField label="Endpoint URL" v-model="form.s3EndpointUrl" placeholder="https://s3.amazonaws.com" />
           <FormField label="Bucket Name" v-model="form.s3BucketName" placeholder="my-reports-bucket" />
           <FormField label="Access Key" v-model="form.s3AccessKey" placeholder="AKIAIOSFODNN7EXAMPLE" />

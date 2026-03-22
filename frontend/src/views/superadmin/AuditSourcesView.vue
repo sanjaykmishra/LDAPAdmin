@@ -48,8 +48,8 @@
 
     <!-- Create/Edit modal -->
     <AppModal v-model="showModal" :title="editing ? 'Edit Audit Source' : 'New Audit Source'" size="lg">
-      <form @submit.prevent="save" class="space-y-4">
-        <div class="grid grid-cols-2 gap-4">
+      <form @submit.prevent="save" class="space-y-2">
+        <div class="grid grid-cols-2 gap-3">
           <FormField label="Display Name" v-model="form.displayName" required />
           <FormField label="Host" v-model="form.host" required />
           <FormField label="Port" v-model.number="form.port" type="number" placeholder="389" />
@@ -73,7 +73,7 @@
           <FormField label="Changelog Base DN" v-model="form.changelogBaseDn" :placeholder="form.changelogFormat === 'OPENLDAP_ACCESSLOG' ? 'cn=accesslog' : 'cn=changelog'" required />
           <FormField label="Branch Filter DN" v-model="form.branchFilterDn" placeholder="optional" />
         </div>
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-3">
           <label class="flex items-center gap-2 text-sm text-gray-700">
             <input type="checkbox" v-model="form.trustAllCerts" class="rounded" />
             Trust all certificates

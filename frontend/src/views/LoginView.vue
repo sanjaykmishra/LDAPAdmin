@@ -14,7 +14,7 @@
       </div>
 
       <!-- Password login form (LOCAL or LDAP) -->
-      <form v-if="showPasswordLogin" @submit.prevent="handleLogin" class="space-y-4">
+      <form v-if="showPasswordLogin" @submit.prevent="handleLogin" class="space-y-2">
         <FormField label="Username" v-model="form.username" placeholder="username" required />
         <FormField label="Password" type="password" v-model="form.password" placeholder="••••••••" required />
 
