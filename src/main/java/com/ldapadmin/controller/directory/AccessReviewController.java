@@ -22,6 +22,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.security.access.AccessDeniedException;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -60,6 +62,9 @@ public class AccessReviewController {
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody CreateCampaignRequest req) {
+        if (!principal.isSuperadmin()) {
+            throw new AccessDeniedException("Only superadmins can create access review campaigns");
+        }
         var campaign = campaignService.create(directoryId, req, principal);
         return ResponseEntity.status(HttpStatus.CREATED).body(campaignService.get(campaign.getId()));
     }

@@ -12,8 +12,10 @@
           </div>
           <p v-if="campaign.description" class="text-sm text-gray-500 mt-1">{{ campaign.description }}</p>
           <div class="flex gap-4 text-sm text-gray-500 mt-2">
-            <span>Deadline: <strong>{{ fmtDate(campaign.deadline) }}</strong></span>
-            <span v-if="campaign.startsAt">Starts: {{ fmtDate(campaign.startsAt) }}</span>
+            <span>Deadline: <strong>{{ fmtDate(campaign.deadline) }}</strong>
+              <span v-if="campaign.deadlineDays" class="text-gray-400">({{ campaign.deadlineDays }} days)</span>
+            </span>
+            <span v-if="campaign.recurrenceMonths" class="text-blue-600">Repeats every {{ campaign.recurrenceMonths }} month{{ campaign.recurrenceMonths > 1 ? 's' : '' }}</span>
             <span>Created by: {{ campaign.createdByUsername }}</span>
             <span v-if="campaign.autoRevoke" class="text-orange-600">Auto-revoke enabled</span>
           </div>

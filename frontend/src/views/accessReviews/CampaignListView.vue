@@ -2,7 +2,7 @@
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Access Reviews</h1>
-      <button @click="$router.push({ name: 'accessReviewCreate', params: { dirId } })" class="btn-primary">
+      <button v-if="isSuperadmin" @click="$router.push({ name: 'accessReviewCreate', params: { dirId } })" class="btn-primary">
         New Campaign
       </button>
     </div>
@@ -21,7 +21,16 @@
       <template #cell-status="{ value }">
         <span :class="statusClass(value)">{{ value }}</span>
       </template>
-      <template #cell-deadline="{ value }">{{ fmtDate(value) }}</template>
+      <template #cell-deadline="{ row }">
+        <div>
+          {{ fmtDate(row.deadline) }}
+          <span v-if="row.deadlineDays" class="text-xs text-gray-400 ml-1">({{ row.deadlineDays }}d)</span>
+        </div>
+      </template>
+      <template #cell-recurrence="{ row }">
+        <span v-if="row.recurrenceMonths" class="text-xs text-blue-600">Every {{ row.recurrenceMonths }}mo</span>
+        <span v-else class="text-xs text-gray-400">One-time</span>
+      </template>
       <template #cell-createdAt="{ value }">{{ fmtDate(value) }}</template>
       <template #cell-progress="{ row }">
         <div v-if="row.progress" class="flex items-center gap-2">
@@ -47,12 +56,15 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useApi } from '@/composables/useApi'
+import { useAuthStore } from '@/stores/auth'
 import { listCampaigns } from '@/api/accessReviews'
 import DataTable from '@/components/DataTable.vue'
 
 const route = useRoute()
 const { loading, call } = useApi()
+const auth = useAuthStore()
 const dirId = route.params.dirId
+const isSuperadmin = computed(() => auth.isSuperadmin)
 
 const campaigns = ref([])
 const activeTab = ref('ALL')
@@ -68,6 +80,7 @@ const cols = [
   { key: 'name', label: 'Name' },
   { key: 'status', label: 'Status' },
   { key: 'deadline', label: 'Deadline' },
+  { key: 'recurrence', label: 'Schedule' },
   { key: 'progress', label: 'Progress' },
   { key: 'createdByUsername', label: 'Created By' },
   { key: 'createdAt', label: 'Created' },

@@ -44,19 +44,25 @@ public class AccessReviewCampaignService {
         DirectoryConnection dir = directoryRepo.findById(directoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("DirectoryConnection", directoryId));
 
-        if (req.deadline().isBefore(OffsetDateTime.now())) {
-            throw new LdapAdminException("Deadline must be in the future");
+        if (req.deadlineDays() < 1) {
+            throw new LdapAdminException("Deadline must be at least 1 day");
+        }
+        if (req.recurrenceMonths() != null && req.recurrenceMonths() < 1) {
+            throw new LdapAdminException("Recurrence interval must be at least 1 month");
         }
 
         Account creator = accountRepo.findById(principal.id())
                 .orElseThrow(() -> new ResourceNotFoundException("Account", principal.id()));
 
+        OffsetDateTime deadline = OffsetDateTime.now().plusDays(req.deadlineDays());
+
         AccessReviewCampaign campaign = new AccessReviewCampaign();
         campaign.setDirectory(dir);
         campaign.setName(req.name());
         campaign.setDescription(req.description());
-        campaign.setStartsAt(req.startsAt());
-        campaign.setDeadline(req.deadline());
+        campaign.setDeadline(deadline);
+        campaign.setDeadlineDays(req.deadlineDays());
+        campaign.setRecurrenceMonths(req.recurrenceMonths());
         campaign.setAutoRevoke(req.autoRevoke());
         campaign.setAutoRevokeOnExpiry(req.autoRevokeOnExpiry());
         campaign.setCreatedBy(creator);
@@ -165,6 +171,15 @@ public class AccessReviewCampaignService {
 
         auditService.record(principal, dir.getId(), AuditAction.CAMPAIGN_CLOSED,
                 null, Map.of("campaignId", campaignId.toString(), "campaignName", campaign.getName()));
+
+        // Create recurring follow-up if configured
+        if (campaign.getRecurrenceMonths() != null) {
+            try {
+                createRecurringFollowUp(campaign, principal);
+            } catch (Exception e) {
+                log.error("Failed to create recurring follow-up for campaign {}: {}", campaignId, e.getMessage(), e);
+            }
+        }
 
         return campaign;
     }
@@ -279,6 +294,59 @@ public class AccessReviewCampaignService {
                 null, Map.of("campaignId", campaign.getId().toString(), "campaignName", campaign.getName()));
     }
 
+    // ── Recurrence support ────────────────────────────────────────────────
+
+    @Transactional
+    public AccessReviewCampaign createRecurringFollowUp(AccessReviewCampaign source, AuthPrincipal systemPrincipal) {
+        if (source.getRecurrenceMonths() == null || source.getDeadlineDays() == null) {
+            return null;
+        }
+
+        Account creator = accountRepo.findById(systemPrincipal.id()).orElse(null);
+        if (creator == null) {
+            log.warn("Cannot create recurring follow-up: system principal not found");
+            return null;
+        }
+
+        OffsetDateTime deadline = OffsetDateTime.now().plusDays(source.getDeadlineDays());
+
+        AccessReviewCampaign followUp = new AccessReviewCampaign();
+        followUp.setDirectory(source.getDirectory());
+        followUp.setName(source.getName());
+        followUp.setDescription(source.getDescription());
+        followUp.setDeadline(deadline);
+        followUp.setDeadlineDays(source.getDeadlineDays());
+        followUp.setRecurrenceMonths(source.getRecurrenceMonths());
+        followUp.setAutoRevoke(source.isAutoRevoke());
+        followUp.setAutoRevokeOnExpiry(source.isAutoRevokeOnExpiry());
+        followUp.setCreatedBy(creator);
+        followUp.setStatus(CampaignStatus.DRAFT);
+        followUp.setSourceCampaign(source);
+
+        for (AccessReviewGroup srcGroup : source.getReviewGroups()) {
+            AccessReviewGroup group = new AccessReviewGroup();
+            group.setCampaign(followUp);
+            group.setGroupDn(srcGroup.getGroupDn());
+            group.setGroupName(srcGroup.getGroupName());
+            group.setMemberAttribute(srcGroup.getMemberAttribute());
+            group.setReviewer(srcGroup.getReviewer());
+            followUp.getReviewGroups().add(group);
+        }
+
+        followUp = campaignRepo.save(followUp);
+        recordHistory(followUp, null, CampaignStatus.DRAFT, creator,
+                "Recurring follow-up created from campaign '" + source.getName() + "'");
+
+        auditService.record(systemPrincipal, source.getDirectory().getId(), AuditAction.CAMPAIGN_CREATED,
+                null, Map.of("campaignName", followUp.getName(), "campaignId", followUp.getId().toString(),
+                        "sourceCampaignId", source.getId().toString(), "recurring", "true"));
+
+        log.info("Created recurring follow-up campaign '{}' (id={}) from source campaign id={}",
+                followUp.getName(), followUp.getId(), source.getId());
+
+        return followUp;
+    }
+
     // ── Private helpers ─────────────────────────────────────────────────────
 
     private void executeRevocations(AccessReviewCampaign campaign, DirectoryConnection dir, AuthPrincipal principal) {
@@ -347,7 +415,9 @@ public class AccessReviewCampaignService {
     private CampaignSummaryDto toSummaryDto(AccessReviewCampaign c) {
         return new CampaignSummaryDto(
                 c.getId(), c.getName(), c.getStatus(),
-                c.getStartsAt(), c.getDeadline(), c.getCreatedAt(),
+                c.getStartsAt(), c.getDeadline(),
+                c.getDeadlineDays(), c.getRecurrenceMonths(),
+                c.getCreatedAt(),
                 c.getCreatedBy().getUsername(),
                 buildProgress(c.getId()));
     }
@@ -359,6 +429,7 @@ public class AccessReviewCampaignService {
         return new CampaignDetailDto(
                 c.getId(), c.getName(), c.getDescription(), c.getStatus(),
                 c.getStartsAt(), c.getDeadline(),
+                c.getDeadlineDays(), c.getRecurrenceMonths(),
                 c.isAutoRevoke(), c.isAutoRevokeOnExpiry(),
                 c.getCreatedAt(), c.getCompletedAt(),
                 c.getCreatedBy().getUsername(),

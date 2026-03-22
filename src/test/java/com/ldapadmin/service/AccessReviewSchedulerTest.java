@@ -58,6 +58,22 @@ class AccessReviewSchedulerTest {
     }
 
     @Test
+    void processDeadlines_expiresRecurringCampaign_createsFollowUp() {
+        AccessReviewCampaign overdue = buildCampaign(CampaignStatus.ACTIVE, OffsetDateTime.now().minusDays(1));
+        overdue.setRecurrenceMonths(3);
+        overdue.setDeadlineDays(30);
+        when(campaignRepo.findByStatusAndDeadlineBefore(eq(CampaignStatus.ACTIVE), any()))
+                .thenReturn(List.of(overdue))
+                .thenReturn(List.of());
+        when(accountRepo.findAllByRoleAndActiveTrue(AccountRole.SUPERADMIN)).thenReturn(List.of(superadmin));
+
+        scheduler.processDeadlines();
+
+        verify(campaignService).expireCampaign(eq(overdue), any());
+        verify(campaignService).createRecurringFollowUp(eq(overdue), any());
+    }
+
+    @Test
     void processDeadlines_sendsRemindersForApproachingDeadlines() {
         // No overdue campaigns
         when(campaignRepo.findByStatusAndDeadlineBefore(eq(CampaignStatus.ACTIVE), any()))
@@ -91,6 +107,7 @@ class AccessReviewSchedulerTest {
         c.setName("Test Campaign");
         c.setStatus(status);
         c.setDeadline(deadline);
+        c.setDeadlineDays(30);
         c.setCreatedBy(superadmin);
         return c;
     }

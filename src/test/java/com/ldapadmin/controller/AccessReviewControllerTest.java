@@ -49,7 +49,7 @@ class AccessReviewControllerTest extends BaseControllerTest {
     @Test
     void listCampaigns_returns200() throws Exception {
         var summary = new CampaignSummaryDto(campaignId, "Q1 Review", CampaignStatus.DRAFT,
-                null, OffsetDateTime.now().plusDays(30), OffsetDateTime.now(), "admin",
+                null, OffsetDateTime.now().plusDays(30), 30, null, OffsetDateTime.now(), "admin",
                 new CampaignProgressDto(0, 0, 0, 0, 0));
         when(campaignService.list(eq(dirId), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(summary)));
@@ -73,13 +73,13 @@ class AccessReviewControllerTest extends BaseControllerTest {
     }
 
     @Test
-    void createCampaign_returns201() throws Exception {
+    void createCampaign_asSuperadmin_returns201() throws Exception {
         var campaign = new AccessReviewCampaign();
         campaign.setId(campaignId);
         when(campaignService.create(eq(dirId), any(), any())).thenReturn(campaign);
         when(campaignService.get(campaignId)).thenReturn(
                 new CampaignDetailDto(campaignId, "Q1 Review", "Test", CampaignStatus.DRAFT,
-                        null, OffsetDateTime.now().plusDays(30), false, false,
+                        null, OffsetDateTime.now().plusDays(30), 30, null, false, false,
                         OffsetDateTime.now(), null, "admin",
                         new CampaignProgressDto(0, 0, 0, 0, 0), List.of(), List.of()));
 
@@ -87,12 +87,12 @@ class AccessReviewControllerTest extends BaseControllerTest {
                 {
                   "name": "Q1 Review",
                   "description": "Test",
-                  "deadline": "%s",
+                  "deadlineDays": 30,
                   "autoRevoke": false,
                   "autoRevokeOnExpiry": false,
                   "groups": [{"groupDn": "cn=admins,dc=test", "memberAttribute": "member", "reviewerAccountId": "%s"}]
                 }
-                """.formatted(OffsetDateTime.now().plusDays(30), UUID.randomUUID());
+                """.formatted(UUID.randomUUID());
 
         mvc.perform(post("/api/v1/directories/{dirId}/access-reviews", dirId)
                         .with(authentication(superadminAuth()))
@@ -103,10 +103,58 @@ class AccessReviewControllerTest extends BaseControllerTest {
     }
 
     @Test
+    void createCampaign_asNonSuperadmin_returns403() throws Exception {
+        var body = """
+                {
+                  "name": "Q1 Review",
+                  "deadlineDays": 30,
+                  "groups": [{"groupDn": "cn=admins,dc=test", "memberAttribute": "member", "reviewerAccountId": "%s"}]
+                }
+                """.formatted(UUID.randomUUID());
+
+        mvc.perform(post("/api/v1/directories/{dirId}/access-reviews", dirId)
+                        .with(authentication(adminAuth()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void createCampaign_withRecurrence_returns201() throws Exception {
+        var campaign = new AccessReviewCampaign();
+        campaign.setId(campaignId);
+        when(campaignService.create(eq(dirId), any(), any())).thenReturn(campaign);
+        when(campaignService.get(campaignId)).thenReturn(
+                new CampaignDetailDto(campaignId, "Quarterly Review", null, CampaignStatus.DRAFT,
+                        null, OffsetDateTime.now().plusDays(30), 30, 3, false, false,
+                        OffsetDateTime.now(), null, "admin",
+                        new CampaignProgressDto(0, 0, 0, 0, 0), List.of(), List.of()));
+
+        var body = """
+                {
+                  "name": "Quarterly Review",
+                  "deadlineDays": 30,
+                  "recurrenceMonths": 3,
+                  "autoRevoke": false,
+                  "autoRevokeOnExpiry": false,
+                  "groups": [{"groupDn": "cn=admins,dc=test", "memberAttribute": "member", "reviewerAccountId": "%s"}]
+                }
+                """.formatted(UUID.randomUUID());
+
+        mvc.perform(post("/api/v1/directories/{dirId}/access-reviews", dirId)
+                        .with(authentication(superadminAuth()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.recurrenceMonths").value(3))
+                .andExpect(jsonPath("$.deadlineDays").value(30));
+    }
+
+    @Test
     void getCampaign_returns200() throws Exception {
         when(campaignService.get(campaignId)).thenReturn(
                 new CampaignDetailDto(campaignId, "Q1 Review", null, CampaignStatus.ACTIVE,
-                        null, OffsetDateTime.now().plusDays(30), false, false,
+                        null, OffsetDateTime.now().plusDays(30), 30, null, false, false,
                         OffsetDateTime.now(), null, "admin",
                         new CampaignProgressDto(10, 5, 2, 3, 70.0), List.of(), List.of()));
 
