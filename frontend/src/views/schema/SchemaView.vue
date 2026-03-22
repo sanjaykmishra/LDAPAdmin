@@ -37,12 +37,12 @@
         <div v-else class="bg-white border border-gray-200 rounded-xl overflow-hidden max-h-[60vh] overflow-y-auto">
           <div v-if="filteredList.length === 0" class="p-4 text-sm text-gray-400 text-center">Nothing found.</div>
           <button
-            v-for="name in filteredList"
-            :key="name"
-            @click="loadDetail(name)"
-            :class="selected === name ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'"
+            v-for="item in filteredList"
+            :key="item.name"
+            @click="loadDetail(item.name)"
+            :class="selected === item.name ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50'"
             class="w-full text-left px-3 py-2 text-sm border-b border-gray-50 last:border-0 font-mono"
-          >{{ name }}</button>
+          >{{ item.name }}</button>
         </div>
       </div>
 
@@ -53,20 +53,26 @@
         </div>
         <div v-else-if="detailLoading" class="text-sm text-gray-400 mt-8 text-center">Loading…</div>
         <div v-else-if="detail" class="bg-white border border-gray-200 rounded-xl p-5">
-          <h2 class="text-lg font-semibold text-gray-900 font-mono mb-4">{{ selected }}</h2>
+          <h2 class="text-lg font-semibold text-gray-900 font-mono mb-1">{{ selected }}</h2>
+          <p v-if="detail.oid" class="text-xs text-gray-400 font-mono mb-4">{{ detail.oid }}</p>
+          <div v-else class="mb-3"></div>
 
           <!-- Object class detail -->
           <template v-if="activeTab === 'objectClasses'">
             <div v-if="detail.required?.length" class="mb-4">
               <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Required Attributes</p>
               <div class="flex flex-wrap gap-1">
-                <span v-for="a in detail.required" :key="a" class="text-xs bg-red-50 text-red-700 rounded px-2 py-0.5 font-mono">{{ a }}</span>
+                <button v-for="a in detail.required" :key="a"
+                  @click="navigateToAttribute(a)"
+                  class="text-xs bg-red-50 text-red-700 rounded px-2 py-0.5 font-mono hover:bg-red-100 cursor-pointer transition-colors">{{ a }}</button>
               </div>
             </div>
             <div v-if="detail.optional?.length">
               <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Optional Attributes</p>
               <div class="flex flex-wrap gap-1">
-                <span v-for="a in detail.optional" :key="a" class="text-xs bg-gray-100 text-gray-700 rounded px-2 py-0.5 font-mono">{{ a }}</span>
+                <button v-for="a in detail.optional" :key="a"
+                  @click="navigateToAttribute(a)"
+                  class="text-xs bg-gray-100 text-gray-700 rounded px-2 py-0.5 font-mono hover:bg-gray-200 cursor-pointer transition-colors">{{ a }}</button>
               </div>
             </div>
             <div v-if="!detail.required?.length && !detail.optional?.length" class="text-sm text-gray-400">
@@ -118,7 +124,10 @@ const detailLoading = ref(false)
 
 const filteredList = computed(() => {
   const q = search.value.toLowerCase()
-  return q ? allItems.value.filter(n => n.toLowerCase().includes(q)) : allItems.value
+  if (!q) return allItems.value
+  return allItems.value.filter(item =>
+    item.name.toLowerCase().includes(q) || (item.oid && item.oid.includes(q))
+  )
 })
 
 const detailRows = computed(() => {
@@ -143,7 +152,9 @@ async function loadList() {
   try {
     const fn = activeTab.value === 'objectClasses' ? listObjectClasses : listAttributeTypes
     const { data } = await fn(selectedDirId.value)
-    allItems.value = Array.isArray(data) ? [...data].sort() : data
+    allItems.value = Array.isArray(data)
+      ? data.map(d => typeof d === 'string' ? { name: d, oid: null } : d)
+      : data
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
   } finally {
@@ -171,6 +182,13 @@ function switchTab(tab) {
   activeTab.value = tab
   search.value = ''
   if (selectedDirId.value) loadList()
+}
+
+async function navigateToAttribute(name) {
+  activeTab.value = 'attributeTypes'
+  search.value = ''
+  await loadList()
+  loadDetail(name)
 }
 
 onMounted(async () => {
