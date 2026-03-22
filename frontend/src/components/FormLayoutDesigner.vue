@@ -6,97 +6,68 @@
         <button type="button" @click="addSection" class="btn-secondary text-xs">+ Add Section</button>
         <span class="text-xs text-gray-400">Drag fields to reorder. Use column spans to control width.</span>
       </div>
-      <button
-        type="button"
-        @click="showPreview = !showPreview"
-        :class="showPreview ? 'btn-primary' : 'btn-secondary'"
-        class="text-xs"
-      >{{ showPreview ? 'Hide Preview' : 'Preview' }}</button>
+      <div class="flex items-center gap-3">
+        <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+          <input type="checkbox" v-model="localShowDnField" class="rounded" />
+          Show DN field on form
+        </label>
+        <button
+          type="button"
+          @click="showPreview = !showPreview"
+          :class="showPreview ? 'btn-primary' : 'btn-secondary'"
+          class="text-xs"
+        >{{ showPreview ? 'Hide Preview' : 'Preview' }}</button>
+      </div>
     </div>
 
     <!-- Live Preview -->
     <div v-if="showPreview" class="border border-blue-200 bg-blue-50/30 rounded-xl p-4">
       <h4 class="text-sm font-semibold text-blue-800 mb-3">Form Preview</h4>
       <div class="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
-        <!-- Row 1: RDN (1/3) + Computed DN (2/3) -->
-        <div v-if="rdnField" class="grid grid-cols-3 gap-3">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
-              {{ rdnField.customLabel || rdnField.attributeName }}
-              <span class="text-red-500">*</span>
-              <span class="text-xs bg-amber-100 text-amber-700 rounded px-1 ml-1">RDN</span>
-            </label>
-            <div class="w-full h-9 border border-gray-200 rounded-lg bg-gray-50"></div>
-          </div>
-          <div class="col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
-              DN
-              <span class="text-xs bg-gray-100 text-gray-500 rounded px-1 ml-1">computed</span>
-            </label>
-            <div class="w-full h-9 border border-gray-200 rounded-lg bg-gray-100 flex items-center px-3 text-xs text-gray-400 italic">
-              {{ rdnField.attributeName }}=…,ou=…,dc=…
-            </div>
-          </div>
-        </div>
-
-        <!-- Remaining sections (non-RDN fields) -->
         <template v-for="(section, sIdx) in previewSections" :key="section.id">
           <fieldset v-if="section.fields.length" class="space-y-3">
             <legend v-if="section.name" class="text-sm font-semibold text-gray-800 pb-1 border-b border-gray-100 w-full mb-2">{{ section.name }}</legend>
             <div class="grid grid-cols-3 gap-3">
-              <div
-                v-for="field in section.fields"
-                :key="field.attributeName"
-                :style="{ gridColumn: `span ${field.columnSpan || 3}` }"
-              >
-                <label class="block text-sm font-medium text-gray-700 mb-1">
-                  {{ field.customLabel || field.attributeName }}
-                  <span v-if="field.requiredOnCreate" class="text-red-500">*</span>
-                </label>
-                <div v-if="field.inputType === 'TEXTAREA' || field.inputType === 'MULTI_VALUE'" class="w-full h-16 border border-gray-200 rounded-lg bg-gray-50"></div>
-                <div v-else-if="field.inputType === 'BOOLEAN'" class="flex items-center gap-2">
-                  <div class="w-4 h-4 border border-gray-300 rounded bg-white"></div>
-                  <span class="text-sm text-gray-500">{{ field.customLabel || field.attributeName }}</span>
+              <template v-for="field in section.fields" :key="field.attributeName">
+                <!-- RDN field -->
+                <div v-if="field.rdn" :style="{ gridColumn: localShowDnField ? 'span 1' : `span ${field.columnSpan || 3}` }">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ field.customLabel || field.attributeName }}
+                    <span class="text-red-500">*</span>
+                    <span class="text-xs bg-amber-100 text-amber-700 rounded px-1 ml-1">RDN</span>
+                  </label>
+                  <div class="w-full h-9 border border-gray-200 rounded-lg bg-gray-50"></div>
                 </div>
-                <div v-else class="w-full h-9 border border-gray-200 rounded-lg bg-gray-50"></div>
-              </div>
+                <!-- Computed DN (shown immediately after RDN when enabled) -->
+                <div v-if="field.rdn && localShowDnField" class="col-span-2">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">
+                    DN
+                    <span class="text-xs bg-gray-100 text-gray-500 rounded px-1 ml-1">computed</span>
+                  </label>
+                  <div class="w-full h-9 border border-gray-200 rounded-lg bg-gray-100 flex items-center px-3 text-xs text-gray-400 italic">
+                    {{ field.attributeName }}=…,ou=…,dc=…
+                  </div>
+                </div>
+                <!-- Regular field -->
+                <div
+                  v-if="!field.rdn"
+                  :style="{ gridColumn: `span ${field.columnSpan || 3}` }"
+                >
+                  <label class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ field.customLabel || field.attributeName }}
+                    <span v-if="field.requiredOnCreate" class="text-red-500">*</span>
+                  </label>
+                  <div v-if="field.inputType === 'TEXTAREA' || field.inputType === 'MULTI_VALUE'" class="w-full h-16 border border-gray-200 rounded-lg bg-gray-50"></div>
+                  <div v-else-if="field.inputType === 'BOOLEAN'" class="flex items-center gap-2">
+                    <div class="w-4 h-4 border border-gray-300 rounded bg-white"></div>
+                    <span class="text-sm text-gray-500">{{ field.customLabel || field.attributeName }}</span>
+                  </div>
+                  <div v-else class="w-full h-9 border border-gray-200 rounded-lg bg-gray-50"></div>
+                </div>
+              </template>
             </div>
           </fieldset>
         </template>
-      </div>
-    </div>
-
-    <!-- Row 1: RDN + Computed DN (fixed, not draggable) -->
-    <div v-if="rdnField" class="border border-amber-200 bg-amber-50/30 rounded-xl overflow-hidden">
-      <div class="flex items-center gap-2 px-3 py-2 bg-amber-50 border-b border-amber-100">
-        <span class="text-xs font-semibold text-amber-700">Row 1 — RDN + DN</span>
-        <span class="text-[10px] text-amber-500">(always first row, not draggable)</span>
-      </div>
-      <div class="p-2">
-        <div class="grid grid-cols-3 gap-2">
-          <!-- RDN field (1/3) -->
-          <div class="flex items-center gap-2 px-3 py-2 bg-white border border-amber-200 rounded-lg">
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-1.5">
-                <span class="text-sm font-medium text-gray-800 truncate">{{ rdnField.customLabel || rdnField.attributeName }}</span>
-                <span class="text-[10px] font-mono text-gray-400" v-if="rdnField.customLabel">{{ rdnField.attributeName }}</span>
-                <span class="text-[10px] bg-amber-100 text-amber-700 rounded px-1 font-medium">RDN</span>
-                <span class="text-red-400 text-xs">*</span>
-              </div>
-              <div class="text-[10px] text-gray-400">{{ rdnField.inputType }} · 1/3 width</div>
-            </div>
-          </div>
-          <!-- Computed DN (2/3) -->
-          <div class="col-span-2 flex items-center gap-2 px-3 py-2 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-1.5">
-                <span class="text-sm font-medium text-gray-500">DN</span>
-                <span class="text-[10px] bg-gray-100 text-gray-500 rounded px-1 font-medium">computed</span>
-              </div>
-              <div class="text-[10px] text-gray-400">Auto-generated from RDN · 2/3 width</div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -122,7 +93,7 @@
             class="flex-1 bg-transparent text-sm font-medium text-gray-700 placeholder-gray-400 focus:outline-none"
             @input="syncToParent"
           />
-          <span class="text-xs text-gray-400">{{ nonRdnFields(section).length }} field{{ nonRdnFields(section).length !== 1 ? 's' : '' }}</span>
+          <span class="text-xs text-gray-400">{{ section.fields.length }} field{{ section.fields.length !== 1 ? 's' : '' }}</span>
           <button
             v-if="sections.length > 1"
             type="button"
@@ -134,7 +105,7 @@
 
         <!-- Fields in section -->
         <div class="p-2 min-h-[48px]">
-          <div v-if="nonRdnFields(section).length === 0" class="text-center text-xs text-gray-400 py-3">
+          <div v-if="section.fields.length === 0" class="text-center text-xs text-gray-400 py-3">
             Drag fields here or add attributes above
           </div>
           <div class="grid grid-cols-3 gap-2">
@@ -142,52 +113,109 @@
               v-for="(field, fIdx) in section.fields"
               :key="field.attributeName"
             >
-            <div
-              v-if="!field.rdn"
-              :style="{ gridColumn: `span ${field.columnSpan || 3}` }"
-              :class="[
-                dragField?.attributeName === field.attributeName ? 'opacity-30' : '',
-              ]"
-              class="group relative flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 cursor-grab transition-colors"
-              draggable="true"
-              @dragstart="onDragStart($event, sIdx, fIdx, field)"
-              @dragend="onDragEnd"
-              @dragover.prevent.stop="onDragOverField($event, sIdx, fIdx)"
-              @drop.prevent.stop="onDropField($event, sIdx, fIdx)"
-            >
-              <!-- Drag handle -->
-              <svg class="w-3.5 h-3.5 text-gray-300 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm0 6a2 2 0 10.001 4.001A2 2 0 007 14zm6-8a2 2 0 10-.001-4.001A2 2 0 0013 6zm0 2a2 2 0 10.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10.001 4.001A2 2 0 0013 14z"/>
-              </svg>
-
-              <!-- Field info -->
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-1.5">
-                  <span class="text-sm font-medium text-gray-800 truncate">{{ field.customLabel || field.attributeName }}</span>
-                  <span class="text-[10px] font-mono text-gray-400" v-if="field.customLabel">{{ field.attributeName }}</span>
-                  <span v-if="field.rdn" class="text-[10px] bg-amber-100 text-amber-700 rounded px-1 font-medium">RDN</span>
-                  <span v-if="field.requiredOnCreate" class="text-red-400 text-xs">*</span>
+              <!-- RDN field card -->
+              <div
+                v-if="field.rdn"
+                :style="{ gridColumn: localShowDnField ? 'span 1' : `span ${field.columnSpan || 3}` }"
+                :class="[
+                  dragField?.attributeName === field.attributeName ? 'opacity-30' : '',
+                ]"
+                class="group relative flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg hover:border-amber-400 cursor-grab transition-colors"
+                draggable="true"
+                @dragstart="onDragStart($event, sIdx, fIdx, field)"
+                @dragend="onDragEnd"
+                @dragover.prevent.stop="onDragOverField($event, sIdx, fIdx)"
+                @drop.prevent.stop="onDropField($event, sIdx, fIdx)"
+              >
+                <svg class="w-3.5 h-3.5 text-amber-300 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm0 6a2 2 0 10.001 4.001A2 2 0 007 14zm6-8a2 2 0 10-.001-4.001A2 2 0 0013 6zm0 2a2 2 0 10.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10.001 4.001A2 2 0 0013 14z"/>
+                </svg>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-sm font-medium text-gray-800 truncate">{{ field.customLabel || field.attributeName }}</span>
+                    <span class="text-[10px] font-mono text-gray-400" v-if="field.customLabel">{{ field.attributeName }}</span>
+                    <span class="text-[10px] bg-amber-100 text-amber-700 rounded px-1 font-medium">RDN</span>
+                    <span class="text-red-400 text-xs">*</span>
+                  </div>
+                  <div class="text-[10px] text-gray-400">{{ field.inputType }} · {{ localShowDnField ? '1/3 width' : `${field.columnSpan || 3}/3 width` }}</div>
                 </div>
-                <div class="text-[10px] text-gray-400">{{ field.inputType }}</div>
+                <!-- Column span selector (only when DN is not shown, otherwise forced to 1/3) -->
+                <div v-if="!localShowDnField" class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    v-for="span in [1, 2, 3]"
+                    :key="span"
+                    type="button"
+                    @click="setColumnSpan(sIdx, fIdx, span)"
+                    :class="[
+                      'w-5 h-5 rounded text-[10px] font-bold border transition-colors',
+                      (field.columnSpan || 3) === span
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-500 border-gray-300 hover:border-blue-400'
+                    ]"
+                    :title="`${span}/3 width`"
+                  >{{ span }}</button>
+                </div>
+              </div>
+              <!-- Computed DN card (shown after RDN when enabled) -->
+              <div
+                v-if="field.rdn && localShowDnField"
+                class="col-span-2 flex items-center gap-2 px-3 py-2 bg-gray-50 border border-dashed border-gray-300 rounded-lg"
+              >
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-sm font-medium text-gray-500">DN</span>
+                    <span class="text-[10px] bg-gray-100 text-gray-500 rounded px-1 font-medium">computed</span>
+                  </div>
+                  <div class="text-[10px] text-gray-400">Auto-generated from RDN · 2/3 width</div>
+                </div>
               </div>
 
-              <!-- Column span selector -->
-              <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  v-for="span in [1, 2, 3]"
-                  :key="span"
-                  type="button"
-                  @click="setColumnSpan(sIdx, fIdx, span)"
-                  :class="[
-                    'w-5 h-5 rounded text-[10px] font-bold border transition-colors',
-                    (field.columnSpan || 3) === span
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-500 border-gray-300 hover:border-blue-400'
-                  ]"
-                  :title="`${span}/3 width`"
-                >{{ span }}</button>
+              <!-- Regular field card -->
+              <div
+                v-if="!field.rdn"
+                :style="{ gridColumn: `span ${field.columnSpan || 3}` }"
+                :class="[
+                  dragField?.attributeName === field.attributeName ? 'opacity-30' : '',
+                ]"
+                class="group relative flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 cursor-grab transition-colors"
+                draggable="true"
+                @dragstart="onDragStart($event, sIdx, fIdx, field)"
+                @dragend="onDragEnd"
+                @dragover.prevent.stop="onDragOverField($event, sIdx, fIdx)"
+                @drop.prevent.stop="onDropField($event, sIdx, fIdx)"
+              >
+                <!-- Drag handle -->
+                <svg class="w-3.5 h-3.5 text-gray-300 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm0 6a2 2 0 10.001 4.001A2 2 0 007 14zm6-8a2 2 0 10-.001-4.001A2 2 0 0013 6zm0 2a2 2 0 10.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10.001 4.001A2 2 0 0013 14z"/>
+                </svg>
+
+                <!-- Field info -->
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-sm font-medium text-gray-800 truncate">{{ field.customLabel || field.attributeName }}</span>
+                    <span class="text-[10px] font-mono text-gray-400" v-if="field.customLabel">{{ field.attributeName }}</span>
+                    <span v-if="field.requiredOnCreate" class="text-red-400 text-xs">*</span>
+                  </div>
+                  <div class="text-[10px] text-gray-400">{{ field.inputType }}</div>
+                </div>
+
+                <!-- Column span selector -->
+                <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    v-for="span in [1, 2, 3]"
+                    :key="span"
+                    type="button"
+                    @click="setColumnSpan(sIdx, fIdx, span)"
+                    :class="[
+                      'w-5 h-5 rounded text-[10px] font-bold border transition-colors',
+                      (field.columnSpan || 3) === span
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-500 border-gray-300 hover:border-blue-400'
+                    ]"
+                    :title="`${span}/3 width`"
+                  >{{ span }}</button>
+                </div>
               </div>
-            </div>
             </template>
           </div>
         </div>
@@ -201,10 +229,26 @@ import { ref, computed, watch } from 'vue'
 
 const props = defineProps({
   attributeConfigs: { type: Array, required: true },
+  showDnField: { type: Boolean, default: true },
 })
-const emit = defineEmits(['update:attributeConfigs'])
+const emit = defineEmits(['update:attributeConfigs', 'update:showDnField'])
 
 const showPreview = ref(false)
+const localShowDnField = ref(props.showDnField)
+
+watch(() => props.showDnField, (v) => { localShowDnField.value = v })
+watch(localShowDnField, (v) => {
+  emit('update:showDnField', v)
+  // When DN display is toggled on, force RDN field to 1/3 width
+  if (v) {
+    for (const section of sections.value) {
+      for (const field of section.fields) {
+        if (field.rdn) field.columnSpan = 1
+      }
+    }
+    syncToParent()
+  }
+})
 
 let sectionIdCounter = 0
 function nextSectionId() { return `section-${++sectionIdCounter}` }
@@ -222,8 +266,8 @@ function buildSections(attrs) {
       map.set(key, { id: nextSectionId(), name: key, fields: [] })
     }
     const field = { ...attr }
-    // RDN field defaults to 1/3 width (shown in fixed row 1 alongside computed DN)
-    if (field.rdn && !field.columnSpan) {
+    // RDN field defaults to 1/3 width when DN display is enabled
+    if (field.rdn && localShowDnField.value && !field.columnSpan) {
       field.columnSpan = 1
     }
     map.get(key).fields.push(field)
@@ -235,7 +279,7 @@ function buildSections(attrs) {
   return result
 }
 
-/** The RDN field, shown in the fixed row 1 (not part of draggable sections). */
+/** The RDN field (used for preview). */
 const rdnField = computed(() => {
   for (const section of sections.value) {
     const f = section.fields.find(f => f.rdn)
@@ -244,13 +288,8 @@ const rdnField = computed(() => {
   return null
 })
 
-/** Sections with the RDN field excluded (for preview and section editor). */
-const previewSections = computed(() =>
-  sections.value.map(s => ({
-    ...s,
-    fields: s.fields.filter(f => !f.rdn),
-  }))
-)
+/** Sections for preview (includes all fields). */
+const previewSections = computed(() => sections.value)
 
 // Initialize from props
 sections.value = buildSections(props.attributeConfigs)
@@ -281,7 +320,9 @@ watch(() => props.attributeConfigs, (newConfigs) => {
   // Add newly-added visible fields into the first section
   for (const attr of visibleConfigs) {
     if (!currentNames.has(attr.attributeName)) {
-      sections.value[0].fields.push({ ...attr })
+      const field = { ...attr }
+      if (field.rdn && localShowDnField.value) field.columnSpan = 1
+      sections.value[0].fields.push(field)
     }
   }
 }, { deep: true })
@@ -304,11 +345,6 @@ function syncToParent() {
   emit('update:attributeConfigs', flattenSections())
   // Allow the next tick to propagate before re-enabling the watch
   setTimeout(() => { syncing = false }, 0)
-}
-
-/** Return non-RDN fields for a section (RDN is shown in the fixed row 1). */
-function nonRdnFields(section) {
-  return section.fields.filter(f => !f.rdn)
 }
 
 // ── Section management ───────────────────────────────────────────────────────
