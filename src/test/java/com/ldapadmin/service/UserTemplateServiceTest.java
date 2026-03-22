@@ -57,7 +57,7 @@ class UserTemplateServiceTest {
             return t;
         });
         UserTemplateResponse resp = service.create(new UserTemplateRequest(
-                dirId, List.of("inetOrgPerson"), "Standard Template", List.of()));
+                dirId, List.of("inetOrgPerson"), "Standard Template", true, List.of()));
 
         assertThat(resp.directoryId()).isEqualTo(dirId);
         ArgumentCaptor<UserTemplate> captor = ArgumentCaptor.forClass(UserTemplate.class);
@@ -73,7 +73,7 @@ class UserTemplateServiceTest {
             return t;
         });
         UserTemplateResponse resp = service.create(new UserTemplateRequest(
-                null, List.of("inetOrgPerson"), "Standard Template", List.of()));
+                null, List.of("inetOrgPerson"), "Standard Template", true, List.of()));
 
         assertThat(resp.directoryId()).isNull();
         ArgumentCaptor<UserTemplate> captor = ArgumentCaptor.forClass(UserTemplate.class);
@@ -88,7 +88,7 @@ class UserTemplateServiceTest {
         when(directoryRepo.findById(badId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.create(new UserTemplateRequest(
-                badId, List.of("inetOrgPerson"), "Template", List.of())))
+                badId, List.of("inetOrgPerson"), "Template", true, List.of())))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(templateRepo, never()).save(any());
@@ -113,7 +113,7 @@ class UserTemplateServiceTest {
                 "cn", "Common Name", true, true, "TEXT", true, null, null, false);
 
         UserTemplateResponse resp = service.create(new UserTemplateRequest(
-                null, List.of("inetOrgPerson"), "Template", List.of(configEntry)));
+                null, List.of("inetOrgPerson"), "Template", true, List.of(configEntry)));
 
         assertThat(resp.attributeConfigs()).hasSize(1);
         verify(configRepo).saveAll(any());
@@ -127,7 +127,7 @@ class UserTemplateServiceTest {
             return t;
         });
         UserTemplateResponse resp = service.create(new UserTemplateRequest(
-                null, List.of("inetOrgPerson", "posixAccount"), "Multi-Class Template", List.of()));
+                null, List.of("inetOrgPerson", "posixAccount"), "Multi-Class Template", true, List.of()));
 
         assertThat(resp.objectClassNames()).containsExactly("inetOrgPerson", "posixAccount");
         ArgumentCaptor<UserTemplate> captor = ArgumentCaptor.forClass(UserTemplate.class);
@@ -151,7 +151,7 @@ class UserTemplateServiceTest {
         when(templateRepo.save(any())).thenReturn(existing);
 
         service.update(templateId, new UserTemplateRequest(
-                dirId, List.of("inetOrgPerson", "posixAccount"), "Updated Template", List.of()));
+                dirId, List.of("inetOrgPerson", "posixAccount"), "Updated Template", true, List.of()));
 
         assertThat(existing.getDirectoryConnection()).isEqualTo(dir);
         assertThat(existing.getObjectClassNames()).containsExactly("inetOrgPerson", "posixAccount");
@@ -162,7 +162,7 @@ class UserTemplateServiceTest {
         when(templateRepo.findById(templateId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.update(templateId, new UserTemplateRequest(
-                null, List.of("inetOrgPerson"), "Template", List.of())))
+                null, List.of("inetOrgPerson"), "Template", true, List.of())))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
