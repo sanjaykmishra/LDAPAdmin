@@ -331,12 +331,13 @@ async function addObjectClass() {
     // Track schema-required attributes and cache for RDN picker
     for (const attr of required) schemaRequiredAttrs.value.add(attr)
     ocSchemaCache.value[ocToAdd.value] = { required: [...required], optional: [...optional] }
-    for (const attr of [...required, ...optional]) {
+    // Auto-add only schema-required attributes; optional ones can be added via the picker
+    for (const attr of required) {
       if (!profile.value.attributeConfigs.find(a => a.attributeName === attr)) {
         const isObjClass = attr.toLowerCase() === 'objectclass'
         profile.value.attributeConfigs.push({
           attributeName: attr, customLabel: isObjClass ? '' : guessLabel(attr), inputType: isObjClass ? 'HIDDEN_FIXED' : 'TEXT',
-          requiredOnCreate: required.includes(attr), editableOnCreate: !isObjClass,
+          requiredOnCreate: true, editableOnCreate: !isObjClass,
           editableOnUpdate: !isObjClass, selfServiceEdit: !isObjClass && isSelfServiceEditable(attr),
           selfRegistrationEdit: !isObjClass && isSelfServiceEditable(attr),
           defaultValue: '', computedExpression: '', validationRegex: '',
@@ -939,6 +940,6 @@ function toggleApprover(accountId) {
 <style scoped>
 @reference "tailwindcss";
 .btn-primary { @apply px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50; }
-.btn-secondary { @apply px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50; }
+.btn-secondary { @apply px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed; }
 .input { @apply border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none; }
 </style>
