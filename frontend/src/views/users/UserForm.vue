@@ -383,9 +383,37 @@ function groupIntoSections(attrs) {
   return result.length ? result : [{ name: '', fields: attrs }]
 }
 
+/**
+ * Evaluate computed expressions like "${givenName}.${sn}@corp.com".
+ * Substitutes ${attrName} references with current attribute values.
+ */
+function evaluateComputedExpressions() {
+  if (!props.userTemplateConfig?.attributeConfigs) return
+  for (const attr of props.userTemplateConfig.attributeConfigs) {
+    if (!attr.computedExpression) continue
+    const expr = attr.computedExpression
+    const resolved = expr.replace(/\$\{(\w+)\}/g, (_, name) => {
+      // Check rdnValue first since it's stored separately
+      if (name === local.rdnAttribute) return local.rdnValue || ''
+      return local.attributes[name] || ''
+    })
+    // Only set if expression produced a meaningful result (not all placeholders empty)
+    if (resolved !== expr || !expr.includes('${')) {
+      local.attributes[attr.attributeName] = resolved
+    }
+  }
+}
+
 let syncing = false
+let computing = false
 watch(local, v => {
   if (syncing) return
+  if (!computing && !props.isEdit) {
+    computing = true
+    evaluateComputedExpressions()
+    // Allow the watcher to re-fire with computed values included
+    nextTick(() => { computing = false })
+  }
   emit('update', JSON.parse(JSON.stringify(v)))
 }, { deep: true })
 watch(() => props.data, v => {
@@ -498,6 +526,15 @@ function emitPendingGroups() {
 }
 
 onMounted(() => {
+  // Initialize pending groups from profile group assignments passed via data
+  if (props.data?._pendingGroups?.length) {
+    pendingGroups.value = props.data._pendingGroups.map(g => ({
+      dn: g.dn,
+      cn: g.dn.split(',')[0] || g.dn,
+      memberAttr: g.memberAttr,
+      members: [],
+    }))
+  }
   if (props.dirId) {
     loadGroups()
   }

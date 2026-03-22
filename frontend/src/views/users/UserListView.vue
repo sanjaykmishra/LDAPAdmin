@@ -343,7 +343,15 @@ async function selectProfileAndCreate(p) {
     console.warn('Failed to load profile:', e)
     profileConfig.value = null
   }
-  form.value = emptyForm()
+  const f = emptyForm()
+  // Auto-queue group assignments defined on the profile
+  if (profileConfig.value?.groupAssignments?.length) {
+    f._pendingGroups = profileConfig.value.groupAssignments.map(g => ({
+      dn: g.groupDn,
+      memberAttr: g.memberAttribute,
+    }))
+  }
+  form.value = f
   showModal.value = true
 }
 
@@ -393,7 +401,13 @@ async function save() {
       const dn = `${f.rdnAttribute}=${f.rdnValue},${f.parentDn}`
       const attributes = {}
       for (const [k, v] of Object.entries(f.attributes || {})) {
-        if (v) attributes[k] = [v]
+        if (!v && v !== false) continue
+        // Multi-value / textarea fields are newline-separated
+        if (typeof v === 'string' && v.includes('\n')) {
+          attributes[k] = v.split('\n').map(s => s.trim()).filter(Boolean)
+        } else {
+          attributes[k] = [String(v)]
+        }
       }
       // Include the RDN attribute in the attributes map
       attributes[f.rdnAttribute] = [f.rdnValue]
