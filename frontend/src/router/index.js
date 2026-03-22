@@ -25,6 +25,7 @@ const router = createRouter({
       component: () => import('@/components/AppLayout.vue'),
       children: [
         { path: '', name: 'home', redirect: () => '/superadmin/directories' },
+        { path: 'no-access', name: 'noAccess', component: { template: '<div />' } },
 
         // Users
         {
@@ -230,7 +231,7 @@ async function resolveHomePath(auth) {
     const { data } = await myProfiles()
     if (data.length) return `/directories/${data[0].directoryId}/users`
   } catch (e) { console.warn('Failed to resolve home path:', e) }
-  return '/login'
+  return '/no-access'
 }
 
 router.beforeEach(async (to) => {
