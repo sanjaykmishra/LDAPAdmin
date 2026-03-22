@@ -145,7 +145,7 @@ public class ReportExecutionService {
         OffsetDateTime from = OffsetDateTime.now().minusDays(lookbackDays);
 
         var page = auditEventRepo.findAll(
-                directoryId, null, AuditAction.USER_DELETE,
+                directoryId, null, AuditAction.USER_DELETE.getDbValue(),
                 from, null, Pageable.unpaged());
 
         List<String> columns = List.of("dn", "deletedBy", "deletedAt");

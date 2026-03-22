@@ -2,5 +2,7 @@ package com.ldapadmin.entity.enums;
 
 public enum ApprovalRequestType {
     USER_CREATE,
-    BULK_IMPORT
+    BULK_IMPORT,
+    USER_MOVE,
+    GROUP_MEMBER_ADD
 }

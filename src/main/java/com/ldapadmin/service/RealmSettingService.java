@@ -19,6 +19,8 @@ import java.util.stream.Collectors;
 public class RealmSettingService {
 
     static final String KEY_APPROVAL_ENABLED = "approval.user_create.enabled";
+    static final String KEY_APPROVAL_MOVE_ENABLED = "approval.user_move.enabled";
+    static final String KEY_APPROVAL_GROUP_ADD_ENABLED = "approval.group_member_add.enabled";
     static final String KEY_APPROVER_GROUP_DN = "approval.approver_group_dn";
 
     private final RealmSettingRepository settingRepo;
@@ -60,6 +62,20 @@ public class RealmSettingService {
     @Transactional(readOnly = true)
     public boolean isApprovalRequired(UUID realmId) {
         return getSetting(realmId, KEY_APPROVAL_ENABLED)
+                .map("true"::equals)
+                .orElse(false);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isMoveApprovalRequired(UUID realmId) {
+        return getSetting(realmId, KEY_APPROVAL_MOVE_ENABLED)
+                .map("true"::equals)
+                .orElse(false);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isGroupMemberAddApprovalRequired(UUID realmId) {
+        return getSetting(realmId, KEY_APPROVAL_GROUP_ADD_ENABLED)
                 .map("true"::equals)
                 .orElse(false);
     }

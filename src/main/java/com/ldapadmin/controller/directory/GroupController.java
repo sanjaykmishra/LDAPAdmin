@@ -10,7 +10,11 @@ import com.ldapadmin.dto.ldap.CreateEntryRequest;
 import com.ldapadmin.dto.ldap.LdapEntryResponse;
 import com.ldapadmin.dto.ldap.MemberRequest;
 import com.ldapadmin.dto.ldap.UpdateEntryRequest;
+import com.ldapadmin.entity.PendingApproval;
+import com.ldapadmin.entity.Realm;
+import com.ldapadmin.entity.enums.ApprovalRequestType;
 import com.ldapadmin.entity.enums.FeatureKey;
+import com.ldapadmin.service.ApprovalWorkflowService;
 import com.ldapadmin.service.LdapOperationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +33,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -53,6 +59,7 @@ public class GroupController {
     private static final int MAX_LIMIT      = 2000;
 
     private final LdapOperationService service;
+    private final ApprovalWorkflowService approvalService;
 
     // ── Search ────────────────────────────────────────────────────────────────
 
@@ -134,11 +141,27 @@ public class GroupController {
 
     @PostMapping("/members")
     @RequiresFeature(FeatureKey.GROUP_MANAGE_MEMBERS)
-    public ResponseEntity<Void> addMember(
+    public ResponseEntity<?> addMember(
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn,
             @Valid @RequestBody MemberRequest req) {
+
+        // Check approval for the realm containing the group
+        Optional<Realm> realm = approvalService.findRealmForDn(directoryId, dn);
+        if (realm.isPresent() && approvalService.isGroupMemberAddApprovalRequired(realm.get().getId())) {
+            PendingApproval pa = approvalService.submitForApproval(
+                    directoryId, realm.get().getId(), principal,
+                    ApprovalRequestType.GROUP_MEMBER_ADD,
+                    Map.of("groupDn", dn,
+                            "memberAttribute", req.memberAttribute(),
+                            "memberValue", req.memberValue()));
+            return ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body(Map.of(
+                            "message", "Group member addition submitted for approval",
+                            "approvalId", pa.getId()));
+        }
+
         service.addGroupMember(directoryId, principal, dn, req.memberAttribute(), req.memberValue());
         return ResponseEntity.noContent().build();
     }

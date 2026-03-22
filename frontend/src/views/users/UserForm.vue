@@ -211,6 +211,7 @@
 
 <script setup>
 import { reactive, ref, watch, nextTick, computed, onMounted } from 'vue'
+import { useNotificationStore } from '@/stores/notifications'
 import FormField from '@/components/FormField.vue'
 import * as groupsApi from '@/api/groups'
 
@@ -394,11 +395,16 @@ async function addToGroup(group) {
   if (props.isEdit) {
     // Edit mode: immediately persist the membership via API
     try {
-      await groupsApi.addGroupMember(props.dirId, group.dn, {
+      const res = await groupsApi.addGroupMember(props.dirId, group.dn, {
         memberAttribute: group.memberAttr,
         memberValue: local.dn,
       })
-      group.members.push(local.dn)
+      if (res.status === 202) {
+        const notif = useNotificationStore()
+        notif.success('Group member addition submitted for approval')
+      } else {
+        group.members.push(local.dn)
+      }
       refreshMemberships()
     } catch (e) {
       // silent
