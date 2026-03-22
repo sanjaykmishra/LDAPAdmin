@@ -1,6 +1,6 @@
 # Feature Recommendations — Making LDAPAdmin a Joy to Use
 
-## High-Impact UX Features
+## Implemented Features
 
 ### 1. Dashboard / Home Page
 **Status: Not Yet Implemented**
@@ -24,7 +24,19 @@ Side-by-side comparison of two LDAP entries — invaluable for troubleshooting "
 
 ---
 
-## Workflow & Automation
+## Not Yet Implemented
+
+### Dashboard / Home Page
+A landing page showing user/group counts per directory, pending approvals, active access review campaigns, recent audit events, and system health for immediate situational awareness.
+
+### Password Policy Visualization
+Display LDAP password policy status on user accounts: days until expiration, lockout status, failed login attempts, grace logins remaining. This is the #1 helpdesk pain point in LDAP environments.
+
+### Entry Comparison / Diff View
+Side-by-side comparison of two LDAP entries to troubleshoot "why does user A have access but user B doesn't?" scenarios. Highlight attribute differences.
+
+### Keyboard Shortcuts
+`/` to search, `n` for new user, `g u` for users, `g g` for groups, `Esc` to close modals. Power users in enterprise tools live on keyboard shortcuts.
 
 ### 6. User Lifecycle Playbooks
 **Status: Not Yet Implemented**
@@ -70,7 +82,11 @@ The `FormField` component supports `required` attributes and hint text. The pass
 **Status: Not Yet Implemented**
 Enterprise deployments in non-English-speaking organizations need this. Vue i18n makes it relatively straightforward. No `vue-i18n` integration exists in the codebase.
 
----
+### Toast Notifications with Undo
+Extend the existing toast system with a 5-second undo button for destructive actions (e.g., "User deleted — Undo").
+
+### Activity Timeline per Entry
+On a user or group detail page, show a timeline of all changes: "March 15 — added to VPN Users by admin@corp", "March 10 — password reset by helpdesk". Pulls from audit log data you already have.
 
 ## Quick Wins
 
@@ -107,7 +123,7 @@ These significant features have been built but were not part of the original rec
 
 ---
 
-## Recommended Priority
+## Recommended Next Priorities
 
 The biggest bang for the buck would be **Dashboard**, **Password Policy Visualization**, and **Activity Timeline per Entry** — they address the most frequent admin workflows and leverage existing infrastructure (audit log, directory connections).
 
