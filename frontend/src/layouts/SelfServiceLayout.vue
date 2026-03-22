@@ -14,14 +14,14 @@
           <span class="text-lg font-bold text-gray-900">My Account</span>
         </RouterLink>
 
-        <div v-if="isLoggedIn" class="flex items-center gap-4">
+        <div v-if="auth.isLoggedIn" class="flex items-center gap-4">
           <nav class="hidden sm:flex gap-1">
             <RouterLink to="/self-service/profile" class="nav-link">Profile</RouterLink>
             <RouterLink to="/self-service/password" class="nav-link">Password</RouterLink>
             <RouterLink to="/self-service/groups" class="nav-link">Groups</RouterLink>
           </nav>
           <div class="flex items-center gap-3 pl-4 border-l border-gray-200">
-            <span class="text-sm text-gray-600">{{ username }}</span>
+            <span class="text-sm text-gray-600">{{ auth.username }}</span>
             <button @click="handleLogout" class="text-sm text-gray-400 hover:text-gray-700">Logout</button>
           </div>
         </div>
@@ -29,7 +29,7 @@
     </header>
 
     <!-- Mobile nav -->
-    <div v-if="isLoggedIn" class="sm:hidden bg-white border-b border-gray-200 px-4 py-2 flex gap-1">
+    <div v-if="auth.isLoggedIn" class="sm:hidden bg-white border-b border-gray-200 px-4 py-2 flex gap-1">
       <RouterLink to="/self-service/profile" class="nav-link text-xs">Profile</RouterLink>
       <RouterLink to="/self-service/password" class="nav-link text-xs">Password</RouterLink>
       <RouterLink to="/self-service/groups" class="nav-link text-xs">Groups</RouterLink>
@@ -43,15 +43,14 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
-// Mockup — these would come from the auth store in the real implementation
-const isLoggedIn = computed(() => true)
-const username = computed(() => 'jdoe')
-
+const auth = useAuthStore()
 const router = useRouter()
-function handleLogout() {
+
+async function handleLogout() {
+  await auth.logout()
   router.push('/self-service/login')
 }
 </script>

@@ -162,7 +162,7 @@ const router = createRouter({
       ],
     },
 
-    // ── Self-service portal (authenticated) ──────────────────────────────
+    // ── Self-service portal (authenticated — requires SELF_SERVICE principal) ──
     {
       path: '/self-service',
       component: () => import('@/layouts/SelfServiceLayout.vue'),
@@ -171,19 +171,19 @@ const router = createRouter({
           path: 'profile',
           name: 'selfServiceProfile',
           component: () => import('@/views/selfservice/SelfServiceProfileView.vue'),
-          meta: { public: true },
+          meta: { requiresSelfService: true },
         },
         {
           path: 'password',
           name: 'selfServicePassword',
           component: () => import('@/views/selfservice/SelfServicePasswordView.vue'),
-          meta: { public: true },
+          meta: { requiresSelfService: true },
         },
         {
           path: 'groups',
           name: 'selfServiceGroups',
           component: () => import('@/views/selfservice/SelfServiceGroupsView.vue'),
-          meta: { public: true },
+          meta: { requiresSelfService: true },
         },
       ],
     },
@@ -237,8 +237,28 @@ router.beforeEach(async (to) => {
   const auth = useAuthStore()
   // Restore session from httpOnly cookie on first navigation after page load
   await auth.init()
-  if (!to.meta.public && !auth.isLoggedIn) {
+
+  // Public routes — no auth needed
+  if (to.meta.public) return
+
+  // Self-service protected routes
+  if (to.meta.requiresSelfService) {
+    if (!auth.isLoggedIn) {
+      return { name: 'selfServiceLogin', query: { redirect: to.fullPath } }
+    }
+    if (!auth.isSelfService) {
+      return { path: await resolveHomePath(auth) }
+    }
+    return
+  }
+
+  // Admin routes — require logged in non-self-service user
+  if (!auth.isLoggedIn) {
     return { name: 'login', query: { redirect: to.fullPath } }
+  }
+  if (auth.isSelfService) {
+    // Self-service users cannot access admin routes
+    return { name: 'selfServiceProfile' }
   }
   if (to.meta.requiresSuperadmin && !auth.isSuperadmin) {
     return { path: await resolveHomePath(auth) }

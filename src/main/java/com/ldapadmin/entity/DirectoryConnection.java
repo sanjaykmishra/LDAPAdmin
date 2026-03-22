@@ -88,6 +88,14 @@ public class DirectoryConnection {
     @Column(name = "disable_value")
     private String disableValue;
 
+    // ── Self-service portal ──────────────────────────────────────────────────
+
+    @Column(name = "self_service_enabled", nullable = false)
+    private boolean selfServiceEnabled = false;
+
+    @Column(name = "self_service_login_attribute", length = 64)
+    private String selfServiceLoginAttribute = "uid";
+
     // ── Application user repository ───────────────────────────────────────────
 
     /**
