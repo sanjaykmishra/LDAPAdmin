@@ -134,6 +134,10 @@ public class ApprovalWorkflowService {
             throw new IllegalStateException("Approval is not in PENDING status");
         }
 
+        if (approver.id().equals(pa.getRequestedBy())) {
+            throw new AccessDeniedException("Cannot approve your own request");
+        }
+
         if (!approver.isSuperadmin() && pa.getProfileId() != null
                 && !profileService.isApprover(pa.getProfileId(), approver.id())) {
             throw new AccessDeniedException("Not an approver for this profile");
