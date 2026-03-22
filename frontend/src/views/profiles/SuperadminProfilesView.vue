@@ -490,6 +490,11 @@ const selfServiceAttributeConfigs = computed({
 
 const layoutMode = ref('admin')
 
+// Reset layout mode if self-registration is turned off while viewing that layout
+watch(() => profile.value.selfRegistrationAllowed, (allowed) => {
+  if (!allowed && layoutMode.value === 'registration') layoutMode.value = 'admin'
+})
+
 // Fixed modal height based on attribute count so switching tabs doesn't resize
 const modalHeight = computed(() => {
   const count = profile.value.attributeConfigs.length
@@ -687,7 +692,7 @@ function toggleApprover(accountId) {
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.editableOnCreate" /> Editable (create)</label>
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.editableOnUpdate" /> Editable (update)</label>
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.selfServiceEdit" /> Self-service</label>
-              <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.selfRegistrationEdit" /> Self-registration</label>
+              <label v-if="profile.selfRegistrationAllowed" class="flex items-center gap-1"><input type="checkbox" v-model="attr.selfRegistrationEdit" /> Self-registration</label>
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.hidden" /> Hidden</label>
             </div>
           </div>
@@ -700,7 +705,7 @@ function toggleApprover(accountId) {
             <button v-for="mode in [
               { id: 'admin', label: 'Admin' },
               { id: 'self-service', label: 'Self-service' },
-              { id: 'registration', label: 'Self-registration' }
+              ...(profile.selfRegistrationAllowed ? [{ id: 'registration', label: 'Self-registration' }] : [])
             ]" :key="mode.id"
               :class="['px-4 py-1.5 font-medium transition-colors first:rounded-l-md last:rounded-r-md',
                 layoutMode === mode.id
