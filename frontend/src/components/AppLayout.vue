@@ -137,6 +137,9 @@
     <main class="flex-1 overflow-y-auto">
       <RouterView />
     </main>
+
+    <!-- Keyboard shortcuts help -->
+    <KeyboardShortcutsHelp v-model="showShortcutsHelp" />
   </div>
 </template>
 
@@ -145,8 +148,10 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSettingsStore } from '@/stores/settings'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { myProfiles } from '@/api/auth'
 import { countPendingApprovals } from '@/api/approvals'
+import KeyboardShortcutsHelp from '@/components/KeyboardShortcutsHelp.vue'
 
 const auth     = useAuthStore()
 const settings = useSettingsStore()
@@ -165,6 +170,11 @@ const currentDirId = computed(() => {
   if (!pickerValue.value) return ''
   const profile = profiles.value.find(p => p.id === pickerValue.value)
   return profile?.directoryId || ''
+})
+
+// Keyboard shortcuts
+const { showHelp: showShortcutsHelp } = useKeyboardShortcuts({
+  dirId: () => currentDirId.value || route.params.dirId,
 })
 
 // Load profiles for admin users; superadmins don't need the picker

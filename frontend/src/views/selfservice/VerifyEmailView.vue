@@ -14,11 +14,10 @@
         </div>
         <h1 class="text-xl font-bold text-gray-900">Email Verified</h1>
         <p class="text-sm text-gray-600">
-          Your email has been verified. Your account request has been submitted for approval.
-          You'll receive an email once it's been reviewed.
+          {{ resultMessage }}
         </p>
         <div class="bg-blue-50 rounded-lg p-3 text-sm text-blue-700">
-          Status: <strong>Pending Approval</strong>
+          Status: <strong>{{ resultStatus }}</strong>
         </div>
         <RouterLink to="/self-service/login" class="inline-block mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
           Back to Login
@@ -32,7 +31,7 @@
         </div>
         <h1 class="text-xl font-bold text-gray-900">Verification Failed</h1>
         <p class="text-sm text-gray-600">
-          This verification link is invalid or has expired. Please submit a new registration request.
+          {{ errorMessage }}
         </p>
         <RouterLink to="/register" class="inline-block mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
           Register Again
@@ -45,14 +44,33 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
+import { verifyEmail } from '@/api/selfservice'
 
 const route = useRoute()
 const status = ref('verifying')
+const resultStatus = ref('')
+const resultMessage = ref('')
+const errorMessage = ref('')
 
 onMounted(async () => {
-  // Mockup — would call verifyEmail(route.params.token)
-  await new Promise(resolve => setTimeout(resolve, 1500))
-  // Simulate success
-  status.value = 'success'
+  try {
+    const { data } = await verifyEmail(route.params.token)
+    status.value = 'success'
+    resultStatus.value = data.status
+
+    if (data.status === 'PENDING_APPROVAL') {
+      resultMessage.value = 'Your email has been verified. Your account request has been submitted for approval. You\'ll receive an email once it\'s been reviewed.'
+    } else if (data.status === 'APPROVED') {
+      resultMessage.value = 'Your email has been verified and your account has been created! You can now log in.'
+    } else if (data.status === 'ALREADY_VERIFIED') {
+      resultMessage.value = 'This email has already been verified.'
+    } else {
+      resultMessage.value = 'Your email has been verified successfully.'
+    }
+  } catch (e) {
+    status.value = 'error'
+    errorMessage.value = e.response?.data?.detail
+      || 'This verification link is invalid or has expired. Please submit a new registration request.'
+  }
 })
 </script>

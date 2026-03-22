@@ -7,11 +7,12 @@ import {
   getApprovalConfig, setApprovalConfig, getApprovers, setApprovers
 } from '@/api/profiles'
 import { listDirectories } from '@/api/directories'
-import { listObjectClasses, getObjectClass } from '@/api/schema'
+import { listObjectClasses, getObjectClass, getObjectClassesBulk } from '@/api/schema'
 import { listAdmins } from '@/api/adminManagement'
 import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import FormLayoutDesigner from '@/components/FormLayoutDesigner.vue'
+import DnPicker from '@/components/DnPicker.vue'
 
 const notif = useNotificationStore()
 
@@ -46,7 +47,7 @@ const profileApprovers = ref([])
 function emptyProfile() {
   return {
     name: '', description: '', targetOuDn: '',
-    objectClassNames: [], rdnAttribute: 'uid',
+    objectClassNames: [], rdnAttribute: '',
     showDnField: true, enabled: true, selfRegistrationAllowed: false,
     attributeConfigs: [], groupAssignments: []
   }
@@ -103,6 +104,8 @@ function openCreate() {
   lifecycle.value = emptyLifecycle()
   approval.value = emptyApproval()
   profileApprovers.value = []
+  schemaRequiredAttrs.value = new Set()
+  ocSchemaCache.value = {}
   selectedDirId.value = directories.value.length > 0 ? directories.value[0].id : null
   modalTab.value = 'general'
   showModal.value = true
@@ -133,6 +136,21 @@ async function openEdit(p) {
   }
   modalTab.value = 'general'
 
+  // Load schema data for existing object classes (for RDN picker and required tracking)
+  schemaRequiredAttrs.value = new Set()
+  ocSchemaCache.value = {}
+  if (p.objectClassNames.length > 0) {
+    try {
+      const { data } = await getObjectClassesBulk(p.directoryId, p.objectClassNames)
+      for (const oc of data) {
+        const required = oc.requiredAttributes || oc.required || []
+        const optional = oc.optionalAttributes || oc.optional || []
+        ocSchemaCache.value[oc.name] = { required: [...required], optional: [...optional] }
+        for (const attr of required) schemaRequiredAttrs.value.add(attr)
+      }
+    } catch { /* schema lookup optional */ }
+  }
+
   // Load lifecycle & approval data
   try {
     const { data } = await getLifecyclePolicy(p.id)
@@ -159,6 +177,10 @@ async function save() {
   }
   if (profile.value.objectClassNames.length === 0) {
     notif.error('At least one object class is required')
+    return
+  }
+  if (!profile.value.rdnAttribute) {
+    notif.error('RDN Attribute is required')
     return
   }
   saving.value = true
@@ -238,6 +260,9 @@ function removeGroupAssignment(index) {
 
 // Object class management
 const ocToAdd = ref('')
+// Track which attributes are required by the schema (cannot uncheck required or remove)
+const schemaRequiredAttrs = ref(new Set())
+
 async function addObjectClass() {
   if (!ocToAdd.value) return
   profile.value.objectClassNames.push(ocToAdd.value)
@@ -246,15 +271,19 @@ async function addObjectClass() {
     const { data } = await getObjectClass(selectedDirId.value, ocToAdd.value)
     const required = data.requiredAttributes || data.required || []
     const optional = data.optionalAttributes || data.optional || []
+    // Track schema-required attributes and cache for RDN picker
+    for (const attr of required) schemaRequiredAttrs.value.add(attr)
+    ocSchemaCache.value[ocToAdd.value] = { required: [...required], optional: [...optional] }
     for (const attr of [...required, ...optional]) {
       if (!profile.value.attributeConfigs.find(a => a.attributeName === attr)) {
+        const isObjClass = attr.toLowerCase() === 'objectclass'
         profile.value.attributeConfigs.push({
-          attributeName: attr, customLabel: '', inputType: 'TEXT',
-          requiredOnCreate: required.includes(attr), editableOnCreate: true,
-          editableOnUpdate: true, selfServiceEdit: false,
+          attributeName: attr, customLabel: '', inputType: isObjClass ? 'HIDDEN_FIXED' : 'TEXT',
+          requiredOnCreate: required.includes(attr), editableOnCreate: !isObjClass,
+          editableOnUpdate: !isObjClass, selfServiceEdit: false,
           defaultValue: '', computedExpression: '', validationRegex: '',
           validationMessage: '', allowedValues: '', minLength: null,
-          maxLength: null, sectionName: '', columnSpan: 3, hidden: false
+          maxLength: null, sectionName: '', columnSpan: 3, hidden: isObjClass
         })
       }
     }
@@ -263,6 +292,18 @@ async function addObjectClass() {
 }
 function removeObjectClass(name) {
   profile.value.objectClassNames = profile.value.objectClassNames.filter(n => n !== name)
+  // Rebuild schema-required set from remaining OCs
+  rebuildSchemaRequired()
+}
+
+async function rebuildSchemaRequired() {
+  schemaRequiredAttrs.value = new Set()
+  for (const ocName of profile.value.objectClassNames) {
+    const cached = ocSchemaCache.value[ocName]
+    if (cached) {
+      for (const attr of cached.required) schemaRequiredAttrs.value.add(attr)
+    }
+  }
 }
 
 function dirName(dirId) {
@@ -273,6 +314,70 @@ function dirName(dirId) {
 const availableObjectClasses = computed(() => {
   const added = new Set(profile.value.objectClassNames.map(n => n.toLowerCase()))
   return objectClasses.value.filter(oc => !added.has(oc.toLowerCase()))
+})
+
+// RDN attribute candidates: all attributes from selected object classes
+const rdnCandidates = computed(() => {
+  const attrs = new Set()
+  for (const ocName of profile.value.objectClassNames) {
+    const cached = ocSchemaCache.value[ocName]
+    if (cached) {
+      for (const a of [...cached.required, ...cached.optional]) {
+        if (a.toLowerCase() !== 'objectclass') attrs.add(a)
+      }
+    }
+  }
+  // Also include any configured attribute names
+  for (const a of profile.value.attributeConfigs) {
+    if (a.attributeName.toLowerCase() !== 'objectclass') attrs.add(a.attributeName)
+  }
+  return [...attrs].sort()
+})
+
+// Helper: check if an attribute is the RDN attribute
+function isRdnAttribute(attr) {
+  return attr.attributeName === profile.value.rdnAttribute
+}
+
+// Helper: check if an attribute is schema-required
+function isSchemaRequired(attr) {
+  return schemaRequiredAttrs.value.has(attr.attributeName)
+}
+
+// Helper: check if an attribute can be removed
+function canRemoveAttribute(attr) {
+  return !isRdnAttribute(attr) && !isSchemaRequired(attr)
+}
+
+// Helper: determine which fields to show based on input type
+function showFieldFor(inputType, fieldName) {
+  const rules = {
+    defaultValue:       ['TEXT', 'TEXTAREA', 'PASSWORD', 'DATE', 'DATETIME', 'MULTI_VALUE', 'HIDDEN_FIXED', 'SELECT'],
+    allowedValues:      ['SELECT'],
+    computedExpression: ['TEXT', 'TEXTAREA', 'PASSWORD', 'MULTI_VALUE', 'DATE', 'DATETIME', 'DN_LOOKUP'],
+    validationRegex:    ['TEXT', 'TEXTAREA', 'PASSWORD', 'MULTI_VALUE'],
+  }
+  return (rules[fieldName] || []).includes(inputType)
+}
+
+// Ensure RDN attribute is always marked as required
+watch(() => profile.value.rdnAttribute, (rdnAttr) => {
+  if (!rdnAttr) return
+  const attr = profile.value.attributeConfigs.find(a => a.attributeName === rdnAttr)
+  if (attr) attr.requiredOnCreate = true
+})
+
+// Attribute configs with RDN flag for the layout designer
+const layoutAttributeConfigs = computed({
+  get() {
+    return profile.value.attributeConfigs.map(a => ({
+      ...a,
+      rdn: a.attributeName === profile.value.rdnAttribute,
+    }))
+  },
+  set(val) {
+    profile.value.attributeConfigs = val.map(({ rdn, ...rest }) => rest)
+  }
 })
 
 function toggleApprover(accountId) {
@@ -329,7 +434,7 @@ function toggleApprover(accountId) {
       <div class="space-y-4">
         <!-- Tab Navigation -->
         <div class="flex border-b gap-1">
-          <button v-for="tab in ['general', 'attributes', 'groups', 'lifecycle', 'approval']" :key="tab"
+          <button v-for="tab in ['general', 'attributes', 'layout', 'groups', 'lifecycle', 'approval']" :key="tab"
             :class="['px-4 py-2 text-sm font-medium border-b-2 -mb-px',
               modalTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']"
             @click="modalTab = tab">
@@ -345,15 +450,9 @@ function toggleApprover(accountId) {
               <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
             </select>
           </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
-              <input v-model="profile.name" class="input w-full" placeholder="e.g. Full-Time Engineer" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">RDN Attribute</label>
-              <input v-model="profile.rdnAttribute" class="input w-full" placeholder="e.g. uid" />
-            </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <input v-model="profile.name" class="input w-full" placeholder="e.g. Full-Time Engineer" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -361,24 +460,39 @@ function toggleApprover(accountId) {
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Target OU DN</label>
-            <input v-model="profile.targetOuDn" class="input w-full font-mono text-sm"
+            <DnPicker v-model="profile.targetOuDn" :directory-id="selectedDirId"
               placeholder="e.g. ou=engineers,ou=people,dc=corp" />
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Object Classes</label>
-            <div class="flex gap-2 mb-2 flex-wrap">
-              <span v-for="oc in profile.objectClassNames" :key="oc"
-                class="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
-                {{ oc }}
-                <button @click="removeObjectClass(oc)" class="text-blue-400 hover:text-red-600">&times;</button>
-              </span>
+          <div class="grid grid-cols-3 gap-4">
+            <div class="col-span-2">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Object Classes</label>
+              <div class="flex gap-2 mb-2 flex-wrap">
+                <span v-for="oc in profile.objectClassNames" :key="oc"
+                  class="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
+                  {{ oc }}
+                  <button @click="removeObjectClass(oc)" class="text-blue-400 hover:text-red-600">&times;</button>
+                </span>
+              </div>
+              <div class="flex gap-2">
+                <select v-model="ocToAdd" class="input flex-1">
+                  <option value="">Select object class…</option>
+                  <option v-for="oc in availableObjectClasses" :key="oc" :value="oc">{{ oc }}</option>
+                </select>
+                <button class="btn-secondary" @click="addObjectClass" :disabled="!ocToAdd">Add</button>
+              </div>
             </div>
-            <div class="flex gap-2">
-              <select v-model="ocToAdd" class="input flex-1">
-                <option value="">Select object class…</option>
-                <option v-for="oc in availableObjectClasses" :key="oc" :value="oc">{{ oc }}</option>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                RDN Attribute <span class="text-red-500">*</span>
+              </label>
+              <select v-model="profile.rdnAttribute" class="input w-full"
+                :disabled="profile.objectClassNames.length === 0">
+                <option value="">Select RDN attribute…</option>
+                <option v-for="attr in rdnCandidates" :key="attr" :value="attr">{{ attr }}</option>
               </select>
-              <button class="btn-secondary" @click="addObjectClass" :disabled="!ocToAdd">Add</button>
+              <p v-if="profile.objectClassNames.length === 0" class="text-xs text-gray-400 mt-1">
+                Add an object class first
+              </p>
             </div>
           </div>
           <div class="flex gap-6">
@@ -402,9 +516,17 @@ function toggleApprover(accountId) {
           <div v-for="(attr, i) in profile.attributeConfigs" :key="i"
             class="border rounded-lg p-3 space-y-2">
             <div class="flex items-center justify-between">
-              <span class="font-medium text-sm">{{ attr.attributeName }}</span>
-              <button class="text-red-500 text-xs hover:underline"
+              <div class="flex items-center gap-2">
+                <span class="font-medium text-sm">{{ attr.attributeName }}</span>
+                <span v-if="isRdnAttribute(attr)"
+                  class="text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5 font-medium">RDN</span>
+                <span v-if="isSchemaRequired(attr)"
+                  class="text-[10px] bg-blue-50 text-blue-600 rounded px-1.5 py-0.5 font-medium">schema required</span>
+              </div>
+              <button v-if="canRemoveAttribute(attr)"
+                class="text-red-500 text-xs hover:underline"
                 @click="profile.attributeConfigs.splice(i, 1)">Remove</button>
+              <span v-else class="text-xs text-gray-400 italic">cannot remove</span>
             </div>
             <div class="grid grid-cols-3 gap-3 text-sm">
               <div>
@@ -418,33 +540,44 @@ function toggleApprover(accountId) {
                     :key="t" :value="t">{{ t }}</option>
                 </select>
               </div>
-              <div>
+              <div v-if="showFieldFor(attr.inputType, 'defaultValue')">
                 <label class="block text-xs text-gray-500">Default Value</label>
                 <input v-model="attr.defaultValue" class="input w-full text-sm" />
               </div>
-              <div>
+              <div v-if="showFieldFor(attr.inputType, 'computedExpression')">
                 <label class="block text-xs text-gray-500">Computed Expression</label>
                 <input v-model="attr.computedExpression" class="input w-full text-sm"
                   placeholder="${givenName}.${sn}@corp.com" />
               </div>
-              <div>
+              <div v-if="showFieldFor(attr.inputType, 'validationRegex')">
                 <label class="block text-xs text-gray-500">Validation Regex</label>
                 <input v-model="attr.validationRegex" class="input w-full text-sm" />
               </div>
-              <div>
+              <div v-if="showFieldFor(attr.inputType, 'allowedValues')">
                 <label class="block text-xs text-gray-500">Allowed Values (JSON array)</label>
                 <input v-model="attr.allowedValues" class="input w-full text-sm"
                   placeholder='["Eng","Finance","HR"]' />
               </div>
             </div>
             <div class="flex gap-4 text-xs">
-              <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.requiredOnCreate" /> Required</label>
+              <label class="flex items-center gap-1">
+                <input type="checkbox" v-model="attr.requiredOnCreate"
+                  :disabled="isRdnAttribute(attr) || isSchemaRequired(attr)" /> Required
+              </label>
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.editableOnCreate" /> Editable (create)</label>
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.editableOnUpdate" /> Editable (update)</label>
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.selfServiceEdit" /> Self-service</label>
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.hidden" /> Hidden</label>
             </div>
           </div>
+        </div>
+
+        <!-- Layout Tab -->
+        <div v-if="modalTab === 'layout'">
+          <FormLayoutDesigner
+            v-model:attributeConfigs="layoutAttributeConfigs"
+            v-model:showDnField="profile.showDnField"
+          />
         </div>
 
         <!-- Groups Tab -->
