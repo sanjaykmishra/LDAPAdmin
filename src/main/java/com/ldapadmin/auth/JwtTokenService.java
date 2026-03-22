@@ -30,8 +30,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class JwtTokenService {
 
-    private static final String CLAIM_TYPE       = "type";
-    private static final String CLAIM_ACCOUNT_ID = "aid";
+    private static final String CLAIM_TYPE         = "type";
+    private static final String CLAIM_ACCOUNT_ID   = "aid";
+    private static final String CLAIM_DN           = "dn";
+    private static final String CLAIM_DIRECTORY_ID = "did";
 
     private final AppProperties appProperties;
 
@@ -42,14 +44,22 @@ public class JwtTokenService {
         Instant now    = Instant.now();
         Instant expiry = now.plusSeconds(appProperties.getJwt().getExpiryMinutes() * 60L);
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(principal.username())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
                 .claim(CLAIM_TYPE, principal.type().name())
-                .claim(CLAIM_ACCOUNT_ID, principal.id().toString())
-                .signWith(signingKey())
-                .compact();
+                .claim(CLAIM_ACCOUNT_ID, principal.id().toString());
+
+        // Self-service tokens carry the user's LDAP DN and directory ID
+        if (principal.dn() != null) {
+            builder.claim(CLAIM_DN, principal.dn());
+        }
+        if (principal.directoryId() != null) {
+            builder.claim(CLAIM_DIRECTORY_ID, principal.directoryId().toString());
+        }
+
+        return builder.signWith(signingKey()).compact();
     }
 
     /**
@@ -66,6 +76,13 @@ public class JwtTokenService {
 
         PrincipalType type = PrincipalType.valueOf(claims.get(CLAIM_TYPE, String.class));
         UUID          id   = UUID.fromString(claims.get(CLAIM_ACCOUNT_ID, String.class));
+
+        if (type == PrincipalType.SELF_SERVICE) {
+            String dn = claims.get(CLAIM_DN, String.class);
+            String didStr = claims.get(CLAIM_DIRECTORY_ID, String.class);
+            UUID directoryId = didStr != null ? UUID.fromString(didStr) : null;
+            return new AuthPrincipal(type, id, claims.getSubject(), dn, directoryId);
+        }
 
         return new AuthPrincipal(type, id, claims.getSubject());
     }

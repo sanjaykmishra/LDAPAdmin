@@ -77,6 +77,22 @@
           </label>
         </div>
 
+        <!-- Self-service settings -->
+        <details class="border border-gray-200 rounded-lg">
+          <summary class="px-4 py-2 text-sm font-medium text-gray-700 cursor-pointer">Self-service portal</summary>
+          <div class="px-4 pb-4 pt-2 space-y-3">
+            <label class="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" v-model="form.selfServiceEnabled" class="rounded" />
+              Enable self-service portal for this directory
+            </label>
+            <div v-if="form.selfServiceEnabled">
+              <FormField label="Login Attribute" v-model="form.selfServiceLoginAttribute"
+                placeholder="uid (or sAMAccountName for AD)" />
+              <p class="text-xs text-gray-400 mt-1">The LDAP attribute used to identify users during self-service login (e.g. uid, sAMAccountName, mail)</p>
+            </div>
+          </div>
+        </details>
+
         <!-- Connection pool settings -->
         <details class="border border-gray-200 rounded-lg">
           <summary class="px-4 py-2 text-sm font-medium text-gray-700 cursor-pointer">Advanced settings</summary>
@@ -154,6 +170,7 @@ function emptyForm() {
     poolConnectTimeoutSeconds: 10, poolResponseTimeoutSeconds: 30,
     enableDisableAttribute: '', enableDisableValueType: 'BOOLEAN',
     enableValue: '', disableValue: '', enabled: true,
+    selfServiceEnabled: false, selfServiceLoginAttribute: 'uid',
   }
 }
 
@@ -190,6 +207,8 @@ function openEdit(d) {
     enableDisableValueType: d.enableDisableValueType || 'BOOLEAN',
     enableValue: d.enableValue || '', disableValue: d.disableValue || '',
     enabled: d.enabled,
+    selfServiceEnabled: d.selfServiceEnabled || false,
+    selfServiceLoginAttribute: d.selfServiceLoginAttribute || 'uid',
   }
   testResult.value = null
   showModal.value = true

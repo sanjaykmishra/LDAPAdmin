@@ -47,7 +47,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (token != null) {
             try {
                 AuthPrincipal principal = jwtTokenService.parse(token);
-                String role = "ROLE_" + principal.type().name(); // ROLE_SUPERADMIN or ROLE_ADMIN
+                String role = "ROLE_" + principal.type().name(); // ROLE_SUPERADMIN, ROLE_ADMIN, or ROLE_SELF_SERVICE
 
                 UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                         principal,

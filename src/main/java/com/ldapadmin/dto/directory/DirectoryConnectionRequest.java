@@ -40,6 +40,8 @@ public record DirectoryConnectionRequest(
         String disableValue,
         UUID auditDataSourceId,
         boolean enabled,
+        boolean selfServiceEnabled,
+        String selfServiceLoginAttribute,
         @Valid List<BaseDnRequest> userBaseDns,
         @Valid List<BaseDnRequest> groupBaseDns) {
 }

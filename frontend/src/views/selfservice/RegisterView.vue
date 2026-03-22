@@ -21,84 +21,118 @@
         </div>
         <h2 class="text-lg font-semibold text-gray-900">Check your email</h2>
         <p class="text-sm text-gray-600">
-          We've sent a verification link to <strong>{{ form.mail }}</strong>.
+          We've sent a verification link to <strong>{{ formData.email }}</strong>.
           Click the link to verify your email address and submit your request for approval.
         </p>
         <div class="bg-gray-50 rounded-lg p-4 text-sm text-gray-500">
-          <p>Your request ID: <code class="bg-gray-200 px-1.5 py-0.5 rounded text-xs">REQ-2026-0042</code></p>
+          <p>Your request ID: <code class="bg-gray-200 px-1.5 py-0.5 rounded text-xs">{{ submitResult.requestId }}</code></p>
           <p class="mt-1">You can check the status of your request at any time.</p>
         </div>
         <div class="flex gap-3 justify-center pt-2">
-          <RouterLink to="/register/status/mock-id" class="btn-secondary">Check Status</RouterLink>
+          <RouterLink :to="`/register/status/${submitResult.requestId}`" class="btn-secondary">Check Status</RouterLink>
           <RouterLink to="/self-service/login" class="btn-primary">Back to Login</RouterLink>
         </div>
       </div>
 
       <!-- Registration form -->
       <form v-else @submit.prevent="handleSubmit" class="space-y-4">
-        <!-- Step 1: Directory & Realm selection -->
+        <!-- Step 1: Directory & Profile selection -->
         <div class="space-y-3">
           <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Directory</h2>
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Directory *</label>
-            <select v-model="form.directoryId" required
+            <select v-model="formData.directoryId" required @change="onDirectoryChange"
               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
               <option value="">-- select directory --</option>
               <option v-for="dir in directories" :key="dir.id" :value="dir.id">{{ dir.displayName }}</option>
             </select>
           </div>
 
-          <div v-if="form.directoryId">
+          <div v-if="formData.directoryId">
             <label class="block text-sm font-medium text-gray-700 mb-1">Profile *</label>
-            <select v-model="form.profileId" required
+            <select v-model="formData.profileId" required @change="onProfileChange"
               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
               <option value="">-- select profile --</option>
               <option v-for="p in profiles" :key="p.id" :value="p.id">{{ p.name }}</option>
             </select>
+            <p v-if="selectedProfileDesc" class="text-xs text-gray-400 mt-1">{{ selectedProfileDesc }}</p>
           </div>
         </div>
 
-        <!-- Step 2: User details (shown after profile selected) -->
-        <template v-if="form.profileId">
+        <!-- Loading form schema -->
+        <div v-if="loadingForm" class="text-center text-gray-500 text-sm py-4">Loading form fields...</div>
+
+        <!-- Step 2: Dynamic fields from ProfileAttributeConfig -->
+        <template v-if="formFields.length > 0">
           <hr class="border-gray-200" />
-          <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Account Details</h2>
 
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
-              <input v-model="form.givenName" type="text" required
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+          <template v-for="(sectionFields, sectionName) in groupedFormFields" :key="sectionName">
+            <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">
+              {{ sectionName === '_default' ? 'Account Details' : sectionName }}
+            </h2>
+
+            <div :class="sectionFields.some(f => f.columnSpan < 3) ? 'grid grid-cols-2 gap-3' : 'space-y-3'">
+              <div v-for="field in sectionFields" :key="field.attributeName"
+                :class="field.columnSpan >= 3 ? 'col-span-2' : ''">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  {{ field.label }} {{ field.required ? '*' : '' }}
+                </label>
+
+                <textarea v-if="field.inputType === 'TEXTAREA'"
+                  v-model="attributeValues[field.attributeName]" rows="2"
+                  :required="field.required"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+
+                <select v-else-if="field.inputType === 'SELECT' && field.allowedValues"
+                  v-model="attributeValues[field.attributeName]"
+                  :required="field.required"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                  <option value="">-- select --</option>
+                  <option v-for="opt in parseAllowedValues(field.allowedValues)" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+
+                <label v-else-if="field.inputType === 'BOOLEAN'" class="flex items-center gap-2 py-1">
+                  <input type="checkbox" v-model="attributeValues[field.attributeName]" class="rounded" />
+                  <span class="text-sm text-gray-700">{{ field.label }}</span>
+                </label>
+
+                <input v-else-if="field.inputType === 'DATE'"
+                  v-model="attributeValues[field.attributeName]"
+                  type="date" :required="field.required"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+
+                <input v-else-if="field.inputType === 'PASSWORD'"
+                  v-model="attributeValues[field.attributeName]"
+                  type="password" :required="field.required"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+
+                <input v-else
+                  v-model="attributeValues[field.attributeName]"
+                  :type="field.inputType === 'DATETIME' ? 'datetime-local' : 'text'"
+                  :required="field.required"
+                  :placeholder="field.label"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+
+                <p v-if="fieldErrors[field.attributeName]" class="text-xs text-red-500 mt-1">
+                  {{ fieldErrors[field.attributeName] }}
+                </p>
+              </div>
             </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
-              <input v-model="form.sn" type="text" required
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
-            </div>
-          </div>
+          </template>
 
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Desired Username *</label>
-            <input v-model="form.uid" type="text" required placeholder="jdoe"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
-          </div>
-
+          <!-- Email (always required) -->
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Email Address *</label>
-            <input v-model="form.mail" type="email" required placeholder="john.doe@example.com"
+            <input v-model="formData.email" type="email" required placeholder="john.doe@example.com"
               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
             <p class="text-xs text-gray-400 mt-1">A verification link will be sent to this address</p>
           </div>
 
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-            <input v-model="form.telephoneNumber" type="tel"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
-          </div>
-
+          <!-- Justification -->
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Justification *</label>
-            <textarea v-model="form.justification" rows="3" required
+            <textarea v-model="formData.justification" rows="3" required
               placeholder="Please explain why you need access..."
               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
           </div>
@@ -124,43 +158,149 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
+import {
+  listRegistrationDirectories,
+  listRegistrationProfiles,
+  getRegistrationForm,
+  submitRegistration,
+} from '@/api/selfservice'
 
 const loading = ref(false)
+const loadingForm = ref(false)
 const errorMsg = ref('')
 const submitted = ref(false)
+const submitResult = ref(null)
 
-const form = reactive({
+const formData = reactive({
   directoryId: '',
   profileId: '',
-  givenName: '',
-  sn: '',
-  uid: '',
-  mail: '',
-  telephoneNumber: '',
+  email: '',
   justification: '',
 })
 
-// Mockup data
-const directories = ref([
-  { id: 'dir-1', displayName: 'Corporate LDAP' },
-])
+const directories = ref([])
+const profiles = ref([])
+const formFields = ref([])
+const attributeValues = reactive({})
+const fieldErrors = reactive({})
 
-const profiles = ref([
-  { id: 'profile-1', name: 'Employees' },
-  { id: 'profile-2', name: 'Contractors' },
-])
+const selectedProfileDesc = computed(() => {
+  const p = profiles.value.find(p => p.id === formData.profileId)
+  return p?.description || ''
+})
+
+const groupedFormFields = computed(() => {
+  const groups = {}
+  for (const field of formFields.value) {
+    const section = field.sectionName || '_default'
+    if (!groups[section]) groups[section] = []
+    groups[section].push(field)
+  }
+  return groups
+})
+
+onMounted(async () => {
+  try {
+    const { data } = await listRegistrationDirectories()
+    directories.value = data
+  } catch { /* no directories */ }
+})
+
+async function onDirectoryChange() {
+  formData.profileId = ''
+  profiles.value = []
+  formFields.value = []
+  errorMsg.value = ''
+  if (!formData.directoryId) return
+  try {
+    const { data } = await listRegistrationProfiles(formData.directoryId)
+    profiles.value = data
+  } catch { /* no profiles */ }
+}
+
+async function onProfileChange() {
+  formFields.value = []
+  errorMsg.value = ''
+  Object.keys(attributeValues).forEach(k => delete attributeValues[k])
+  if (!formData.profileId) return
+
+  loadingForm.value = true
+  try {
+    const { data } = await getRegistrationForm(formData.profileId)
+    formFields.value = data
+    // Initialize attribute values
+    for (const field of data) {
+      if (field.inputType === 'BOOLEAN') {
+        attributeValues[field.attributeName] = false
+      } else {
+        attributeValues[field.attributeName] = ''
+      }
+    }
+  } catch (e) {
+    errorMsg.value = e.response?.data?.detail || 'Failed to load form'
+  } finally {
+    loadingForm.value = false
+  }
+}
+
+function parseAllowedValues(json) {
+  try { return JSON.parse(json) } catch { return [] }
+}
+
+function validateFields() {
+  Object.keys(fieldErrors).forEach(k => delete fieldErrors[k])
+  let valid = true
+  for (const field of formFields.value) {
+    const val = attributeValues[field.attributeName]
+    const strVal = typeof val === 'boolean' ? (val ? 'TRUE' : 'FALSE') : (val || '')
+
+    if (field.required && !strVal) {
+      fieldErrors[field.attributeName] = `${field.label} is required`
+      valid = false
+      continue
+    }
+    if (!strVal) continue
+    if (field.minLength && strVal.length < field.minLength) {
+      fieldErrors[field.attributeName] = `Must be at least ${field.minLength} characters`
+      valid = false
+    }
+    if (field.maxLength && strVal.length > field.maxLength) {
+      fieldErrors[field.attributeName] = `Must be at most ${field.maxLength} characters`
+      valid = false
+    }
+    if (field.validationRegex && !new RegExp(field.validationRegex).test(strVal)) {
+      fieldErrors[field.attributeName] = field.validationMessage || 'Invalid format'
+      valid = false
+    }
+  }
+  return valid
+}
 
 async function handleSubmit() {
+  if (!validateFields()) return
+
   errorMsg.value = ''
   loading.value = true
   try {
-    // Mockup — would call registerSubmit(form)
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    // Build attributes map: { attrName: [value] }
+    const attributes = {}
+    for (const field of formFields.value) {
+      const val = attributeValues[field.attributeName]
+      if (field.inputType === 'BOOLEAN') {
+        attributes[field.attributeName] = [val ? 'TRUE' : 'FALSE']
+      } else if (val) {
+        attributes[field.attributeName] = [val]
+      }
+    }
+
+    const { data } = await submitRegistration(
+      formData.profileId, formData.email, formData.justification, attributes)
+    submitResult.value = data
     submitted.value = true
-  } catch {
-    errorMsg.value = 'Registration failed. Please try again.'
+  } catch (e) {
+    errorMsg.value = e.response?.data?.detail || 'Registration failed. Please try again.'
   } finally {
     loading.value = false
   }

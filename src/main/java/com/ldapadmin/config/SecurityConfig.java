@@ -69,14 +69,20 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // ── Public ────────────────────────────────────────────────────
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/logout").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/self-service/login").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/oidc/authorize").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/oidc/callback").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/settings/branding").permitAll()
+                .requestMatchers("/api/v1/self-service/register/**").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                // ── Self-service portal (SELF_SERVICE principal only) ─────────
+                .requestMatchers("/api/v1/self-service/**").hasRole("SELF_SERVICE")
                 // ── Superadmin-only management plane ──────────────────────────
                 .requestMatchers("/api/v1/superadmin/**").hasRole("SUPERADMIN")
-                // ── Protected (any authenticated user) ────────────────────────
+                // ── Admin endpoints (SUPERADMIN or ADMIN — exclude SELF_SERVICE) ──
+                .requestMatchers("/api/v1/**").hasAnyRole("SUPERADMIN", "ADMIN")
+                // ── Everything else ───────────────────────────────────────────
                 .anyRequest().authenticated()
             )
             // Return RFC 7807 ProblemDetail on missing/invalid JWT (not plain-text 401)

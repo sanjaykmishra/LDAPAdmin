@@ -9,12 +9,15 @@ import com.ldapadmin.dto.ldap.MoveUserRequest;
 import com.ldapadmin.entity.Account;
 import com.ldapadmin.entity.PendingApproval;
 import com.ldapadmin.entity.ProvisioningProfile;
+import com.ldapadmin.entity.RegistrationRequest;
 import com.ldapadmin.entity.enums.ApprovalRequestType;
 import com.ldapadmin.entity.enums.ApprovalStatus;
 import com.ldapadmin.entity.enums.AuditAction;
+import com.ldapadmin.entity.enums.RegistrationStatus;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.repository.AccountRepository;
 import com.ldapadmin.repository.PendingApprovalRepository;
+import com.ldapadmin.repository.RegistrationRequestRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,11 +37,19 @@ public class ApprovalWorkflowService {
 
     private final PendingApprovalRepository approvalRepo;
     private final AccountRepository accountRepo;
+    private final RegistrationRequestRepository registrationRepo;
     private final ProvisioningProfileService profileService;
     private final LdapOperationService ldapOperationService;
     private final AuditService auditService;
     private final ApprovalNotificationService notificationService;
     private final ObjectMapper objectMapper;
+
+    // Lazy to break circular dependency: SelfServiceService → ApprovalWorkflowService → SelfServiceService
+    private final org.springframework.context.ApplicationContext applicationContext;
+
+    private SelfServiceService selfServiceService() {
+        return applicationContext.getBean(SelfServiceService.class);
+    }
 
     @Transactional(readOnly = true)
     public boolean isApprovalRequired(UUID profileId) {
@@ -137,6 +148,8 @@ public class ApprovalWorkflowService {
             executeUserMove(pa, approver);
         } else if (pa.getRequestType() == ApprovalRequestType.GROUP_MEMBER_ADD) {
             executeGroupMemberAdd(pa, approver);
+        } else if (pa.getRequestType() == ApprovalRequestType.SELF_REGISTRATION) {
+            executeSelfRegistration(pa);
         }
 
         pa.setStatus(ApprovalStatus.APPROVED);
@@ -171,6 +184,14 @@ public class ApprovalWorkflowService {
         pa.setReviewedBy(approver.id());
         pa.setReviewedAt(OffsetDateTime.now());
         approvalRepo.save(pa);
+
+        // Update associated registration request if this is a self-registration
+        if (pa.getRequestType() == ApprovalRequestType.SELF_REGISTRATION) {
+            registrationRepo.findByPendingApprovalId(pa.getId()).ifPresent(regReq -> {
+                regReq.setStatus(RegistrationStatus.REJECTED);
+                registrationRepo.save(regReq);
+            });
+        }
 
         auditService.record(approver, pa.getDirectoryId(), AuditAction.APPROVAL_REJECTED,
                 null, Map.of("approvalId", pa.getId().toString(), "reason", reason));
@@ -234,6 +255,16 @@ public class ApprovalWorkflowService {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to deserialize group member add payload", e);
         }
+    }
+
+    private void executeSelfRegistration(PendingApproval pa) {
+        RegistrationRequest regReq = registrationRepo.findByPendingApprovalId(pa.getId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Registration request not found for approval " + pa.getId()));
+        selfServiceService().provisionRegisteredUser(regReq);
+        regReq.setStatus(RegistrationStatus.APPROVED);
+        registrationRepo.save(regReq);
+        log.info("Self-registration approved and provisioned for {}", regReq.getEmail());
     }
 
     private PendingApprovalResponse toResponse(PendingApproval pa) {

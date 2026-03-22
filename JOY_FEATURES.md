@@ -2,35 +2,25 @@
 
 ## Implemented Features
 
-### 1. Toast Notifications ✅
-Global notification system using a Pinia store (`useNotificationStore`) and `NotificationToast.vue` component. Supports success, error, and info types with auto-dismiss (4s for success/info, 6s for error) and animated slide-in transitions. Used across Users, Groups, Bulk, Settings, and other views.
+### 1. Dashboard / Home Page
+**Status: Not Yet Implemented**
+Superadmins currently land on the directories list. A dashboard showing user/group counts per directory, pending approvals, active access review campaigns, recent audit events, and system health would give immediate situational awareness.
 
-### 2. Copy DN to Clipboard ✅
-Reusable `CopyButton.vue` component with copy icon that switches to a checkmark on success. Used in user lists, group lists, edit entry forms, and the directory browser. Includes fallback for older browsers via `execCommand('copy')`.
+### 2. Password Policy Visualization
+**Status: Not Yet Implemented**
+When resetting a user's password or viewing their account, show the LDAP password policy status: days until expiration, lockout status, failed login attempts, grace logins remaining. This is the #1 helpdesk pain point in LDAP environments. (Note: the password-reset modal does include a client-side strength meter, but no server-side policy status is displayed.)
 
-### 3. Saved Search Filters / Bookmarks ✅
-In `LdapSearchView.vue`, users can save named LDAP search filters and reload them from a dropdown. Searches are persisted in browser localStorage (`ldap-saved-searches`). Includes a "Clear saved" option.
+### 3. Saved Search Filters / Bookmarks
+**Status: Implemented**
+The LDAP Search view (`LdapSearchView.vue`) supports saving named searches to `localStorage`. Users can save the current base DN, scope, filter, attributes, and limit under a named entry, then quickly reload saved searches from a dropdown. A "Clear saved" button is also provided.
 
-### 4. Search History / Recent Searches ✅
-Recent LDAP searches stored in localStorage with quick-access buttons for previously used filters and a "Clear History" option. Located in `LdapSearchView.vue`.
+### 4. Entry Comparison / Diff View
+**Status: Not Yet Implemented**
+Side-by-side comparison of two LDAP entries — invaluable for troubleshooting "why does user A have access but user B doesn't?" scenarios. Highlight attribute differences.
 
-### 5. Bulk Actions from Search Results ✅
-`DataTable.vue` supports checkbox selection with "Select All" and indeterminate state. `UserListView.vue` provides a bulk attribute update modal supporting SET (replace), ADD, and DELETE operations on multiple selected users simultaneously.
-
-### 6. Bulk Import/Export ✅
-`BulkView.vue` provides CSV import with preview, CSV export for users and groups, template-driven import with object class and RDN attribute specification, conflict handling strategies, and result summaries showing Created/Updated/Skipped/Errors counts.
-
-### 7. Client-Side Form Validation ✅
-`FormField.vue` provides required field indicators (red asterisks), HTML5 validation attributes, focus ring styling, and hint text. `UserListView.vue` includes a password strength meter with color-coded levels and confirm-password matching validation.
-
-### 9. Form Layout Designer ✅
-`FormLayoutDesigner.vue` offers live form preview during design, drag-and-drop field reordering, column span control, section grouping with customizable names, required field indicators, and computed DN display.
-
-### 10. Branding / Theming ✅
-`SettingsView.vue` and `ApplicationSettings.java` support customizable application name, logo URL, and primary/secondary color selection via color picker. Settings are persisted in the database.
-
-### 10. Column Sorting ✅
-`DataTable.vue` supports sortable columns across user, group, and other list views.
+### 5. Keyboard Shortcuts
+**Status: Not Yet Implemented**
+`/` to search, `n` for new user, `g u` for users, `g g` for groups, `Esc` to close modals. Power users in enterprise tools live on keyboard shortcuts.
 
 ---
 
@@ -48,26 +38,49 @@ Side-by-side comparison of two LDAP entries to troubleshoot "why does user A hav
 ### Keyboard Shortcuts
 `/` to search, `n` for new user, `g u` for users, `g g` for groups, `Esc` to close modals. Power users in enterprise tools live on keyboard shortcuts.
 
-### User Lifecycle Playbooks
-Onboarding and offboarding templates: "When onboarding an employee, add to these 5 groups, set these attributes, notify these people." Offboarding: disable account, remove from all groups, move to archived OU — all in one click.
+### 6. User Lifecycle Playbooks
+**Status: Not Yet Implemented**
+Onboarding and offboarding templates: "When onboarding an employee, add to these 5 groups, set these attributes, notify these people." Offboarding: disable account, remove from all groups, move to archived OU — all in one click. (Note: user templates exist for defining attribute schemas during creation, but not multi-step lifecycle playbooks.)
 
-### Scheduled Integrity Checks with Alerts
-Run integrity checks on a schedule (daily/weekly) and email results when issues are found. Proactive rather than reactive.
+### 7. Scheduled Reports with Email Delivery
+**Status: Implemented**
+Scheduled report jobs are fully supported (`ScheduledReportJobController`, `ReportJobsView.vue`). Admins can create scheduled jobs with configurable report types, lookback periods, and cron-like scheduling. Reports can also be run on-demand with CSV download. SMTP settings are configurable in the application settings for email delivery. Referential integrity checks (`IntegrityCheckView.vue`) exist as an on-demand tool but are not yet schedulable with automated alerting.
 
-### Webhooks / Event Notifications
+### 8. Webhooks / Event Notifications
+**Status: Not Yet Implemented**
 Fire webhooks on key events (user created, group membership changed, approval needed) so external systems (Slack, ServiceNow, SIEM) can integrate.
 
-### Approval Delegation & Escalation
-Allow approvers to delegate to another admin when they're out of office. Auto-escalate if no action is taken within X days.
+### 9. Approval Delegation & Escalation
+**Status: Not Yet Implemented**
+The approval workflow is implemented (`PendingApprovalsView.vue`, `ApprovalController`) with approve/reject actions, but delegation to another admin when out of office and auto-escalation after X days are not yet built.
 
-### Dark Mode
-A toggle in settings — especially appreciated by admins who live in the tool all day.
+---
 
-### Inline Attribute Editing
-Click-to-edit on user/group attributes directly from the list or detail view instead of opening a full form. Feels much faster for quick fixes.
+## Polish & Delight
 
-### i18n / Multi-Language
-Enterprise deployments in non-English-speaking organizations need this. Vue i18n makes it relatively straightforward.
+### 10. Dark Mode
+**Status: Not Yet Implemented**
+A toggle in settings — especially appreciated by admins who live in the tool all day. (The settings store supports dynamic primary/secondary colour theming via CSS custom properties, which could serve as a foundation.)
+
+### 11. Inline Attribute Editing
+**Status: Partially Implemented**
+The Directory Browser (`DirectoryBrowserView.vue`) has an `EditEntryForm` component that allows editing attributes of any entry in the DIT. The User List view supports editing via a modal form. However, true click-to-edit directly from list/table cells (without opening a separate form or modal) is not yet implemented.
+
+### 12. Activity Timeline per Entry
+**Status: Not Yet Implemented**
+On a user or group detail page, show a timeline of all changes: "March 15 — added to VPN Users by admin@corp", "March 10 — password reset by helpdesk". The audit log infrastructure exists (per-directory audit log with filterable events in `AuditLogView.vue`, plus external audit data sources), but a per-entry timeline view is not yet built.
+
+### 13. Bulk Actions from Search Results
+**Status: Implemented**
+The User List view (`UserListView.vue`) supports multi-select via checkboxes on the `DataTable` component. Selected users can have bulk attribute updates applied (set/add/remove operations on arbitrary attributes). The Bulk Import/Export view (`BulkView.vue`) additionally supports CSV-based bulk operations for both users and groups, with configurable column-mapping templates.
+
+### 14. Client-Side Form Validation
+**Status: Partially Implemented**
+The `FormField` component supports `required` attributes and hint text. The password reset modal includes a real-time password strength meter (weak/fair/good/strong) with visual progress bar and confirmation matching. However, regex-pattern validation, DN format validation, and other advanced client-side rules are not yet implemented.
+
+### 15. i18n / Multi-Language
+**Status: Not Yet Implemented**
+Enterprise deployments in non-English-speaking organizations need this. Vue i18n makes it relatively straightforward. No `vue-i18n` integration exists in the codebase.
 
 ### Toast Notifications with Undo
 Extend the existing toast system with a 5-second undo button for destructive actions (e.g., "User deleted — Undo").
@@ -75,14 +88,43 @@ Extend the existing toast system with a 5-second undo button for destructive act
 ### Activity Timeline per Entry
 On a user or group detail page, show a timeline of all changes: "March 15 — added to VPN Users by admin@corp", "March 10 — password reset by helpdesk". Pulls from audit log data you already have.
 
-### Relative Timestamps
-"2 hours ago" instead of "2026-03-22T08:30:00Z"
+## Quick Wins
 
-### Empty State Illustrations
-Friendly graphics instead of bare "No data found" text on empty tables and search results.
+| Feature | Status |
+|---|---|
+| **Toast notifications** | Implemented — `NotificationToast.vue` with success/error/info types, auto-dismiss, and dismiss button. No undo support yet. |
+| **Recent items** | Not yet implemented — no quick-access list of recently viewed users/groups. |
+| **Copy DN to clipboard** | Implemented — `CopyButton.vue` is used on user DNs in the list view and in the Directory Browser's edit form. One-click copy with visual feedback. |
+| **Relative timestamps** | Not yet implemented — dates are displayed using standard formatting, not "2 hours ago" style. |
+| **Empty state illustrations** | Not yet implemented — empty states show plain text ("No records found.") via the `DataTable` component's `emptyText` prop. |
+| **Column sorting & persistence** | Not yet implemented — `DataTable` does not support clickable column sorting or persisted sort preferences. |
+
+---
+
+## Additional Implemented Features (Not in Original List)
+
+These significant features have been built but were not part of the original recommendations:
+
+- **Access Review Campaigns** — Full lifecycle for periodic access reviews: create campaigns scoped to groups, assign reviewers, collect approve/revoke decisions, with recurrence scheduling.
+- **Approval Workflow** — Operations (user creation, group membership, user moves) can require approval before executing. Pending approvals are managed in a dedicated view.
+- **Self-Service Portal** — End users can log in via a separate self-service flow to view/edit their profile, change their password, and manage group memberships.
+- **Self-Registration** — Public registration with email verification and admin approval flow.
+- **User Templates** — Define attribute schemas (required fields, object classes, RDN attribute) per template. Templates are linked to realms and drive the user creation form.
+- **Realms** — Logical groupings within a directory (user base DN, group base DN, linked templates) enabling multi-tenant-like scoping.
+- **Schema Browser** — Introspect LDAP schema: object classes, attribute types, and their properties.
+- **Directory Browser** — Two-panel DIT browser with tree navigation, entry detail view, inline editing, LDIF import, and entry creation.
+- **LDAP Search** — Advanced search with configurable base DN, scope, filter, attributes, and result limits. Includes search history and saved searches.
+- **CSV Import/Export** — Bulk user and group operations via CSV with configurable column-mapping templates. Preview before import, dry-run mode.
+- **Referential Integrity Checker** — On-demand checks for broken member references, orphaned entries, and empty groups.
+- **Audit Log** — Per-directory audit log with date range and action type filtering, pagination. Supports external audit data sources.
+- **Multi-Auth Support** — Local, LDAP bind, and OIDC authentication methods, configurable in application settings.
+- **Branding & Theming** — Configurable app name, logo URL, and primary/secondary colours applied as CSS custom properties.
+- **RBAC** — Superadmin and realm-scoped admin roles with feature-level permission checks.
 
 ---
 
 ## Recommended Next Priorities
 
-The biggest bang for the buck would be **Dashboard**, **Password Policy Visualization**, and **Keyboard Shortcuts** — they address the most frequent admin workflows and the saved search/bookmark feature is already in place.
+The biggest bang for the buck would be **Dashboard**, **Password Policy Visualization**, and **Activity Timeline per Entry** — they address the most frequent admin workflows and leverage existing infrastructure (audit log, directory connections).
+
+For quick wins, **column sorting in DataTable** and **relative timestamps** would polish the existing UI significantly with minimal effort.

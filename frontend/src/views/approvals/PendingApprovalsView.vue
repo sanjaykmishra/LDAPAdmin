@@ -117,7 +117,14 @@ function fmtDate(val) {
 }
 
 function formatType(type) {
-  return type === 'USER_CREATE' ? 'User Create' : type === 'BULK_IMPORT' ? 'Bulk Import' : type
+  const labels = {
+    USER_CREATE: 'User Create',
+    BULK_IMPORT: 'Bulk Import',
+    USER_MOVE: 'User Move',
+    GROUP_MEMBER_ADD: 'Group Member Add',
+    SELF_REGISTRATION: 'Self-Registration',
+  }
+  return labels[type] || type
 }
 
 function statusClass(status) {
