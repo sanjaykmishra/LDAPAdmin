@@ -38,6 +38,7 @@ class ApplicationSettingsControllerTest extends BaseControllerTest {
         return new ApplicationSettingsDto(
                 UUID.randomUUID(),
                 "LDAPAdmin", null, null, null,
+                false,
                 30,
                 null, null, null, null, false, false,
                 null, null, null, false, null, 24,
@@ -54,6 +55,7 @@ class ApplicationSettingsControllerTest extends BaseControllerTest {
     UpdateApplicationSettingsRequest sampleUpdateRequest() {
         return new UpdateApplicationSettingsRequest(
                 "LDAPAdmin", null, null, null,
+                false,
                 30,
                 null, null, null, null, null, false,
                 null, null, null, null, null, 1,
