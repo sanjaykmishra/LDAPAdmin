@@ -71,7 +71,7 @@ const activeTab = ref('ALL')
 
 const tabs = [
   { label: 'All', value: 'ALL' },
-  { label: 'Draft', value: 'DRAFT' },
+  { label: 'Upcoming', value: 'UPCOMING' },
   { label: 'Active', value: 'ACTIVE' },
   { label: 'Closed', value: 'CLOSED' },
 ]
@@ -95,7 +95,7 @@ const filteredCampaigns = computed(() => {
 function statusClass(status) {
   const base = 'px-2 py-0.5 rounded-full text-xs font-medium'
   switch (status) {
-    case 'DRAFT': return base + ' bg-gray-100 text-gray-800'
+    case 'UPCOMING': return base + ' bg-gray-100 text-gray-800'
     case 'ACTIVE': return base + ' bg-blue-100 text-blue-800'
     case 'CLOSED': return base + ' bg-green-100 text-green-800'
     case 'CANCELLED': return base + ' bg-red-100 text-red-800'

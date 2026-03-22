@@ -48,7 +48,7 @@ class AccessReviewControllerTest extends BaseControllerTest {
 
     @Test
     void listCampaigns_returns200() throws Exception {
-        var summary = new CampaignSummaryDto(campaignId, "Q1 Review", CampaignStatus.DRAFT,
+        var summary = new CampaignSummaryDto(campaignId, "Q1 Review", CampaignStatus.UPCOMING,
                 null, OffsetDateTime.now().plusDays(30), 30, null, OffsetDateTime.now(), "admin",
                 new CampaignProgressDto(0, 0, 0, 0, 0));
         when(campaignService.list(eq(dirId), any(Pageable.class)))
@@ -78,7 +78,7 @@ class AccessReviewControllerTest extends BaseControllerTest {
         campaign.setId(campaignId);
         when(campaignService.create(eq(dirId), any(), any())).thenReturn(campaign);
         when(campaignService.get(campaignId)).thenReturn(
-                new CampaignDetailDto(campaignId, "Q1 Review", "Test", CampaignStatus.DRAFT,
+                new CampaignDetailDto(campaignId, "Q1 Review", "Test", CampaignStatus.UPCOMING,
                         null, OffsetDateTime.now().plusDays(30), 30, null, false, false,
                         OffsetDateTime.now(), null, "admin",
                         new CampaignProgressDto(0, 0, 0, 0, 0), List.of(), List.of()));
@@ -125,7 +125,7 @@ class AccessReviewControllerTest extends BaseControllerTest {
         campaign.setId(campaignId);
         when(campaignService.create(eq(dirId), any(), any())).thenReturn(campaign);
         when(campaignService.get(campaignId)).thenReturn(
-                new CampaignDetailDto(campaignId, "Quarterly Review", null, CampaignStatus.DRAFT,
+                new CampaignDetailDto(campaignId, "Quarterly Review", null, CampaignStatus.UPCOMING,
                         null, OffsetDateTime.now().plusDays(30), 30, 3, false, false,
                         OffsetDateTime.now(), null, "admin",
                         new CampaignProgressDto(0, 0, 0, 0, 0), List.of(), List.of()));

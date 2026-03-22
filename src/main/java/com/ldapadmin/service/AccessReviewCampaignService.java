@@ -66,7 +66,7 @@ public class AccessReviewCampaignService {
         campaign.setAutoRevoke(req.autoRevoke());
         campaign.setAutoRevokeOnExpiry(req.autoRevokeOnExpiry());
         campaign.setCreatedBy(creator);
-        campaign.setStatus(CampaignStatus.DRAFT);
+        campaign.setStatus(CampaignStatus.UPCOMING);
 
         for (CreateCampaignRequest.GroupAssignment ga : req.groups()) {
             Account reviewer = accountRepo.findById(ga.reviewerAccountId())
@@ -91,7 +91,7 @@ public class AccessReviewCampaignService {
         }
 
         campaign = campaignRepo.save(campaign);
-        recordHistory(campaign, null, CampaignStatus.DRAFT, creator, "Campaign created");
+        recordHistory(campaign, null, CampaignStatus.UPCOMING, creator, "Campaign created");
 
         auditService.record(principal, directoryId, AuditAction.CAMPAIGN_CREATED,
                 null, Map.of("campaignName", req.name(), "campaignId", campaign.getId().toString()));
@@ -102,8 +102,8 @@ public class AccessReviewCampaignService {
     @Transactional
     public AccessReviewCampaign activate(UUID campaignId, AuthPrincipal principal) {
         AccessReviewCampaign campaign = getCampaignOrThrow(campaignId);
-        if (campaign.getStatus() != CampaignStatus.DRAFT) {
-            throw new LdapAdminException("Can only activate campaigns in DRAFT status");
+        if (campaign.getStatus() != CampaignStatus.UPCOMING) {
+            throw new LdapAdminException("Can only activate campaigns in UPCOMING status");
         }
 
         DirectoryConnection dir = campaign.getDirectory();
@@ -187,8 +187,8 @@ public class AccessReviewCampaignService {
     @Transactional
     public AccessReviewCampaign cancel(UUID campaignId, AuthPrincipal principal) {
         AccessReviewCampaign campaign = getCampaignOrThrow(campaignId);
-        if (campaign.getStatus() != CampaignStatus.DRAFT && campaign.getStatus() != CampaignStatus.ACTIVE) {
-            throw new LdapAdminException("Can only cancel campaigns in DRAFT or ACTIVE status");
+        if (campaign.getStatus() != CampaignStatus.UPCOMING && campaign.getStatus() != CampaignStatus.ACTIVE) {
+            throw new LdapAdminException("Can only cancel campaigns in UPCOMING or ACTIVE status");
         }
 
         Account actor = accountRepo.findById(principal.id())
@@ -320,7 +320,7 @@ public class AccessReviewCampaignService {
         followUp.setAutoRevoke(source.isAutoRevoke());
         followUp.setAutoRevokeOnExpiry(source.isAutoRevokeOnExpiry());
         followUp.setCreatedBy(creator);
-        followUp.setStatus(CampaignStatus.DRAFT);
+        followUp.setStatus(CampaignStatus.UPCOMING);
         followUp.setSourceCampaign(source);
 
         for (AccessReviewGroup srcGroup : source.getReviewGroups()) {
@@ -334,7 +334,7 @@ public class AccessReviewCampaignService {
         }
 
         followUp = campaignRepo.save(followUp);
-        recordHistory(followUp, null, CampaignStatus.DRAFT, creator,
+        recordHistory(followUp, null, CampaignStatus.UPCOMING, creator,
                 "Recurring follow-up created from campaign '" + source.getName() + "'");
 
         auditService.record(systemPrincipal, source.getDirectory().getId(), AuditAction.CAMPAIGN_CREATED,

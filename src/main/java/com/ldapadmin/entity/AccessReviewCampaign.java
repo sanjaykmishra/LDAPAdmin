@@ -32,7 +32,7 @@ public class AccessReviewCampaign {
     private String description;
 
     @Enumerated(EnumType.STRING)
-    private CampaignStatus status = CampaignStatus.DRAFT;
+    private CampaignStatus status = CampaignStatus.UPCOMING;
 
     private OffsetDateTime startsAt;
     private OffsetDateTime deadline;

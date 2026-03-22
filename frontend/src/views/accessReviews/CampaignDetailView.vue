@@ -21,10 +21,10 @@
           </div>
         </div>
         <div class="flex gap-2">
-          <button v-if="campaign.status === 'DRAFT'" @click="handleActivate" :disabled="loading" class="btn-primary text-sm">Activate</button>
+          <button v-if="campaign.status === 'UPCOMING'" @click="handleActivate" :disabled="loading" class="btn-primary text-sm">Activate</button>
           <button v-if="campaign.status === 'ACTIVE'" @click="handleClose(false)" :disabled="loading" class="btn-primary text-sm">Close</button>
           <button v-if="campaign.status === 'ACTIVE'" @click="handleClose(true)" :disabled="loading" class="text-sm px-3 py-1.5 rounded-lg bg-orange-600 text-white hover:bg-orange-700">Force Close</button>
-          <button v-if="campaign.status === 'DRAFT' || campaign.status === 'ACTIVE'" @click="handleCancel" :disabled="loading" class="text-sm px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700">Cancel</button>
+          <button v-if="campaign.status === 'UPCOMING' || campaign.status === 'ACTIVE'" @click="handleCancel" :disabled="loading" class="text-sm px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700">Cancel</button>
           <button @click="handleExport" class="btn-secondary text-sm">Export CSV</button>
         </div>
       </div>
@@ -138,7 +138,7 @@ const groupCols = [
 function statusClass(status) {
   const base = 'px-2 py-0.5 rounded-full text-xs font-medium'
   switch (status) {
-    case 'DRAFT': return base + ' bg-gray-100 text-gray-800'
+    case 'UPCOMING': return base + ' bg-gray-100 text-gray-800'
     case 'ACTIVE': return base + ' bg-blue-100 text-blue-800'
     case 'CLOSED': return base + ' bg-green-100 text-green-800'
     case 'CANCELLED': return base + ' bg-red-100 text-red-800'
