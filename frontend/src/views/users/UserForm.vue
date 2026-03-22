@@ -260,17 +260,11 @@ const local = reactive({
   attributes: { ...(props.data.attributes || {}) }
 })
 
-// Ensure SELECT fields have their defaultValue resolved against actual option values
+// Ensure SELECT fields have their defaultValue applied even if emptyForm() missed them
 if (!props.isEdit && props.userTemplateConfig?.attributeConfigs) {
   for (const attr of props.userTemplateConfig.attributeConfigs) {
-    if (attr.inputType === 'SELECT' && attr.allowedValues) {
-      const options = parseOptions(attr.allowedValues)
-      const current = local.attributes[attr.attributeName] || attr.defaultValue || ''
-      if (current) {
-        // Match case-insensitively against the actual option values
-        const match = options.find(o => o.value.toLowerCase() === current.toLowerCase())
-        local.attributes[attr.attributeName] = match ? match.value : current
-      }
+    if (attr.inputType === 'SELECT' && attr.defaultValue && !local.attributes[attr.attributeName]) {
+      local.attributes[attr.attributeName] = attr.defaultValue
     }
   }
 }
