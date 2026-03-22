@@ -3,11 +3,15 @@ package com.ldapadmin.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ldapadmin.controller.directory.AccessReviewController;
 import com.ldapadmin.dto.accessreview.*;
+import com.ldapadmin.dto.admin.AdminAccountResponse;
 import com.ldapadmin.entity.AccessReviewCampaign;
+import com.ldapadmin.entity.enums.AccountRole;
+import com.ldapadmin.entity.enums.AccountType;
 import com.ldapadmin.entity.enums.CampaignStatus;
 import com.ldapadmin.entity.enums.ReviewDecision;
 import com.ldapadmin.service.AccessReviewCampaignService;
 import com.ldapadmin.service.AccessReviewDecisionService;
+import com.ldapadmin.service.AdminManagementService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -36,6 +40,7 @@ class AccessReviewControllerTest extends BaseControllerTest {
 
     @MockBean private AccessReviewCampaignService campaignService;
     @MockBean private AccessReviewDecisionService decisionService;
+    @MockBean private AdminManagementService adminService;
 
     private final UUID dirId = UUID.randomUUID();
     private final UUID campaignId = UUID.randomUUID();
@@ -53,6 +58,18 @@ class AccessReviewControllerTest extends BaseControllerTest {
                         .with(authentication(superadminAuth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].name").value("Q1 Review"));
+    }
+
+    @Test
+    void listReviewers_returns200() throws Exception {
+        var reviewer = new AdminAccountResponse(UUID.randomUUID(), "reviewer1", "Reviewer One",
+                "r@test.com", AccountRole.ADMIN, AccountType.LOCAL, null, true, null, null, null);
+        when(adminService.listAdmins()).thenReturn(List.of(reviewer));
+
+        mvc.perform(get("/api/v1/directories/{dirId}/access-reviews/reviewers", dirId)
+                        .with(authentication(superadminAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].username").value("reviewer1"));
     }
 
     @Test
