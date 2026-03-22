@@ -317,8 +317,14 @@ watch(() => props.attributeConfigs, (newConfigs) => {
   const visibleConfigs = newConfigs.filter(a => !a.hidden)
   const incomingNames = new Set(visibleConfigs.map(a => a.attributeName))
 
+  // Detect RDN change (even when attribute set hasn't changed)
+  const incomingRdn = visibleConfigs.find(a => a.rdn)?.attributeName || null
+  const currentRdn = sections.value.flatMap(s => s.fields).find(f => f.rdn)?.attributeName || null
+  const rdnChanged = incomingRdn !== currentRdn
+
   // Nothing changed — skip
   if (
+    !rdnChanged &&
     currentNames.size === incomingNames.size &&
     [...currentNames].every(n => incomingNames.has(n))
   ) return
@@ -335,6 +341,27 @@ watch(() => props.attributeConfigs, (newConfigs) => {
       if (field.rdn && localShowDnField.value) field.columnSpan = 1
       sections.value[0].fields.push(field)
     }
+  }
+
+  // Sync RDN flag changes and move new RDN to first position
+  if (rdnChanged) {
+    for (const section of sections.value) {
+      for (const field of section.fields) {
+        field.rdn = field.attributeName === incomingRdn
+      }
+    }
+    // Move the new RDN field to index 0 of the first section
+    for (let s = 0; s < sections.value.length; s++) {
+      const rdnIdx = sections.value[s].fields.findIndex(f => f.rdn)
+      if (rdnIdx >= 0) {
+        if (s === 0 && rdnIdx === 0) break // already in place
+        const [rdnF] = sections.value[s].fields.splice(rdnIdx, 1)
+        if (localShowDnField.value) rdnF.columnSpan = 1
+        sections.value[0].fields.unshift(rdnF)
+        break
+      }
+    }
+    syncToParent()
   }
 }, { deep: true })
 
