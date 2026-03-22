@@ -146,7 +146,7 @@ public class ReportExecutionService {
 
         var page = auditEventRepo.findAll(
                 directoryId, null, AuditAction.USER_DELETE.getDbValue(),
-                from, null, Pageable.unpaged());
+                null, from, null, Pageable.unpaged());
 
         List<String> columns = List.of("dn", "deletedBy", "deletedAt");
         List<Map<String, String>> rows = page.getContent().stream()

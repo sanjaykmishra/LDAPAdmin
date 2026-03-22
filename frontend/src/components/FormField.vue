@@ -33,6 +33,7 @@
         @change="$emit('update:modelValue', $event.target.value)"
         class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
       >
+        <option v-if="!modelValue" value="" disabled selected>Select…</option>
         <option v-for="opt in options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
       </select>
     </slot>
