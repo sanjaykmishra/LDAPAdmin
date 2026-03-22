@@ -13,6 +13,8 @@ public record CampaignDetailDto(
         CampaignStatus status,
         OffsetDateTime startsAt,
         OffsetDateTime deadline,
+        Integer deadlineDays,
+        Integer recurrenceMonths,
         boolean autoRevoke,
         boolean autoRevokeOnExpiry,
         OffsetDateTime createdAt,

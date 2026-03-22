@@ -78,6 +78,7 @@ const router = createRouter({
           path: 'directories/:dirId/access-reviews/new',
           name: 'accessReviewCreate',
           component: () => import('@/views/accessReviews/CampaignCreateView.vue'),
+          meta: { requiresSuperadmin: true },
         },
         {
           path: 'directories/:dirId/access-reviews/:campaignId',
