@@ -8,7 +8,7 @@
           <button @click="$emit('update:modelValue', false)" class="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
         </div>
         <!-- Body -->
-        <div class="px-6 py-4 overflow-y-auto max-h-[80vh]">
+        <div class="px-6 py-4 overflow-y-auto" :style="{ height: fixedHeight || undefined, maxHeight: fixedHeight ? undefined : '80vh' }">
           <slot />
         </div>
         <!-- Footer -->
@@ -26,6 +26,7 @@ const props = defineProps({
   modelValue: Boolean,
   title: { type: String, default: '' },
   size: { type: String, default: 'md' }, // sm | md | lg | xl
+  fixedHeight: { type: String, default: '' }, // e.g. '60vh' — locks body height so tabs don't resize
 })
 defineEmits(['update:modelValue'])
 const sizeClass = computed(() => ({

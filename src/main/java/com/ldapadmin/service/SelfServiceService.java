@@ -91,8 +91,8 @@ public class SelfServiceService {
                         c.getMinLength(),
                         c.getMaxLength(),
                         c.getSelfServiceSectionName() != null ? c.getSelfServiceSectionName() : c.getSectionName(),
-                        c.getSelfServiceColumnSpan(),
-                        c.getSelfServiceDisplayOrder()))
+                        c.getSelfServiceColumnSpan() != null ? c.getSelfServiceColumnSpan() : c.getColumnSpan(),
+                        c.getSelfServiceDisplayOrder() != null ? c.getSelfServiceDisplayOrder() : c.getDisplayOrder()))
                 .toList();
 
         return new SelfServiceTemplateResponse(profile.getId(), profile.getName(), fields);
@@ -281,8 +281,8 @@ public class SelfServiceService {
                         c.getMinLength(),
                         c.getMaxLength(),
                         c.getRegistrationSectionName() != null ? c.getRegistrationSectionName() : c.getSectionName(),
-                        c.getRegistrationColumnSpan(),
-                        c.getRegistrationDisplayOrder()))
+                        c.getRegistrationColumnSpan() != null ? c.getRegistrationColumnSpan() : c.getColumnSpan(),
+                        c.getRegistrationDisplayOrder() != null ? c.getRegistrationDisplayOrder() : c.getDisplayOrder()))
                 .toList();
     }
 

@@ -90,7 +90,7 @@ public class ProfileAttributeConfig {
     private String sectionName;
 
     @Column(name = "column_span", nullable = false)
-    private int columnSpan = 3;
+    private int columnSpan = 6;
 
     @Column(name = "display_order", nullable = false)
     private int displayOrder = 0;
@@ -103,20 +103,20 @@ public class ProfileAttributeConfig {
     @Column(name = "registration_section_name", length = 100)
     private String registrationSectionName;
 
-    @Column(name = "registration_column_span", nullable = false)
-    private int registrationColumnSpan = 3;
+    @Column(name = "registration_column_span")
+    private Integer registrationColumnSpan;
 
-    @Column(name = "registration_display_order", nullable = false)
-    private int registrationDisplayOrder = 0;
+    @Column(name = "registration_display_order")
+    private Integer registrationDisplayOrder;
 
     // ── Self-service-specific layout ─────────────────────────────────────────
 
     @Column(name = "self_service_section_name", length = 100)
     private String selfServiceSectionName;
 
-    @Column(name = "self_service_column_span", nullable = false)
-    private int selfServiceColumnSpan = 3;
+    @Column(name = "self_service_column_span")
+    private Integer selfServiceColumnSpan;
 
-    @Column(name = "self_service_display_order", nullable = false)
-    private int selfServiceDisplayOrder = 0;
+    @Column(name = "self_service_display_order")
+    private Integer selfServiceDisplayOrder;
 }
