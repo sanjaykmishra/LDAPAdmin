@@ -401,13 +401,11 @@ function evaluateComputedExpressions() {
   for (const attr of props.userTemplateConfig.attributeConfigs) {
     if (!attr.computedExpression) continue
     const expr = attr.computedExpression
-    let resolved = expr.replace(/\$\{(\w+)\}/g, (_, name) => {
+    const resolved = expr.replace(/\$\{(\w+)\}/g, (_, name) => {
       // Check rdnValue first since it's stored separately
       if (name === local.rdnAttribute) return local.rdnValue || ''
       return local.attributes[name] || ''
     })
-    // Evaluate + concatenation with quoted strings, e.g. +" "+ or +' '+
-    resolved = resolved.replace(/\+["']([^"']*)["']/g, '$1').replace(/["']([^"']*)["']\+/g, '$1')
     // Only set if expression produced a meaningful result (not all placeholders empty)
     if (resolved !== expr || !expr.includes('${')) {
       local.attributes[attr.attributeName] = resolved

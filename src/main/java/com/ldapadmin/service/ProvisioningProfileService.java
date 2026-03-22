@@ -338,10 +338,7 @@ public class ProvisioningProfileService {
             matcher.appendReplacement(result, Matcher.quoteReplacement(replacement));
         }
         matcher.appendTail(result);
-        // Evaluate + concatenation with quoted strings, e.g. +" "+ or +' '+
-        return result.toString()
-                .replaceAll("\\+[\"']([^\"']*)[\"']", "$1")
-                .replaceAll("[\"']([^\"']*)[\"']\\+", "$1");
+        return result.toString();
     }
 
     /**
