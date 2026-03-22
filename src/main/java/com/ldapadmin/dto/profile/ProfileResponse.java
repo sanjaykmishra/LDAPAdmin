@@ -47,11 +47,11 @@ public record ProfileResponse(
             int displayOrder,
             boolean hidden,
             String registrationSectionName,
-            int registrationColumnSpan,
-            int registrationDisplayOrder,
+            Integer registrationColumnSpan,
+            Integer registrationDisplayOrder,
             String selfServiceSectionName,
-            int selfServiceColumnSpan,
-            int selfServiceDisplayOrder) {
+            Integer selfServiceColumnSpan,
+            Integer selfServiceDisplayOrder) {
 
         public static AttributeConfigEntry from(ProfileAttributeConfig c) {
             return new AttributeConfigEntry(

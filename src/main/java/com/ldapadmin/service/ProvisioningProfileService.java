@@ -501,15 +501,15 @@ public class ProvisioningProfileService {
             c.setMinLength(e.minLength());
             c.setMaxLength(e.maxLength());
             c.setSectionName(e.sectionName());
-            c.setColumnSpan(e.columnSpan() != null ? e.columnSpan() : 3);
+            c.setColumnSpan(e.columnSpan() != null ? e.columnSpan() : 6);
             c.setDisplayOrder(i);
             c.setHidden(e.hidden());
             c.setRegistrationSectionName(e.registrationSectionName());
-            c.setRegistrationColumnSpan(e.registrationColumnSpan() != null ? e.registrationColumnSpan() : 3);
-            c.setRegistrationDisplayOrder(i);
+            c.setRegistrationColumnSpan(e.registrationColumnSpan());
+            c.setRegistrationDisplayOrder(e.registrationColumnSpan() != null ? i : null);
             c.setSelfServiceSectionName(e.selfServiceSectionName());
-            c.setSelfServiceColumnSpan(e.selfServiceColumnSpan() != null ? e.selfServiceColumnSpan() : 3);
-            c.setSelfServiceDisplayOrder(i);
+            c.setSelfServiceColumnSpan(e.selfServiceColumnSpan());
+            c.setSelfServiceDisplayOrder(e.selfServiceColumnSpan() != null ? i : null);
             attrConfigRepo.save(c);
         }
     }

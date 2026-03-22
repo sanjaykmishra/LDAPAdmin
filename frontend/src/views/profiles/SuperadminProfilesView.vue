@@ -131,10 +131,10 @@ async function openEdit(p) {
       allowedValues: a.allowedValues || '', minLength: a.minLength,
       maxLength: a.maxLength, sectionName: a.sectionName || '',
       columnSpan: a.columnSpan, hidden: a.hidden,
-      registrationSectionName: a.registrationSectionName || '',
-      registrationColumnSpan: a.registrationColumnSpan, registrationDisplayOrder: a.registrationDisplayOrder,
-      selfServiceSectionName: a.selfServiceSectionName || '',
-      selfServiceColumnSpan: a.selfServiceColumnSpan, selfServiceDisplayOrder: a.selfServiceDisplayOrder
+      registrationSectionName: a.registrationSectionName ?? null,
+      registrationColumnSpan: a.registrationColumnSpan ?? null, registrationDisplayOrder: a.registrationDisplayOrder ?? null,
+      selfServiceSectionName: a.selfServiceSectionName ?? null,
+      selfServiceColumnSpan: a.selfServiceColumnSpan ?? null, selfServiceDisplayOrder: a.selfServiceDisplayOrder ?? null
     })),
     groupAssignments: p.groupAssignments.map(g => ({
       groupDn: g.groupDn, memberAttribute: g.memberAttribute
@@ -282,6 +282,34 @@ function isSelfServiceEditable(attrName) {
   return SELF_SERVICE_EDITABLE_ATTRS.has(attrName.toLowerCase())
 }
 
+// Human-readable labels for well-known LDAP attributes
+const ATTR_LABELS = {
+  cn: 'Common Name', sn: 'Last Name', givenname: 'First Name',
+  displayname: 'Display Name', mail: 'Email', uid: 'User ID',
+  telephonenumber: 'Phone', mobile: 'Mobile', facsimiletelephonenumber: 'Fax',
+  homephone: 'Home Phone', pager: 'Pager',
+  street: 'Street Address', l: 'City', st: 'State/Province',
+  postalcode: 'Postal Code', postaladdress: 'Postal Address', co: 'Country',
+  title: 'Job Title', description: 'Description', o: 'Organization',
+  ou: 'Organizational Unit', dc: 'Domain Component',
+  preferredlanguage: 'Preferred Language', labeleduri: 'URL',
+  jpegphoto: 'Photo', userpassword: 'Password',
+  employeenumber: 'Employee Number', employeetype: 'Employee Type',
+  departmentnumber: 'Department Number', roomnumber: 'Room Number',
+  manager: 'Manager', secretary: 'Secretary',
+  initials: 'Initials', c: 'Country Code',
+}
+
+function guessLabel(attrName) {
+  const known = ATTR_LABELS[attrName.toLowerCase()]
+  if (known) return known
+  // Split camelCase / snake_case into words and title-case them
+  return attrName
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_-]/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+}
+
 async function addObjectClass() {
   if (!ocToAdd.value) return
   profile.value.objectClassNames.push(ocToAdd.value)
@@ -297,15 +325,15 @@ async function addObjectClass() {
       if (!profile.value.attributeConfigs.find(a => a.attributeName === attr)) {
         const isObjClass = attr.toLowerCase() === 'objectclass'
         profile.value.attributeConfigs.push({
-          attributeName: attr, customLabel: '', inputType: isObjClass ? 'HIDDEN_FIXED' : 'TEXT',
+          attributeName: attr, customLabel: isObjClass ? '' : guessLabel(attr), inputType: isObjClass ? 'HIDDEN_FIXED' : 'TEXT',
           requiredOnCreate: required.includes(attr), editableOnCreate: !isObjClass,
           editableOnUpdate: !isObjClass, selfServiceEdit: !isObjClass && isSelfServiceEditable(attr),
-          selfRegistrationEdit: false,
+          selfRegistrationEdit: !isObjClass && isSelfServiceEditable(attr),
           defaultValue: '', computedExpression: '', validationRegex: '',
           validationMessage: '', allowedValues: '', minLength: null,
-          maxLength: null, sectionName: '', columnSpan: 3, hidden: isObjClass,
-          registrationSectionName: '', registrationColumnSpan: 3, registrationDisplayOrder: 0,
-          selfServiceSectionName: '', selfServiceColumnSpan: 3, selfServiceDisplayOrder: 0
+          maxLength: null, sectionName: '', columnSpan: 6, hidden: isObjClass,
+          registrationSectionName: null, registrationColumnSpan: null, registrationDisplayOrder: null,
+          selfServiceSectionName: null, selfServiceColumnSpan: null, selfServiceDisplayOrder: null
         })
       }
     }
@@ -410,8 +438,8 @@ const registrationAttributeConfigs = computed({
       .map(a => ({
         ...a,
         rdn: a.attributeName === profile.value.rdnAttribute,
-        sectionName: a.registrationSectionName || a.sectionName || '',
-        columnSpan: a.registrationColumnSpan ?? a.columnSpan ?? 3,
+        sectionName: a.registrationSectionName ?? a.sectionName ?? '',
+        columnSpan: a.registrationColumnSpan ?? a.columnSpan ?? 6,
       }))
   },
   set(val) {
@@ -421,8 +449,8 @@ const registrationAttributeConfigs = computed({
       if (updated) {
         return {
           ...a,
-          registrationSectionName: updated.sectionName || '',
-          registrationColumnSpan: updated.columnSpan ?? 3,
+          registrationSectionName: updated.sectionName ?? '',
+          registrationColumnSpan: updated.columnSpan ?? 6,
           registrationDisplayOrder: updated.registrationDisplayOrder,
         }
       }
@@ -439,8 +467,8 @@ const selfServiceAttributeConfigs = computed({
       .map(a => ({
         ...a,
         rdn: a.attributeName === profile.value.rdnAttribute,
-        sectionName: a.selfServiceSectionName || a.sectionName || '',
-        columnSpan: a.selfServiceColumnSpan ?? a.columnSpan ?? 3,
+        sectionName: a.selfServiceSectionName ?? a.sectionName ?? '',
+        columnSpan: a.selfServiceColumnSpan ?? a.columnSpan ?? 6,
       }))
   },
   set(val) {
@@ -450,8 +478,8 @@ const selfServiceAttributeConfigs = computed({
       if (updated) {
         return {
           ...a,
-          selfServiceSectionName: updated.sectionName || '',
-          selfServiceColumnSpan: updated.columnSpan ?? 3,
+          selfServiceSectionName: updated.sectionName ?? '',
+          selfServiceColumnSpan: updated.columnSpan ?? 6,
           selfServiceDisplayOrder: updated.selfServiceDisplayOrder,
         }
       }
@@ -462,13 +490,20 @@ const selfServiceAttributeConfigs = computed({
 
 const layoutMode = ref('admin')
 
+// Fixed modal height based on attribute count so switching tabs doesn't resize
+const modalHeight = computed(() => {
+  const count = profile.value.attributeConfigs.length
+  if (count <= 6) return '50vh'
+  if (count <= 12) return '60vh'
+  return '70vh'
+})
+
 const modalTabs = [
   { id: 'general', label: 'General' },
   { id: 'attributes', label: 'Attributes' },
   { id: 'layout', label: 'Layout' },
   { id: 'groups', label: 'Groups' },
   { id: 'lifecycle', label: 'Lifecycle' },
-  { id: 'approval', label: 'Approval' },
 ]
 
 function toggleApprover(accountId) {
@@ -521,7 +556,7 @@ function toggleApprover(accountId) {
     <div v-else class="text-gray-500">No provisioning profiles configured.</div>
 
     <!-- Create/Edit Modal -->
-    <AppModal v-model="showModal" :title="editing ? 'Edit Profile' : 'Create Profile'" size="xl">
+    <AppModal v-model="showModal" :title="editing ? 'Edit Profile' : 'Create Profile'" size="xl" :fixedHeight="modalHeight">
       <div class="space-y-4">
         <!-- Tab Navigation -->
         <div class="flex border-b gap-1">
@@ -773,36 +808,36 @@ function toggleApprover(accountId) {
             <label class="block text-sm font-medium text-gray-700 mb-1">Warning Days Before Expiry</label>
             <input v-model.number="lifecycle.warningDaysBefore" type="number" class="input w-48" />
           </div>
-        </div>
 
-        <!-- Approval Tab -->
-        <div v-if="modalTab === 'approval'" class="space-y-4">
-          <label class="flex items-center gap-2 text-sm font-medium">
-            <input type="checkbox" v-model="approval.requireApproval" /> Require approval for user creation
-          </label>
-          <div v-if="approval.requireApproval" class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Approver Mode</label>
-              <select v-model="approval.approverMode" class="input w-full">
-                <option value="DATABASE">Database (select approvers below)</option>
-                <option value="LDAP_GROUP">LDAP Group</option>
-              </select>
-            </div>
-            <div v-if="approval.approverMode === 'LDAP_GROUP'">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Approver Group DN</label>
-              <input v-model="approval.approverGroupDn" class="input w-full font-mono text-sm" />
-            </div>
-            <div v-if="approval.approverMode === 'DATABASE'">
-              <label class="block text-sm font-medium text-gray-700 mb-2">Approvers</label>
-              <div class="space-y-1 max-h-48 overflow-y-auto border rounded p-2">
-                <label v-for="admin in admins.filter(a => a.role === 'ADMIN')" :key="admin.id"
-                  class="flex items-center gap-2 text-sm p-1 hover:bg-gray-50 rounded cursor-pointer">
-                  <input type="checkbox"
-                    :checked="profileApprovers.includes(admin.id)"
-                    @change="toggleApprover(admin.id)" />
-                  {{ admin.username }}
-                  <span class="text-gray-400" v-if="admin.email">({{ admin.email }})</span>
-                </label>
+          <!-- Approval -->
+          <div class="border-t border-gray-200 pt-4 mt-2 space-y-4">
+            <label class="flex items-center gap-2 text-sm font-medium">
+              <input type="checkbox" v-model="approval.requireApproval" /> Require approval for user creation
+            </label>
+            <div v-if="approval.requireApproval" class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Approver Mode</label>
+                <select v-model="approval.approverMode" class="input w-full">
+                  <option value="DATABASE">Database (select approvers below)</option>
+                  <option value="LDAP_GROUP">LDAP Group</option>
+                </select>
+              </div>
+              <div v-if="approval.approverMode === 'LDAP_GROUP'">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Approver Group DN</label>
+                <input v-model="approval.approverGroupDn" class="input w-full font-mono text-sm" />
+              </div>
+              <div v-if="approval.approverMode === 'DATABASE'">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Approvers</label>
+                <div class="space-y-1 max-h-48 overflow-y-auto border rounded p-2">
+                  <label v-for="admin in admins.filter(a => a.role === 'ADMIN')" :key="admin.id"
+                    class="flex items-center gap-2 text-sm p-1 hover:bg-gray-50 rounded cursor-pointer">
+                    <input type="checkbox"
+                      :checked="profileApprovers.includes(admin.id)"
+                      @change="toggleApprover(admin.id)" />
+                    {{ admin.username }}
+                    <span class="text-gray-400" v-if="admin.email">({{ admin.email }})</span>
+                  </label>
+                </div>
               </div>
             </div>
           </div>

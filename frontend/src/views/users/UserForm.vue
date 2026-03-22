@@ -20,9 +20,9 @@
       <!-- ── Create mode ── -->
       <div v-if="!isEdit" class="space-y-2">
         <!-- Fallback RDN + DN row when no user form config -->
-        <div v-if="!userTemplateConfig" class="grid grid-cols-3 gap-2">
+        <div v-if="!userTemplateConfig" class="grid grid-cols-6 gap-2">
           <FormField label="RDN Attribute" v-model="local.rdnAttribute" placeholder="uid" required />
-          <div class="col-span-2">
+          <div class="col-span-4">
             <FormField
               label="DN"
               :model-value="computedDn"
@@ -41,13 +41,13 @@
           <template v-for="(section, sIdx) in createSections" :key="sIdx">
             <fieldset v-if="section.fields.length" class="space-y-2">
               <legend v-if="section.name" class="text-sm font-semibold text-gray-800 pb-1 border-b border-gray-100 w-full mb-2">{{ section.name }}</legend>
-              <div class="grid grid-cols-3 gap-2">
+              <div class="grid grid-cols-6 gap-2">
                 <template
                   v-for="attr in section.fields"
                   :key="attr.id || attr.attributeName"
                 >
                   <!-- RDN field -->
-                  <div v-if="attr.rdn" :style="{ gridColumn: showDnField ? 'span 1' : `span ${attr.columnSpan || 3}` }">
+                  <div v-if="attr.rdn" :style="{ gridColumn: showDnField ? 'span 2' : `span ${attr.columnSpan || 6}` }">
                     <FormField
                       :label="(attr.customLabel || attr.attributeName) + ' (RDN)'"
                       v-model="local.rdnValue"
@@ -57,7 +57,7 @@
                     />
                   </div>
                   <!-- Computed DN (shown after RDN when enabled) -->
-                  <div v-if="attr.rdn && showDnField" class="col-span-2">
+                  <div v-if="attr.rdn && showDnField" class="col-span-4">
                     <FormField
                       label="DN"
                       :model-value="computedDn"
@@ -69,7 +69,7 @@
                   <!-- Regular field -->
                   <div
                     v-if="!attr.rdn"
-                    :style="{ gridColumn: `span ${attr.columnSpan || 3}` }"
+                    :style="{ gridColumn: `span ${attr.columnSpan || 6}` }"
                   >
                     <FormField
                       :label="attr.customLabel || attr.attributeName"
@@ -105,13 +105,13 @@
           <template v-for="(section, sIdx) in editSections" :key="sIdx">
             <fieldset v-if="section.fields.length" class="space-y-2">
               <legend v-if="section.name" class="text-sm font-semibold text-gray-800 pb-1 border-b border-gray-100 w-full mb-2">{{ section.name }}</legend>
-              <div class="grid grid-cols-3 gap-2">
+              <div class="grid grid-cols-6 gap-2">
                 <template
                   v-for="attr in section.fields"
                   :key="attr.id || attr.attributeName"
                 >
                   <!-- RDN field in edit mode -->
-                  <div v-if="attr.rdn" :style="{ gridColumn: showDnField ? 'span 1' : `span ${attr.columnSpan || 3}` }">
+                  <div v-if="attr.rdn" :style="{ gridColumn: showDnField ? 'span 2' : `span ${attr.columnSpan || 6}` }">
                     <FormField
                       :label="attr.customLabel || attr.attributeName"
                       v-model="local.attributes[attr.attributeName]"
@@ -123,7 +123,7 @@
                     />
                   </div>
                   <!-- DN field (shown after RDN when enabled, edit mode) -->
-                  <div v-if="attr.rdn && showDnField" class="col-span-2">
+                  <div v-if="attr.rdn && showDnField" class="col-span-4">
                     <FormField
                       label="DN"
                       :model-value="local.dn"
@@ -133,7 +133,7 @@
                   <!-- Regular field -->
                   <div
                     v-if="!attr.rdn"
-                    :style="{ gridColumn: `span ${attr.columnSpan || 3}` }"
+                    :style="{ gridColumn: `span ${attr.columnSpan || 6}` }"
                   >
                     <FormField
                       :label="attr.customLabel || attr.attributeName"
