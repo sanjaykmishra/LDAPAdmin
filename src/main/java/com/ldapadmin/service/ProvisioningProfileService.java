@@ -276,6 +276,7 @@ public class ProvisioningProfileService {
     public List<ProfileApproverResponse> setApprovers(UUID profileId, List<UUID> accountIds) {
         ProvisioningProfile profile = requireProfile(profileId);
         approverRepo.deleteAllByProfileId(profileId);
+        approverRepo.flush();
 
         for (UUID accountId : accountIds) {
             Account account = accountRepo.findById(accountId)
