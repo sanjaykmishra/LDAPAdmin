@@ -20,10 +20,7 @@ Recent LDAP searches stored in localStorage with quick-access buttons for previo
 ### 6. Bulk Import/Export ✅
 `BulkView.vue` provides CSV import with preview, CSV export for users and groups, template-driven import with object class and RDN attribute specification, conflict handling strategies, and result summaries showing Created/Updated/Skipped/Errors counts.
 
-### 7. Activity Timeline per Entry ✅
-`CampaignDetailView.vue` displays campaign status history in an expandable section showing old → new status transitions, who made the change, timestamps, and optional notes. Styled with timeline dots.
-
-### 8. Client-Side Form Validation ✅
+### 7. Client-Side Form Validation ✅
 `FormField.vue` provides required field indicators (red asterisks), HTML5 validation attributes, focus ring styling, and hint text. `UserListView.vue` includes a password strength meter with color-coded levels and confirm-password matching validation.
 
 ### 9. Form Layout Designer ✅
@@ -32,10 +29,7 @@ Recent LDAP searches stored in localStorage with quick-access buttons for previo
 ### 10. Branding / Theming ✅
 `SettingsView.vue` and `ApplicationSettings.java` support customizable application name, logo URL, and primary/secondary color selection via color picker. Settings are persisted in the database.
 
-### 11. Relative Timestamps ✅
-Date formatting helpers (`fmtDate()`, `fmtDateTime()`) used across views. Campaign detail view calculates and displays days remaining until deadlines.
-
-### 12. Column Sorting ✅
+### 10. Column Sorting ✅
 `DataTable.vue` supports sortable columns across user, group, and other list views.
 
 ---
@@ -77,6 +71,12 @@ Enterprise deployments in non-English-speaking organizations need this. Vue i18n
 
 ### Toast Notifications with Undo
 Extend the existing toast system with a 5-second undo button for destructive actions (e.g., "User deleted — Undo").
+
+### Activity Timeline per Entry
+On a user or group detail page, show a timeline of all changes: "March 15 — added to VPN Users by admin@corp", "March 10 — password reset by helpdesk". Pulls from audit log data you already have.
+
+### Relative Timestamps
+"2 hours ago" instead of "2026-03-22T08:30:00Z"
 
 ### Empty State Illustrations
 Friendly graphics instead of bare "No data found" text on empty tables and search results.
