@@ -159,6 +159,12 @@ const router = createRouter({
           component: () => import('@/views/superadmin/IntegrityCheckView.vue'),
           meta: { requiresSuperadmin: true },
         },
+        {
+          path: 'superadmin/access-reviews',
+          name: 'superadminAccessReviews',
+          component: () => import('@/views/superadmin/AccessReviewsView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
       ],
     },
 
