@@ -102,8 +102,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '@/composables/useApi'
-import { createCampaign } from '@/api/accessReviews'
-import { listAdmins } from '@/api/adminManagement'
+import { createCampaign, listReviewers } from '@/api/accessReviews'
 
 const route = useRoute()
 const router = useRouter()
@@ -149,10 +148,10 @@ async function handleSubmit() {
 
 onMounted(async () => {
   try {
-    const res = await listAdmins()
+    const res = await listReviewers(dirId)
     admins.value = res.data
   } catch (e) {
-    console.warn('Failed to load admins:', e)
+    console.warn('Failed to load reviewers:', e)
   }
 })
 </script>
