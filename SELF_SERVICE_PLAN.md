@@ -7,24 +7,17 @@ Add two related capabilities to LDAPAdmin in a single cohesive feature:
 1. **Self-Service Portal** — Authenticated end users manage their own LDAP entry (profile, password, group visibility)
 2. **Self-Registration** — Unauthenticated visitors request a new LDAP account via an approval workflow
 
-Both share a new `SELF_SERVICE` principal type, a unified `SelfServiceController`, a common frontend layout (`SelfServiceLayout.vue`), and extensions to the existing `UserTemplate` system. Self-registration piggybacks on the existing approval workflow.
+Both share a new `SELF_SERVICE` principal type, a unified `SelfServiceController`, a common frontend layout (`SelfServiceLayout.vue`), and extensions to the provisioning profile system. Self-registration piggybacks on the existing approval workflow.
+
+> **Note:** The former Realm + UserTemplate model has been replaced by the unified Provisioning Profile concept (see `PROVISIONING_PROFILES_PLAN.md`). This plan reflects that architecture: `ProfileAttributeConfig` already includes `self_service_edit`, and `ProvisioningProfile` already includes `self_registration_allowed`.
 
 ---
 
-## Phase 1: Database Migration (V23)
+## Phase 1: Database Migration (V26)
 
-**File:** `src/main/resources/db/migration/V23__self_service.sql`
+**File:** `src/main/resources/db/migration/V26__self_service.sql`
 
-### 1a. Extend `user_template_attribute_config`
-
-```sql
-ALTER TABLE user_template_attribute_config
-  ADD COLUMN self_service_editable BOOLEAN NOT NULL DEFAULT FALSE;
-```
-
-Admins mark which attributes end users can edit (e.g. `mail`, `telephoneNumber`, `mobile`, `jpegPhoto`). The RDN, `cn`, and structural attributes stay `FALSE`.
-
-### 1b. Extend `directory_connections`
+### 1a. Extend `directory_connections`
 
 ```sql
 ALTER TABLE directory_connections
@@ -35,21 +28,13 @@ ALTER TABLE directory_connections
 - `self_service_enabled` — per-directory toggle for the self-service portal
 - `self_service_login_attribute` — attribute used to locate the user's DN during bind-as-self (e.g. `uid`, `sAMAccountName`)
 
-### 1c. Self-registration realm settings
-
-New key-value pairs in `realm_settings` (existing KV table — no schema change needed):
-
-- `selfRegistrationEnabled` (boolean)
-- `selfRegistrationTargetDn` (string — OU where new users land)
-- `selfRegistrationRequireEmailVerification` (boolean)
-
-### 1d. Create `registration_requests` table
+### 1b. Create `registration_requests` table
 
 ```sql
 CREATE TABLE registration_requests (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   directory_id          UUID NOT NULL REFERENCES directory_connections(id),
-  realm_id              UUID NOT NULL REFERENCES realms(id),
+  profile_id            UUID NOT NULL REFERENCES provisioning_profiles(id),
   target_ou_dn          VARCHAR(500) NOT NULL,
   attributes            JSONB NOT NULL,
   email                 VARCHAR(255) NOT NULL,
@@ -65,6 +50,12 @@ CREATE TABLE registration_requests (
 ```
 
 Statuses: `PENDING_VERIFICATION`, `PENDING_APPROVAL`, `APPROVED`, `REJECTED`, `EXPIRED`.
+
+### 1c. No migration needed for self-service attribute editing or self-registration flag
+
+The provisioning profile migration (V25) already created:
+- `profile_attribute_configs.self_service_edit` — marks which attributes end users can edit
+- `provisioning_profiles.self_registration_allowed` — per-profile toggle for public registration
 
 ---
 
@@ -99,7 +90,7 @@ The `parse()` method populates the new `AuthPrincipal` fields when `type == SELF
 
 ### 2d. Self-service login endpoint
 
-**File:** `src/main/java/com/ldapadmin/auth/AuthController.java` (extend existing)
+**File:** `src/main/java/com/ldapadmin/controller/AuthController.java` (extend existing)
 
 ```
 POST /api/v1/auth/self-service/login
@@ -143,9 +134,9 @@ Add a filter or `@PreAuthorize` to ensure `SELF_SERVICE` principals can **only**
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/v1/self-service/template` | User template filtered to self-service-visible fields |
-| GET | `/api/v1/self-service/profile` | Read own LDAP entry (all template fields, editable flags indicated) |
-| PUT | `/api/v1/self-service/profile` | Update own entry (only `selfServiceEditable` attributes accepted) |
+| GET | `/api/v1/self-service/template` | Profile attribute configs filtered to self-service-visible fields |
+| GET | `/api/v1/self-service/profile` | Read own LDAP entry (all profile fields, editable flags indicated) |
+| PUT | `/api/v1/self-service/profile` | Update own entry (only `selfServiceEdit` attributes accepted) |
 | POST | `/api/v1/self-service/change-password` | Change own password (old + new required) |
 | GET | `/api/v1/self-service/groups` | List own group memberships (read-only) |
 
@@ -154,8 +145,8 @@ Add a filter or `@PreAuthorize` to ensure `SELF_SERVICE` principals can **only**
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/v1/self-service/register/directories` | List directories with self-registration enabled |
-| GET | `/api/v1/self-service/register/realms/{directoryId}` | List realms with `selfRegistrationEnabled` |
-| GET | `/api/v1/self-service/register/form/{realmId}` | User template form schema (non-hidden create fields) |
+| GET | `/api/v1/self-service/register/profiles/{directoryId}` | List profiles with `selfRegistrationAllowed=true` |
+| GET | `/api/v1/self-service/register/form/{profileId}` | Profile attribute config form schema (non-hidden, editable-on-create fields) |
 | POST | `/api/v1/self-service/register/submit` | Submit registration request |
 | POST | `/api/v1/self-service/register/verify/{token}` | Email verification callback |
 | GET | `/api/v1/self-service/register/status/{requestId}` | Check request status (requires email for auth) |
@@ -166,20 +157,22 @@ Add a filter or `@PreAuthorize` to ensure `SELF_SERVICE` principals can **only**
 
 **Profile operations:**
 1. Load `DirectoryConnection` from JWT's `directoryId`
-2. Resolve which `UserTemplate` applies (from user's objectClasses → Realm → UserTemplate)
-3. Filter `UserTemplateAttributeConfig` entries: all fields visible, only `selfServiceEditable=true` fields writable
+2. Resolve which `ProvisioningProfile` applies (from user's objectClasses → profile resolution via `ProvisioningProfileService.resolveProfileForDn()`)
+3. Filter `ProfileAttributeConfig` entries: all fields visible, only `selfServiceEdit=true` fields writable
 4. For reads: use service-account LDAP connection to fetch the user's entry by DN
 5. For writes: validate only allowed attributes are present, then call `LdapUserService.updateUser()`
 6. For password: bind-as-user with old password (proves knowledge), then `LdapUserService.resetPassword()` with new
 7. For groups: `LdapGroupService` read-only membership lookup for the user's DN
 
 **Registration operations:**
-1. Validate form data against realm's `UserTemplate` (required fields, input types)
-2. Create `RegistrationRequest` row with status `PENDING_VERIFICATION`
-3. Send verification email with token (via existing email infrastructure)
-4. On `verify/{token}`: mark `email_verified=true`, change status to `PENDING_APPROVAL`
-5. Create `PendingApproval` with type `SELF_REGISTRATION` and payload referencing the registration request
-6. Notify approvers via existing `ApprovalNotificationService`
+1. Validate form data against profile's `ProfileAttributeConfig` (required fields, input types, validation rules)
+2. Apply computed expressions and default values via `ProvisioningProfileService.applyDefaults()`
+3. Run attribute validation via `ProvisioningProfileService.validateAttributes()`
+4. Create `RegistrationRequest` row with status `PENDING_VERIFICATION`
+5. Send verification email with token (via existing email infrastructure)
+6. On `verify/{token}`: mark `email_verified=true`, change status to `PENDING_APPROVAL`
+7. Create `PendingApproval` with type `SELF_REGISTRATION` and payload referencing the registration request
+8. Notify approvers via existing `ApprovalNotificationService`
 
 ### 3c. Extend approval workflow
 
@@ -187,11 +180,16 @@ Add a filter or `@PreAuthorize` to ensure `SELF_SERVICE` principals can **only**
 
 **File:** `src/main/java/com/ldapadmin/service/ApprovalWorkflowService.java`
 
-Add a branch in `processApproval()` for `SELF_REGISTRATION`:
+Add a branch in `approve()` for `SELF_REGISTRATION`:
 1. Load the `RegistrationRequest` from the approval payload
-2. Call `LdapUserService.createUser()` with the stored attributes and target DN
-3. Update `RegistrationRequest.status` to `APPROVED`
-4. Send welcome/confirmation email to the registrant
+2. Load the associated `ProvisioningProfile`
+3. Build LDAP attributes with object classes, computed expressions, defaults, and fixed values from the profile
+4. Construct DN from `rdnAttribute=value,targetOuDn`
+5. Call `LdapUserService.createUser()` with the assembled entry
+6. Add user to auto-join groups from `ProfileGroupAssignment`
+7. If lifecycle policy exists on the profile, schedule expiration
+8. Update `RegistrationRequest.status` to `APPROVED`
+9. Send welcome/confirmation email to the registrant
 
 For rejection: update status to `REJECTED`, send rejection email.
 
@@ -202,8 +200,6 @@ For rejection: update status to `REJECTED`, send rejection email.
 - `src/main/java/com/ldapadmin/repository/RegistrationRequestRepository.java`
 
 ### 3e. Extend existing entities
-
-**`UserTemplateAttributeConfig.java`** — add `selfServiceEditable` boolean field
 
 **`DirectoryConnection.java`** — add `selfServiceEnabled` boolean + `selfServiceLoginAttribute` string
 
@@ -260,7 +256,7 @@ Directory picker (dropdown of self-service-enabled directories), username + pass
 
 **File:** `frontend/src/views/selfservice/SelfServiceProfileView.vue`
 
-Fetches template + profile, renders with `FormField.vue`. Editable fields for `selfServiceEditable=true`, read-only for others.
+Fetches profile attribute configs + user entry, renders with `FormField.vue`. Editable fields for `selfServiceEdit=true`, read-only for others. Computed expression fields shown as read-only with live preview.
 
 ### 5c. Password change
 
@@ -278,7 +274,9 @@ Read-only list of group memberships.
 
 **File:** `frontend/src/views/selfservice/RegisterView.vue`
 
-Directory selector → realm selector → dynamic form from user template → submit → "check your email" confirmation.
+Directory selector → profile selector (filtered to `selfRegistrationAllowed=true`) → dynamic form from profile attribute configs → submit → "check your email" confirmation.
+
+The form renders `ProfileAttributeConfig` fields filtered to those where `editableOnCreate=true`. Computed and fixed (HIDDEN_FIXED) attributes are applied server-side during provisioning. Validation rules (regex, min/max length, allowed values) are enforced client-side in real-time.
 
 ### 5f. Verification + status
 
@@ -290,21 +288,21 @@ Directory selector → realm selector → dynamic form from user template → su
 
 ## Phase 6: Admin UI Extensions
 
-### 6a. Template designer
+### 6a. Profile attribute designer
 
-Add "Self-service editable" checkbox column to the attribute configuration table.
+The `SuperadminProfilesView.vue` attributes tab already includes the `selfServiceEdit` checkbox per attribute. No additional changes needed for the attribute designer.
 
 ### 6b. Directory settings
 
-Add "Enable self-service portal" toggle and "Login attribute" field.
+Add "Enable self-service portal" toggle and "Login attribute" field to the directory management UI.
 
-### 6c. Realm settings
+### 6c. Profile settings
 
-Add "Enable self-registration" toggle, "Registration target DN" field, "Require email verification" toggle.
+The `selfRegistrationAllowed` toggle already exists on the profile's General tab in `SuperadminProfilesView.vue`. No additional changes needed.
 
 ### 6d. Approvals view
 
-Show `SELF_REGISTRATION` requests in `PendingApprovalsView.vue` with submitted attributes and justification.
+Show `SELF_REGISTRATION` requests in `PendingApprovalsView.vue` with submitted attributes, profile name, and justification.
 
 ---
 
@@ -317,9 +315,10 @@ Show `SELF_REGISTRATION` requests in `PendingApprovalsView.vue` with submitted a
 | Rate limiting | On login + registration submit endpoints |
 | CAPTCHA | reCAPTCHA v3 on registration submit |
 | Spam prevention | Email verification required before request reaches approvers |
-| LDAP injection | Validate/sanitize all attribute values before LDAP writes |
+| LDAP injection | Validate/sanitize all attribute values before LDAP writes; profile validation rules enforced server-side |
 | No public LDAP writes | Registration only writes to PostgreSQL; LDAP creation only after admin approval |
 | Token expiry | Verification tokens expire after configurable TTL (default 24h) |
+| Attribute whitelisting | Self-service writes only accept attributes where `selfServiceEdit=true` in profile config |
 
 ---
 
@@ -329,7 +328,7 @@ Show `SELF_REGISTRATION` requests in `PendingApprovalsView.vue` with submitted a
 
 | # | File | Purpose |
 |---|------|---------|
-| 1 | `V23__self_service.sql` | Migration |
+| 1 | `V26__self_service.sql` | Migration (directory self-service fields + registration_requests table) |
 | 2 | `RegistrationRequest.java` | Entity |
 | 3 | `RegistrationStatus.java` | Enum |
 | 4 | `RegistrationRequestRepository.java` | Repository |
@@ -344,7 +343,7 @@ Show `SELF_REGISTRATION` requests in `PendingApprovalsView.vue` with submitted a
 | 13 | `RegisterView.vue` | Registration form |
 | 14 | `VerifyEmailView.vue` | Email verify + status |
 
-### Modified files (11)
+### Modified files (8)
 
 | File | Change |
 |------|--------|
@@ -355,22 +354,31 @@ Show `SELF_REGISTRATION` requests in `PendingApprovalsView.vue` with submitted a
 | `SecurityConfig.java` | Public + self-service route rules, principal isolation filter |
 | `ApprovalRequestType.java` | Add `SELF_REGISTRATION` |
 | `ApprovalWorkflowService.java` | Handle `SELF_REGISTRATION` approve/reject |
-| `UserTemplateAttributeConfig.java` | Add `selfServiceEditable` |
 | `DirectoryConnection.java` | Add `selfServiceEnabled`, `selfServiceLoginAttribute` |
-| `frontend/src/router/index.js` | Self-service + registration routes |
-| `frontend/src/stores/auth.js` | Handle `SELF_SERVICE` principal type |
+
+### Already in place (from provisioning profiles)
+
+| Feature | Location |
+|---------|----------|
+| `selfServiceEdit` per attribute | `ProfileAttributeConfig.selfServiceEdit` |
+| `selfRegistrationAllowed` per profile | `ProvisioningProfile.selfRegistrationAllowed` |
+| Attribute validation (regex, length, allowed values) | `ProvisioningProfileService.validateAttributes()` |
+| Computed expressions and defaults | `ProvisioningProfileService.applyDefaults()` |
+| Auto-join groups | `ProfileGroupAssignment` |
+| Lifecycle policies | `ProfileLifecyclePolicy` |
+| Profile-scoped approval workflow | `ProfileApprovalConfig` + `ProfileApprover` |
 
 ---
 
 ## Implementation Order
 
-1. **Phase 1** — Migration (all schema changes in one V23 migration)
+1. **Phase 1** — Migration (directory self-service fields + registration_requests table)
 2. **Phase 2** — Auth changes (principal, JWT, login endpoint, security config)
 3. **Phase 3a-3b** — Self-service profile/password/groups (authenticated portal)
 4. **Phase 3c-3d** — Registration entity + approval workflow extension
 5. **Phase 4** — Frontend shared infrastructure (API client, layout, router, auth store)
 6. **Phase 5a-5d** — Self-service portal views (login, profile, password, groups)
 7. **Phase 5e-5f** — Registration views
-8. **Phase 6** — Admin UI extensions (template designer, directory/realm settings, approvals)
+8. **Phase 6** — Admin UI extensions (directory settings, approvals view)
 
 The self-service portal (phases 2, 3a-3b, 5a-5d) can ship independently of self-registration (phases 3c-3d, 5e-5f), enabling incremental delivery.
