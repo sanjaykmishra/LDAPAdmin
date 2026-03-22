@@ -68,6 +68,28 @@ const router = createRouter({
           component: () => import('@/views/approvals/PendingApprovalsView.vue'),
         },
 
+        // Access Reviews
+        {
+          path: 'directories/:dirId/access-reviews',
+          name: 'accessReviews',
+          component: () => import('@/views/accessReviews/CampaignListView.vue'),
+        },
+        {
+          path: 'directories/:dirId/access-reviews/new',
+          name: 'accessReviewCreate',
+          component: () => import('@/views/accessReviews/CampaignCreateView.vue'),
+        },
+        {
+          path: 'directories/:dirId/access-reviews/:campaignId',
+          name: 'accessReviewDetail',
+          component: () => import('@/views/accessReviews/CampaignDetailView.vue'),
+        },
+        {
+          path: 'directories/:dirId/access-reviews/:campaignId/groups/:groupId',
+          name: 'accessReviewDecisions',
+          component: () => import('@/views/accessReviews/ReviewDecisionsView.vue'),
+        },
+
         // Schema Browser (superadmin)
         {
           path: 'superadmin/schema',

@@ -70,6 +70,10 @@
               Approvals
               <span v-if="pendingCount > 0" class="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{{ pendingCount }}</span>
             </RouterLink>
+            <RouterLink :to="{ path: `/directories/${currentDirId}/access-reviews` }" class="nav-item">
+              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M9 11l8-8"/><path d="M14 3h3v3"/></svg>
+              Access Reviews
+            </RouterLink>
           </template>
 
         </template>
@@ -201,7 +205,7 @@ watch(() => route.params.dirId, (dirId) => {
 })
 
 // Navigate when user picks a different realm
-const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'approvals']
+const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'approvals', 'accessReviews']
 watch(currentDirId, (newDirId) => {
   if (!newDirId || newDirId === route.params.dirId) return
   const section = dirSections.includes(route.name) ? route.name : 'users'
