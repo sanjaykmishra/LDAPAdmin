@@ -19,7 +19,7 @@ Both share a new `SELF_SERVICE` principal type, a unified `SelfServiceController
 
 The `profile_attribute_configs` table already includes a `self_service_edit` boolean column that controls which attributes end users can edit (e.g. `mail`, `telephoneNumber`, `mobile`, `jpegPhoto`). The RDN, `cn`, and structural attributes stay `FALSE`. No additional schema changes needed for self-service editability.
 
-### 1a. Extend `directory_connections`
+### 1b. Extend `directory_connections`
 
 ```sql
 ALTER TABLE directory_connections
@@ -211,19 +211,21 @@ For rejection: update status to `REJECTED`, send rejection email.
 
 ### 4a. Self-service API client
 
-**File:** `frontend/src/api/selfservice.js`
+**File:** `frontend/src/api/selfservice.js` *(new)*
 
 All API calls for both self-service and registration endpoints. Registration endpoints use profile-based URLs (e.g., `register/profiles/{directoryId}` instead of `register/realms/{directoryId}`).
 
-### 4b. Self-service layout
+### 4b. Self-service layout — ALREADY EXISTS
 
 **File:** `frontend/src/layouts/SelfServiceLayout.vue`
 
 Simplified chrome: top bar with app name, user display name (when logged in), and logout. No sidebar, no admin navigation.
 
-### 4c. Router additions
+### 4c. Router — ALREADY CONFIGURED
 
 **File:** `frontend/src/router/index.js`
+
+All self-service and registration routes are already wired up:
 
 Public routes (no auth guard):
 - `/self-service/login` → `SelfServiceLoginView.vue`
@@ -236,17 +238,19 @@ Protected routes (require `SELF_SERVICE` principal):
 - `/self-service/password` → `SelfServicePasswordView.vue`
 - `/self-service/groups` → `SelfServiceGroupsView.vue`
 
-Router guard: check `principal.accountType` — redirect `SELF_SERVICE` users away from admin routes and vice versa.
+**Remaining work:** add router guard to check `principal.accountType` — redirect `SELF_SERVICE` users away from admin routes and vice versa.
 
 ### 4d. Auth store extension
 
-**File:** `frontend/src/stores/auth.js`
+**File:** `frontend/src/stores/auth.js` *(modify)*
 
 Add `isSelfService` computed property. Extend `init()` / `/api/auth/me` to handle self-service tokens.
 
 ---
 
-## Phase 5: Frontend — Views
+## Phase 5: Frontend — Views (ALL ALREADY EXIST)
+
+All seven self-service view files already exist in `frontend/src/views/selfservice/`. They will need to be wired up to the API client (Phase 4a) once the backend endpoints are implemented.
 
 ### 5a. Self-service login
 
@@ -327,7 +331,7 @@ Show `SELF_REGISTRATION` requests in `PendingApprovalsView.vue` with submitted a
 
 ## File Summary
 
-### New files (13)
+### New files (6)
 
 | # | File | Purpose |
 |---|------|---------|
@@ -337,15 +341,8 @@ Show `SELF_REGISTRATION` requests in `PendingApprovalsView.vue` with submitted a
 | 4 | `SelfServiceController.java` | All endpoints |
 | 5 | `SelfServiceService.java` | Business logic |
 | 6 | `frontend/src/api/selfservice.js` | API client |
-| 7 | `frontend/src/layouts/SelfServiceLayout.vue` | End-user layout |
-| 8 | `SelfServiceLoginView.vue` | Login |
-| 9 | `SelfServiceProfileView.vue` | Profile |
-| 10 | `SelfServicePasswordView.vue` | Password change |
-| 11 | `SelfServiceGroupsView.vue` | Group memberships |
-| 12 | `RegisterView.vue` | Registration form |
-| 13 | `VerifyEmailView.vue` | Email verify + status |
 
-### Modified files (8)
+### Modified files (9)
 
 | File | Change |
 |------|--------|
@@ -357,10 +354,39 @@ Show `SELF_REGISTRATION` requests in `PendingApprovalsView.vue` with submitted a
 | `ApprovalRequestType.java` | Add `SELF_REGISTRATION` |
 | `ApprovalWorkflowService.java` | Handle `SELF_REGISTRATION` approve/reject, use `ProvisioningProfileService.provisionUser()` |
 | `DirectoryConnection.java` | Add `selfServiceEnabled`, `selfServiceLoginAttribute` |
+| `frontend/src/stores/auth.js` | Add `isSelfService` computed, handle self-service tokens |
 
 ### Database migration
 
 The self-service schema changes (`directory_connections` columns + `registration_requests` table) are included in the provisioning profiles migration since there are no existing deployments.
+
+### Already in place (from provisioning profiles)
+
+| Feature | Location |
+|---------|----------|
+| `selfServiceEdit` per attribute | `ProfileAttributeConfig.selfServiceEdit` |
+| `selfRegistrationAllowed` per profile | `ProvisioningProfile.selfRegistrationAllowed` |
+| `selfServiceEdit` admin UI checkbox | `SuperadminProfilesView.vue` attributes tab |
+| `selfRegistrationAllowed` admin UI toggle | `SuperadminProfilesView.vue` general tab |
+| Attribute validation (regex, length, allowed values) | `ProvisioningProfileService.validateAttributes()` |
+| Computed expressions and defaults | `ProvisioningProfileService.applyDefaults()` |
+| Auto-join groups | `ProfileGroupAssignment` |
+| Lifecycle policies | `ProfileLifecyclePolicy` |
+| Profile-scoped approval workflow | `ProfileApprovalConfig` + `ProfileApprover` |
+
+### Already in place (frontend scaffolding)
+
+| Feature | Location |
+|---------|----------|
+| Self-service layout | `frontend/src/layouts/SelfServiceLayout.vue` |
+| Self-service login view | `frontend/src/views/selfservice/SelfServiceLoginView.vue` |
+| Profile edit view | `frontend/src/views/selfservice/SelfServiceProfileView.vue` |
+| Password change view | `frontend/src/views/selfservice/SelfServicePasswordView.vue` |
+| Groups view | `frontend/src/views/selfservice/SelfServiceGroupsView.vue` |
+| Registration form view | `frontend/src/views/selfservice/RegisterView.vue` |
+| Email verification view | `frontend/src/views/selfservice/VerifyEmailView.vue` |
+| Registration status view | `frontend/src/views/selfservice/RegistrationStatusView.vue` |
+| All self-service routes | `frontend/src/router/index.js` (routes configured, guard TBD) |
 
 ---
 
@@ -370,10 +396,9 @@ The self-service schema changes (`directory_connections` columns + `registration
 2. **Phase 2** — Auth changes (principal, JWT, login endpoint, security config)
 3. **Phase 3a-3b** — Self-service profile/password/groups (authenticated portal)
 4. **Phase 3c-3d** — Registration entity + approval workflow extension
-5. **Phase 4** — Frontend shared infrastructure (API client, layout, router, auth store)
-6. **Phase 5a-5d** — Self-service portal views (login, profile, password, groups)
-7. **Phase 5e-5f** — Registration views
-8. **Phase 6** — Admin UI extensions (directory settings, approvals)
+5. **Phase 4a, 4d** — Frontend API client + auth store extension (layout, routes, and views already exist)
+6. **Phase 5** — Wire existing frontend views to API client; add router guard for principal isolation
+7. **Phase 6** — Admin UI extensions (directory settings, approvals view)
 
 The self-service portal (phases 2, 3a-3b, 5a-5d) can ship independently of self-registration (phases 3c-3d, 5e-5f), enabling incremental delivery.
 
