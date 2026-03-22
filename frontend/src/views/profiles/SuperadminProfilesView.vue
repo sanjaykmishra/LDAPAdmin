@@ -399,6 +399,29 @@ function canRemoveAttribute(attr) {
   return !isRdnAttribute(attr) && !isSchemaRequired(attr)
 }
 
+// Add a custom attribute manually
+const newAttributeName = ref('')
+function addCustomAttribute() {
+  const name = newAttributeName.value.trim()
+  if (!name) return
+  if (profile.value.attributeConfigs.find(a => a.attributeName === name)) {
+    notif.error(`Attribute "${name}" already exists in this profile.`)
+    return
+  }
+  profile.value.attributeConfigs.push({
+    attributeName: name, customLabel: guessLabel(name), inputType: 'TEXT',
+    requiredOnCreate: false, editableOnCreate: true,
+    editableOnUpdate: true, selfServiceEdit: false,
+    selfRegistrationEdit: false,
+    defaultValue: '', computedExpression: '', validationRegex: '',
+    validationMessage: '', allowedValues: '', minLength: null,
+    maxLength: null, sectionName: '', columnSpan: 6, hidden: false,
+    registrationSectionName: null, registrationColumnSpan: null, registrationDisplayOrder: null,
+    selfServiceSectionName: null, selfServiceColumnSpan: null, selfServiceDisplayOrder: null
+  })
+  newAttributeName.value = ''
+}
+
 // Helper: determine which fields to show based on input type
 function showFieldFor(inputType, fieldName) {
   const rules = {
@@ -635,8 +658,16 @@ function toggleApprover(accountId) {
 
         <!-- Attributes Tab -->
         <div v-if="modalTab === 'attributes'" class="space-y-3">
+          <div class="flex gap-2 items-end">
+            <div class="flex-1">
+              <label class="block text-xs text-gray-500 mb-1">Attribute Name</label>
+              <input v-model="newAttributeName" class="input w-full text-sm font-mono"
+                placeholder="e.g. telephoneNumber" @keydown.enter="addCustomAttribute" />
+            </div>
+            <button class="btn-primary text-sm" :disabled="!newAttributeName.trim()" @click="addCustomAttribute">Add Attribute</button>
+          </div>
           <div v-if="profile.attributeConfigs.length === 0" class="text-gray-500 text-sm">
-            Add object classes in the General tab to populate attributes.
+            Add object classes in the General tab or use the button above to add attributes.
           </div>
           <div v-for="(attr, i) in profile.attributeConfigs" :key="i"
             class="border rounded-lg p-3 space-y-2">
