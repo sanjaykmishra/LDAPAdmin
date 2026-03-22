@@ -9,9 +9,22 @@ import java.util.UUID;
 public record AuthPrincipal(
         PrincipalType type,
         UUID id,
-        String username) {
+        String username,
+        /** User's full LDAP DN — non-null only for {@link PrincipalType#SELF_SERVICE}. */
+        String dn,
+        /** Directory the user authenticated against — non-null only for {@link PrincipalType#SELF_SERVICE}. */
+        UUID directoryId) {
+
+    /** Convenience constructor for admin principals (no dn/directoryId). */
+    public AuthPrincipal(PrincipalType type, UUID id, String username) {
+        this(type, id, username, null, null);
+    }
 
     public boolean isSuperadmin() {
         return type == PrincipalType.SUPERADMIN;
+    }
+
+    public boolean isSelfService() {
+        return type == PrincipalType.SELF_SERVICE;
     }
 }

@@ -148,6 +148,10 @@ public class DirectoryConnectionService {
         dc.setEnableValue(req.enableValue());
         dc.setDisableValue(req.disableValue());
         dc.setEnabled(req.enabled());
+        dc.setSelfServiceEnabled(req.selfServiceEnabled());
+        dc.setSelfServiceLoginAttribute(
+                req.selfServiceLoginAttribute() != null && !req.selfServiceLoginAttribute().isBlank()
+                        ? req.selfServiceLoginAttribute() : "uid");
 
         if (req.auditDataSourceId() != null) {
             AuditDataSource auditSrc = auditSourceRepo.findById(req.auditDataSourceId())

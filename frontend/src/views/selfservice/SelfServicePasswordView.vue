@@ -73,6 +73,7 @@
 
 <script setup>
 import { ref, reactive, computed } from 'vue'
+import { changePassword } from '@/api/selfservice'
 
 const loading = ref(false)
 const errorMsg = ref('')
@@ -98,11 +99,10 @@ async function handleSubmit() {
   errorMsg.value = ''
   loading.value = true
   try {
-    // Mockup — would call changePassword({ currentPassword, newPassword })
-    await new Promise(resolve => setTimeout(resolve, 800))
+    await changePassword(form.currentPassword, form.newPassword)
     success.value = true
-  } catch {
-    errorMsg.value = 'Current password is incorrect'
+  } catch (e) {
+    errorMsg.value = e.response?.data?.detail || 'Current password is incorrect'
   } finally {
     loading.value = false
   }

@@ -7,5 +7,7 @@ public enum PrincipalType {
     /** Platform-level superadmin — full access to all realms and system settings. */
     SUPERADMIN,
     /** Realm-scoped admin — subject to the four-dimensional permission model. */
-    ADMIN
+    ADMIN,
+    /** End user authenticated via LDAP bind-as-self for self-service portal. */
+    SELF_SERVICE
 }

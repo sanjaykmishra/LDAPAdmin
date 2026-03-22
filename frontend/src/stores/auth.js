@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { login as apiLogin, logout as apiLogout, me } from '@/api/auth'
+import { selfServiceLogin as apiSelfServiceLogin } from '@/api/selfservice'
 
 export const useAuthStore = defineStore('auth', () => {
   const principal   = ref(null)
@@ -8,6 +9,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isLoggedIn    = computed(() => !!principal.value)
   const isSuperadmin  = computed(() => principal.value?.accountType === 'SUPERADMIN')
+  const isSelfService = computed(() => principal.value?.accountType === 'SELF_SERVICE')
   const username      = computed(() => principal.value?.username || '')
 
   /**
@@ -23,6 +25,8 @@ export const useAuthStore = defineStore('auth', () => {
         id:          data.id,
         username:    data.username,
         accountType: data.accountType,
+        dn:          data.dn || null,
+        directoryId: data.directoryId || null,
       }
     } catch {
       principal.value = null
@@ -31,11 +35,22 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(username, password) {
     const { data } = await apiLogin(username, password)
-    // Populate principal from login response body (token is in httpOnly cookie)
     principal.value = {
       id:          data.id,
       username:    data.username,
       accountType: data.accountType,
+    }
+    initialized.value = true
+  }
+
+  async function selfServiceLogin(directoryId, username, password) {
+    const { data } = await apiSelfServiceLogin(directoryId, username, password)
+    principal.value = {
+      id:          data.id,
+      username:    data.username,
+      accountType: data.accountType,
+      dn:          data.dn,
+      directoryId: data.directoryId,
     }
     initialized.value = true
   }
@@ -48,5 +63,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { principal, isLoggedIn, isSuperadmin, username, init, login, logout }
+  return { principal, isLoggedIn, isSuperadmin, isSelfService, username, init, login, selfServiceLogin, logout }
 })

@@ -61,9 +61,13 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { listRegistrationDirectories } from '@/api/selfservice'
 
 const router = useRouter()
+const route = useRoute()
+const auth = useAuthStore()
 
 const loading = ref(false)
 const errorMsg = ref('')
@@ -74,21 +78,25 @@ const form = reactive({
   password: '',
 })
 
-// Mockup directories — real implementation would fetch from API
-const directories = ref([
-  { id: 'dir-1', displayName: 'Corporate LDAP' },
-  { id: 'dir-2', displayName: 'Partner Directory' },
-])
+const directories = ref([])
+
+onMounted(async () => {
+  try {
+    const { data } = await listRegistrationDirectories()
+    directories.value = data
+  } catch {
+    // Directories may fail to load if no self-service directories exist
+  }
+})
 
 async function handleLogin() {
   errorMsg.value = ''
   loading.value = true
   try {
-    // Mockup — would call selfServiceLogin(form) API
-    await new Promise(resolve => setTimeout(resolve, 800))
-    router.push('/self-service/profile')
-  } catch {
-    errorMsg.value = 'Invalid username or password'
+    await auth.selfServiceLogin(form.directoryId, form.username, form.password)
+    router.push(route.query.redirect || '/self-service/profile')
+  } catch (e) {
+    errorMsg.value = e.response?.data?.detail || 'Invalid username or password'
   } finally {
     loading.value = false
   }
