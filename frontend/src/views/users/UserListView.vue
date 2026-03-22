@@ -279,11 +279,20 @@ const profileData       = ref(null)
 const profileConfig     = ref(null)
 
 const emptyForm = () => {
+  // Pre-populate default values from profile attribute configs
+  const attributes = {}
+  if (profileData.value?.attributeConfigs) {
+    for (const attr of profileData.value.attributeConfigs) {
+      if (attr.defaultValue) {
+        attributes[attr.attributeName] = attr.defaultValue
+      }
+    }
+  }
   return {
     parentDn: profileData.value?.targetOuDn || '',
     rdnAttribute: profileData.value?.rdnAttribute || 'uid',
     rdnValue: '',
-    attributes: {},
+    attributes,
   }
 }
 const form = ref(emptyForm())
