@@ -17,7 +17,8 @@
       </button>
     </div>
 
-    <DataTable :columns="cols" :rows="filteredCampaigns" :loading="loading" row-key="id">
+    <DataTable :columns="cols" :rows="filteredCampaigns" :loading="loading" row-key="id"
+      empty-text="No campaigns found" empty-icon="clipboard">
       <template #cell-status="{ value }">
         <span :class="statusClass(value)">{{ value }}</span>
       </template>
@@ -31,7 +32,7 @@
         <span v-if="row.recurrenceMonths" class="text-xs text-blue-600">Every {{ row.recurrenceMonths }}mo</span>
         <span v-else class="text-xs text-gray-400">One-time</span>
       </template>
-      <template #cell-createdAt="{ value }">{{ fmtDate(value) }}</template>
+      <template #cell-createdAt="{ value }"><RelativeTime :value="value" /></template>
       <template #cell-progress="{ row }">
         <div v-if="row.progress" class="flex items-center gap-2">
           <div class="w-24 bg-gray-200 rounded-full h-2">
@@ -45,10 +46,6 @@
           class="btn-secondary text-xs">View</button>
       </template>
     </DataTable>
-
-    <p v-if="!loading && filteredCampaigns.length === 0" class="text-gray-500 text-sm mt-4">
-      No campaigns found.
-    </p>
   </div>
 </template>
 
@@ -59,6 +56,7 @@ import { useApi } from '@/composables/useApi'
 import { useAuthStore } from '@/stores/auth'
 import { listCampaigns } from '@/api/accessReviews'
 import DataTable from '@/components/DataTable.vue'
+import RelativeTime from '@/components/RelativeTime.vue'
 
 const route = useRoute()
 const { loading, call } = useApi()

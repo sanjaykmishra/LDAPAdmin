@@ -19,8 +19,8 @@ The LDAP Search view (`LdapSearchView.vue`) supports saving named searches to `l
 Side-by-side comparison of two LDAP entries — invaluable for troubleshooting "why does user A have access but user B doesn't?" scenarios. Highlight attribute differences.
 
 ### 5. Keyboard Shortcuts
-**Status: Not Yet Implemented**
-`/` to search, `n` for new user, `g u` for users, `g g` for groups, `Esc` to close modals. Power users in enterprise tools live on keyboard shortcuts.
+**Status: Implemented**
+Global keyboard shortcuts registered via `useKeyboardShortcuts` composable in `AppLayout.vue`: `/` to focus search, `n` for new user, `g u` for users, `g g` for groups, `g a` for audit log, `Esc` to close modals, `?` to show shortcuts help overlay. Shortcuts are disabled when an input is focused. Help overlay provided by `KeyboardShortcutsHelp.vue`.
 
 ---
 
@@ -34,9 +34,6 @@ Display LDAP password policy status on user accounts: days until expiration, loc
 
 ### Entry Comparison / Diff View
 Side-by-side comparison of two LDAP entries to troubleshoot "why does user A have access but user B doesn't?" scenarios. Highlight attribute differences.
-
-### Keyboard Shortcuts
-`/` to search, `n` for new user, `g u` for users, `g g` for groups, `Esc` to close modals. Power users in enterprise tools live on keyboard shortcuts.
 
 ### 6. User Lifecycle Playbooks
 **Status: Not Yet Implemented**
@@ -59,8 +56,8 @@ The approval workflow is implemented (`PendingApprovalsView.vue`, `ApprovalContr
 ## Polish & Delight
 
 ### 10. Dark Mode
-**Status: Not Yet Implemented**
-A toggle in settings — especially appreciated by admins who live in the tool all day. (The settings store supports dynamic primary/secondary colour theming via CSS custom properties, which could serve as a foundation.)
+**Status: Implemented**
+Theme toggle (Light / Dark / System) in Settings view via `useTheme` composable. Theme preference persisted in `localStorage`. Dark mode applied via `data-theme="dark"` attribute on `<html>`, with CSS overrides in `main.css` for backgrounds, text, borders, inputs, and badges. System mode respects `prefers-color-scheme`.
 
 ### 11. Inline Attribute Editing
 **Status: Partially Implemented**
@@ -82,21 +79,16 @@ The `FormField` component supports `required` attributes and hint text. The pass
 **Status: Not Yet Implemented**
 Enterprise deployments in non-English-speaking organizations need this. Vue i18n makes it relatively straightforward. No `vue-i18n` integration exists in the codebase.
 
-### Toast Notifications with Undo
-Extend the existing toast system with a 5-second undo button for destructive actions (e.g., "User deleted — Undo").
-
-### Activity Timeline per Entry
-On a user or group detail page, show a timeline of all changes: "March 15 — added to VPN Users by admin@corp", "March 10 — password reset by helpdesk". Pulls from audit log data you already have.
 
 ## Quick Wins
 
 | Feature | Status |
 |---|---|
-| **Toast notifications** | Implemented — `NotificationToast.vue` with success/error/info types, auto-dismiss, and dismiss button. No undo support yet. |
+| **Toast notifications with undo** | Implemented — `NotificationToast.vue` with success/error/info types, auto-dismiss, dismiss button, and optional undo callback. Callers pass `{ onUndo: fn }` to `success()` for destructive actions. |
 | **Recent items** | Not yet implemented — no quick-access list of recently viewed users/groups. |
 | **Copy DN to clipboard** | Implemented — `CopyButton.vue` is used on user DNs in the list view and in the Directory Browser's edit form. One-click copy with visual feedback. |
-| **Relative timestamps** | Not yet implemented — dates are displayed using standard formatting, not "2 hours ago" style. |
-| **Empty state illustrations** | Not yet implemented — empty states show plain text ("No records found.") via the `DataTable` component's `emptyText` prop. |
+| **Relative timestamps** | Implemented — `RelativeTime.vue` component and `useRelativeTime` composable using `Intl.RelativeTimeFormat`. Shows "2 hours ago" with absolute time in tooltip. Integrated into Audit Log, Campaign List, Campaign Detail, and Pending Approvals views. |
+| **Empty state illustrations** | Implemented — `EmptyState.vue` component with SVG icon variants (search, users, folder, shield, clipboard). Integrated into `DataTable.vue` via `emptyIcon` prop; used across User, Audit, Campaign, and Approval views. |
 | **Column sorting & persistence** | Not yet implemented — `DataTable` does not support clickable column sorting or persisted sort preferences. |
 
 ---
@@ -127,4 +119,4 @@ These significant features have been built but were not part of the original rec
 
 The biggest bang for the buck would be **Dashboard**, **Password Policy Visualization**, and **Activity Timeline per Entry** — they address the most frequent admin workflows and leverage existing infrastructure (audit log, directory connections).
 
-For quick wins, **column sorting in DataTable** and **relative timestamps** would polish the existing UI significantly with minimal effort.
+For quick wins, **column sorting in DataTable** and **recent items** would further polish the existing UI with minimal effort.

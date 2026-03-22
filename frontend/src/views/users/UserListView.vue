@@ -34,7 +34,8 @@
     </div>
 
     <DataTable :columns="cols" :rows="users" :loading="loading" row-key="dn"
-      selectable v-model:selectedKeys="selectedDns">
+      selectable v-model:selectedKeys="selectedDns"
+      empty-text="No users found" empty-icon="users">
       <template #cell-dn="{ value }">
         <span class="inline-flex items-center gap-1">
           <code class="text-xs">{{ value }}</code>

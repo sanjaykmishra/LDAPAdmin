@@ -22,8 +22,8 @@
           </td>
         </tr>
         <tr v-else-if="!rows.length">
-          <td :colspan="totalCols" class="px-4 py-8 text-center text-gray-400">
-            {{ emptyText }}
+          <td :colspan="totalCols">
+            <EmptyState :icon="emptyIcon" :title="emptyText" />
           </td>
         </tr>
         <tr
@@ -53,13 +53,15 @@
 
 <script setup>
 import { computed } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 const props = defineProps({
   columns: { type: Array, required: true },   // [{ key, label }]
   rows:    { type: Array, default: () => [] },
   rowKey:  { type: String, default: 'id' },
   loading: { type: Boolean, default: false },
-  emptyText: { type: String, default: 'No records found.' },
+  emptyText: { type: String, default: 'No records found' },
+  emptyIcon: { type: String, default: 'folder' },
   selectable: { type: Boolean, default: false },
   selectedKeys: { type: Set, default: () => new Set() },
 })

@@ -90,7 +90,7 @@
               <span class="font-medium">{{ h.newStatus }}</span>
               <span v-if="h.oldStatus" class="text-gray-400"> (from {{ h.oldStatus }})</span>
               <span class="text-gray-500"> — {{ h.changedByUsername }}</span>
-              <span class="text-gray-400 ml-2">{{ fmtDateTime(h.changedAt) }}</span>
+              <span class="text-gray-400 ml-2"><RelativeTime :value="h.changedAt" /></span>
               <p v-if="h.note" class="text-gray-500 text-xs mt-0.5">{{ h.note }}</p>
             </div>
           </div>
@@ -116,6 +116,7 @@ import { useApi, downloadBlob } from '@/composables/useApi'
 import { getCampaign, activateCampaign, closeCampaign, cancelCampaign, exportCampaign } from '@/api/accessReviews'
 import DataTable from '@/components/DataTable.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import RelativeTime from '@/components/RelativeTime.vue'
 
 const route = useRoute()
 const router = useRouter()

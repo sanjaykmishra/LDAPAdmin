@@ -2,14 +2,15 @@
   <div class="p-6">
     <h1 class="text-2xl font-bold text-gray-900 mb-6">Pending Approvals</h1>
 
-    <DataTable :columns="cols" :rows="approvals" :loading="loading" row-key="id">
+    <DataTable :columns="cols" :rows="approvals" :loading="loading" row-key="id"
+      empty-text="No pending approvals" empty-icon="shield">
       <template #cell-status="{ value }">
         <span :class="statusClass(value)">{{ value }}</span>
       </template>
       <template #cell-requestType="{ value }">
         <span class="badge-gray">{{ formatType(value) }}</span>
       </template>
-      <template #cell-createdAt="{ value }">{{ fmtDate(value) }}</template>
+      <template #cell-createdAt="{ value }"><RelativeTime :value="value" /></template>
       <template #cell-actions="{ row }">
         <div class="flex gap-2" v-if="row.status === 'PENDING'">
           <button @click="openDetail(row)" class="btn-secondary text-xs">View</button>
@@ -22,22 +23,18 @@
       </template>
     </DataTable>
 
-    <p v-if="!loading && approvals.length === 0" class="text-gray-500 text-sm mt-4">
-      No pending approvals.
-    </p>
-
     <!-- Detail Modal -->
     <AppModal v-model="detailModal" title="Approval Details">
       <div v-if="selectedApproval" class="space-y-3">
         <div><strong>Request Type:</strong> {{ formatType(selectedApproval.requestType) }}</div>
         <div><strong>Requester:</strong> {{ selectedApproval.requesterUsername }}</div>
         <div><strong>Status:</strong> <span :class="statusClass(selectedApproval.status)">{{ selectedApproval.status }}</span></div>
-        <div><strong>Submitted:</strong> {{ fmtDate(selectedApproval.createdAt) }}</div>
+        <div><strong>Submitted:</strong> <RelativeTime :value="selectedApproval.createdAt" /></div>
         <div v-if="selectedApproval.reviewerUsername">
           <strong>Reviewed by:</strong> {{ selectedApproval.reviewerUsername }}
         </div>
         <div v-if="selectedApproval.reviewedAt">
-          <strong>Reviewed at:</strong> {{ fmtDate(selectedApproval.reviewedAt) }}
+          <strong>Reviewed at:</strong> <RelativeTime :value="selectedApproval.reviewedAt" />
         </div>
         <div v-if="selectedApproval.rejectReason">
           <strong>Reject Reason:</strong> {{ selectedApproval.rejectReason }}
@@ -90,6 +87,7 @@ import { listPendingApprovals, approveRequest, rejectRequest } from '@/api/appro
 import DataTable from '@/components/DataTable.vue'
 import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import RelativeTime from '@/components/RelativeTime.vue'
 
 const route = useRoute()
 const { loading, call } = useApi()
