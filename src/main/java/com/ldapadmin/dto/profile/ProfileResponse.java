@@ -44,7 +44,10 @@ public record ProfileResponse(
             String sectionName,
             int columnSpan,
             int displayOrder,
-            boolean hidden) {
+            boolean hidden,
+            String registrationSectionName,
+            int registrationColumnSpan,
+            int registrationDisplayOrder) {
 
         public static AttributeConfigEntry from(ProfileAttributeConfig c) {
             return new AttributeConfigEntry(
@@ -66,7 +69,10 @@ public record ProfileResponse(
                     c.getSectionName(),
                     c.getColumnSpan(),
                     c.getDisplayOrder(),
-                    c.isHidden());
+                    c.isHidden(),
+                    c.getRegistrationSectionName(),
+                    c.getRegistrationColumnSpan(),
+                    c.getRegistrationDisplayOrder());
         }
     }
 

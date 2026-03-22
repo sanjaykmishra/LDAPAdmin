@@ -94,4 +94,15 @@ public class ProfileAttributeConfig {
 
     @Column(nullable = false)
     private boolean hidden = false;
+
+    // ── Registration-specific layout ─────────────────────────────────────────
+
+    @Column(name = "registration_section_name", length = 100)
+    private String registrationSectionName;
+
+    @Column(name = "registration_column_span", nullable = false)
+    private int registrationColumnSpan = 3;
+
+    @Column(name = "registration_display_order", nullable = false)
+    private int registrationDisplayOrder = 0;
 }
