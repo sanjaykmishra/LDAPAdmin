@@ -504,7 +504,6 @@ const modalTabs = [
   { id: 'layout', label: 'Layout' },
   { id: 'groups', label: 'Groups' },
   { id: 'lifecycle', label: 'Lifecycle' },
-  { id: 'approval', label: 'Approval' },
 ]
 
 function toggleApprover(accountId) {
@@ -809,36 +808,36 @@ function toggleApprover(accountId) {
             <label class="block text-sm font-medium text-gray-700 mb-1">Warning Days Before Expiry</label>
             <input v-model.number="lifecycle.warningDaysBefore" type="number" class="input w-48" />
           </div>
-        </div>
 
-        <!-- Approval Tab -->
-        <div v-if="modalTab === 'approval'" class="space-y-4">
-          <label class="flex items-center gap-2 text-sm font-medium">
-            <input type="checkbox" v-model="approval.requireApproval" /> Require approval for user creation
-          </label>
-          <div v-if="approval.requireApproval" class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Approver Mode</label>
-              <select v-model="approval.approverMode" class="input w-full">
-                <option value="DATABASE">Database (select approvers below)</option>
-                <option value="LDAP_GROUP">LDAP Group</option>
-              </select>
-            </div>
-            <div v-if="approval.approverMode === 'LDAP_GROUP'">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Approver Group DN</label>
-              <input v-model="approval.approverGroupDn" class="input w-full font-mono text-sm" />
-            </div>
-            <div v-if="approval.approverMode === 'DATABASE'">
-              <label class="block text-sm font-medium text-gray-700 mb-2">Approvers</label>
-              <div class="space-y-1 max-h-48 overflow-y-auto border rounded p-2">
-                <label v-for="admin in admins.filter(a => a.role === 'ADMIN')" :key="admin.id"
-                  class="flex items-center gap-2 text-sm p-1 hover:bg-gray-50 rounded cursor-pointer">
-                  <input type="checkbox"
-                    :checked="profileApprovers.includes(admin.id)"
-                    @change="toggleApprover(admin.id)" />
-                  {{ admin.username }}
-                  <span class="text-gray-400" v-if="admin.email">({{ admin.email }})</span>
-                </label>
+          <!-- Approval -->
+          <div class="border-t border-gray-200 pt-4 mt-2 space-y-4">
+            <label class="flex items-center gap-2 text-sm font-medium">
+              <input type="checkbox" v-model="approval.requireApproval" /> Require approval for user creation
+            </label>
+            <div v-if="approval.requireApproval" class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Approver Mode</label>
+                <select v-model="approval.approverMode" class="input w-full">
+                  <option value="DATABASE">Database (select approvers below)</option>
+                  <option value="LDAP_GROUP">LDAP Group</option>
+                </select>
+              </div>
+              <div v-if="approval.approverMode === 'LDAP_GROUP'">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Approver Group DN</label>
+                <input v-model="approval.approverGroupDn" class="input w-full font-mono text-sm" />
+              </div>
+              <div v-if="approval.approverMode === 'DATABASE'">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Approvers</label>
+                <div class="space-y-1 max-h-48 overflow-y-auto border rounded p-2">
+                  <label v-for="admin in admins.filter(a => a.role === 'ADMIN')" :key="admin.id"
+                    class="flex items-center gap-2 text-sm p-1 hover:bg-gray-50 rounded cursor-pointer">
+                    <input type="checkbox"
+                      :checked="profileApprovers.includes(admin.id)"
+                      @change="toggleApprover(admin.id)" />
+                    {{ admin.username }}
+                    <span class="text-gray-400" v-if="admin.email">({{ admin.email }})</span>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
