@@ -72,9 +72,9 @@
               {{ sectionName === '_default' ? 'Account Details' : sectionName }}
             </h2>
 
-            <div :class="sectionFields.some(f => f.columnSpan < 3) ? 'grid grid-cols-2 gap-3' : 'space-y-3'">
+            <div :class="sectionFields.some(f => f.columnSpan < 6) ? 'grid grid-cols-6 gap-3' : 'space-y-3'">
               <div v-for="field in sectionFields" :key="field.attributeName"
-                :class="field.columnSpan >= 3 ? 'col-span-2' : ''">
+                :style="{ gridColumn: `span ${field.columnSpan || 6}` }">
                 <label class="block text-sm font-medium text-gray-700 mb-1">
                   {{ field.label }} {{ field.required ? '*' : '' }}
                 </label>
