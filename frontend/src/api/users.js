@@ -31,3 +31,6 @@ export const resetPassword = (dirId, dn, newPassword) =>
 
 export const bulkUpdateAttributes = (dirId, data) =>
   client.post(`${base(dirId)}/bulk-update`, data)
+
+export const getPasswordStatus = (dirId, dn) =>
+  client.get(`${base(dirId)}/password-status`, { params: { dn } })

@@ -75,6 +75,7 @@
                       :label="attr.customLabel || attr.attributeName"
                       v-model="local.attributes[attr.attributeName]"
                       :type="mapInputType(attr.inputType)"
+                      :options="attr.inputType === 'SELECT' ? parseOptions(attr.allowedValues) : undefined"
                       :required="attr.requiredOnCreate"
                       :disabled="!attr.editableOnCreate"
                       :rows="attr.inputType === 'TEXTAREA' || attr.inputType === 'MULTI_VALUE' ? 3 : undefined"
@@ -139,8 +140,9 @@
                       :label="attr.customLabel || attr.attributeName"
                       v-model="local.attributes[attr.attributeName]"
                       :type="mapInputType(attr.inputType)"
+                      :options="attr.inputType === 'SELECT' ? parseOptions(attr.allowedValues) : undefined"
                       :required="attr.requiredOnCreate"
-                      :disabled="attr.rdn"
+                      :disabled="!attr.editableOnUpdate"
                       :rows="attr.inputType === 'TEXTAREA' || attr.inputType === 'MULTI_VALUE' ? 3 : undefined"
                       :hint="attr.inputType === 'MULTI_VALUE' ? 'One value per line' : undefined"
                     />
@@ -284,9 +286,10 @@ const editableAttributes = computed(() => {
 /** Attributes from the form config to show in edit mode (excludes objectClass and hidden, includes RDN). */
 const editFormAttributes = computed(() => {
   if (!props.userTemplateConfig?.attributeConfigs) return []
-  return props.userTemplateConfig.attributeConfigs.filter(
-    a => !a.hidden && a.attributeName.toLowerCase() !== 'objectclass'
-  )
+  const rdnName = props.userTemplateConfig.rdnAttribute
+  return props.userTemplateConfig.attributeConfigs
+    .filter(a => !a.hidden && a.attributeName.toLowerCase() !== 'objectclass')
+    .map(a => ({ ...a, rdn: a.attributeName === rdnName }))
 })
 
 /** Attributes present on the entry but NOT in the form config (edit mode overflow). */
@@ -313,16 +316,31 @@ const INPUT_TYPE_MAP = {
   DATETIME: 'datetime-local',
   MULTI_VALUE: 'textarea',
   DN_LOOKUP: 'text',
+  SELECT: 'select',
+  HIDDEN_FIXED: 'hidden',
 }
 
 function mapInputType(inputType) {
   return INPUT_TYPE_MAP[inputType] || 'text'
 }
 
+/** Parse the allowedValues JSON string into FormField options. */
+function parseOptions(allowedValues) {
+  if (!allowedValues) return []
+  try {
+    const arr = JSON.parse(allowedValues)
+    if (!Array.isArray(arr)) return []
+    return arr.map(v => ({ value: String(v), label: String(v) }))
+  } catch {
+    return allowedValues.split(',').map(v => ({ value: v.trim(), label: v.trim() }))
+  }
+}
+
 /** The attribute marked as RDN in the user form config. */
 const rdnAttr = computed(() => {
   if (!props.userTemplateConfig?.attributeConfigs) return null
-  return props.userTemplateConfig.attributeConfigs.find(a => a.rdn) || null
+  const rdnName = props.userTemplateConfig.rdnAttribute
+  return props.userTemplateConfig.attributeConfigs.find(a => a.attributeName === rdnName) || null
 })
 
 /** Computed full DN based on RDN attribute, RDN value, and parent DN. */
@@ -340,7 +358,10 @@ const showDnField = computed(() => props.userTemplateConfig?.showDnField !== fal
 /** All non-hidden attributes (including RDN), preserving the order defined in the user form config. */
 const allVisibleAttributes = computed(() => {
   if (!props.userTemplateConfig?.attributeConfigs) return []
-  return props.userTemplateConfig.attributeConfigs.filter(a => !a.hidden && a.attributeName.toLowerCase() !== 'objectclass')
+  const rdnName = props.userTemplateConfig.rdnAttribute
+  return props.userTemplateConfig.attributeConfigs
+    .filter(a => !a.hidden && a.attributeName.toLowerCase() !== 'objectclass')
+    .map(a => ({ ...a, rdn: a.attributeName === rdnName }))
 })
 
 /** Group all visible attributes into sections for create mode. */
@@ -362,9 +383,37 @@ function groupIntoSections(attrs) {
   return result.length ? result : [{ name: '', fields: attrs }]
 }
 
+/**
+ * Evaluate computed expressions like "${givenName}.${sn}@corp.com".
+ * Substitutes ${attrName} references with current attribute values.
+ */
+function evaluateComputedExpressions() {
+  if (!props.userTemplateConfig?.attributeConfigs) return
+  for (const attr of props.userTemplateConfig.attributeConfigs) {
+    if (!attr.computedExpression) continue
+    const expr = attr.computedExpression
+    const resolved = expr.replace(/\$\{(\w+)\}/g, (_, name) => {
+      // Check rdnValue first since it's stored separately
+      if (name === local.rdnAttribute) return local.rdnValue || ''
+      return local.attributes[name] || ''
+    })
+    // Only set if expression produced a meaningful result (not all placeholders empty)
+    if (resolved !== expr || !expr.includes('${')) {
+      local.attributes[attr.attributeName] = resolved
+    }
+  }
+}
+
 let syncing = false
+let computing = false
 watch(local, v => {
   if (syncing) return
+  if (!computing && !props.isEdit) {
+    computing = true
+    evaluateComputedExpressions()
+    // Allow the watcher to re-fire with computed values included
+    nextTick(() => { computing = false })
+  }
   emit('update', JSON.parse(JSON.stringify(v)))
 }, { deep: true })
 watch(() => props.data, v => {
@@ -477,6 +526,15 @@ function emitPendingGroups() {
 }
 
 onMounted(() => {
+  // Initialize pending groups from profile group assignments passed via data
+  if (props.data?._pendingGroups?.length) {
+    pendingGroups.value = props.data._pendingGroups.map(g => ({
+      dn: g.dn,
+      cn: g.dn.split(',')[0] || g.dn,
+      memberAttr: g.memberAttr,
+      members: [],
+    }))
+  }
   if (props.dirId) {
     loadGroups()
   }

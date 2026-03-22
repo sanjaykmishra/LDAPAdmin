@@ -49,6 +49,7 @@ public class UserController {
 
     private final LdapOperationService service;
     private final ApprovalWorkflowService approvalService;
+    private final com.ldapadmin.service.PasswordPolicyService passwordPolicyService;
 
     @GetMapping
     public List<LdapEntryResponse> search(
@@ -180,5 +181,13 @@ public class UserController {
 
         service.moveUser(directoryId, principal, dn, req);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/password-status")
+    public Map<String, Object> passwordStatus(
+            @DirectoryId @PathVariable UUID directoryId,
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @RequestParam String dn) {
+        return passwordPolicyService.getPasswordStatus(directoryId, principal, dn);
     }
 }

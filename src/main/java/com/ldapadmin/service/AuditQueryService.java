@@ -33,11 +33,24 @@ public class AuditQueryService {
             OffsetDateTime to,
             int page,
             int size) {
+        return query(directoryId, actorId, action, null, from, to, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AuditEventResponse> query(
+            UUID directoryId,
+            UUID actorId,
+            AuditAction action,
+            String targetDn,
+            OffsetDateTime from,
+            OffsetDateTime to,
+            int page,
+            int size) {
 
         PageRequest pageable = PageRequest.of(page, clampSize(size),
                 Sort.by(Sort.Direction.DESC, "occurredAt"));
         String actionStr = action != null ? action.getDbValue() : null;
-        return auditRepo.findAll(directoryId, actorId, actionStr, from, to, pageable)
+        return auditRepo.findAll(directoryId, actorId, actionStr, targetDn, from, to, pageable)
                 .map(AuditEventResponse::from);
     }
 
