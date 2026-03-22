@@ -87,6 +87,7 @@ public class ApplicationSettingsService {
         s.setLogoUrl(req.logoUrl());
         s.setPrimaryColour(req.primaryColour());
         s.setSecondaryColour(req.secondaryColour());
+        s.setSuperadminBypassApproval(req.superadminBypassApproval());
         s.setSessionTimeoutMinutes(req.sessionTimeoutMinutes());
 
         // SMTP
@@ -157,6 +158,7 @@ public class ApplicationSettingsService {
                 s.getLogoUrl(),
                 s.getPrimaryColour(),
                 s.getSecondaryColour(),
+                s.isSuperadminBypassApproval(),
                 s.getSessionTimeoutMinutes(),
                 s.getSmtpHost(),
                 s.getSmtpPort(),
@@ -196,6 +198,7 @@ public class ApplicationSettingsService {
         return new ApplicationSettingsDto(
                 null,
                 "LDAP Portal", null, null, null,
+                false,
                 60,
                 null, 587, null, null, false, true,
                 null, null, null, false, null, 24,

@@ -21,6 +21,9 @@ public record ApplicationSettingsDto(
         String primaryColour,
         String secondaryColour,
 
+        // Approval workflow
+        boolean superadminBypassApproval,
+
         // Session
         int sessionTimeoutMinutes,
 

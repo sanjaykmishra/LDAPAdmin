@@ -14,8 +14,9 @@
       <template #cell-actions="{ row }">
         <div class="flex gap-2" v-if="row.status === 'PENDING'">
           <button @click="openDetail(row)" class="btn-secondary text-xs">View</button>
-          <button @click="handleApprove(row)" class="btn-primary text-xs">Approve</button>
-          <button @click="openReject(row)" class="text-xs px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700">Reject</button>
+          <button v-if="!isOwnRequest(row)" @click="handleApprove(row)" class="btn-primary text-xs">Approve</button>
+          <button v-if="!isOwnRequest(row)" @click="openReject(row)" class="text-xs px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700">Reject</button>
+          <span v-if="isOwnRequest(row)" class="text-xs text-gray-400 italic self-center">Own request</span>
         </div>
         <div v-else>
           <button @click="openDetail(row)" class="btn-secondary text-xs">View</button>
@@ -46,8 +47,11 @@
         </details>
 
         <div v-if="selectedApproval.status === 'PENDING'" class="flex gap-2 mt-4 pt-4 border-t">
-          <button @click="handleApprove(selectedApproval); detailModal = false" class="btn-primary">Approve</button>
-          <button @click="detailModal = false; openReject(selectedApproval)" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Reject</button>
+          <template v-if="!isOwnRequest(selectedApproval)">
+            <button @click="handleApprove(selectedApproval); detailModal = false" class="btn-primary">Approve</button>
+            <button @click="detailModal = false; openReject(selectedApproval)" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Reject</button>
+          </template>
+          <span v-else class="text-sm text-gray-400 italic">You cannot approve or reject your own request</span>
         </div>
       </div>
     </AppModal>
@@ -82,6 +86,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { useApi } from '@/composables/useApi'
 import { listPendingApprovals, approveRequest, rejectRequest } from '@/api/approvals'
 import DataTable from '@/components/DataTable.vue'
@@ -90,6 +95,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import RelativeTime from '@/components/RelativeTime.vue'
 
 const route = useRoute()
+const auth = useAuthStore()
 const { loading, call } = useApi()
 const dirId = route.params.dirId
 
@@ -141,6 +147,10 @@ function formatPayload(payload) {
   } catch {
     return payload
   }
+}
+
+function isOwnRequest(approval) {
+  return auth.principal?.id === approval.requestedBy
 }
 
 function openDetail(approval) {
