@@ -23,7 +23,9 @@ public enum FeatureKey {
     BULK_ATTRIBUTE_UPDATE("bulk.attribute_update"),
     REPORTS_RUN          ("reports.run"),
     REPORTS_EXPORT       ("reports.export"),
-    REPORTS_SCHEDULE     ("reports.schedule");
+    REPORTS_SCHEDULE     ("reports.schedule"),
+    ACCESS_REVIEW_MANAGE ("access_review.manage"),
+    ACCESS_REVIEW_REVIEW ("access_review.review");
 
     private final String dbValue;
 
