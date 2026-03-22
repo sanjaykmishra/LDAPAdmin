@@ -7,6 +7,7 @@ import com.ldapadmin.dto.ldap.AttributeModification;
 import com.ldapadmin.dto.ldap.LdapEntryResponse;
 import com.ldapadmin.dto.ldap.MemberRequest;
 import com.ldapadmin.dto.ldap.UpdateEntryRequest;
+import com.ldapadmin.service.ApprovalWorkflowService;
 import com.ldapadmin.service.LdapOperationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +42,7 @@ class GroupControllerTest extends BaseControllerTest {
     @Autowired ObjectMapper objectMapper;
 
     @MockBean LdapOperationService ldapService;
+    @MockBean ApprovalWorkflowService approvalService;
 
     static final UUID DIR_ID    = UUID.fromString("30000000-0000-0000-0000-000000000003");
     static final String BASE_URL = "/api/v1/directories/" + DIR_ID + "/groups";
