@@ -59,6 +59,9 @@ public class ProfileAttributeConfig {
     @Column(name = "self_service_edit", nullable = false)
     private boolean selfServiceEdit = false;
 
+    @Column(name = "self_registration_edit", nullable = false)
+    private boolean selfRegistrationEdit = false;
+
     /** Static default value applied when the attribute is not supplied. */
     @Column(name = "default_value", length = 500)
     private String defaultValue;
@@ -105,4 +108,15 @@ public class ProfileAttributeConfig {
 
     @Column(name = "registration_display_order", nullable = false)
     private int registrationDisplayOrder = 0;
+
+    // ── Self-service-specific layout ─────────────────────────────────────────
+
+    @Column(name = "self_service_section_name", length = 100)
+    private String selfServiceSectionName;
+
+    @Column(name = "self_service_column_span", nullable = false)
+    private int selfServiceColumnSpan = 3;
+
+    @Column(name = "self_service_display_order", nullable = false)
+    private int selfServiceDisplayOrder = 0;
 }

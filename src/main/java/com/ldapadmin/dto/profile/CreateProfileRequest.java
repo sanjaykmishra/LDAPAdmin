@@ -27,6 +27,7 @@ public record CreateProfileRequest(
             boolean editableOnCreate,
             boolean editableOnUpdate,
             boolean selfServiceEdit,
+            boolean selfRegistrationEdit,
             @Size(max = 500) String defaultValue,
             @Size(max = 500) String computedExpression,
             @Size(max = 500) String validationRegex,
@@ -38,7 +39,9 @@ public record CreateProfileRequest(
             Integer columnSpan,
             boolean hidden,
             @Size(max = 100) String registrationSectionName,
-            Integer registrationColumnSpan) {
+            Integer registrationColumnSpan,
+            @Size(max = 100) String selfServiceSectionName,
+            Integer selfServiceColumnSpan) {
     }
 
     public record GroupAssignmentEntry(

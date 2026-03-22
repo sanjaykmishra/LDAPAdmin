@@ -77,7 +77,8 @@ public class SelfServiceService {
                 attrConfigRepo.findAllByProfileIdOrderByDisplayOrderAsc(profile.getId());
 
         List<SelfServiceFieldConfig> fields = configs.stream()
-                .filter(c -> !c.isHidden())
+                .filter(c -> !c.isHidden() && c.isSelfServiceEdit())
+                .sorted(Comparator.comparingInt(ProfileAttributeConfig::getSelfServiceDisplayOrder))
                 .map(c -> new SelfServiceFieldConfig(
                         c.getAttributeName(),
                         c.getCustomLabel() != null ? c.getCustomLabel() : humanize(c.getAttributeName()),
@@ -89,9 +90,9 @@ public class SelfServiceService {
                         c.getAllowedValues(),
                         c.getMinLength(),
                         c.getMaxLength(),
-                        c.getSectionName(),
-                        c.getColumnSpan(),
-                        c.getDisplayOrder()))
+                        c.getSelfServiceSectionName() != null ? c.getSelfServiceSectionName() : c.getSectionName(),
+                        c.getSelfServiceColumnSpan(),
+                        c.getSelfServiceDisplayOrder()))
                 .toList();
 
         return new SelfServiceTemplateResponse(profile.getId(), profile.getName(), fields);
@@ -265,7 +266,7 @@ public class SelfServiceService {
         }
 
         return attrConfigRepo.findAllByProfileIdOrderByDisplayOrderAsc(profileId).stream()
-                .filter(c -> c.isEditableOnCreate() && !c.isHidden()
+                .filter(c -> c.isSelfRegistrationEdit() && !c.isHidden()
                         && !"HIDDEN_FIXED".equals(c.getInputType().name()))
                 .sorted(Comparator.comparingInt(ProfileAttributeConfig::getRegistrationDisplayOrder))
                 .map(c -> new SelfServiceFieldConfig(

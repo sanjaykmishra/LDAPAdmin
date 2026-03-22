@@ -492,6 +492,7 @@ public class ProvisioningProfileService {
             c.setEditableOnCreate(e.editableOnCreate());
             c.setEditableOnUpdate(e.editableOnUpdate());
             c.setSelfServiceEdit(e.selfServiceEdit());
+            c.setSelfRegistrationEdit(e.selfRegistrationEdit());
             c.setDefaultValue(e.defaultValue());
             c.setComputedExpression(e.computedExpression());
             c.setValidationRegex(e.validationRegex());
@@ -506,6 +507,9 @@ public class ProvisioningProfileService {
             c.setRegistrationSectionName(e.registrationSectionName());
             c.setRegistrationColumnSpan(e.registrationColumnSpan() != null ? e.registrationColumnSpan() : 3);
             c.setRegistrationDisplayOrder(i);
+            c.setSelfServiceSectionName(e.selfServiceSectionName());
+            c.setSelfServiceColumnSpan(e.selfServiceColumnSpan() != null ? e.selfServiceColumnSpan() : 3);
+            c.setSelfServiceDisplayOrder(i);
             attrConfigRepo.save(c);
         }
     }
