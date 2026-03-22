@@ -34,6 +34,7 @@ public record ProfileResponse(
             boolean editableOnCreate,
             boolean editableOnUpdate,
             boolean selfServiceEdit,
+            boolean selfRegistrationEdit,
             String defaultValue,
             String computedExpression,
             String validationRegex,
@@ -47,7 +48,10 @@ public record ProfileResponse(
             boolean hidden,
             String registrationSectionName,
             int registrationColumnSpan,
-            int registrationDisplayOrder) {
+            int registrationDisplayOrder,
+            String selfServiceSectionName,
+            int selfServiceColumnSpan,
+            int selfServiceDisplayOrder) {
 
         public static AttributeConfigEntry from(ProfileAttributeConfig c) {
             return new AttributeConfigEntry(
@@ -59,6 +63,7 @@ public record ProfileResponse(
                     c.isEditableOnCreate(),
                     c.isEditableOnUpdate(),
                     c.isSelfServiceEdit(),
+                    c.isSelfRegistrationEdit(),
                     c.getDefaultValue(),
                     c.getComputedExpression(),
                     c.getValidationRegex(),
@@ -72,7 +77,10 @@ public record ProfileResponse(
                     c.isHidden(),
                     c.getRegistrationSectionName(),
                     c.getRegistrationColumnSpan(),
-                    c.getRegistrationDisplayOrder());
+                    c.getRegistrationDisplayOrder(),
+                    c.getSelfServiceSectionName(),
+                    c.getSelfServiceColumnSpan(),
+                    c.getSelfServiceDisplayOrder());
         }
     }
 
