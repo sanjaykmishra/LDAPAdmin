@@ -19,7 +19,7 @@ Both share a new `SELF_SERVICE` principal type, a unified `SelfServiceController
 
 The `profile_attribute_configs` table already includes a `self_service_edit` boolean column that controls which attributes end users can edit (e.g. `mail`, `telephoneNumber`, `mobile`, `jpegPhoto`). The RDN, `cn`, and structural attributes stay `FALSE`. No additional schema changes needed for self-service editability.
 
-### 1a. Extend `directory_connections`
+### 1b. Extend `directory_connections`
 
 ```sql
 ALTER TABLE directory_connections
@@ -211,19 +211,21 @@ For rejection: update status to `REJECTED`, send rejection email.
 
 ### 4a. Self-service API client
 
-**File:** `frontend/src/api/selfservice.js`
+**File:** `frontend/src/api/selfservice.js` *(new)*
 
 All API calls for both self-service and registration endpoints. Registration endpoints use profile-based URLs (e.g., `register/profiles/{directoryId}` instead of `register/realms/{directoryId}`).
 
-### 4b. Self-service layout
+### 4b. Self-service layout — ALREADY EXISTS
 
 **File:** `frontend/src/layouts/SelfServiceLayout.vue`
 
 Simplified chrome: top bar with app name, user display name (when logged in), and logout. No sidebar, no admin navigation.
 
-### 4c. Router additions
+### 4c. Router — ALREADY CONFIGURED
 
 **File:** `frontend/src/router/index.js`
+
+All self-service and registration routes are already wired up:
 
 Public routes (no auth guard):
 - `/self-service/login` → `SelfServiceLoginView.vue`
@@ -236,11 +238,11 @@ Protected routes (require `SELF_SERVICE` principal):
 - `/self-service/password` → `SelfServicePasswordView.vue`
 - `/self-service/groups` → `SelfServiceGroupsView.vue`
 
-Router guard: check `principal.accountType` — redirect `SELF_SERVICE` users away from admin routes and vice versa.
+**Remaining work:** add router guard to check `principal.accountType` — redirect `SELF_SERVICE` users away from admin routes and vice versa.
 
 ### 4d. Auth store extension
 
-**File:** `frontend/src/stores/auth.js`
+**File:** `frontend/src/stores/auth.js` *(modify)*
 
 Add `isSelfService` computed property. Extend `init()` / `/api/auth/me` to handle self-service tokens.
 
@@ -248,43 +250,58 @@ Add `isSelfService` computed property. Extend `init()` / `/api/auth/me` to handl
 
 ## Phase 5: Frontend — Views
 
-### 5a. Self-service login
+All seven self-service view files already exist in `frontend/src/views/selfservice/` as UI mockups with hardcoded data. Most are usable as-is and just need API wiring, but two views need significant rework to support the dynamic provisioning profile model.
+
+### 5a. Self-service login — MOCKUP OK
 
 **File:** `frontend/src/views/selfservice/SelfServiceLoginView.vue`
 
-Directory picker (dropdown of self-service-enabled directories), username + password. On success → `/self-service/profile`.
+Directory picker (dropdown of self-service-enabled directories), username + password. On success → `/self-service/profile`. **Mockup structure is correct** — just replace hardcoded directories with API call and mock login with real `POST /api/v1/auth/self-service/login`.
 
-### 5b. Profile view
+### 5b. Profile view — NEEDS REWORK
 
 **File:** `frontend/src/views/selfservice/SelfServiceProfileView.vue`
 
-Fetches the user's resolved provisioning profile attribute configs + current LDAP entry, renders with `FormField.vue`. Editable fields for `self_service_edit=true`, read-only for others. Validation rules (regex, min/max length, allowed values) are enforced client-side.
+The current mockup has **hardcoded fields** (uid, cn, mail, etc.) with static `editable` flags, and a comment referencing the old "UserTemplate selfServiceEditable" model. This needs to be reworked to:
 
-### 5c. Password change
+- Fetch the user's resolved `ProfileAttributeConfig` list from `GET /api/v1/self-service/template`
+- Render fields dynamically based on each config's `inputType` (TEXT, TEXTAREA, SELECT, BOOLEAN, etc.), `customLabel`, `sectionName`, and `columnSpan`
+- Mark fields as editable/read-only based on `selfServiceEdit` (not the old hardcoded `editable` flag)
+- Enforce validation rules client-side: `validationRegex`, `minLength`, `maxLength`, `allowedValues`
+- Show `validationMessage` on failed validation
+- Show computed expression fields as read-only
+
+### 5c. Password change — MOCKUP OK
 
 **File:** `frontend/src/views/selfservice/SelfServicePasswordView.vue`
 
-Current password + new password + confirm. Calls `POST /api/v1/self-service/change-password`.
+Current password + new password + confirm. Calls `POST /api/v1/self-service/change-password`. **Mockup structure is correct** — hardcoded password requirements (8 chars, uppercase, etc.) are reasonable defaults; replace mock submit with real API call.
 
-### 5d. Groups view
+### 5d. Groups view — MOCKUP OK
 
 **File:** `frontend/src/views/selfservice/SelfServiceGroupsView.vue`
 
-Read-only list of group memberships.
+Read-only list of group memberships with search filter. **Mockup structure is correct** — replace hardcoded groups with `GET /api/v1/self-service/groups`.
 
-### 5e. Registration form
+### 5e. Registration form — NEEDS REWORK
 
 **File:** `frontend/src/views/selfservice/RegisterView.vue`
 
-Directory selector → provisioning profile selector (filtered to `self_registration_allowed=true`) → dynamic form rendered from `ProfileAttributeConfig` (fields where `editable_on_create=true`) → submit → "check your email" confirmation.
+The directory/profile selector flow is already correct (uses `profileId` and `profiles`). However, the form fields below the profile selector are **hardcoded** (givenName, sn, uid, mail, telephoneNumber, justification) instead of being dynamically generated. This needs to be reworked to:
 
-Computed fields are applied server-side during provisioning. Fixed/hidden fields are not shown on the form.
+- After profile selection, fetch the form schema from `GET /api/v1/self-service/register/form/{profileId}`
+- Render fields dynamically from `ProfileAttributeConfig` where `editableOnCreate=true` and not hidden/fixed
+- Support all `inputType` values (TEXT, TEXTAREA, SELECT, BOOLEAN, DATE, etc.)
+- Group fields by `sectionName` and respect `columnSpan` and `displayOrder`
+- Enforce `requiredOnCreate`, `validationRegex`, `minLength`, `maxLength`, `allowedValues` client-side
+- Show `validationMessage` on failed validation
+- Keep the justification field as a separate non-profile field
 
-### 5f. Verification + status
+### 5f. Verification + status — MOCKUP OK
 
-**File:** `frontend/src/views/selfservice/VerifyEmailView.vue` — calls verify endpoint, shows result
+**File:** `frontend/src/views/selfservice/VerifyEmailView.vue` — calls verify endpoint, shows result. **Structure correct**, replace mock delay with real API call.
 
-**File:** `frontend/src/views/selfservice/RegistrationStatusView.vue` — displays request status
+**File:** `frontend/src/views/selfservice/RegistrationStatusView.vue` — displays request status timeline. **Structure correct**, replace hardcoded timeline with real status from `GET /api/v1/self-service/register/status/{requestId}`.
 
 ---
 
@@ -327,7 +344,7 @@ Show `SELF_REGISTRATION` requests in `PendingApprovalsView.vue` with submitted a
 
 ## File Summary
 
-### New files (13)
+### New files (6)
 
 | # | File | Purpose |
 |---|------|---------|
@@ -337,15 +354,8 @@ Show `SELF_REGISTRATION` requests in `PendingApprovalsView.vue` with submitted a
 | 4 | `SelfServiceController.java` | All endpoints |
 | 5 | `SelfServiceService.java` | Business logic |
 | 6 | `frontend/src/api/selfservice.js` | API client |
-| 7 | `frontend/src/layouts/SelfServiceLayout.vue` | End-user layout |
-| 8 | `SelfServiceLoginView.vue` | Login |
-| 9 | `SelfServiceProfileView.vue` | Profile |
-| 10 | `SelfServicePasswordView.vue` | Password change |
-| 11 | `SelfServiceGroupsView.vue` | Group memberships |
-| 12 | `RegisterView.vue` | Registration form |
-| 13 | `VerifyEmailView.vue` | Email verify + status |
 
-### Modified files (8)
+### Modified files (12)
 
 | File | Change |
 |------|--------|
@@ -357,10 +367,44 @@ Show `SELF_REGISTRATION` requests in `PendingApprovalsView.vue` with submitted a
 | `ApprovalRequestType.java` | Add `SELF_REGISTRATION` |
 | `ApprovalWorkflowService.java` | Handle `SELF_REGISTRATION` approve/reject, use `ProvisioningProfileService.provisionUser()` |
 | `DirectoryConnection.java` | Add `selfServiceEnabled`, `selfServiceLoginAttribute` |
+| `frontend/src/stores/auth.js` | Add `isSelfService` computed, handle self-service tokens |
+| `frontend/src/api/client.js` | 401 interceptor must redirect self-service users to `/self-service/login` instead of `/login` |
+| `SelfServiceProfileView.vue` | **Rework**: replace hardcoded fields with dynamic rendering from `ProfileAttributeConfig` (supports `inputType`, `selfServiceEdit`, validation rules, sections) |
+| `RegisterView.vue` | **Rework**: replace hardcoded form fields with dynamic rendering from `ProfileAttributeConfig` (keep existing directory/profile selector flow) |
 
 ### Database migration
 
 The self-service schema changes (`directory_connections` columns + `registration_requests` table) are included in the provisioning profiles migration since there are no existing deployments.
+
+### Already in place (from provisioning profiles)
+
+| Feature | Location |
+|---------|----------|
+| `selfServiceEdit` per attribute | `ProfileAttributeConfig.selfServiceEdit` |
+| `selfRegistrationAllowed` per profile | `ProvisioningProfile.selfRegistrationAllowed` |
+| `selfServiceEdit` admin UI checkbox | `SuperadminProfilesView.vue` attributes tab |
+| `selfRegistrationAllowed` admin UI toggle | `SuperadminProfilesView.vue` general tab |
+| Attribute validation (regex, length, allowed values) | `ProvisioningProfileService.validateAttributes()` |
+| Computed expressions and defaults | `ProvisioningProfileService.applyDefaults()` |
+| Auto-join groups | `ProfileGroupAssignment` |
+| Lifecycle policies | `ProfileLifecyclePolicy` |
+| Profile-scoped approval workflow | `ProfileApprovalConfig` + `ProfileApprover` |
+
+### Already in place (frontend scaffolding — mockups)
+
+All files exist as UI mockups with hardcoded data. Status indicates how much work is needed:
+
+| Feature | Location | Status |
+|---------|----------|--------|
+| Self-service layout | `SelfServiceLayout.vue` | OK — wire auth store |
+| Login view | `SelfServiceLoginView.vue` | OK — wire API |
+| Profile edit view | `SelfServiceProfileView.vue` | **REWORK** — hardcoded fields, old "UserTemplate" ref; must render dynamically from `ProfileAttributeConfig` |
+| Password change view | `SelfServicePasswordView.vue` | OK — wire API |
+| Groups view | `SelfServiceGroupsView.vue` | OK — wire API |
+| Registration form view | `RegisterView.vue` | **REWORK** — profile selector OK, but form fields are hardcoded; must render dynamically from `ProfileAttributeConfig` |
+| Email verification view | `VerifyEmailView.vue` | OK — wire API |
+| Registration status view | `RegistrationStatusView.vue` | OK — wire API |
+| All self-service routes | `router/index.js` | OK — routes configured, guard TBD |
 
 ---
 
@@ -370,10 +414,9 @@ The self-service schema changes (`directory_connections` columns + `registration
 2. **Phase 2** — Auth changes (principal, JWT, login endpoint, security config)
 3. **Phase 3a-3b** — Self-service profile/password/groups (authenticated portal)
 4. **Phase 3c-3d** — Registration entity + approval workflow extension
-5. **Phase 4** — Frontend shared infrastructure (API client, layout, router, auth store)
-6. **Phase 5a-5d** — Self-service portal views (login, profile, password, groups)
-7. **Phase 5e-5f** — Registration views
-8. **Phase 6** — Admin UI extensions (directory settings, approvals)
+5. **Phase 4a, 4d** — Frontend API client + auth store extension + client.js 401 fix
+6. **Phase 5** — Wire mockup views to API; rework `SelfServiceProfileView` and `RegisterView` for dynamic `ProfileAttributeConfig` rendering; add router guard for principal isolation
+7. **Phase 6** — Admin UI extensions (directory settings, approvals view)
 
 The self-service portal (phases 2, 3a-3b, 5a-5d) can ship independently of self-registration (phases 3c-3d, 5e-5f), enabling incremental delivery.
 
