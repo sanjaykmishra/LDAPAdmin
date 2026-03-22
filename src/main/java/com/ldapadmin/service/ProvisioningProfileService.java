@@ -398,7 +398,6 @@ public class ProvisioningProfileService {
                     log.warn("Failed to parse allowed values JSON for attribute [{}]: {}",
                             config.getAttributeName(), e.getMessage());
                 }
-                }
             }
         }
     }
