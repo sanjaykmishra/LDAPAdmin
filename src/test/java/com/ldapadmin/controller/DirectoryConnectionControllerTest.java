@@ -69,6 +69,8 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
                 null,                               // disableValue
                 null,                               // auditDataSourceId
                 true,                               // enabled
+                false,                              // selfServiceEnabled
+                null,                               // selfServiceLoginAttribute
                 List.of(),                          // userBaseDns
                 List.of(),                          // groupBaseDns
                 OffsetDateTime.now(),               // createdAt
@@ -81,7 +83,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
                 false, null, "cn=admin,dc=example,dc=com", "secret",
                 "dc=example,dc=com", 500, 1, 10, 5, 30,
                 null, null, null, null, null, true,
-                List.of(), List.of());
+                false, null, List.of(), List.of());
     }
 
     // ── GET list ──────────────────────────────────────────────────────────────
@@ -131,7 +133,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
                 false, null, "cn=admin,dc=example,dc=com", "secret",
                 "dc=example,dc=com", 500, 1, 10, 5, 30,
                 null, null, null, null, null, true,
-                List.of(), List.of());
+                false, null, List.of(), List.of());
 
         mockMvc.perform(post(BASE_URL)
                         .with(authentication(superadminAuth()))
@@ -147,7 +149,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
                 false, null, "cn=admin,dc=example,dc=com", "secret",
                 "dc=example,dc=com", 500, 1, 10, 5, 30,
                 null, null, null, null, null, true,
-                List.of(), List.of());
+                false, null, List.of(), List.of());
 
         mockMvc.perform(post(BASE_URL)
                         .with(authentication(superadminAuth()))
