@@ -39,6 +39,16 @@ public enum AuditAction {
     APPROVAL_APPROVED    ("approval.approved"),
     APPROVAL_REJECTED    ("approval.rejected"),
 
+    // ── Access review campaigns ─────────────────────────────────────────────
+    CAMPAIGN_CREATED     ("campaign.created"),
+    CAMPAIGN_ACTIVATED   ("campaign.activated"),
+    CAMPAIGN_CLOSED      ("campaign.closed"),
+    CAMPAIGN_CANCELLED   ("campaign.cancelled"),
+    CAMPAIGN_EXPIRED     ("campaign.expired"),
+    REVIEW_CONFIRMED     ("review.confirmed"),
+    REVIEW_REVOKED       ("review.revoked"),
+    REVIEW_AUTO_REVOKED  ("review.auto_revoked"),
+
     // ── Changelog-sourced (raw LDAP changelog entry) ──────────────────────────
     LDAP_CHANGE          ("ldap.change");
 
