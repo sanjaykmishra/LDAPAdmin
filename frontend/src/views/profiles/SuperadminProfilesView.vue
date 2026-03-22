@@ -7,7 +7,7 @@ import {
   getApprovalConfig, setApprovalConfig, getApprovers, setApprovers
 } from '@/api/profiles'
 import { listDirectories } from '@/api/directories'
-import { listObjectClasses, getObjectClass, getObjectClassesBulk } from '@/api/schema'
+import { listObjectClasses, getObjectClass } from '@/api/schema'
 import { listAdmins } from '@/api/adminManagement'
 import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -155,15 +155,13 @@ async function openEdit(p) {
   // Load schema data for existing object classes (for RDN picker and required tracking)
   schemaRequiredAttrs.value = new Set()
   ocSchemaCache.value = {}
-  if (p.objectClassNames.length > 0) {
+  for (const ocName of p.objectClassNames) {
     try {
-      const { data } = await getObjectClassesBulk(p.directoryId, p.objectClassNames)
-      for (const oc of data) {
-        const required = oc.requiredAttributes || oc.required || []
-        const optional = oc.optionalAttributes || oc.optional || []
-        ocSchemaCache.value[oc.name] = { required: [...required], optional: [...optional] }
-        for (const attr of required) schemaRequiredAttrs.value.add(attr)
-      }
+      const { data } = await getObjectClass(selectedDirId.value, ocName)
+      const required = data.requiredAttributes || data.required || []
+      const optional = data.optionalAttributes || data.optional || []
+      ocSchemaCache.value[ocName] = { required: [...required], optional: [...optional] }
+      for (const attr of required) schemaRequiredAttrs.value.add(attr)
     } catch { /* schema lookup optional */ }
   }
 
