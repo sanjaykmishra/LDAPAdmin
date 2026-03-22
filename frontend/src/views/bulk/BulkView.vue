@@ -18,15 +18,15 @@
 
     <!-- Import tab -->
     <section v-if="activeTab === 'import'" class="bg-white border border-gray-200 border-t-0 rounded-b-xl p-6">
-      <h2 class="text-lg font-semibold mb-4">Import Users from CSV</h2>
-      <div class="space-y-3">
+      <h2 class="text-lg font-semibold mb-3">Import Users from CSV</h2>
+      <div class="space-y-2">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Parent DN <span class="text-red-500">*</span></label>
           <DnPicker v-model="importForm.parentDn" :directoryId="dirId" :superadmin="false" />
         </div>
 
         <!-- Template picker + actions dropdown -->
-        <div class="flex gap-3 items-end">
+        <div class="flex gap-2 items-end">
           <div class="flex-1">
             <label class="block text-sm font-medium text-gray-700 mb-1">Import Template <span class="text-red-500">*</span></label>
             <select v-model="selectedTemplateId" class="input w-full" @change="onTemplateSelected">
@@ -57,7 +57,7 @@
         </div>
 
         <!-- Template-driven fields (disabled, populated from template) -->
-        <div v-if="selectedTemplate" class="grid grid-cols-3 gap-3">
+        <div v-if="selectedTemplate" class="grid grid-cols-3 gap-2">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Object Class</label>
             <div class="input w-full bg-gray-50 text-gray-500 min-h-[38px]">
@@ -121,7 +121,7 @@
 
       <!-- Import result -->
       <div v-if="importResult" class="mt-4 p-4 rounded-lg bg-gray-50 border border-gray-200 text-sm">
-        <div class="grid grid-cols-4 gap-3 mb-3">
+        <div class="grid grid-cols-4 gap-2 mb-3">
           <div class="text-center"><p class="text-2xl font-bold text-green-600">{{ importResult.created }}</p><p class="text-xs text-gray-500">Created</p></div>
           <div class="text-center"><p class="text-2xl font-bold text-blue-600">{{ importResult.updated }}</p><p class="text-xs text-gray-500">Updated</p></div>
           <div class="text-center"><p class="text-2xl font-bold text-yellow-600">{{ importResult.skipped }}</p><p class="text-xs text-gray-500">Skipped</p></div>
@@ -137,8 +137,8 @@
 
     <!-- Export tab -->
     <section v-if="activeTab === 'export'" class="bg-white border border-gray-200 border-t-0 rounded-b-xl p-6">
-      <h2 class="text-lg font-semibold mb-4">Export Users to CSV</h2>
-      <div class="space-y-3">
+      <h2 class="text-lg font-semibold mb-3">Export Users to CSV</h2>
+      <div class="space-y-2">
         <FormField label="LDAP Filter (optional)" v-model="exportForm.filter" placeholder="(objectClass=inetOrgPerson)" />
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Base DN (optional)</label>
@@ -153,9 +153,9 @@
 
     <!-- Template create/edit modal -->
     <AppModal v-model="showTemplateModal" :title="editTemplate ? 'Edit Template' : 'New Template'" size="xl">
-      <form @submit.prevent="saveTemplate" class="space-y-4">
-        <div class="grid grid-cols-2 gap-4 items-end">
-          <div class="space-y-3">
+      <form @submit.prevent="saveTemplate" class="space-y-2">
+        <div class="grid grid-cols-2 gap-2 items-end">
+          <div class="space-y-2">
             <FormField label="Template Name" v-model="templateForm.name" required />
             <FormField label="RDN Attribute" v-model="templateForm.targetKeyAttribute" placeholder="uid" />
           </div>
@@ -198,7 +198,7 @@
             </div>
           </div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-2 gap-2">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Conflict Handling</label>
             <select v-model="templateForm.conflictHandling" class="input w-full">

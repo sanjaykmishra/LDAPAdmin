@@ -51,7 +51,7 @@
 
     <!-- Create/Edit modal -->
     <AppModal v-model="showModal" :title="editing ? 'Edit Realm' : 'New Realm'" size="lg">
-      <form @submit.prevent="save" class="space-y-4">
+      <form @submit.prevent="save" class="space-y-2">
         <!-- Directory picker -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
@@ -65,7 +65,7 @@
         </div>
 
         <FormField label="Name" v-model="form.name" required placeholder="e.g. People, Service Accounts" />
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-2 gap-2">
           <FormField label="User Base DN" v-model="form.userBaseDn" required placeholder="ou=people,dc=example,dc=com" />
           <FormField label="Group Base DN" v-model="form.groupBaseDn" required placeholder="ou=groups,dc=example,dc=com" />
         </div>
@@ -94,7 +94,7 @@
 
         <!-- Approval Workflow (only shown when editing) -->
         <div v-if="editing" class="border-t border-gray-200 pt-4 mt-4">
-          <h3 class="text-sm font-semibold text-gray-800 mb-3">Approval Workflow</h3>
+          <h3 class="text-sm font-semibold text-gray-800 mb-2">Approval Workflow</h3>
           <label class="flex items-center gap-2 mb-2">
             <input type="checkbox" v-model="approvalEnabled"
               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
@@ -105,7 +105,7 @@
               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
             <span class="text-sm text-gray-700">Require approval for user move</span>
           </label>
-          <label class="flex items-center gap-2 mb-3">
+          <label class="flex items-center gap-2 mb-2">
             <input type="checkbox" v-model="groupAddApprovalEnabled"
               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
             <span class="text-sm text-gray-700">Require approval for group member addition</span>

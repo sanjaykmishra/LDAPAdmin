@@ -42,7 +42,7 @@
 
     <!-- Create / Edit modal -->
     <AppModal v-model="showForm" :title="editing ? 'Edit Admin User' : 'New Admin User'" size="sm">
-      <form @submit.prevent="save" class="space-y-1">
+      <form @submit.prevent="save" class="space-y-0.5">
         <FormField label="Username" v-model="form.username" required :disabled="!!editing"
           hint="Used to log in. Cannot be changed after creation." />
         <FormField label="Display name" v-model="form.displayName" placeholder="Optional" />
@@ -79,7 +79,7 @@
     <!-- Permissions panel -->
     <AppModal v-model="showPerms" :title="`Permissions — ${permsTarget?.username}`" size="lg">
       <div v-if="permsLoading" class="py-8 text-center text-sm text-gray-400">Loading…</div>
-      <div v-else-if="perms" class="space-y-6 text-sm">
+      <div v-else-if="perms" class="space-y-4 text-sm">
 
         <!-- Realm roles -->
         <section>
@@ -127,7 +127,7 @@
         <!-- Feature overrides -->
         <section>
           <h3 class="font-semibold text-gray-700 mb-2">Feature permission overrides</h3>
-          <p class="text-xs text-gray-400 mb-3">Override the default feature permissions for this admin. Leave as "Default" to use the role-based default.</p>
+          <p class="text-xs text-gray-400 mb-2">Override the default feature permissions for this admin. Leave as "Default" to use the role-based default.</p>
           <div class="grid grid-cols-2 gap-x-6 gap-y-2">
             <div v-for="fk in allFeatureKeys" :key="fk" class="flex items-center justify-between">
               <span class="text-xs text-gray-700 font-mono">{{ fk }}</span>

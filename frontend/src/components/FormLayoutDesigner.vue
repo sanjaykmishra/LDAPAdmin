@@ -1,12 +1,12 @@
 <template>
-  <div class="space-y-4">
+  <div class="space-y-2">
     <!-- Toolbar -->
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2">
         <button type="button" @click="addSection" class="btn-secondary text-xs">+ Add Section</button>
         <span class="text-xs text-gray-400">Drag fields to reorder. Use column spans to control width.</span>
       </div>
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2">
         <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
           <input type="checkbox" v-model="localShowDnField" class="rounded" />
           Show DN field on form
@@ -23,11 +23,11 @@
     <!-- Live Preview -->
     <div v-if="showPreview" class="border border-blue-200 bg-blue-50/30 rounded-xl p-4">
       <h4 class="text-sm font-semibold text-blue-800 mb-3">Form Preview</h4>
-      <div class="bg-white rounded-lg border border-gray-200 p-4 space-y-4">
+      <div class="bg-white rounded-lg border border-gray-200 p-4 space-y-2">
         <template v-for="(section, sIdx) in previewSections" :key="section.id">
-          <fieldset v-if="section.fields.length" class="space-y-3">
+          <fieldset v-if="section.fields.length" class="space-y-2">
             <legend v-if="section.name" class="text-sm font-semibold text-gray-800 pb-1 border-b border-gray-100 w-full mb-2">{{ section.name }}</legend>
-            <div class="grid grid-cols-3 gap-3">
+            <div class="grid grid-cols-3 gap-2">
               <template v-for="field in section.fields" :key="field.attributeName">
                 <!-- RDN field -->
                 <div v-if="field.rdn" :style="{ gridColumn: localShowDnField ? 'span 1' : `span ${field.columnSpan || 3}` }">
@@ -72,7 +72,7 @@
     </div>
 
     <!-- Section editor -->
-    <div class="space-y-3">
+    <div class="space-y-2">
       <div
         v-for="(section, sIdx) in sections"
         :key="section.id"
