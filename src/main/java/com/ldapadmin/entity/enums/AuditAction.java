@@ -38,6 +38,7 @@ public enum AuditAction {
     // ── Approval workflow ──────────────────────────────────────────────────────
     APPROVAL_SUBMITTED   ("approval.submitted"),
     APPROVAL_APPROVED    ("approval.approved"),
+    APPROVAL_AUTO_APPROVED("approval.auto_approved"),
     APPROVAL_REJECTED    ("approval.rejected"),
 
     // ── Access review campaigns ─────────────────────────────────────────────

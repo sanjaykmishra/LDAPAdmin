@@ -45,6 +45,7 @@ public class ApprovalWorkflowService {
     private final ObjectMapper objectMapper;
 
     // Lazy to break circular dependency: SelfServiceService → ApprovalWorkflowService → SelfServiceService
+    private final ApplicationSettingsService settingsService;
     private final org.springframework.context.ApplicationContext applicationContext;
 
     private SelfServiceService selfServiceService() {
@@ -89,7 +90,12 @@ public class ApprovalWorkflowService {
         auditService.record(requester, directoryId, AuditAction.APPROVAL_SUBMITTED,
                 null, Map.of("approvalId", pa.getId().toString(), "requestType", type.name()));
 
-        notificationService.notifyApproversOfNewRequest(pa);
+        // Auto-approve if requester is superadmin and bypass setting is enabled
+        if (requester.isSuperadmin() && settingsService.getEntity().isSuperadminBypassApproval()) {
+            autoApprove(pa, requester);
+        } else {
+            notificationService.notifyApproversOfNewRequest(pa);
+        }
 
         return pa;
     }
@@ -132,6 +138,10 @@ public class ApprovalWorkflowService {
 
         if (pa.getStatus() != ApprovalStatus.PENDING) {
             throw new IllegalStateException("Approval is not in PENDING status");
+        }
+
+        if (approver.id().equals(pa.getRequestedBy())) {
+            throw new AccessDeniedException("Cannot approve your own request");
         }
 
         if (!approver.isSuperadmin() && pa.getProfileId() != null
@@ -207,6 +217,34 @@ public class ApprovalWorkflowService {
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    /**
+     * Immediately approves and executes a request submitted by a superadmin
+     * when the bypass setting is enabled. Creates a full audit trail.
+     */
+    private void autoApprove(PendingApproval pa, AuthPrincipal requester) {
+        if (pa.getRequestType() == ApprovalRequestType.USER_CREATE) {
+            executeUserCreate(pa, requester);
+        } else if (pa.getRequestType() == ApprovalRequestType.BULK_IMPORT) {
+            executeBulkImport(pa, requester);
+        } else if (pa.getRequestType() == ApprovalRequestType.USER_MOVE) {
+            executeUserMove(pa, requester);
+        } else if (pa.getRequestType() == ApprovalRequestType.GROUP_MEMBER_ADD) {
+            executeGroupMemberAdd(pa, requester);
+        } else if (pa.getRequestType() == ApprovalRequestType.SELF_REGISTRATION) {
+            executeSelfRegistration(pa);
+        }
+
+        pa.setStatus(ApprovalStatus.APPROVED);
+        pa.setReviewedBy(requester.id());
+        pa.setReviewedAt(OffsetDateTime.now());
+        approvalRepo.save(pa);
+
+        auditService.record(requester, pa.getDirectoryId(), AuditAction.APPROVAL_AUTO_APPROVED,
+                null, Map.of("approvalId", pa.getId().toString()));
+
+        log.info("Auto-approved request {} for superadmin {}", pa.getId(), requester.id());
+    }
 
     private void executeUserCreate(PendingApproval pa, AuthPrincipal approver) {
         try {

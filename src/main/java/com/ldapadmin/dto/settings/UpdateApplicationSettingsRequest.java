@@ -22,6 +22,9 @@ public record UpdateApplicationSettingsRequest(
         String primaryColour,
         String secondaryColour,
 
+        // Approval workflow
+        boolean superadminBypassApproval,
+
         // Session
         @NotNull @Min(1) Integer sessionTimeoutMinutes,
 
