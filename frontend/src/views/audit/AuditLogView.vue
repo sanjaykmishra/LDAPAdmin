@@ -3,12 +3,12 @@
     <h1 class="text-2xl font-bold text-gray-900 mb-6">Audit Log</h1>
 
     <!-- Filters -->
-    <div class="bg-white border border-gray-200 rounded-xl p-4 mb-4 grid grid-cols-3 gap-3">
+    <div class="bg-white border border-gray-200 rounded-xl p-4 mb-2 grid grid-cols-3 gap-2">
       <FormField label="From" type="datetime-local" v-model="filters.from" />
       <FormField label="To"   type="datetime-local" v-model="filters.to" />
       <FormField label="Action" type="select" v-model="filters.action" :options="actionOptions" />
     </div>
-    <div class="flex gap-3 mb-4">
+    <div class="flex gap-2 mb-2">
       <button @click="load(0)" class="btn-primary">Filter</button>
       <button @click="clearFilters" class="btn-secondary">Clear</button>
     </div>

@@ -2,7 +2,7 @@
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Groups</h1>
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2">
         <div v-if="allRealms.length > 1" class="flex items-center gap-2">
           <label class="text-sm text-gray-600 font-medium">Realm:</label>
           <select v-model="selectedRealmId" @change="onRealmChange"
@@ -15,7 +15,7 @@
     </div>
 
     <!-- Search -->
-    <div class="flex gap-3 mb-4">
+    <div class="flex gap-2 mb-2">
       <input v-model="filterText" placeholder="Filter (e.g. cn=staff*)" @keyup.enter="load"
         class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
       <button @click="load" class="btn-primary">Search</button>
@@ -32,7 +32,7 @@
         <span class="text-gray-600 text-xs">{{ value }}</span>
       </template>
       <template #actions="{ row }">
-        <div class="flex gap-3 justify-end whitespace-nowrap">
+        <div class="flex gap-2 justify-end whitespace-nowrap">
           <button @click="openEdit(row)" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Edit</button>
           <button @click="openMembers(row)" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Members</button>
           <button @click="confirmDelete(row)" class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
@@ -42,7 +42,7 @@
 
     <!-- Create group -->
     <AppModal v-model="showCreate" title="New Group" size="lg">
-      <div class="grid grid-cols-3 gap-3">
+      <div class="grid grid-cols-3 gap-2">
         <FormField label="Group Name (cn) (RDN)" v-model="createForm.cn" required />
         <div class="col-span-2">
           <FormField label="DN" :model-value="computedGroupDn" required disabled />

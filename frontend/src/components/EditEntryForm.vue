@@ -1,12 +1,12 @@
 <template>
   <div>
-    <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center justify-between mb-2">
       <h2 class="text-lg font-semibold text-gray-900">Edit Entry</h2>
       <button @click="$emit('cancel')" class="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
     </div>
 
     <!-- DN (read-only) -->
-    <div class="mb-4">
+    <div class="mb-2">
       <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Distinguished Name</p>
       <div class="text-sm font-mono text-gray-900 bg-gray-50 px-3 py-2 rounded-lg break-all flex items-center gap-2">
         <span class="flex-1">{{ dn }}</span>
@@ -14,13 +14,13 @@
       </div>
     </div>
 
-    <p v-if="loadingSchema" class="text-xs text-gray-400 mb-3">Loading schema...</p>
+    <p v-if="loadingSchema" class="text-xs text-gray-400 mb-2">Loading schema...</p>
 
     <!-- Attributes -->
-    <div class="mb-4">
-      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Attributes</p>
+    <div class="mb-2">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Attributes</p>
 
-      <div v-for="attr in editableAttributes" :key="attr.name" class="mb-4">
+      <div v-for="attr in editableAttributes" :key="attr.name" class="mb-2">
         <label class="block text-sm font-medium text-gray-700 mb-1">
           {{ attr.name }}
           <span v-if="attr.required" class="text-red-500">*</span>
@@ -50,7 +50,7 @@
     </div>
 
     <!-- Add new attribute -->
-    <div v-if="availableNewAttrs.length" class="mb-4">
+    <div v-if="availableNewAttrs.length" class="mb-2">
       <div class="flex gap-2">
         <select v-model="newAttrToAdd" class="input flex-1">
           <option value="" disabled>— Add attribute —</option>

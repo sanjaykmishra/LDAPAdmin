@@ -7,8 +7,8 @@
 
     <!-- On-demand run -->
     <section class="bg-white border border-gray-200 rounded-xl p-6 mb-6">
-      <h2 class="text-lg font-semibold mb-4">Run Report Now</h2>
-      <div class="grid grid-cols-2 gap-4">
+      <h2 class="text-lg font-semibold mb-3">Run Report Now</h2>
+      <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
           <select v-model="runForm.reportType" class="input w-full">
@@ -78,8 +78,8 @@
 
     <!-- Create / Edit modal -->
     <AppModal v-model="showModal" :title="editJob ? 'Edit Scheduled Job' : 'New Scheduled Job'" size="lg">
-      <form @submit.prevent="saveJob" class="space-y-4">
-        <div class="grid grid-cols-2 gap-4">
+      <form @submit.prevent="saveJob" class="space-y-2">
+        <div class="grid grid-cols-2 gap-3">
           <FormField label="Name" v-model="form.name" required />
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
@@ -89,7 +89,7 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-2 gap-3">
           <FormField label="Cron Expression" v-model="form.cronExpression" placeholder="0 8 * * 1" required />
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Delivery Method</label>
@@ -101,18 +101,18 @@
         </div>
 
         <!-- Email delivery -->
-        <div v-if="form.deliveryMethod === 'EMAIL'" class="grid grid-cols-2 gap-4">
+        <div v-if="form.deliveryMethod === 'EMAIL'" class="grid grid-cols-2 gap-3">
           <FormField label="Recipient Email" v-model="form.recipientEmail" placeholder="user@example.com" />
           <FormField label="Email Subject" v-model="form.emailSubject" placeholder="Scheduled report" />
         </div>
 
         <!-- S3 delivery -->
-        <div v-if="form.deliveryMethod === 'S3'" class="grid grid-cols-2 gap-4">
+        <div v-if="form.deliveryMethod === 'S3'" class="grid grid-cols-2 gap-3">
           <FormField label="S3 Key Prefix" v-model="form.s3KeyPrefix" placeholder="reports/" />
         </div>
 
         <!-- Report params -->
-        <div v-if="formNeedsParam" class="grid grid-cols-2 gap-4">
+        <div v-if="formNeedsParam" class="grid grid-cols-2 gap-3">
           <FormField :label="formParamLabel" v-model="form.paramValue" :placeholder="formParamPlaceholder" />
         </div>
         <FormField label="Lookback Days" v-model.number="form.lookbackDays" type="number" placeholder="30" />

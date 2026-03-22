@@ -57,7 +57,7 @@
 
     <!-- Create/Edit modal -->
     <AppModal v-model="showModal" :title="editing ? 'Edit User Template' : 'New User Template'" size="xl">
-      <form @submit.prevent="save" class="space-y-4">
+      <form @submit.prevent="save" class="space-y-2">
         <!-- Directory picker -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>

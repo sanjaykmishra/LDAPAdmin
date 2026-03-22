@@ -1,7 +1,7 @@
 <template>
   <div>
     <!-- Tabs (shown in both create and edit modes) -->
-    <div class="flex border-b border-gray-200 mb-4">
+    <div class="flex border-b border-gray-200 mb-2">
       <button
         @click="activeTab = 'attributes'"
         class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
@@ -18,9 +18,9 @@
     <div v-show="activeTab === 'attributes'">
 
       <!-- ── Create mode ── -->
-      <div v-if="!isEdit" class="space-y-3">
+      <div v-if="!isEdit" class="space-y-2">
         <!-- Fallback RDN + DN row when no user form config -->
-        <div v-if="!userTemplateConfig" class="grid grid-cols-3 gap-3">
+        <div v-if="!userTemplateConfig" class="grid grid-cols-3 gap-2">
           <FormField label="RDN Attribute" v-model="local.rdnAttribute" placeholder="uid" required />
           <div class="col-span-2">
             <FormField
@@ -39,9 +39,9 @@
         <!-- Dynamic fields from user form config (all attributes in layout order) -->
         <template v-if="userTemplateConfig?.attributeConfigs?.length">
           <template v-for="(section, sIdx) in createSections" :key="sIdx">
-            <fieldset v-if="section.fields.length" class="space-y-3">
+            <fieldset v-if="section.fields.length" class="space-y-2">
               <legend v-if="section.name" class="text-sm font-semibold text-gray-800 pb-1 border-b border-gray-100 w-full mb-2">{{ section.name }}</legend>
-              <div class="grid grid-cols-3 gap-3">
+              <div class="grid grid-cols-3 gap-2">
                 <template
                   v-for="attr in section.fields"
                   :key="attr.id || attr.attributeName"
@@ -97,15 +97,15 @@
       </div>
 
       <!-- ── Edit mode ── -->
-      <div v-else class="space-y-3">
-        <p class="text-xs text-gray-500 mb-3">Editing: <code class="bg-gray-100 px-1 rounded">{{ local.dn }}</code></p>
+      <div v-else class="space-y-2">
+        <p class="text-xs text-gray-500 mb-2">Editing: <code class="bg-gray-100 px-1 rounded">{{ local.dn }}</code></p>
 
         <!-- When user form config is available, render structured fields -->
         <template v-if="userTemplateConfig?.attributeConfigs?.length">
           <template v-for="(section, sIdx) in editSections" :key="sIdx">
-            <fieldset v-if="section.fields.length" class="space-y-3">
+            <fieldset v-if="section.fields.length" class="space-y-2">
               <legend v-if="section.name" class="text-sm font-semibold text-gray-800 pb-1 border-b border-gray-100 w-full mb-2">{{ section.name }}</legend>
-              <div class="grid grid-cols-3 gap-3">
+              <div class="grid grid-cols-3 gap-2">
                 <template
                   v-for="attr in section.fields"
                   :key="attr.id || attr.attributeName"
@@ -160,7 +160,7 @@
               </svg>
               Other Attributes ({{ Object.keys(extraEditAttributes).length }})
             </button>
-            <div v-if="showExtraAttrs" class="space-y-3 mt-3 pl-3 border-l-2 border-gray-100">
+            <div v-if="showExtraAttrs" class="space-y-2 mt-3 pl-3 border-l-2 border-gray-100">
               <template v-for="(_, key) in extraEditAttributes" :key="key">
                 <FormField :label="key" v-model="local.attributes[key]" type="textarea" :rows="2" hint="One value per line" />
               </template>
@@ -179,11 +179,11 @@
 
     <!-- ═══ Groups tab ═══ -->
     <div v-show="activeTab === 'groups'">
-      <p v-if="isEdit" class="text-xs text-gray-500 mb-3">Manage group memberships for <code class="bg-gray-100 px-1 rounded">{{ local.dn }}</code></p>
-      <p v-else class="text-xs text-gray-500 mb-3">Select groups for the new user. Memberships will be created after the user is saved.</p>
+      <p v-if="isEdit" class="text-xs text-gray-500 mb-2">Manage group memberships for <code class="bg-gray-100 px-1 rounded">{{ local.dn }}</code></p>
+      <p v-else class="text-xs text-gray-500 mb-2">Select groups for the new user. Memberships will be created after the user is saved.</p>
 
       <!-- Current memberships (edit mode only) -->
-      <div v-if="isEdit" class="mb-4">
+      <div v-if="isEdit" class="mb-2">
         <h3 class="text-sm font-medium text-gray-700 mb-2">Current Groups</h3>
         <div v-if="loadingGroups" class="text-sm text-gray-400 py-3 text-center">Loading…</div>
         <ul v-else-if="memberGroups.length" class="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
@@ -199,7 +199,7 @@
       </div>
 
       <!-- Pending groups (create mode only) -->
-      <div v-if="!isEdit && pendingGroups.length" class="mb-4">
+      <div v-if="!isEdit && pendingGroups.length" class="mb-2">
         <h3 class="text-sm font-medium text-gray-700 mb-2">Groups to Join</h3>
         <ul class="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
           <li v-for="g in pendingGroups" :key="g.dn" class="flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50">
