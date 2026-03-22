@@ -159,7 +159,65 @@ const router = createRouter({
           component: () => import('@/views/superadmin/IntegrityCheckView.vue'),
           meta: { requiresSuperadmin: true },
         },
+        {
+          path: 'superadmin/access-reviews',
+          name: 'superadminAccessReviews',
+          component: () => import('@/views/superadmin/AccessReviewsView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
       ],
+    },
+
+    // ── Self-service portal (authenticated) ──────────────────────────────
+    {
+      path: '/self-service',
+      component: () => import('@/layouts/SelfServiceLayout.vue'),
+      children: [
+        {
+          path: 'profile',
+          name: 'selfServiceProfile',
+          component: () => import('@/views/selfservice/SelfServiceProfileView.vue'),
+          meta: { public: true },
+        },
+        {
+          path: 'password',
+          name: 'selfServicePassword',
+          component: () => import('@/views/selfservice/SelfServicePasswordView.vue'),
+          meta: { public: true },
+        },
+        {
+          path: 'groups',
+          name: 'selfServiceGroups',
+          component: () => import('@/views/selfservice/SelfServiceGroupsView.vue'),
+          meta: { public: true },
+        },
+      ],
+    },
+
+    // ── Self-service public pages ──────────────────────────────────────────
+    {
+      path: '/self-service/login',
+      name: 'selfServiceLogin',
+      component: () => import('@/views/selfservice/SelfServiceLoginView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: () => import('@/views/selfservice/RegisterView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/register/verify/:token',
+      name: 'verifyEmail',
+      component: () => import('@/views/selfservice/VerifyEmailView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/register/status/:requestId',
+      name: 'registrationStatus',
+      component: () => import('@/views/selfservice/RegistrationStatusView.vue'),
+      meta: { public: true },
     },
 
     // Catch-all
