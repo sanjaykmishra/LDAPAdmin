@@ -1,5 +1,7 @@
 package com.ldapadmin.dto.profile;
 
+import com.ldapadmin.dto.profile.CreateProfileRequest.AttributeConfigEntry;
+import com.ldapadmin.dto.profile.CreateProfileRequest.GroupAssignmentEntry;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -16,6 +18,6 @@ public record UpdateProfileRequest(
         boolean showDnField,
         boolean enabled,
         boolean selfRegistrationAllowed,
-        List<@Valid CreateProfileRequest.AttributeConfigEntry> attributeConfigs,
-        List<@Valid CreateProfileRequest.GroupAssignmentEntry> groupAssignments) {
+        List<@Valid AttributeConfigEntry> attributeConfigs,
+        List<@Valid GroupAssignmentEntry> groupAssignments) {
 }
