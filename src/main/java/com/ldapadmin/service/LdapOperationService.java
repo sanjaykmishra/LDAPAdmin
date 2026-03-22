@@ -25,6 +25,7 @@ import com.ldapadmin.ldap.LdapGroupService;
 import com.ldapadmin.ldap.LdapSchemaService;
 import com.ldapadmin.ldap.LdapSchemaService.AttributeTypeInfo;
 import com.ldapadmin.ldap.LdapSchemaService.ObjectClassAttributes;
+import com.ldapadmin.ldap.LdapSchemaService.SchemaListItem;
 import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.unboundid.ldap.sdk.Modification;
@@ -84,13 +85,13 @@ public class LdapOperationService {
 
     // ── Schema ────────────────────────────────────────────────────────────────
 
-    public List<String> getObjectClassNames(UUID directoryId, AuthPrincipal principal) {
+    public List<SchemaListItem> getObjectClassNames(UUID directoryId, AuthPrincipal principal) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
         return schemaService.getObjectClassNames(dc);
     }
 
-    public List<String> getAttributeTypeNames(UUID directoryId, AuthPrincipal principal) {
+    public List<SchemaListItem> getAttributeTypeNames(UUID directoryId, AuthPrincipal principal) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
         return schemaService.getAttributeTypeNames(dc);

@@ -269,7 +269,9 @@ public class BrowseController {
     @GetMapping("/schema/object-classes")
     public List<String> listObjectClasses(@PathVariable UUID directoryId) {
         DirectoryConnection dc = loadDirectory(directoryId);
-        return schemaService.getObjectClassNames(dc);
+        return schemaService.getObjectClassNames(dc).stream()
+            .map(LdapSchemaService.SchemaListItem::name)
+            .collect(java.util.stream.Collectors.toList());
     }
 
     @GetMapping("/schema/object-classes/bulk")

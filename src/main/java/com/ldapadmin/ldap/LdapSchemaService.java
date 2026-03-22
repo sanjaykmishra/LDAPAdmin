@@ -33,11 +33,11 @@ public class LdapSchemaService {
      * Returns all objectClass names defined in the directory schema,
      * sorted alphabetically.
      */
-    public List<String> getObjectClassNames(DirectoryConnection dc) {
+    public List<SchemaListItem> getObjectClassNames(DirectoryConnection dc) {
         Schema schema = fetchSchema(dc);
         return schema.getObjectClasses().stream()
-            .map(ObjectClassDefinition::getNameOrOID)
-            .sorted(String.CASE_INSENSITIVE_ORDER)
+            .map(ocd -> new SchemaListItem(ocd.getNameOrOID(), ocd.getOID()))
+            .sorted(Comparator.comparing(SchemaListItem::name, String.CASE_INSENSITIVE_ORDER))
             .collect(Collectors.toList());
     }
 
@@ -45,11 +45,11 @@ public class LdapSchemaService {
      * Returns all attributeType names defined in the directory schema,
      * sorted alphabetically.
      */
-    public List<String> getAttributeTypeNames(DirectoryConnection dc) {
+    public List<SchemaListItem> getAttributeTypeNames(DirectoryConnection dc) {
         Schema schema = fetchSchema(dc);
         return schema.getAttributeTypes().stream()
-            .map(AttributeTypeDefinition::getNameOrOID)
-            .sorted(String.CASE_INSENSITIVE_ORDER)
+            .map(atd -> new SchemaListItem(atd.getNameOrOID(), atd.getOID()))
+            .sorted(Comparator.comparing(SchemaListItem::name, String.CASE_INSENSITIVE_ORDER))
             .collect(Collectors.toList());
     }
 
@@ -74,7 +74,7 @@ public class LdapSchemaService {
         Set<String> required = collectAttributeNames(schema, ocd, true);
         Set<String> optional = collectAttributeNames(schema, ocd, false);
 
-        return new ObjectClassAttributes(objectClass, required, optional);
+        return new ObjectClassAttributes(objectClass, ocd.getOID(), required, optional);
     }
 
     /**
@@ -180,6 +180,7 @@ public class LdapSchemaService {
         allOptional.removeAll(allRequired);
         return new ObjectClassAttributes(
             String.join(", ", objectClasses),
+            null,
             Collections.unmodifiableSet(allRequired),
             Collections.unmodifiableSet(allOptional));
     }
@@ -187,10 +188,16 @@ public class LdapSchemaService {
     // ── Value objects ─────────────────────────────────────────────────────────
 
     /**
+     * Name and OID for schema list entries.
+     */
+    public record SchemaListItem(String name, String oid) {}
+
+    /**
      * Required and optional attribute names for an objectClass.
      */
     public record ObjectClassAttributes(
         String objectClassName,
+        String oid,
         Set<String> required,
         Set<String> optional
     ) {}

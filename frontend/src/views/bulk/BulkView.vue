@@ -527,7 +527,7 @@ async function loadTemplates() {
 async function loadObjectClasses() {
   try {
     const { data } = await listObjectClasses(dirId)
-    objectClasses.value = data
+    objectClasses.value = data.map(oc => typeof oc === 'string' ? oc : oc.name)
   } catch (e) { console.warn('Failed to load objectClasses:', e) }
 }
 
