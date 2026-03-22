@@ -77,13 +77,25 @@
         v-for="(section, sIdx) in sections"
         :key="section.id"
         class="border border-gray-200 rounded-xl overflow-hidden"
-        :class="dragOverSection === sIdx ? 'ring-2 ring-blue-400' : ''"
+        :class="[
+          fieldDrag.field && fieldDrag.overSection === sIdx ? 'ring-2 ring-blue-400' : '',
+          sectionDrag.source !== null && sectionDrag.source !== sIdx && sectionDrag.overIdx === sIdx ? 'border-t-2 border-t-blue-500' : '',
+          sectionDrag.source === sIdx ? 'opacity-40' : '',
+        ]"
         @dragover.prevent="onDragOverSection($event, sIdx)"
         @dragleave="onDragLeaveSection"
         @drop="onDropSection($event, sIdx)"
       >
-        <!-- Section header -->
-        <div class="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
+        <!-- Section header (draggable for section reorder) -->
+        <div
+          class="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100"
+          :class="sections.length > 1 ? 'cursor-grab' : ''"
+          :draggable="sections.length > 1"
+          @dragstart.stop="onSectionDragStart($event, sIdx)"
+          @dragend.stop="onSectionDragEnd"
+          @dragover.prevent.stop="onSectionHeaderDragOver($event, sIdx)"
+          @drop.prevent.stop="onSectionDrop($event, sIdx)"
+        >
           <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
           </svg>
@@ -92,8 +104,11 @@
             placeholder="Section name (optional)"
             class="flex-1 bg-transparent text-sm font-medium text-gray-700 placeholder-gray-400 focus:outline-none"
             @input="syncToParent"
+            @mousedown.stop
           />
           <span class="text-xs text-gray-400">{{ section.fields.length }} field{{ section.fields.length !== 1 ? 's' : '' }}</span>
+          <button v-if="sIdx > 0" type="button" @click="moveSectionUp(sIdx)" class="text-gray-400 hover:text-blue-500 text-xs" title="Move section up">&uarr;</button>
+          <button v-if="sIdx < sections.length - 1" type="button" @click="moveSectionDown(sIdx)" class="text-gray-400 hover:text-blue-500 text-xs" title="Move section down">&darr;</button>
           <button
             v-if="sections.length > 1"
             type="button"
@@ -113,19 +128,25 @@
               v-for="(field, fIdx) in section.fields"
               :key="field.attributeName"
             >
+              <!-- Drop indicator line (before this field) -->
+              <div
+                v-if="fieldDrag.field && fieldDrag.overSection === sIdx && fieldDrag.overIdx === fIdx && !(fieldDrag.sourceSIdx === sIdx && fieldDrag.sourceFIdx === fIdx)"
+                class="col-span-3 h-0.5 bg-blue-500 rounded-full -my-0.5 pointer-events-none"
+              ></div>
+
               <!-- RDN field card -->
               <div
                 v-if="field.rdn"
                 :style="{ gridColumn: localShowDnField ? 'span 1' : `span ${field.columnSpan || 3}` }"
                 :class="[
-                  dragField?.attributeName === field.attributeName ? 'opacity-30' : '',
+                  fieldDrag.field?.attributeName === field.attributeName ? 'opacity-30' : '',
                 ]"
                 class="group relative flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg hover:border-amber-400 cursor-grab transition-colors"
                 draggable="true"
-                @dragstart="onDragStart($event, sIdx, fIdx, field)"
-                @dragend="onDragEnd"
-                @dragover.prevent.stop="onDragOverField($event, sIdx, fIdx)"
-                @drop.prevent.stop="onDropField($event, sIdx, fIdx)"
+                @dragstart="onFieldDragStart($event, sIdx, fIdx, field)"
+                @dragend="onFieldDragEnd"
+                @dragover.prevent.stop="onFieldDragOver($event, sIdx, fIdx)"
+                @drop.prevent.stop="onFieldDrop($event, sIdx, fIdx)"
               >
                 <svg class="w-3.5 h-3.5 text-amber-300 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm0 6a2 2 0 10.001 4.001A2 2 0 007 14zm6-8a2 2 0 10-.001-4.001A2 2 0 0013 6zm0 2a2 2 0 10.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10.001 4.001A2 2 0 0013 14z"/>
@@ -175,14 +196,14 @@
                 v-if="!field.rdn"
                 :style="{ gridColumn: `span ${field.columnSpan || 3}` }"
                 :class="[
-                  dragField?.attributeName === field.attributeName ? 'opacity-30' : '',
+                  fieldDrag.field?.attributeName === field.attributeName ? 'opacity-30' : '',
                 ]"
                 class="group relative flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 cursor-grab transition-colors"
                 draggable="true"
-                @dragstart="onDragStart($event, sIdx, fIdx, field)"
-                @dragend="onDragEnd"
-                @dragover.prevent.stop="onDragOverField($event, sIdx, fIdx)"
-                @drop.prevent.stop="onDropField($event, sIdx, fIdx)"
+                @dragstart="onFieldDragStart($event, sIdx, fIdx, field)"
+                @dragend="onFieldDragEnd"
+                @dragover.prevent.stop="onFieldDragOver($event, sIdx, fIdx)"
+                @drop.prevent.stop="onFieldDrop($event, sIdx, fIdx)"
               >
                 <!-- Drag handle -->
                 <svg class="w-3.5 h-3.5 text-gray-300 shrink-0" viewBox="0 0 20 20" fill="currentColor">
@@ -217,6 +238,12 @@
                 </div>
               </div>
             </template>
+
+            <!-- Drop indicator at end of field list -->
+            <div
+              v-if="fieldDrag.field && fieldDrag.overSection === sIdx && fieldDrag.overIdx === section.fields.length && !(fieldDrag.sourceSIdx === sIdx && fieldDrag.sourceFIdx === section.fields.length)"
+              class="col-span-3 h-0.5 bg-blue-500 rounded-full -my-0.5 pointer-events-none"
+            ></div>
           </div>
         </div>
       </div>
@@ -225,7 +252,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 
 const props = defineProps({
   attributeConfigs: { type: Array, required: true },
@@ -257,10 +284,17 @@ function nextSectionId() { return `section-${++sectionIdCounter}` }
 
 const sections = ref([])
 
+// Tracks last-known position of hidden fields so un-hiding restores them
+// Map<attributeName, { sectionName, afterAttribute }>
+const hiddenPositions = ref(new Map())
+
 function buildSections(attrs) {
   const map = new Map()
   for (const attr of attrs) {
-    if (attr.hidden) continue
+    if (attr.hidden) {
+      // Remember position relative to the previous visible field
+      continue
+    }
     const key = attr.sectionName || ''
     if (!map.has(key)) {
       map.set(key, { id: nextSectionId(), name: key, fields: [] })
@@ -276,17 +310,41 @@ function buildSections(attrs) {
   if (result.length === 0) {
     result.push({ id: nextSectionId(), name: '', fields: [] })
   }
+  // Ensure RDN field is always first in the first section
+  moveRdnToFirst(result)
+  // Build initial hidden position map
+  recordHiddenPositions(attrs)
   return result
 }
 
-/** The RDN field (used for preview). */
-const rdnField = computed(() => {
-  for (const section of sections.value) {
-    const f = section.fields.find(f => f.rdn)
-    if (f) return f
+function moveRdnToFirst(sectionList) {
+  for (let s = 0; s < sectionList.length; s++) {
+    const rdnIdx = sectionList[s].fields.findIndex(f => f.rdn)
+    if (rdnIdx > 0) {
+      const [rdnF] = sectionList[s].fields.splice(rdnIdx, 1)
+      sectionList[0].fields.unshift(rdnF)
+      return
+    } else if (rdnIdx === 0 && s === 0) {
+      return // already in the right place
+    }
   }
-  return null
-})
+}
+
+function recordHiddenPositions(attrs) {
+  let lastVisible = null
+  let lastSectionName = ''
+  for (const attr of attrs) {
+    if (!attr.hidden) {
+      lastVisible = attr.attributeName
+      lastSectionName = attr.sectionName || ''
+    } else {
+      hiddenPositions.value.set(attr.attributeName, {
+        sectionName: attr.sectionName || lastSectionName,
+        afterAttribute: lastVisible,
+      })
+    }
+  }
+}
 
 /** Sections for preview (includes all fields). */
 const previewSections = computed(() => sections.value)
@@ -300,30 +358,110 @@ let syncing = false
 watch(() => props.attributeConfigs, (newConfigs) => {
   if (syncing) return
 
-  const currentNames = new Set(
-    sections.value.flatMap(s => s.fields.map(f => f.attributeName))
-  )
+  const currentFields = sections.value.flatMap(s => s.fields)
+  const currentNames = new Set(currentFields.map(f => f.attributeName))
   const visibleConfigs = newConfigs.filter(a => !a.hidden)
   const incomingNames = new Set(visibleConfigs.map(a => a.attributeName))
 
+  // Detect RDN change (even when attribute set hasn't changed)
+  const incomingRdn = visibleConfigs.find(a => a.rdn)?.attributeName || null
+  const currentRdn = currentFields.find(f => f.rdn)?.attributeName || null
+  const rdnChanged = incomingRdn !== currentRdn
+
+  // Detect hidden→visible transitions
+  const newlyVisible = visibleConfigs.filter(a => !currentNames.has(a.attributeName) && hiddenPositions.value.has(a.attributeName))
+  const newlyHidden = newConfigs.filter(a => a.hidden && currentNames.has(a.attributeName))
+
+  // Record positions of newly hidden fields before removing them
+  for (const attr of newlyHidden) {
+    for (let s = 0; s < sections.value.length; s++) {
+      const idx = sections.value[s].fields.findIndex(f => f.attributeName === attr.attributeName)
+      if (idx >= 0) {
+        const prevField = idx > 0 ? sections.value[s].fields[idx - 1].attributeName : null
+        hiddenPositions.value.set(attr.attributeName, {
+          sectionName: sections.value[s].name || '',
+          afterAttribute: prevField,
+        })
+        break
+      }
+    }
+  }
+
   // Nothing changed — skip
   if (
+    !rdnChanged &&
+    newlyVisible.length === 0 &&
+    newlyHidden.length === 0 &&
     currentNames.size === incomingNames.size &&
     [...currentNames].every(n => incomingNames.has(n))
   ) return
 
-  // Remove fields that were deleted on the Attributes tab
+  // Remove fields that were deleted or hidden on the Attributes tab
   for (const section of sections.value) {
     section.fields = section.fields.filter(f => incomingNames.has(f.attributeName))
   }
 
-  // Add newly-added visible fields into the first section
+  // Add newly-added visible fields
   for (const attr of visibleConfigs) {
     if (!currentNames.has(attr.attributeName)) {
       const field = { ...attr }
       if (field.rdn && localShowDnField.value) field.columnSpan = 1
-      sections.value[0].fields.push(field)
+
+      // Try to restore un-hidden fields to their previous position
+      const savedPos = hiddenPositions.value.get(attr.attributeName)
+      let inserted = false
+      if (savedPos) {
+        // Find the section matching the saved position
+        const targetSection = sections.value.find(s => (s.name || '') === savedPos.sectionName) || sections.value[0]
+        if (savedPos.afterAttribute) {
+          const afterIdx = targetSection.fields.findIndex(f => f.attributeName === savedPos.afterAttribute)
+          if (afterIdx >= 0) {
+            targetSection.fields.splice(afterIdx + 1, 0, field)
+            inserted = true
+          }
+        }
+        if (!inserted) {
+          targetSection.fields.unshift(field)
+          inserted = true
+        }
+        hiddenPositions.value.delete(attr.attributeName)
+      }
+
+      if (!inserted) {
+        sections.value[0].fields.push(field)
+      }
     }
+  }
+
+  // Record positions of any newly hidden configs
+  for (const attr of newConfigs.filter(a => a.hidden)) {
+    if (!hiddenPositions.value.has(attr.attributeName)) {
+      hiddenPositions.value.set(attr.attributeName, {
+        sectionName: attr.sectionName || '',
+        afterAttribute: null,
+      })
+    }
+  }
+
+  // Sync RDN flag changes and move new RDN to first position
+  if (rdnChanged) {
+    for (const section of sections.value) {
+      for (const field of section.fields) {
+        field.rdn = field.attributeName === incomingRdn
+      }
+    }
+    // Move the new RDN field to index 0 of the first section
+    for (let s = 0; s < sections.value.length; s++) {
+      const rdnIdx = sections.value[s].fields.findIndex(f => f.rdn)
+      if (rdnIdx >= 0) {
+        if (s === 0 && rdnIdx === 0) break // already in place
+        const [rdnF] = sections.value[s].fields.splice(rdnIdx, 1)
+        if (localShowDnField.value) rdnF.columnSpan = 1
+        sections.value[0].fields.unshift(rdnF)
+        break
+      }
+    }
+    syncToParent()
   }
 }, { deep: true })
 
@@ -362,6 +500,20 @@ function removeSection(idx) {
   syncToParent()
 }
 
+function moveSectionUp(idx) {
+  if (idx <= 0) return
+  const arr = sections.value
+  ;[arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]]
+  syncToParent()
+}
+
+function moveSectionDown(idx) {
+  if (idx >= sections.value.length - 1) return
+  const arr = sections.value
+  ;[arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]]
+  syncToParent()
+}
+
 // ── Column span ──────────────────────────────────────────────────────────────
 
 function setColumnSpan(sIdx, fIdx, span) {
@@ -369,68 +521,161 @@ function setColumnSpan(sIdx, fIdx, span) {
   syncToParent()
 }
 
-// ── Drag and drop ────────────────────────────────────────────────────────────
+// ── Field drag and drop (with drop position indicator) ───────────────────────
 
-const dragField = ref(null)
-const dragSource = ref(null) // { sIdx, fIdx }
-const dragOverSection = ref(null)
+const fieldDrag = reactive({
+  field: null,
+  sourceSIdx: null,
+  sourceFIdx: null,
+  overSection: null,
+  overIdx: null,
+})
 
-function onDragStart(e, sIdx, fIdx, field) {
-  dragField.value = field
-  dragSource.value = { sIdx, fIdx }
+function onFieldDragStart(e, sIdx, fIdx, field) {
+  fieldDrag.field = field
+  fieldDrag.sourceSIdx = sIdx
+  fieldDrag.sourceFIdx = fIdx
   e.dataTransfer.effectAllowed = 'move'
-  e.dataTransfer.setData('text/plain', '')
+  e.dataTransfer.setData('text/plain', 'field')
 }
 
-function onDragEnd() {
-  dragField.value = null
-  dragSource.value = null
-  dragOverSection.value = null
+function onFieldDragEnd() {
+  fieldDrag.field = null
+  fieldDrag.sourceSIdx = null
+  fieldDrag.sourceFIdx = null
+  fieldDrag.overSection = null
+  fieldDrag.overIdx = null
 }
 
-function onDragOverSection(e, sIdx) {
-  dragOverSection.value = sIdx
+function onFieldDragOver(e, sIdx, fIdx) {
+  if (!fieldDrag.field) return
+  fieldDrag.overSection = sIdx
+
+  // Determine if cursor is in the top or bottom half of the field card
+  const rect = e.currentTarget.getBoundingClientRect()
+  const midY = rect.top + rect.height / 2
+  fieldDrag.overIdx = e.clientY < midY ? fIdx : fIdx + 1
 }
 
-function onDragLeaveSection() {
-  dragOverSection.value = null
-}
+function onFieldDrop(e, targetSIdx, targetFIdx) {
+  if (!fieldDrag.field) return
+  const srcSIdx = fieldDrag.sourceSIdx
+  const srcFIdx = fieldDrag.sourceFIdx
 
-function onDropSection(e, targetSIdx) {
-  if (!dragField.value || !dragSource.value) return
-  const { sIdx: srcSIdx, fIdx: srcFIdx } = dragSource.value
-  // Remove from source
-  const [moved] = sections.value[srcSIdx].fields.splice(srcFIdx, 1)
-  // Add to target section at the end
-  sections.value[targetSIdx].fields.push(moved)
-  dragOverSection.value = null
-  syncToParent()
-  onDragEnd()
-}
+  // Compute actual insert index from the indicator position
+  const rect = e.currentTarget.getBoundingClientRect()
+  const midY = rect.top + rect.height / 2
+  let insertIdx = e.clientY < midY ? targetFIdx : targetFIdx + 1
 
-function onDragOverField(e, sIdx, fIdx) {
-  dragOverSection.value = sIdx
-}
-
-function onDropField(e, targetSIdx, targetFIdx) {
-  if (!dragField.value || !dragSource.value) return
-  const { sIdx: srcSIdx, fIdx: srcFIdx } = dragSource.value
+  // Dropping on self — nothing to do
+  if (srcSIdx === targetSIdx && (srcFIdx === insertIdx || srcFIdx === insertIdx - 1)) {
+    onFieldDragEnd()
+    return
+  }
 
   // Remove from source
   const [moved] = sections.value[srcSIdx].fields.splice(srcFIdx, 1)
 
   // Adjust target index if same section and source was before target
-  let insertIdx = targetFIdx
-  if (srcSIdx === targetSIdx && srcFIdx < targetFIdx) {
-    insertIdx = targetFIdx
+  if (srcSIdx === targetSIdx && srcFIdx < insertIdx) {
+    insertIdx--
   }
 
   // Insert at target position
   sections.value[targetSIdx].fields.splice(insertIdx, 0, moved)
 
-  dragOverSection.value = null
   syncToParent()
-  onDragEnd()
+  onFieldDragEnd()
+}
+
+// Section-level drag/drop for field drops (when dropping on empty section area)
+function onDragOverSection(e, sIdx) {
+  if (fieldDrag.field) {
+    fieldDrag.overSection = sIdx
+    // When dragging over the section body (not a specific field), show indicator at end
+    if (fieldDrag.overIdx === null || fieldDrag.overSection !== sIdx) {
+      fieldDrag.overIdx = sections.value[sIdx].fields.length
+    }
+  }
+}
+
+function onDragLeaveSection(e) {
+  // Only clear if we actually left the section (not entering a child)
+  if (fieldDrag.field && !e.currentTarget.contains(e.relatedTarget)) {
+    fieldDrag.overSection = null
+    fieldDrag.overIdx = null
+  }
+}
+
+function onDropSection(e, targetSIdx) {
+  // Handle field drop on section (not on a specific field card)
+  if (fieldDrag.field) {
+    const srcSIdx = fieldDrag.sourceSIdx
+    const srcFIdx = fieldDrag.sourceFIdx
+
+    // Remove from source
+    const [moved] = sections.value[srcSIdx].fields.splice(srcFIdx, 1)
+
+    // Determine insert position based on drop Y coordinate relative to field cards
+    const targetFields = sections.value[targetSIdx].fields
+    let insertIdx = targetFields.length
+    const sectionEl = e.currentTarget.querySelector('.grid')
+    if (sectionEl) {
+      const fieldCards = sectionEl.querySelectorAll('[draggable="true"]')
+      for (let i = 0; i < fieldCards.length; i++) {
+        const rect = fieldCards[i].getBoundingClientRect()
+        if (e.clientY < rect.top + rect.height / 2) {
+          insertIdx = i
+          break
+        }
+      }
+    }
+
+    sections.value[targetSIdx].fields.splice(insertIdx, 0, moved)
+    syncToParent()
+    onFieldDragEnd()
+    return
+  }
+
+  // Handle section drop
+  if (sectionDrag.source !== null) {
+    onSectionDrop(e, targetSIdx)
+  }
+}
+
+// ── Section drag and drop ────────────────────────────────────────────────────
+
+const sectionDrag = reactive({
+  source: null,
+  overIdx: null,
+})
+
+function onSectionDragStart(e, sIdx) {
+  sectionDrag.source = sIdx
+  e.dataTransfer.effectAllowed = 'move'
+  e.dataTransfer.setData('text/plain', 'section')
+}
+
+function onSectionDragEnd() {
+  sectionDrag.source = null
+  sectionDrag.overIdx = null
+}
+
+function onSectionHeaderDragOver(e, sIdx) {
+  if (sectionDrag.source === null) return
+  sectionDrag.overIdx = sIdx
+}
+
+function onSectionDrop(e, targetSIdx) {
+  if (sectionDrag.source === null || sectionDrag.source === targetSIdx) {
+    onSectionDragEnd()
+    return
+  }
+  const [moved] = sections.value.splice(sectionDrag.source, 1)
+  const insertAt = sectionDrag.source < targetSIdx ? targetSIdx - 1 : targetSIdx
+  sections.value.splice(insertAt, 0, moved)
+  syncToParent()
+  onSectionDragEnd()
 }
 </script>
 
