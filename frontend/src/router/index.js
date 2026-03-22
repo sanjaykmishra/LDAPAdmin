@@ -24,7 +24,7 @@ const router = createRouter({
       path: '/',
       component: () => import('@/components/AppLayout.vue'),
       children: [
-        { path: '', name: 'home', redirect: () => '/superadmin/directories' },
+        { path: '', name: 'home', redirect: () => '/superadmin/dashboard' },
         { path: 'no-access', name: 'noAccess', component: { template: '<div />' } },
 
         // Users
@@ -111,6 +111,12 @@ const router = createRouter({
         {
           path: 'superadmin',
           redirect: '/superadmin/admins',
+        },
+        {
+          path: 'superadmin/dashboard',
+          name: 'dashboard',
+          component: () => import('@/views/superadmin/DashboardView.vue'),
+          meta: { requiresSuperadmin: true },
         },
         {
           path: 'superadmin/admins',
@@ -226,7 +232,7 @@ const router = createRouter({
  * regular admins land on the user list for their first authorized profile's directory.
  */
 async function resolveHomePath(auth) {
-  if (auth.isSuperadmin) return '/superadmin/directories'
+  if (auth.isSuperadmin) return '/superadmin/dashboard'
   try {
     const { data } = await myProfiles()
     if (data.length) return `/directories/${data[0].directoryId}/users`

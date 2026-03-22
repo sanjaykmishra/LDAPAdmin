@@ -49,6 +49,7 @@ public class AuditLogController {
             @RequestParam(required = false) UUID directoryId,
             @RequestParam(required = false) UUID actorId,
             @RequestParam(required = false) AuditAction action,
+            @RequestParam(required = false) String targetDn,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
                     OffsetDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
@@ -56,6 +57,6 @@ public class AuditLogController {
             @RequestParam(defaultValue = "0")  int page,
             @RequestParam(defaultValue = "50") int size) {
 
-        return queryService.query(directoryId, actorId, action, from, to, page, size);
+        return queryService.query(directoryId, actorId, action, targetDn, from, to, page, size);
     }
 }

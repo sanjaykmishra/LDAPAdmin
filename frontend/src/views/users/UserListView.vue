@@ -53,6 +53,7 @@
           <button @click="toggleEnabled(row)" class="text-xs font-medium" :class="row.enabled !== false ? 'text-amber-600 hover:text-amber-800' : 'text-green-600 hover:text-green-800'">{{ row.enabled !== false ? 'Disable' : 'Enable' }}</button>
           <button @click="openResetPassword(row)" class="text-purple-600 hover:text-purple-800 text-xs font-medium">Password</button>
           <button @click="openMove(row)" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Move</button>
+          <button @click="timelineTarget = row; showTimeline = true" class="text-gray-500 hover:text-gray-700 text-xs font-medium">History</button>
           <button @click="confirmDelete(row)" class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
         </div>
       </template>
@@ -108,6 +109,7 @@
       <div class="space-y-4">
         <p class="text-sm text-gray-600">Reset password for:</p>
         <p class="text-sm font-mono text-gray-900 bg-gray-50 px-3 py-2 rounded-lg break-all">{{ resetPwTarget?.dn }}</p>
+        <PasswordPolicyStatus v-if="resetPwTarget" :directory-id="dirId" :user-dn="resetPwTarget.dn" />
         <FormField label="New Password" v-model="resetPwNew" type="password" required />
         <FormField label="Confirm Password" v-model="resetPwConfirm" type="password" required />
         <div v-if="resetPwNew" class="flex items-center gap-2">
@@ -169,6 +171,17 @@
       </template>
     </AppModal>
 
+    <!-- Activity Timeline modal -->
+    <AppModal v-model="showTimeline" title="Activity History" size="lg">
+      <div v-if="timelineTarget" class="mb-3">
+        <p class="text-xs font-mono text-gray-500 break-all">{{ timelineTarget.dn }}</p>
+      </div>
+      <EntryTimeline v-if="timelineTarget" :directory-id="dirId" :target-dn="timelineTarget.dn" />
+      <template #footer>
+        <button @click="showTimeline = false" class="btn-secondary">Close</button>
+      </template>
+    </AppModal>
+
     <ConfirmDialog v-model="showDelete" title="Delete User" :message="`Delete '${deleteTarget?.dn}'?`" confirm-label="Delete" danger @confirm="doDelete" />
   </div>
 </template>
@@ -187,6 +200,8 @@ import FormField from '@/components/FormField.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import UserForm from './UserForm.vue'
 import CopyButton from '@/components/CopyButton.vue'
+import EntryTimeline from '@/components/EntryTimeline.vue'
+import PasswordPolicyStatus from '@/components/PasswordPolicyStatus.vue'
 
 const PAGE_SIZE = 50
 
@@ -207,6 +222,8 @@ const editingDn      = ref(null)
 const deleteTarget   = ref(null)
 const moveTarget     = ref(null)
 const newParentDn    = ref('')
+const showTimeline   = ref(false)
+const timelineTarget = ref(null)
 const saving             = ref(false)
 const showResetPassword  = ref(false)
 const resetPwTarget      = ref(null)
