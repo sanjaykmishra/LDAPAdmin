@@ -6,7 +6,7 @@ import com.ldapadmin.repository.AuditEventRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,8 +47,7 @@ public class AuditQueryService {
             int page,
             int size) {
 
-        PageRequest pageable = PageRequest.of(page, clampSize(size),
-                Sort.by(Sort.Direction.DESC, "occurredAt"));
+        PageRequest pageable = PageRequest.of(page, clampSize(size));
         String actionStr = action != null ? action.getDbValue() : null;
         return auditRepo.findAll(directoryId, actorId, actionStr, targetDn, from, to, pageable)
                 .map(AuditEventResponse::from);

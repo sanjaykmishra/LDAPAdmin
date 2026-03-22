@@ -3,6 +3,7 @@ package com.ldapadmin.controller.directory;
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.ldap.LdapSchemaService.AttributeTypeInfo;
 import com.ldapadmin.ldap.LdapSchemaService.ObjectClassAttributes;
+import com.ldapadmin.ldap.LdapSchemaService.SchemaListItem;
 import com.ldapadmin.service.LdapOperationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -32,7 +33,7 @@ public class SchemaController {
     private final LdapOperationService service;
 
     @GetMapping("/object-classes")
-    public List<String> listObjectClasses(
+    public List<SchemaListItem> listObjectClasses(
             @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return service.getObjectClassNames(directoryId, principal);
@@ -55,7 +56,7 @@ public class SchemaController {
     }
 
     @GetMapping("/attribute-types")
-    public List<String> listAttributeTypes(
+    public List<SchemaListItem> listAttributeTypes(
             @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return service.getAttributeTypeNames(directoryId, principal);
