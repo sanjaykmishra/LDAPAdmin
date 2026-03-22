@@ -175,7 +175,7 @@ class UserTemplateServiceTest {
         t.setObjectClassNames(new ArrayList<>(List.of("inetOrgPerson")));
         t.setTemplateName("Test");
         when(templateRepo.findAll()).thenReturn(List.of(t));
-        when(configRepo.findAllByUserTemplateId(templateId)).thenReturn(List.of());
+        when(configRepo.findAllByUserTemplateIdOrderByDisplayOrderAsc(templateId)).thenReturn(List.of());
 
         List<UserTemplateResponse> result = service.list();
 

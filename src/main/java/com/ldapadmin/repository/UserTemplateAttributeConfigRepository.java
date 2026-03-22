@@ -10,7 +10,7 @@ import java.util.UUID;
 @Repository
 public interface UserTemplateAttributeConfigRepository extends JpaRepository<UserTemplateAttributeConfig, UUID> {
 
-    List<UserTemplateAttributeConfig> findAllByUserTemplateId(UUID userTemplateId);
+    List<UserTemplateAttributeConfig> findAllByUserTemplateIdOrderByDisplayOrderAsc(UUID userTemplateId);
 
     void deleteAllByUserTemplateId(UUID userTemplateId);
 }
