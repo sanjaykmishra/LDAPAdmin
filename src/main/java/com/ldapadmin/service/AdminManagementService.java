@@ -5,13 +5,13 @@ import com.ldapadmin.dto.admin.AdminAccountResponse;
 import com.ldapadmin.dto.admin.AdminPermissionsResponse;
 
 import com.ldapadmin.dto.admin.FeaturePermissionRequest;
-import com.ldapadmin.dto.admin.RealmRoleRequest;
-import com.ldapadmin.dto.admin.RealmRoleResponse;
+import com.ldapadmin.dto.admin.ProfileRoleRequest;
+import com.ldapadmin.dto.admin.ProfileRoleResponse;
 import com.ldapadmin.entity.Account;
 
 import com.ldapadmin.entity.AdminFeaturePermission;
-import com.ldapadmin.entity.AdminRealmRole;
-import com.ldapadmin.entity.Realm;
+import com.ldapadmin.entity.AdminProfileRole;
+import com.ldapadmin.entity.ProvisioningProfile;
 import com.ldapadmin.entity.enums.AccountRole;
 import com.ldapadmin.entity.enums.AccountType;
 import com.ldapadmin.entity.enums.FeatureKey;
@@ -20,8 +20,8 @@ import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.repository.AccountRepository;
 
 import com.ldapadmin.repository.AdminFeaturePermissionRepository;
-import com.ldapadmin.repository.AdminRealmRoleRepository;
-import com.ldapadmin.repository.RealmRepository;
+import com.ldapadmin.repository.AdminProfileRoleRepository;
+import com.ldapadmin.repository.ProvisioningProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -35,8 +35,8 @@ import java.util.UUID;
 public class AdminManagementService {
 
     private final AccountRepository               accountRepo;
-    private final RealmRepository                 realmRepo;
-    private final AdminRealmRoleRepository        realmRoleRepo;
+    private final ProvisioningProfileRepository   profileRepo;
+    private final AdminProfileRoleRepository      profileRoleRepo;
 
     private final AdminFeaturePermissionRepository featureRepo;
     private final PasswordEncoder                 passwordEncoder;
@@ -123,33 +123,33 @@ public class AdminManagementService {
     public AdminPermissionsResponse getPermissions(UUID adminId) {
         requireAccount(adminId);
         return AdminPermissionsResponse.from(
-                realmRoleRepo.findAllByAdminAccountId(adminId),
+                profileRoleRepo.findAllByAdminAccountId(adminId),
                 featureRepo.findAllByAdminAccountId(adminId));
     }
 
-    // ── Dimension 1+2: realm roles ────────────────────────────────────────────
+    // ── Dimension 1+2: profile roles ──────────────────────────────────────────
 
     @Transactional
-    public RealmRoleResponse assignRealmRole(UUID adminId, RealmRoleRequest req) {
+    public ProfileRoleResponse assignProfileRole(UUID adminId, ProfileRoleRequest req) {
         Account admin = requireAccount(adminId);
-        Realm   realm = requireRealm(req.realmId());
+        ProvisioningProfile profile = requireProfile(req.profileId());
 
-        AdminRealmRole role = realmRoleRepo
-                .findByAdminAccountIdAndRealmId(adminId, req.realmId())
-                .orElseGet(AdminRealmRole::new);
+        AdminProfileRole role = profileRoleRepo
+                .findByAdminAccountIdAndProfileId(adminId, req.profileId())
+                .orElseGet(AdminProfileRole::new);
 
         if (role.getId() == null) {
             role.setAdminAccount(admin);
-            role.setRealm(realm);
+            role.setProfile(profile);
         }
         role.setBaseRole(req.baseRole());
-        return RealmRoleResponse.from(realmRoleRepo.save(role));
+        return ProfileRoleResponse.from(profileRoleRepo.save(role));
     }
 
     @Transactional
-    public void removeRealmRole(UUID adminId, UUID realmId) {
+    public void removeProfileRole(UUID adminId, UUID profileId) {
         requireAccount(adminId);
-        realmRoleRepo.deleteByAdminAccountIdAndRealmId(adminId, realmId);
+        profileRoleRepo.deleteByAdminAccountIdAndProfileId(adminId, profileId);
     }
 
     // ── Dimension 4: feature permissions ─────────────────────────────────────
@@ -159,7 +159,6 @@ public class AdminManagementService {
         Account admin = requireAccount(adminId);
 
         // Delete all existing feature permissions, then re-create from the request.
-        // This prevents orphaned entries when features are removed from the list.
         featureRepo.deleteAllByAdminAccountId(adminId);
         featureRepo.flush();
 
@@ -185,8 +184,8 @@ public class AdminManagementService {
                 .orElseThrow(() -> new ResourceNotFoundException("Account", adminId));
     }
 
-    private Realm requireRealm(UUID realmId) {
-        return realmRepo.findById(realmId)
-                .orElseThrow(() -> new ResourceNotFoundException("Realm", realmId));
+    private ProvisioningProfile requireProfile(UUID profileId) {
+        return profileRepo.findById(profileId)
+                .orElseThrow(() -> new ResourceNotFoundException("ProvisioningProfile", profileId));
     }
 }

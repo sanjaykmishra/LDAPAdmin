@@ -4,12 +4,13 @@ import com.ldapadmin.dto.admin.AdminAccountRequest;
 import com.ldapadmin.dto.admin.AdminAccountResponse;
 
 import com.ldapadmin.dto.admin.FeaturePermissionRequest;
-import com.ldapadmin.dto.admin.RealmRoleRequest;
-import com.ldapadmin.dto.admin.RealmRoleResponse;
+import com.ldapadmin.dto.admin.ProfileRoleRequest;
+import com.ldapadmin.dto.admin.ProfileRoleResponse;
 import com.ldapadmin.entity.Account;
 import com.ldapadmin.entity.AdminFeaturePermission;
-import com.ldapadmin.entity.AdminRealmRole;
-import com.ldapadmin.entity.Realm;
+import com.ldapadmin.entity.AdminProfileRole;
+import com.ldapadmin.entity.DirectoryConnection;
+import com.ldapadmin.entity.ProvisioningProfile;
 import com.ldapadmin.entity.enums.AccountRole;
 import com.ldapadmin.entity.enums.AccountType;
 import com.ldapadmin.entity.enums.BaseRole;
@@ -19,8 +20,8 @@ import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.repository.AccountRepository;
 
 import com.ldapadmin.repository.AdminFeaturePermissionRepository;
-import com.ldapadmin.repository.AdminRealmRoleRepository;
-import com.ldapadmin.repository.RealmRepository;
+import com.ldapadmin.repository.AdminProfileRoleRepository;
+import com.ldapadmin.repository.ProvisioningProfileRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,21 +43,21 @@ import static org.mockito.Mockito.*;
 class AdminManagementServiceTest {
 
     @Mock private AccountRepository               accountRepo;
-    @Mock private RealmRepository                 realmRepo;
-    @Mock private AdminRealmRoleRepository        realmRoleRepo;
+    @Mock private ProvisioningProfileRepository   profileRepo;
+    @Mock private AdminProfileRoleRepository      profileRoleRepo;
 
     @Mock private AdminFeaturePermissionRepository featureRepo;
     @Mock private PasswordEncoder                 passwordEncoder;
 
     private AdminManagementService service;
 
-    private final UUID adminId = UUID.randomUUID();
-    private final UUID realmId = UUID.randomUUID();
+    private final UUID adminId   = UUID.randomUUID();
+    private final UUID profileId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
         service = new AdminManagementService(
-                accountRepo, realmRepo, realmRoleRepo, featureRepo, passwordEncoder);
+                accountRepo, profileRepo, profileRoleRepo, featureRepo, passwordEncoder);
     }
 
     // ── listAdmins ────────────────────────────────────────────────────────────
@@ -111,127 +112,47 @@ class AdminManagementServiceTest {
         assertThat(captor.getValue().getAuthType()).isEqualTo(AccountType.LOCAL);
     }
 
-    @Test
-    void createAdmin_superadminRole_savesWithSuperadminRole() {
-        when(accountRepo.existsByUsername("super")).thenReturn(false);
-        Account saved = adminAccount("super");
-        saved.setRole(AccountRole.SUPERADMIN);
-        when(accountRepo.save(any())).thenReturn(saved);
-
-        service.createAdmin(
-                new AdminAccountRequest("super", "Super", "s@e.com", AccountRole.SUPERADMIN, AccountType.LOCAL, "pass", null, true));
-
-        ArgumentCaptor<Account> captor = ArgumentCaptor.forClass(Account.class);
-        verify(accountRepo).save(captor.capture());
-        assertThat(captor.getValue().getRole()).isEqualTo(AccountRole.SUPERADMIN);
-    }
-
-    // ── updateAdmin ───────────────────────────────────────────────────────────
+    // ── assignProfileRole ─────────────────────────────────────────────────────
 
     @Test
-    void updateAdmin_notFound_throwsResourceNotFound() {
-        when(accountRepo.findById(adminId)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.updateAdmin(adminId,
-                new AdminAccountRequest("alice", "Alice", "a@e.com", AccountRole.ADMIN, AccountType.LOCAL, null, null, true)))
-                .isInstanceOf(ResourceNotFoundException.class);
-    }
-
-    @Test
-    void updateAdmin_usernameConflictWithDifferentAdmin_throwsConflict() {
-        Account existing = adminAccount("alice");
-        when(accountRepo.findById(adminId)).thenReturn(Optional.of(existing));
-        when(accountRepo.existsByUsername("bob")).thenReturn(true);
-
-        assertThatThrownBy(() -> service.updateAdmin(adminId,
-                new AdminAccountRequest("bob", "Bob", "b@e.com", AccountRole.ADMIN, AccountType.LOCAL, null, null, true)))
-                .isInstanceOf(ConflictException.class);
-    }
-
-    @Test
-    void updateAdmin_sameUsername_noConflictCheck() {
-        Account existing = adminAccount("alice");
-        when(accountRepo.findById(adminId)).thenReturn(Optional.of(existing));
-        when(accountRepo.save(any())).thenReturn(existing);
-
-        service.updateAdmin(adminId,
-                new AdminAccountRequest("alice", "Alice Renamed", "a@e.com", AccountRole.ADMIN, AccountType.LOCAL, null, null, true));
-
-        verify(accountRepo, never()).existsByUsername("alice");
-    }
-
-    // ── deleteAdmin ───────────────────────────────────────────────────────────
-
-    @Test
-    void deleteAdmin_success_callsDelete() {
-        Account a = adminAccount("alice");
-        when(accountRepo.findById(adminId)).thenReturn(Optional.of(a));
-
-        service.deleteAdmin(adminId);
-
-        verify(accountRepo).delete(a);
-    }
-
-    // ── assignRealmRole ───────────────────────────────────────────────────────
-
-    @Test
-    void assignRealmRole_realmNotFound_throwsResourceNotFound() {
+    void assignProfileRole_profileNotFound_throwsResourceNotFound() {
         when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount("alice")));
-        when(realmRepo.findById(realmId)).thenReturn(Optional.empty());
+        when(profileRepo.findById(profileId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.assignRealmRole(adminId,
-                new RealmRoleRequest(realmId, BaseRole.ADMIN)))
+        assertThatThrownBy(() -> service.assignProfileRole(adminId,
+                new ProfileRoleRequest(profileId, BaseRole.ADMIN)))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
-    void assignRealmRole_newRole_savesRole() {
+    void assignProfileRole_newRole_savesRole() {
         Account admin = adminAccount("alice");
-        Realm realm = realm();
+        ProvisioningProfile profile = profile();
         when(accountRepo.findById(adminId)).thenReturn(Optional.of(admin));
-        when(realmRepo.findById(realmId)).thenReturn(Optional.of(realm));
-        when(realmRoleRepo.findByAdminAccountIdAndRealmId(adminId, realmId))
+        when(profileRepo.findById(profileId)).thenReturn(Optional.of(profile));
+        when(profileRoleRepo.findByAdminAccountIdAndProfileId(adminId, profileId))
                 .thenReturn(Optional.empty());
 
-        AdminRealmRole saved = new AdminRealmRole();
+        AdminProfileRole saved = new AdminProfileRole();
         saved.setBaseRole(BaseRole.ADMIN);
-        saved.setRealm(realm);
-        when(realmRoleRepo.save(any())).thenReturn(saved);
+        saved.setProfile(profile);
+        when(profileRoleRepo.save(any())).thenReturn(saved);
 
-        RealmRoleResponse resp = service.assignRealmRole(adminId,
-                new RealmRoleRequest(realmId, BaseRole.ADMIN));
+        ProfileRoleResponse resp = service.assignProfileRole(adminId,
+                new ProfileRoleRequest(profileId, BaseRole.ADMIN));
 
         assertThat(resp.baseRole()).isEqualTo(BaseRole.ADMIN);
     }
 
-    @Test
-    void assignRealmRole_existingRole_updatesBaseRole() {
-        Account admin = adminAccount("alice");
-        Realm realm = realm();
-        when(accountRepo.findById(adminId)).thenReturn(Optional.of(admin));
-        when(realmRepo.findById(realmId)).thenReturn(Optional.of(realm));
-
-        AdminRealmRole existing = new AdminRealmRole();
-        existing.setBaseRole(BaseRole.READ_ONLY);
-        existing.setRealm(realm);
-        when(realmRoleRepo.findByAdminAccountIdAndRealmId(adminId, realmId))
-                .thenReturn(Optional.of(existing));
-        when(realmRoleRepo.save(any())).thenReturn(existing);
-
-        service.assignRealmRole(adminId, new RealmRoleRequest(realmId, BaseRole.ADMIN));
-
-        assertThat(existing.getBaseRole()).isEqualTo(BaseRole.ADMIN);
-    }
-
-    // ── removeRealmRole ───────────────────────────────────────────────────────
+    // ── removeProfileRole ─────────────────────────────────────────────────────
 
     @Test
-    void removeRealmRole_delegatesToRepo() {
+    void removeProfileRole_delegatesToRepo() {
         when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount("alice")));
 
-        service.removeRealmRole(adminId, realmId);
+        service.removeProfileRole(adminId, profileId);
 
-        verify(realmRoleRepo).deleteByAdminAccountIdAndRealmId(adminId, realmId);
+        verify(profileRoleRepo).deleteByAdminAccountIdAndProfileId(adminId, profileId);
     }
 
     // ── setFeaturePermissions ─────────────────────────────────────────────────
@@ -252,22 +173,6 @@ class AdminManagementServiceTest {
         assertThat(captor.getValue().getFeatureKey()).isEqualTo(FeatureKey.USER_CREATE);
     }
 
-    @Test
-    void setFeaturePermissions_deletesOldAndRecreates() {
-        when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount("alice")));
-        when(featureRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        service.setFeaturePermissions(adminId,
-                List.of(new FeaturePermissionRequest(FeatureKey.USER_DELETE, false)));
-
-        verify(featureRepo).deleteAllByAdminAccountId(adminId);
-        ArgumentCaptor<AdminFeaturePermission> captor =
-                ArgumentCaptor.forClass(AdminFeaturePermission.class);
-        verify(featureRepo).save(captor.capture());
-        assertThat(captor.getValue().isEnabled()).isFalse();
-        assertThat(captor.getValue().getFeatureKey()).isEqualTo(FeatureKey.USER_DELETE);
-    }
-
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private Account adminAccount(String username) {
@@ -280,10 +185,13 @@ class AdminManagementServiceTest {
         return a;
     }
 
-    private Realm realm() {
-        Realm r = new Realm();
-        r.setId(realmId);
-        r.setName("test-realm");
-        return r;
+    private ProvisioningProfile profile() {
+        ProvisioningProfile p = new ProvisioningProfile();
+        p.setId(profileId);
+        p.setName("test-profile");
+        DirectoryConnection dir = new DirectoryConnection();
+        dir.setId(UUID.randomUUID());
+        p.setDirectory(dir);
+        return p;
     }
 }

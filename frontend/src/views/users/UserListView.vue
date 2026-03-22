@@ -7,11 +7,12 @@
         <p class="text-sm text-gray-500 mt-1">Directory: <code class="text-xs bg-gray-100 px-1 rounded">{{ dirId }}</code></p>
       </div>
       <div class="flex items-center gap-3">
-        <div v-if="allRealms.length > 1" class="flex items-center gap-2">
-          <label class="text-sm text-gray-600 font-medium">Realm:</label>
-          <select v-model="selectedRealmId" @change="onRealmChange"
+        <div v-if="allProfiles.length > 1" class="flex items-center gap-2">
+          <label class="text-sm text-gray-600 font-medium">Profile:</label>
+          <select v-model="selectedProfileId" @change="onProfileChange"
             class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option v-for="r in allRealms" :key="r.id" :value="r.id">{{ r.name }}</option>
+            <option value="">All</option>
+            <option v-for="p in allProfiles" :key="p.id" :value="p.id">{{ p.name }}</option>
           </select>
         </div>
         <button v-if="selectedDns.size > 0" @click="openBulkUpdate" class="btn-secondary">
@@ -61,21 +62,21 @@
       <button @click="loadMore" :disabled="loading" class="btn-secondary">Load more</button>
     </div>
 
-    <!-- Form picker modal (step 1 of create) -->
-    <AppModal v-model="showTemplatePicker" title="Choose User Template" size="sm">
+    <!-- Profile picker modal (step 1 of create) -->
+    <AppModal v-model="showTemplatePicker" title="Choose Profile" size="sm">
       <div class="space-y-2">
-        <p class="text-sm text-gray-600 mb-3">Select a user template to define which attributes are available for the new user.</p>
-        <div v-if="availableTemplates.length === 0" class="text-sm text-gray-400 py-4 text-center">
-          No user templates are linked to this realm. Configure user templates in the Realms settings first.
+        <p class="text-sm text-gray-600 mb-3">Select a provisioning profile to define which attributes are available for the new user.</p>
+        <div v-if="allProfiles.length === 0" class="text-sm text-gray-400 py-4 text-center">
+          No provisioning profiles are configured for this directory. Create a profile in the Profiles settings first.
         </div>
         <button
-          v-for="ut in availableTemplates"
-          :key="ut.id"
-          @click="selectTemplateAndCreate(ut)"
+          v-for="p in allProfiles"
+          :key="p.id"
+          @click="selectProfileAndCreate(p)"
           class="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
         >
-          <span class="font-medium text-gray-900 text-sm">{{ ut.templateName }}</span>
-          <span class="text-xs text-gray-500 ml-2">({{ (ut.objectClassNames || []).join(', ') }})</span>
+          <span class="font-medium text-gray-900 text-sm">{{ p.name }}</span>
+          <span class="text-xs text-gray-500 ml-2">({{ (p.objectClassNames || []).join(', ') }})</span>
         </button>
       </div>
       <template #footer>
@@ -85,7 +86,7 @@
 
     <!-- Create/Edit modal (step 2 of create, or edit) -->
     <AppModal v-model="showModal" :title="editingDn ? 'Edit User' : 'New User'" size="lg">
-      <UserForm :data="form" :is-edit="!!editingDn" :user-template-config="userTemplateConfig" :dir-id="dirId" @update="v => form = v" />
+      <UserForm :data="form" :is-edit="!!editingDn" :user-template-config="profileConfig" :dir-id="dirId" @update="v => form = v" />
       <template #footer>
         <button @click="showModal = false" class="btn-secondary">Cancel</button>
         <button @click="save" :disabled="saving" class="btn-primary">{{ saving ? 'Saving…' : 'Save' }}</button>
@@ -178,8 +179,7 @@ import { useNotificationStore } from '@/stores/notifications'
 import { useApi } from '@/composables/useApi'
 import * as usersApi from '@/api/users'
 import * as groupsApi from '@/api/groups'
-import { listRealms } from '@/api/realms'
-import { getUserTemplate } from '@/api/userTemplates'
+import { listProfiles, getProfile } from '@/api/profiles'
 import DataTable from '@/components/DataTable.vue'
 import AppModal from '@/components/AppModal.vue'
 import FormField from '@/components/FormField.vue'
@@ -255,17 +255,15 @@ const cols = [
   { key: 'enabled', label: 'Status' },
 ]
 
-const allRealms       = ref([])
-const selectedRealmId = ref(route.query.realmId || '')
-const realmData       = ref(null)
-const availableTemplates  = ref([])
-const userTemplateConfig  = ref(null)
+const allProfiles       = ref([])
+const selectedProfileId = ref('')
+const profileData       = ref(null)
+const profileConfig     = ref(null)
 
 const emptyForm = () => {
-  const rdnConfig = userTemplateConfig.value?.attributeConfigs?.find(a => a.rdn)
   return {
-    parentDn: realmData.value?.userBaseDn || '',
-    rdnAttribute: rdnConfig?.attributeName || 'uid',
+    parentDn: profileData.value?.targetOuDn || '',
+    rdnAttribute: profileData.value?.rdnAttribute || 'uid',
     rdnValue: '',
     attributes: {},
   }
@@ -278,7 +276,7 @@ async function load() {
   await call(async () => {
     const params = {
       filter: filterText.value || undefined,
-      baseDn: realmData.value?.userBaseDn || undefined,
+      baseDn: profileData.value?.targetOuDn || undefined,
       limit:  limit.value,
     }
     const { data } = await usersApi.searchUsers(dirId, params)
@@ -295,29 +293,28 @@ async function load() {
 
 function loadMore() { limit.value += 50; load() }
 
-function openCreate() {
+async function openCreate() {
   editingDn.value = null
-  userTemplateConfig.value = null
-  if (availableTemplates.value.length === 1) {
-    // Only one template available — skip the picker
-    selectTemplateAndCreate(availableTemplates.value[0])
-  } else if (availableTemplates.value.length > 1) {
+  profileConfig.value = null
+  if (allProfiles.value.length === 1) {
+    await selectProfileAndCreate(allProfiles.value[0])
+  } else if (allProfiles.value.length > 1) {
     showTemplatePicker.value = true
   } else {
-    // No templates linked — open create dialog with fallback fields
     form.value = emptyForm()
     showModal.value = true
   }
 }
 
-async function selectTemplateAndCreate(ut) {
+async function selectProfileAndCreate(p) {
   showTemplatePicker.value = false
   try {
-    const { data } = await getUserTemplate(ut.id)
-    userTemplateConfig.value = data
+    const { data } = await getProfile(dirId, p.id)
+    profileData.value = data
+    profileConfig.value = data
   } catch (e) {
-    console.warn('Failed to load user template:', e)
-    userTemplateConfig.value = null
+    console.warn('Failed to load profile:', e)
+    profileConfig.value = null
   }
   form.value = emptyForm()
   showModal.value = true
@@ -327,19 +324,18 @@ async function openEdit(row) {
   editingDn.value = row.dn
   const attrs = row._raw?.attributes || {}
 
-  // Try to resolve a matching user template from the realm's linked templates
-  userTemplateConfig.value = null
+  // Try to resolve a matching profile from the available profiles
+  profileConfig.value = null
   const userOCs = (attrs.objectClass || attrs.objectclass || []).map(s => s.toLowerCase())
-  if (userOCs.length && availableTemplates.value.length) {
-    // Find the template whose objectClassNames best match the user's objectClasses
-    const match = availableTemplates.value.find(ut =>
-      (ut.objectClassNames || []).every(oc => userOCs.includes(oc.toLowerCase()))
+  if (userOCs.length && allProfiles.value.length) {
+    const match = allProfiles.value.find(p =>
+      (p.objectClassNames || []).every(oc => userOCs.includes(oc.toLowerCase()))
     )
     if (match) {
       try {
-        const { data } = await getUserTemplate(match.id)
-        userTemplateConfig.value = data
-      } catch (e) { console.warn('Failed to load user template for edit:', e) }
+        const { data } = await getProfile(dirId, match.id)
+        profileConfig.value = data
+      } catch (e) { console.warn('Failed to load profile for edit:', e) }
     }
   }
 
@@ -375,8 +371,8 @@ async function save() {
       // Include the RDN attribute in the attributes map
       attributes[f.rdnAttribute] = [f.rdnValue]
       // Include objectClasses from the selected user template
-      if (userTemplateConfig.value?.objectClassNames?.length) {
-        attributes.objectClass = userTemplateConfig.value.objectClassNames
+      if (profileConfig.value?.objectClassNames?.length) {
+        attributes.objectClass = profileConfig.value.objectClassNames
       }
       const createRes = await usersApi.createUser(dirId, { dn, attributes })
       if (createRes.status === 202) {
@@ -524,39 +520,28 @@ async function doDelete() {
   await load()
 }
 
-function selectRealm(realms) {
-  // Use realmId from query param if it matches, otherwise first realm
-  const match = selectedRealmId.value
-    ? realms.find(r => r.id === selectedRealmId.value)
-    : null
-  const selected = match || realms[0]
-  selectedRealmId.value = selected.id
-  realmData.value = selected
-  availableTemplates.value = selected.userTemplates || []
-}
-
-async function loadRealmAndForms() {
+async function loadProfiles() {
   try {
-    const { data: realms } = await listRealms(dirId)
-    allRealms.value = realms
-    if (realms.length) selectRealm(realms)
+    const { data: profiles } = await listProfiles(dirId)
+    allProfiles.value = profiles
+    if (profiles.length === 1) {
+      selectedProfileId.value = profiles[0].id
+      profileData.value = profiles[0]
+    }
   } catch (e) {
-    console.warn('Failed to load realms:', e)
+    console.warn('Failed to load profiles:', e)
   }
 }
 
-function onRealmChange() {
-  const realm = allRealms.value.find(r => r.id === selectedRealmId.value)
-  if (realm) {
-    realmData.value = realm
-    availableTemplates.value = realm.userTemplates || []
-  }
+function onProfileChange() {
+  const p = allProfiles.value.find(p => p.id === selectedProfileId.value)
+  profileData.value = p || null
   limit.value = PAGE_SIZE
   load()
 }
 
 onMounted(async () => {
-  await loadRealmAndForms()
+  await loadProfiles()
   load()
 })
 </script>

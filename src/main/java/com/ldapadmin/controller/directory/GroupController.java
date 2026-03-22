@@ -11,7 +11,7 @@ import com.ldapadmin.dto.ldap.LdapEntryResponse;
 import com.ldapadmin.dto.ldap.MemberRequest;
 import com.ldapadmin.dto.ldap.UpdateEntryRequest;
 import com.ldapadmin.entity.PendingApproval;
-import com.ldapadmin.entity.Realm;
+import com.ldapadmin.entity.ProvisioningProfile;
 import com.ldapadmin.entity.enums.ApprovalRequestType;
 import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.service.ApprovalWorkflowService;
@@ -147,11 +147,11 @@ public class GroupController {
             @RequestParam String dn,
             @Valid @RequestBody MemberRequest req) {
 
-        // Check approval for the realm containing the group
-        Optional<Realm> realm = approvalService.findRealmForDn(directoryId, dn);
-        if (realm.isPresent() && approvalService.isGroupMemberAddApprovalRequired(realm.get().getId())) {
+        // Check approval for the profile containing the group
+        Optional<ProvisioningProfile> profile = approvalService.findProfileForDn(directoryId, dn);
+        if (profile.isPresent() && approvalService.isApprovalRequired(profile.get().getId())) {
             PendingApproval pa = approvalService.submitForApproval(
-                    directoryId, realm.get().getId(), principal,
+                    directoryId, profile.get().getId(), principal,
                     ApprovalRequestType.GROUP_MEMBER_ADD,
                     Map.of("groupDn", dn,
                             "memberAttribute", req.memberAttribute(),

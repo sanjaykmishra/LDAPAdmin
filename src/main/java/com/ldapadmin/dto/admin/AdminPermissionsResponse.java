@@ -1,7 +1,7 @@
 package com.ldapadmin.dto.admin;
 
 import com.ldapadmin.entity.AdminFeaturePermission;
-import com.ldapadmin.entity.AdminRealmRole;
+import com.ldapadmin.entity.AdminProfileRole;
 import com.ldapadmin.entity.enums.FeatureKey;
 
 import java.util.List;
@@ -10,7 +10,7 @@ import java.util.List;
  * Full permission summary for an admin account.
  */
 public record AdminPermissionsResponse(
-        List<RealmRoleResponse> realmRoles,
+        List<ProfileRoleResponse> profileRoles,
         List<FeatureOverride> featurePermissions) {
 
     public record FeatureOverride(FeatureKey featureKey, boolean enabled) {
@@ -20,11 +20,11 @@ public record AdminPermissionsResponse(
     }
 
     public static AdminPermissionsResponse from(
-            List<AdminRealmRole> roles,
+            List<AdminProfileRole> roles,
             List<AdminFeaturePermission> features) {
 
-        List<RealmRoleResponse> roleResponses =
-                roles.stream().map(RealmRoleResponse::from).toList();
+        List<ProfileRoleResponse> roleResponses =
+                roles.stream().map(ProfileRoleResponse::from).toList();
 
         List<FeatureOverride> featureOverrides =
                 features.stream().map(FeatureOverride::from).toList();

@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { myRealms } from '@/api/auth'
+import { myProfiles } from '@/api/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -130,15 +130,9 @@ const router = createRouter({
           meta: { requiresSuperadmin: true },
         },
         {
-          path: 'superadmin/realms',
-          name: 'realms',
-          component: () => import('@/views/realms/RealmsView.vue'),
-          meta: { requiresSuperadmin: true },
-        },
-        {
-          path: 'superadmin/user-templates',
-          name: 'userTemplates',
-          component: () => import('@/views/userTemplates/UserTemplatesView.vue'),
+          path: 'superadmin/profiles',
+          name: 'profiles',
+          component: () => import('@/views/profiles/SuperadminProfilesView.vue'),
           meta: { requiresSuperadmin: true },
         },
         {
@@ -228,12 +222,12 @@ const router = createRouter({
 /**
  * Resolve the default landing path for the current user.
  * Superadmins land on the directories management page;
- * regular admins land on the user list for their first authorized realm.
+ * regular admins land on the user list for their first authorized profile's directory.
  */
 async function resolveHomePath(auth) {
   if (auth.isSuperadmin) return '/superadmin/directories'
   try {
-    const { data } = await myRealms()
+    const { data } = await myProfiles()
     if (data.length) return `/directories/${data[0].directoryId}/users`
   } catch (e) { console.warn('Failed to resolve home path:', e) }
   return '/login'
