@@ -13,6 +13,16 @@ import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import FormLayoutDesigner from '@/components/FormLayoutDesigner.vue'
 import DnPicker from '@/components/DnPicker.vue'
+import GroupDnPicker from '@/components/GroupDnPicker.vue'
+import DataTable from '@/components/DataTable.vue'
+
+const profileCols = [
+  { key: 'name', label: 'Name' },
+  { key: 'directoryName', label: 'Directory' },
+  { key: 'targetOuDn', label: 'Target OU' },
+  { key: 'objectClassNames', label: 'Object Classes' },
+  { key: 'enabled', label: 'Status' },
+]
 
 const notif = useNotificationStore()
 
@@ -574,40 +584,27 @@ function toggleApprover(accountId) {
       <button class="btn-primary" @click="openCreate">+ Create Profile</button>
     </div>
 
-    <div v-if="loading" class="text-gray-500">Loading…</div>
-
-    <table v-else-if="profiles.length" class="w-full text-sm">
-      <thead>
-        <tr class="border-b text-left text-gray-500">
-          <th class="py-2 px-3">Name</th>
-          <th class="py-2 px-3">Directory</th>
-          <th class="py-2 px-3">Target OU</th>
-          <th class="py-2 px-3">Object Classes</th>
-          <th class="py-2 px-3">Status</th>
-          <th class="py-2 px-3 text-right">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="p in profiles" :key="p.id" class="border-b hover:bg-gray-50">
-          <td class="py-2 px-3 font-medium">{{ p.name }}</td>
-          <td class="py-2 px-3 text-gray-600">{{ p.directoryName }}</td>
-          <td class="py-2 px-3 text-gray-600 font-mono text-xs">{{ p.targetOuDn }}</td>
-          <td class="py-2 px-3 text-gray-600 text-xs">{{ p.objectClassNames.join(', ') }}</td>
-          <td class="py-2 px-3">
-            <span :class="p.enabled ? 'text-green-600' : 'text-gray-400'">
-              {{ p.enabled ? 'Enabled' : 'Disabled' }}
-            </span>
-          </td>
-          <td class="py-2 px-3 text-right space-x-2">
-            <button class="text-blue-600 hover:underline" @click="openEdit(p)">Edit</button>
-            <button class="text-blue-600 hover:underline" @click="doClone(p)">Clone</button>
-            <button class="text-red-600 hover:underline" @click="confirmDelete(p)">Delete</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-
-    <div v-else class="text-gray-500">No provisioning profiles configured.</div>
+    <DataTable :columns="profileCols" :rows="profiles" :loading="loading" row-key="id" empty-text="No provisioning profiles configured.">
+      <template #cell-name="{ row }">
+        <span class="font-medium">{{ row.name }}</span>
+      </template>
+      <template #cell-targetOuDn="{ value }">
+        <span class="font-mono text-xs text-gray-600">{{ value }}</span>
+      </template>
+      <template #cell-objectClassNames="{ value }">
+        <span class="text-xs text-gray-600">{{ value.join(', ') }}</span>
+      </template>
+      <template #cell-enabled="{ value }">
+        <span :class="value ? 'text-green-600' : 'text-gray-400'">{{ value ? 'Enabled' : 'Disabled' }}</span>
+      </template>
+      <template #actions="{ row }">
+        <div class="flex gap-3 justify-end whitespace-nowrap">
+          <button class="text-blue-600 hover:text-blue-800 text-xs font-medium" @click="openEdit(row)">Edit</button>
+          <button class="text-blue-600 hover:text-blue-800 text-xs font-medium" @click="doClone(row)">Clone</button>
+          <button class="text-red-500 hover:text-red-700 text-xs font-medium" @click="confirmDelete(row)">Delete</button>
+        </div>
+      </template>
+    </DataTable>
 
     <!-- Create/Edit Modal -->
     <AppModal v-model="showModal" :title="editing ? 'Edit Profile' : 'Create Profile'" size="xl" :fixedHeight="modalHeight">
@@ -830,7 +827,7 @@ function toggleApprover(accountId) {
           <div v-for="(g, i) in profile.groupAssignments" :key="i" class="flex gap-2 items-end">
             <div class="flex-1">
               <label class="block text-xs text-gray-500">Group DN</label>
-              <input v-model="g.groupDn" class="input w-full font-mono text-sm" />
+              <GroupDnPicker v-model="g.groupDn" :directory-id="selectedDirId" />
             </div>
             <div class="w-40">
               <label class="block text-xs text-gray-500">Member Attribute</label>
