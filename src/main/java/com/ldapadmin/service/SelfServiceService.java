@@ -428,7 +428,8 @@ public class SelfServiceService {
             Map<String, List<String>> attributes = objectMapper.readValue(
                     regReq.getAttributes(),
                     objectMapper.getTypeFactory().constructMapType(
-                            LinkedHashMap.class, String.class,
+                            LinkedHashMap.class,
+                            objectMapper.getTypeFactory().constructType(String.class),
                             objectMapper.getTypeFactory().constructCollectionType(List.class, String.class)));
 
             // Apply defaults and computed values from profile
