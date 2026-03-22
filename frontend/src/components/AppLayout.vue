@@ -1,16 +1,16 @@
 <template>
   <div class="flex h-screen bg-gray-100 overflow-hidden">
-    <!-- No-realms modal for admin users -->
+    <!-- No-profiles modal for admin users -->
     <Teleport to="body">
-      <div v-if="showNoRealms" class="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+      <div v-if="showNoProfiles" class="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
         <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">No Realms Assigned</h3>
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">No Profiles Assigned</h3>
           <p class="text-sm text-gray-600 mb-6">
-            There are no realms assigned to your account. Please contact your administrator to request access.
+            There are no provisioning profiles assigned to your account. Please contact your administrator to request access.
           </p>
           <div class="flex justify-end">
             <button
-              @click="handleNoRealmsOk"
+              @click="handleNoProfilesOk"
               class="px-4 py-2 text-sm rounded-lg text-white font-medium"
               :style="{ backgroundColor: settings.primaryColour }"
             >OK</button>
@@ -26,16 +26,16 @@
         <span class="text-lg font-bold tracking-tight">{{ settings.appName }}</span>
       </div>
 
-      <!-- Realm picker (admin users only) -->
+      <!-- Profile picker (admin users only) -->
       <div v-if="!auth.isSuperadmin" class="px-3 py-3 border-b border-white/15">
-        <label class="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Realm</label>
+        <label class="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Profile</label>
         <select
           v-model="pickerValue"
           class="w-full bg-white/10 border border-white/20 text-white rounded px-2 py-1 text-sm"
         >
           <option value="">— select —</option>
-          <option v-for="realm in realms" :key="realm.id" :value="realm.id">
-            {{ realm.name }}
+          <option v-for="p in profiles" :key="p.id" :value="p.id">
+            {{ p.name }}
           </option>
         </select>
       </div>
@@ -45,23 +45,23 @@
         <!-- Admin navigation (directory-scoped) -->
         <template v-if="!auth.isSuperadmin">
           <template v-if="currentDirId">
-            <RouterLink :to="{ path: `/directories/${currentDirId}/users`, query: { realmId: pickerValue } }" class="nav-item">
+            <RouterLink :to="{ path: `/directories/${currentDirId}/users` }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="6" r="3.25"/><path d="M3.5 17.5c0-3.59 2.91-6.5 6.5-6.5s6.5 2.91 6.5 6.5"/></svg>
               Users
             </RouterLink>
-            <RouterLink :to="{ path: `/directories/${currentDirId}/groups`, query: { realmId: pickerValue } }" class="nav-item">
+            <RouterLink :to="{ path: `/directories/${currentDirId}/groups` }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="6" r="2.75"/><circle cx="13.5" cy="6" r="2.75"/><path d="M1.5 17c0-3.04 2.46-5.5 5.5-5.5 1.26 0 2.42.42 3.35 1.14M12 11.64A5.48 5.48 0 0 1 18.5 17"/></svg>
               Groups
             </RouterLink>
-            <RouterLink :to="{ path: `/directories/${currentDirId}/audit`, query: { realmId: pickerValue } }" class="nav-item">
+            <RouterLink :to="{ path: `/directories/${currentDirId}/audit` }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><path d="M7 6h6M7 10h6M7 14h3"/></svg>
               Audit Log
             </RouterLink>
-            <RouterLink :to="{ path: `/directories/${currentDirId}/bulk`, query: { realmId: pickerValue } }" class="nav-item">
+            <RouterLink :to="{ path: `/directories/${currentDirId}/bulk` }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v12M10 2l4 4M10 2 6 6"/><path d="M3 13v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
               Bulk Import/Export
             </RouterLink>
-            <RouterLink :to="{ path: `/directories/${currentDirId}/reports`, query: { realmId: pickerValue } }" class="nav-item">
+            <RouterLink :to="{ path: `/directories/${currentDirId}/reports` }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V10M10 16V4M15 16v-4"/></svg>
               Reports
             </RouterLink>
@@ -88,13 +88,9 @@
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2V5z"/><path d="M6.5 3v14"/><path d="M2.5 7h4M2.5 11h4"/></svg>
             Directories
           </RouterLink>
-          <RouterLink to="/superadmin/realms" class="nav-item">
-            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17V5l7-3 7 3v12"/><path d="M3 17h14"/><path d="M7 9h2v4H7zM11 9h2v4h-2z"/><path d="M10 17v-4"/></svg>
-            Realms
-          </RouterLink>
-          <RouterLink to="/superadmin/user-templates" class="nav-item">
+          <RouterLink to="/superadmin/profiles" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><path d="M7 6h6M7 10h6M7 14h3"/><path d="M14 13l1.5 1.5 3-3"/></svg>
-            User Templates
+            Profiles
           </RouterLink>
           <RouterLink to="/superadmin/schema" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M18 18l-4-4"/></svg>
@@ -149,7 +145,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSettingsStore } from '@/stores/settings'
-import { myRealms } from '@/api/auth'
+import { myProfiles } from '@/api/auth'
 import { countPendingApprovals } from '@/api/approvals'
 
 const auth     = useAuthStore()
@@ -159,44 +155,44 @@ onMounted(() => settings.init())
 const router = useRouter()
 const route  = useRoute()
 
-const realms       = ref([])   // flat list of authorized realms (admin only)
-const pickerValue  = ref('')   // realm id
-const showNoRealms = ref(false)
-const pendingCount = ref(0)
+const profiles       = ref([])   // flat list of authorized profiles (admin only)
+const pickerValue    = ref('')   // profile id
+const showNoProfiles = ref(false)
+const pendingCount   = ref(0)
 
-// Derive the directory id from the selected realm
+// Derive the directory id from the selected profile
 const currentDirId = computed(() => {
   if (!pickerValue.value) return ''
-  const realm = realms.value.find(r => r.id === pickerValue.value)
-  return realm?.directoryId || ''
+  const profile = profiles.value.find(p => p.id === pickerValue.value)
+  return profile?.directoryId || ''
 })
 
-// Load realms for admin users; superadmins don't need the picker
+// Load profiles for admin users; superadmins don't need the picker
 onMounted(async () => {
   if (auth.isSuperadmin) return
 
   try {
-    const { data } = await myRealms()
-    realms.value = data
+    const { data } = await myProfiles()
+    profiles.value = data
 
     if (!data.length) {
-      showNoRealms.value = true
+      showNoProfiles.value = true
       return
     }
 
-    // If currently on a directory-scoped route, select the matching realm
+    // If currently on a directory-scoped route, select the matching profile
     const routeDirId = route.params.dirId
     if (routeDirId) {
-      const match = data.find(r => r.directoryId === routeDirId)
+      const match = data.find(p => p.directoryId === routeDirId)
       if (match) pickerValue.value = match.id
     }
 
-    // Auto-select first realm if nothing matched
+    // Auto-select first profile if nothing matched
     if (!pickerValue.value && data.length) {
       pickerValue.value = data[0].id
     }
   } catch (e) {
-    console.warn('Failed to load realms:', e)
+    console.warn('Failed to load profiles:', e)
   }
 })
 
@@ -204,16 +200,16 @@ onMounted(async () => {
 watch(() => route.params.dirId, (dirId) => {
   if (!dirId) return
   if (currentDirId.value === dirId) return
-  const match = realms.value.find(r => r.directoryId === dirId)
+  const match = profiles.value.find(p => p.directoryId === dirId)
   if (match) pickerValue.value = match.id
 })
 
-// Navigate when user picks a different realm
+// Navigate when user picks a different profile
 const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'approvals', 'accessReviews']
 watch(currentDirId, (newDirId) => {
   if (!newDirId || newDirId === route.params.dirId) return
   const section = dirSections.includes(route.name) ? route.name : 'users'
-  router.push({ path: `/directories/${newDirId}/${section}`, query: { realmId: pickerValue.value } })
+  router.push({ path: `/directories/${newDirId}/${section}` })
 })
 
 // Load pending approval count for the current directory
@@ -225,8 +221,8 @@ watch(currentDirId, async (newDirId) => {
   } catch { pendingCount.value = 0 }
 }, { immediate: true })
 
-async function handleNoRealmsOk() {
-  showNoRealms.value = false
+async function handleNoProfilesOk() {
+  showNoProfiles.value = false
   await auth.logout()
   router.push('/login')
 }

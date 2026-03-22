@@ -19,7 +19,7 @@ Both share a new `SELF_SERVICE` principal type, a unified `SelfServiceController
 
 The `profile_attribute_configs` table already includes a `self_service_edit` boolean column that controls which attributes end users can edit (e.g. `mail`, `telephoneNumber`, `mobile`, `jpegPhoto`). The RDN, `cn`, and structural attributes stay `FALSE`. No additional schema changes needed for self-service editability.
 
-### 1b. Extend `directory_connections`
+### 1a. Extend `directory_connections`
 
 ```sql
 ALTER TABLE directory_connections
@@ -97,7 +97,7 @@ The `parse()` method populates the new `AuthPrincipal` fields when `type == SELF
 
 ### 2d. Self-service login endpoint
 
-**File:** `src/main/java/com/ldapadmin/auth/AuthController.java` (extend existing)
+**File:** `src/main/java/com/ldapadmin/controller/AuthController.java` (extend existing)
 
 ```
 POST /api/v1/auth/self-service/login
@@ -186,7 +186,7 @@ Add a filter or `@PreAuthorize` to ensure `SELF_SERVICE` principals can **only**
 
 **File:** `src/main/java/com/ldapadmin/service/ApprovalWorkflowService.java`
 
-Add a branch in `processApproval()` for `SELF_REGISTRATION`:
+Add a branch in `approve()` for `SELF_REGISTRATION`:
 1. Load the `RegistrationRequest` from the approval payload
 2. Load the associated `ProvisioningProfile`
 3. Call `ProvisioningProfileService.provisionUser()` with the stored attributes — this handles computed expressions, default values, fixed values, LDAP creation, and auto-join groups
@@ -296,7 +296,7 @@ The `self_service_edit` column is already part of the profile attribute config t
 
 ### 6b. Directory settings
 
-Add "Enable self-service portal" toggle and "Login attribute" field.
+Add "Enable self-service portal" toggle and "Login attribute" field to the directory management UI.
 
 ### 6c. Profile settings
 
@@ -321,6 +321,7 @@ Show `SELF_REGISTRATION` requests in `PendingApprovalsView.vue` with submitted a
 | Attribute validation | Registration submissions validated against `ProfileAttributeConfig` rules (regex, allowed values, min/max length) |
 | No public LDAP writes | Registration only writes to PostgreSQL; LDAP creation only after admin approval via `ProvisioningProfileService.provisionUser()` |
 | Token expiry | Verification tokens expire after configurable TTL (default 24h) |
+| Attribute whitelisting | Self-service writes only accept attributes where `selfServiceEdit=true` in profile config |
 
 ---
 

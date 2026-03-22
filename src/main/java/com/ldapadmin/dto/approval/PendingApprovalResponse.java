@@ -10,7 +10,7 @@ import java.util.UUID;
 public record PendingApprovalResponse(
         UUID id,
         UUID directoryId,
-        UUID realmId,
+        UUID profileId,
         UUID requestedBy,
         String requesterUsername,
         ApprovalStatus status,
@@ -28,7 +28,7 @@ public record PendingApprovalResponse(
         return new PendingApprovalResponse(
                 pa.getId(),
                 pa.getDirectoryId(),
-                pa.getRealmId(),
+                pa.getProfileId(),
                 pa.getRequestedBy(),
                 requesterUsername,
                 pa.getStatus(),

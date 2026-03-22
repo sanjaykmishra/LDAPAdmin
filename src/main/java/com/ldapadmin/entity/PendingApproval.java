@@ -28,8 +28,8 @@ public class PendingApproval {
     @Column(name = "directory_id", nullable = false)
     private UUID directoryId;
 
-    @Column(name = "realm_id", nullable = false)
-    private UUID realmId;
+    @Column(name = "profile_id")
+    private UUID profileId;
 
     @Column(name = "requested_by", nullable = false)
     private UUID requestedBy;

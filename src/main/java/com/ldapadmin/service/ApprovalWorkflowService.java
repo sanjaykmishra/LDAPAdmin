@@ -8,14 +8,13 @@ import com.ldapadmin.dto.ldap.LdapEntryResponse;
 import com.ldapadmin.dto.ldap.MoveUserRequest;
 import com.ldapadmin.entity.Account;
 import com.ldapadmin.entity.PendingApproval;
-import com.ldapadmin.entity.Realm;
+import com.ldapadmin.entity.ProvisioningProfile;
 import com.ldapadmin.entity.enums.ApprovalRequestType;
 import com.ldapadmin.entity.enums.ApprovalStatus;
 import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.repository.AccountRepository;
 import com.ldapadmin.repository.PendingApprovalRepository;
-import com.ldapadmin.repository.RealmRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,45 +33,28 @@ import java.util.*;
 public class ApprovalWorkflowService {
 
     private final PendingApprovalRepository approvalRepo;
-    private final RealmRepository realmRepo;
     private final AccountRepository accountRepo;
-    private final RealmSettingService realmSettingService;
-    private final RealmApproverService realmApproverService;
+    private final ProvisioningProfileService profileService;
     private final LdapOperationService ldapOperationService;
     private final AuditService auditService;
     private final ApprovalNotificationService notificationService;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
-    public boolean isApprovalRequired(UUID realmId) {
-        return realmSettingService.isApprovalRequired(realmId);
-    }
-
-    @Transactional(readOnly = true)
-    public boolean isMoveApprovalRequired(UUID realmId) {
-        return realmSettingService.isMoveApprovalRequired(realmId);
-    }
-
-    @Transactional(readOnly = true)
-    public boolean isGroupMemberAddApprovalRequired(UUID realmId) {
-        return realmSettingService.isGroupMemberAddApprovalRequired(realmId);
+    public boolean isApprovalRequired(UUID profileId) {
+        return profileService.isApprovalRequired(profileId);
     }
 
     /**
-     * Finds the realm that contains the given DN for a directory.
-     * Matches by checking if the DN ends with the realm's userBaseDn.
+     * Finds the profile that contains the given DN for a directory.
      */
     @Transactional(readOnly = true)
-    public Optional<Realm> findRealmForDn(UUID directoryId, String dn) {
-        List<Realm> realms = realmRepo.findAllByDirectoryIdOrderByNameAsc(directoryId);
-        String dnLower = dn.toLowerCase();
-        return realms.stream()
-                .filter(r -> dnLower.endsWith(r.getUserBaseDn().toLowerCase()))
-                .findFirst();
+    public Optional<ProvisioningProfile> findProfileForDn(UUID directoryId, String dn) {
+        return profileService.resolveProfileForDn(directoryId, dn);
     }
 
     @Transactional
-    public PendingApproval submitForApproval(UUID directoryId, UUID realmId,
+    public PendingApproval submitForApproval(UUID directoryId, UUID profileId,
                                               AuthPrincipal requester,
                                               ApprovalRequestType type,
                                               Object payload) {
@@ -85,7 +67,7 @@ public class ApprovalWorkflowService {
 
         PendingApproval pa = new PendingApproval();
         pa.setDirectoryId(directoryId);
-        pa.setRealmId(realmId);
+        pa.setProfileId(profileId);
         pa.setRequestedBy(requester.id());
         pa.setStatus(ApprovalStatus.PENDING);
         pa.setRequestType(type);
@@ -111,7 +93,8 @@ public class ApprovalWorkflowService {
             visible = all;
         } else {
             visible = all.stream()
-                    .filter(pa -> realmApproverService.isApprover(pa.getRealmId(), principal.id()))
+                    .filter(pa -> pa.getProfileId() != null
+                            && profileService.isApprover(pa.getProfileId(), principal.id()))
                     .toList();
         }
 
@@ -123,8 +106,9 @@ public class ApprovalWorkflowService {
         PendingApproval pa = approvalRepo.findById(approvalId)
                 .orElseThrow(() -> new ResourceNotFoundException("PendingApproval", approvalId));
 
-        if (!principal.isSuperadmin() && !realmApproverService.isApprover(pa.getRealmId(), principal.id())) {
-            throw new AccessDeniedException("Not an approver for this realm");
+        if (!principal.isSuperadmin() && pa.getProfileId() != null
+                && !profileService.isApprover(pa.getProfileId(), principal.id())) {
+            throw new AccessDeniedException("Not an approver for this profile");
         }
 
         return toResponse(pa);
@@ -139,8 +123,9 @@ public class ApprovalWorkflowService {
             throw new IllegalStateException("Approval is not in PENDING status");
         }
 
-        if (!approver.isSuperadmin() && !realmApproverService.isApprover(pa.getRealmId(), approver.id())) {
-            throw new AccessDeniedException("Not an approver for this realm");
+        if (!approver.isSuperadmin() && pa.getProfileId() != null
+                && !profileService.isApprover(pa.getProfileId(), approver.id())) {
+            throw new AccessDeniedException("Not an approver for this profile");
         }
 
         // Execute the actual LDAP operation
@@ -176,8 +161,9 @@ public class ApprovalWorkflowService {
             throw new IllegalStateException("Approval is not in PENDING status");
         }
 
-        if (!approver.isSuperadmin() && !realmApproverService.isApprover(pa.getRealmId(), approver.id())) {
-            throw new AccessDeniedException("Not an approver for this realm");
+        if (!approver.isSuperadmin() && pa.getProfileId() != null
+                && !profileService.isApprover(pa.getProfileId(), approver.id())) {
+            throw new AccessDeniedException("Not an approver for this profile");
         }
 
         pa.setStatus(ApprovalStatus.REJECTED);

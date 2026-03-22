@@ -11,7 +11,7 @@ import com.ldapadmin.dto.ldap.MoveUserRequest;
 import com.ldapadmin.dto.ldap.ResetPasswordLdapRequest;
 import com.ldapadmin.dto.ldap.UpdateEntryRequest;
 import com.ldapadmin.entity.PendingApproval;
-import com.ldapadmin.entity.Realm;
+import com.ldapadmin.entity.ProvisioningProfile;
 import com.ldapadmin.entity.enums.ApprovalRequestType;
 import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.service.ApprovalWorkflowService;
@@ -38,25 +38,6 @@ import java.util.UUID;
 
 /**
  * LDAP user operations for a specific directory.
- *
- * <pre>
- *   GET    /api/directories/{directoryId}/users          — search
- *   POST   /api/directories/{directoryId}/users          — create
- *   GET    /api/directories/{directoryId}/users/entry    — get by DN (?dn=)
- *   PUT    /api/directories/{directoryId}/users/entry    — update by DN (?dn=)
- *   DELETE /api/directories/{directoryId}/users/entry    — delete by DN (?dn=)
- *   POST   /api/directories/{directoryId}/users/enable   — enable (?dn=)
- *   POST   /api/directories/{directoryId}/users/disable  — disable (?dn=)
- *   POST   /api/directories/{directoryId}/users/move     — move to new parent
- * </pre>
- *
- * <p>Distinguished names are passed as query parameters to avoid percent-encoding
- * issues with slashes, commas, and equals signs in URL path segments.</p>
- *
- * <p>Feature permission checks (dimensions 1, 2, 4) are enforced by the
- * {@link com.ldapadmin.auth.FeaturePermissionAspect} via {@link RequiresFeature}.
- * Branch access (dimension 3) and directory-access checks for read operations
- * are enforced inside {@link LdapOperationService}.</p>
  */
 @RestController
 @RequestMapping("/api/v1/directories/{directoryId}/users")
@@ -69,17 +50,6 @@ public class UserController {
     private final LdapOperationService service;
     private final ApprovalWorkflowService approvalService;
 
-    // ── Search ────────────────────────────────────────────────────────────────
-
-    /**
-     * Searches for user entries. No specific feature key required — any
-     * authenticated principal with directory access may search.
-     *
-     * @param filter     LDAP filter (optional; defaults to {@code (objectClass=*)})
-     * @param baseDn     search base DN (optional; defaults to directory base DN)
-     * @param limit      max results to return (1–2000, default 200)
-     * @param attributes comma-separated list of attributes to include (default: all)
-     */
     @GetMapping
     public List<LdapEntryResponse> search(
             @DirectoryId @PathVariable UUID directoryId,
@@ -94,8 +64,6 @@ public class UserController {
         return service.searchUsers(directoryId, principal, filter, baseDn, safeLimit, attrArray);
     }
 
-    // ── Create ────────────────────────────────────────────────────────────────
-
     @PostMapping
     @RequiresFeature(FeatureKey.USER_CREATE)
     public ResponseEntity<?> create(
@@ -103,11 +71,11 @@ public class UserController {
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody CreateEntryRequest req) {
 
-        // Check if approval is required for the matching realm
-        Optional<Realm> realm = approvalService.findRealmForDn(directoryId, req.dn());
-        if (realm.isPresent() && approvalService.isApprovalRequired(realm.get().getId())) {
+        // Check if approval is required for the matching profile
+        Optional<ProvisioningProfile> profile = approvalService.findProfileForDn(directoryId, req.dn());
+        if (profile.isPresent() && approvalService.isApprovalRequired(profile.get().getId())) {
             PendingApproval pa = approvalService.submitForApproval(
-                    directoryId, realm.get().getId(), principal,
+                    directoryId, profile.get().getId(), principal,
                     ApprovalRequestType.USER_CREATE, req);
             return ResponseEntity.status(HttpStatus.ACCEPTED)
                     .body(Map.of(
@@ -118,8 +86,6 @@ public class UserController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(service.createUser(directoryId, principal, req));
     }
-
-    // ── Get by DN ─────────────────────────────────────────────────────────────
 
     @GetMapping("/entry")
     public LdapEntryResponse get(
@@ -132,8 +98,6 @@ public class UserController {
         return service.getUser(directoryId, principal, dn, attrArray);
     }
 
-    // ── Update by DN ──────────────────────────────────────────────────────────
-
     @PutMapping("/entry")
     @RequiresFeature(FeatureKey.USER_EDIT)
     public LdapEntryResponse update(
@@ -144,8 +108,6 @@ public class UserController {
         return service.updateUser(directoryId, principal, dn, req);
     }
 
-    // ── Delete by DN ──────────────────────────────────────────────────────────
-
     @DeleteMapping("/entry")
     @RequiresFeature(FeatureKey.USER_DELETE)
     public ResponseEntity<Void> delete(
@@ -155,8 +117,6 @@ public class UserController {
         service.deleteUser(directoryId, principal, dn);
         return ResponseEntity.noContent().build();
     }
-
-    // ── Enable / Disable ──────────────────────────────────────────────────────
 
     @PostMapping("/enable")
     @RequiresFeature(FeatureKey.USER_ENABLE_DISABLE)
@@ -178,8 +138,6 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    // ── Reset Password ─────────────────────────────────────────────────────────
-
     @PostMapping("/reset-password")
     @RequiresFeature(FeatureKey.USER_RESET_PASSWORD)
     public ResponseEntity<Void> resetPassword(
@@ -191,8 +149,6 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    // ── Bulk Attribute Update ───────────────────────────────────────────────────
-
     @PostMapping("/bulk-update")
     @RequiresFeature(FeatureKey.BULK_ATTRIBUTE_UPDATE)
     public BulkAttributeUpdateResult bulkUpdate(
@@ -202,8 +158,6 @@ public class UserController {
         return service.bulkUpdateAttributes(directoryId, principal, req);
     }
 
-    // ── Move ──────────────────────────────────────────────────────────────────
-
     @PostMapping("/move")
     @RequiresFeature(FeatureKey.USER_MOVE)
     public ResponseEntity<?> move(
@@ -212,10 +166,10 @@ public class UserController {
             @RequestParam String dn,
             @Valid @RequestBody MoveUserRequest req) {
 
-        Optional<Realm> realm = approvalService.findRealmForDn(directoryId, dn);
-        if (realm.isPresent() && approvalService.isMoveApprovalRequired(realm.get().getId())) {
+        Optional<ProvisioningProfile> profile = approvalService.findProfileForDn(directoryId, dn);
+        if (profile.isPresent() && approvalService.isApprovalRequired(profile.get().getId())) {
             PendingApproval pa = approvalService.submitForApproval(
-                    directoryId, realm.get().getId(), principal,
+                    directoryId, profile.get().getId(), principal,
                     ApprovalRequestType.USER_MOVE,
                     Map.of("dn", dn, "request", req));
             return ResponseEntity.status(HttpStatus.ACCEPTED)

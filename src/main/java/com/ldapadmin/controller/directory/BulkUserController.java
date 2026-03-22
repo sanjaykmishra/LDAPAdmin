@@ -8,7 +8,7 @@ import com.ldapadmin.dto.csv.BulkImportPreviewResult;
 import com.ldapadmin.dto.csv.BulkImportRequest;
 import com.ldapadmin.dto.csv.BulkImportResult;
 import com.ldapadmin.entity.PendingApproval;
-import com.ldapadmin.entity.Realm;
+import com.ldapadmin.entity.ProvisioningProfile;
 import com.ldapadmin.entity.enums.ApprovalRequestType;
 import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.service.ApprovalWorkflowService;
@@ -90,15 +90,14 @@ public class BulkUserController {
 
         rateLimiter.check(principal.username(), "bulk-import");
 
-        // Check if approval is required for the target realm
-        Optional<Realm> realm = approvalService.findRealmForDn(directoryId, request.parentDn());
-        if (realm.isPresent() && approvalService.isApprovalRequired(realm.get().getId())) {
-            // Store the import request as the payload (CSV content is Base64-encoded in the payload)
+        // Check if approval is required for the target profile
+        Optional<ProvisioningProfile> profile = approvalService.findProfileForDn(directoryId, request.parentDn());
+        if (profile.isPresent() && approvalService.isApprovalRequired(profile.get().getId())) {
             Map<String, Object> payload = Map.of(
                     "request", request,
                     "csvContent", java.util.Base64.getEncoder().encodeToString(file.getBytes()));
             PendingApproval pa = approvalService.submitForApproval(
-                    directoryId, realm.get().getId(), principal,
+                    directoryId, profile.get().getId(), principal,
                     ApprovalRequestType.BULK_IMPORT, payload);
             return ResponseEntity.status(HttpStatus.ACCEPTED)
                     .body(Map.of(

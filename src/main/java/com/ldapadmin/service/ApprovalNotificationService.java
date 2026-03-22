@@ -3,20 +3,19 @@ package com.ldapadmin.service;
 import com.ldapadmin.entity.Account;
 import com.ldapadmin.entity.ApplicationSettings;
 import com.ldapadmin.entity.PendingApproval;
-import com.ldapadmin.entity.Realm;
+import com.ldapadmin.entity.ProvisioningProfile;
 import com.ldapadmin.entity.enums.ApprovalStatus;
 import com.ldapadmin.repository.AccountRepository;
 import com.ldapadmin.repository.PendingApprovalRepository;
-import com.ldapadmin.repository.RealmRepository;
+import com.ldapadmin.repository.ProvisioningProfileRepository;
+import com.ldapadmin.repository.ProfileApproverRepository;
+import com.ldapadmin.entity.ProfileApprover;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
@@ -33,26 +32,31 @@ public class ApprovalNotificationService {
 
     private final ApplicationSettingsService appSettingsService;
     private final EncryptionService encryptionService;
-    private final RealmApproverService realmApproverService;
-    private final RealmRepository realmRepo;
+    private final ProvisioningProfileRepository profileRepo;
+    private final ProfileApproverRepository approverRepo;
     private final AccountRepository accountRepo;
     private final PendingApprovalRepository approvalRepo;
 
     @Async
     public void notifyApproversOfNewRequest(PendingApproval approval) {
-        String realmName = realmRepo.findById(approval.getRealmId())
-                .map(Realm::getName).orElse("Unknown");
+        String profileName = approval.getProfileId() != null
+                ? profileRepo.findById(approval.getProfileId())
+                        .map(ProvisioningProfile::getName).orElse("Unknown")
+                : "Unknown";
         String requesterName = accountRepo.findById(approval.getRequestedBy())
                 .map(Account::getUsername).orElse("Unknown");
 
-        List<Account> approvers = realmApproverService.getApprovers(approval.getRealmId());
+        List<Account> approvers = approval.getProfileId() != null
+                ? approverRepo.findAllByProfileIdWithAccount(approval.getProfileId()).stream()
+                        .map(ProfileApprover::getAdminAccount).toList()
+                : List.of();
 
-        String subject = "[LDAPAdmin] New approval request pending — " + realmName;
+        String subject = "[LDAPAdmin] New approval request pending — " + profileName;
         String body = String.format(
-                "A new %s request has been submitted by %s in realm '%s' and is awaiting your approval.\n\n"
+                "A new %s request has been submitted by %s for profile '%s' and is awaiting your approval.\n\n"
                 + "Request type: %s\nSubmitted: %s\n\n"
                 + "Please log in to LDAPAdmin to review and approve or reject this request.",
-                approval.getRequestType().name(), requesterName, realmName,
+                approval.getRequestType().name(), requesterName, profileName,
                 approval.getRequestType().name(), approval.getCreatedAt());
 
         for (Account approver : approvers) {
@@ -64,8 +68,10 @@ public class ApprovalNotificationService {
 
     @Async
     public void notifyRequesterApproved(PendingApproval approval) {
-        String realmName = realmRepo.findById(approval.getRealmId())
-                .map(Realm::getName).orElse("Unknown");
+        String profileName = approval.getProfileId() != null
+                ? profileRepo.findById(approval.getProfileId())
+                        .map(ProvisioningProfile::getName).orElse("Unknown")
+                : "Unknown";
         String reviewerName = approval.getReviewedBy() != null
                 ? accountRepo.findById(approval.getReviewedBy())
                         .map(Account::getUsername).orElse("Unknown")
@@ -75,15 +81,17 @@ public class ApprovalNotificationService {
         if (requester == null || requester.getEmail() == null) return;
 
         sendEmail(requester.getEmail(),
-                "[LDAPAdmin] Your request was approved — " + realmName,
-                String.format("Your %s request in realm '%s' has been approved.\n\nReviewed by: %s",
-                        approval.getRequestType().name(), realmName, reviewerName));
+                "[LDAPAdmin] Your request was approved — " + profileName,
+                String.format("Your %s request for profile '%s' has been approved.\n\nReviewed by: %s",
+                        approval.getRequestType().name(), profileName, reviewerName));
     }
 
     @Async
     public void notifyRequesterRejected(PendingApproval approval) {
-        String realmName = realmRepo.findById(approval.getRealmId())
-                .map(Realm::getName).orElse("Unknown");
+        String profileName = approval.getProfileId() != null
+                ? profileRepo.findById(approval.getProfileId())
+                        .map(ProvisioningProfile::getName).orElse("Unknown")
+                : "Unknown";
         String reviewerName = approval.getReviewedBy() != null
                 ? accountRepo.findById(approval.getReviewedBy())
                         .map(Account::getUsername).orElse("Unknown")
@@ -94,37 +102,34 @@ public class ApprovalNotificationService {
         if (requester == null || requester.getEmail() == null) return;
 
         sendEmail(requester.getEmail(),
-                "[LDAPAdmin] Your request was rejected — " + realmName,
-                String.format("Your %s request in realm '%s' has been rejected.\n\nReason: %s\nReviewed by: %s",
-                        approval.getRequestType().name(), realmName, reason, reviewerName));
+                "[LDAPAdmin] Your request was rejected — " + profileName,
+                String.format("Your %s request for profile '%s' has been rejected.\n\nReason: %s\nReviewed by: %s",
+                        approval.getRequestType().name(), profileName, reason, reviewerName));
     }
 
     @Scheduled(cron = "${ldapadmin.approval.reminder-cron:0 0 9 * * *}")
     public void sendPendingReminders() {
-        List<Realm> allRealms = realmRepo.findAll();
-        for (Realm realm : allRealms) {
-            long pendingCount = approvalRepo.countByRealmIdAndStatus(
-                    realm.getId(), ApprovalStatus.PENDING);
+        List<ProvisioningProfile> allProfiles = profileRepo.findAll();
+        for (ProvisioningProfile profile : allProfiles) {
+            long pendingCount = approvalRepo.countByProfileIdAndStatus(
+                    profile.getId(), ApprovalStatus.PENDING);
             if (pendingCount == 0) continue;
 
-            List<Account> approvers = realmApproverService.getApprovers(realm.getId());
+            List<Account> approvers = approverRepo.findAllByProfileIdWithAccount(profile.getId()).stream()
+                    .map(ProfileApprover::getAdminAccount).toList();
             for (Account approver : approvers) {
                 if (approver.getEmail() != null && !approver.getEmail().isBlank()) {
                     sendEmail(approver.getEmail(),
                             String.format("[LDAPAdmin] Reminder: %d pending approval(s) — %s",
-                                    pendingCount, realm.getName()),
-                            String.format("There are %d pending approval request(s) in realm '%s' awaiting your review.\n\n"
+                                    pendingCount, profile.getName()),
+                            String.format("There are %d pending approval request(s) for profile '%s' awaiting your review.\n\n"
                                     + "Please log in to LDAPAdmin to review them.",
-                                    pendingCount, realm.getName()));
+                                    pendingCount, profile.getName()));
                 }
             }
         }
     }
 
-    /**
-     * Sends an email using the SMTP config from application settings.
-     * Falls back to logging if SMTP is not configured.
-     */
     private void sendEmail(String to, String subject, String body) {
         ApplicationSettings settings = appSettingsService.getEntity();
         if (settings.getSmtpHost() == null || settings.getSmtpHost().isBlank()
@@ -133,7 +138,6 @@ public class ApprovalNotificationService {
             return;
         }
 
-        // Use SMTP submission via simple socket connection
         try {
             sendSmtpEmail(settings, to, subject, body);
         } catch (Exception ex) {
@@ -152,11 +156,10 @@ public class ApprovalNotificationService {
         var out = new java.io.PrintWriter(socket.getOutputStream(), true);
 
         try {
-            readLine(in); // greeting
+            readLine(in);
             out.println("EHLO ldapadmin");
             readMultiLine(in);
 
-            // AUTH if credentials configured
             if (settings.getSmtpUsername() != null && settings.getSmtpPasswordEncrypted() != null) {
                 String password = encryptionService.decrypt(settings.getSmtpPasswordEncrypted());
                 String auth = Base64.getEncoder().encodeToString(
@@ -189,7 +192,7 @@ public class ApprovalNotificationService {
         String line = in.readLine();
         if (line != null && line.length() >= 3) {
             char c = line.charAt(3);
-            if (c == '-') readMultiLine(in); // multi-line response continues
+            if (c == '-') readMultiLine(in);
         }
         return line;
     }
