@@ -128,7 +128,9 @@ async function openEdit(p) {
       validationRegex: a.validationRegex || '', validationMessage: a.validationMessage || '',
       allowedValues: a.allowedValues || '', minLength: a.minLength,
       maxLength: a.maxLength, sectionName: a.sectionName || '',
-      columnSpan: a.columnSpan, hidden: a.hidden
+      columnSpan: a.columnSpan, hidden: a.hidden,
+      registrationSectionName: a.registrationSectionName || '',
+      registrationColumnSpan: a.registrationColumnSpan, registrationDisplayOrder: a.registrationDisplayOrder
     })),
     groupAssignments: p.groupAssignments.map(g => ({
       groupDn: g.groupDn, memberAttribute: g.memberAttribute
@@ -263,6 +265,19 @@ const ocToAdd = ref('')
 // Track which attributes are required by the schema (cannot uncheck required or remove)
 const schemaRequiredAttrs = ref(new Set())
 
+// Attributes commonly safe for users to self-edit
+const SELF_SERVICE_EDITABLE_ATTRS = new Set([
+  'givenname', 'sn', 'displayname', 'cn', 'preferredlanguage',
+  'mail', 'telephonenumber', 'mobile', 'facsimiletelephonenumber', 'pager',
+  'street', 'l', 'st', 'postalcode', 'postaladdress', 'co',
+  'title', 'description',
+  'jpegphoto', 'labeleduri', 'homephone',
+])
+
+function isSelfServiceEditable(attrName) {
+  return SELF_SERVICE_EDITABLE_ATTRS.has(attrName.toLowerCase())
+}
+
 async function addObjectClass() {
   if (!ocToAdd.value) return
   profile.value.objectClassNames.push(ocToAdd.value)
@@ -280,10 +295,11 @@ async function addObjectClass() {
         profile.value.attributeConfigs.push({
           attributeName: attr, customLabel: '', inputType: isObjClass ? 'HIDDEN_FIXED' : 'TEXT',
           requiredOnCreate: required.includes(attr), editableOnCreate: !isObjClass,
-          editableOnUpdate: !isObjClass, selfServiceEdit: false,
+          editableOnUpdate: !isObjClass, selfServiceEdit: !isObjClass && isSelfServiceEditable(attr),
           defaultValue: '', computedExpression: '', validationRegex: '',
           validationMessage: '', allowedValues: '', minLength: null,
-          maxLength: null, sectionName: '', columnSpan: 3, hidden: isObjClass
+          maxLength: null, sectionName: '', columnSpan: 3, hidden: isObjClass,
+          registrationSectionName: '', registrationColumnSpan: 3, registrationDisplayOrder: 0
         })
       }
     }
@@ -380,6 +396,52 @@ const layoutAttributeConfigs = computed({
   }
 })
 
+// Registration layout: only self-service-editable, non-hidden fields,
+// mapping registration-specific layout properties to sectionName/columnSpan
+// so FormLayoutDesigner can manage them independently.
+const registrationAttributeConfigs = computed({
+  get() {
+    return profile.value.attributeConfigs
+      .filter(a => a.selfServiceEdit && !a.hidden && a.inputType !== 'HIDDEN_FIXED')
+      .map(a => ({
+        ...a,
+        rdn: a.attributeName === profile.value.rdnAttribute,
+        // Present registration layout fields as sectionName/columnSpan for the designer
+        sectionName: a.registrationSectionName || '',
+        columnSpan: a.registrationColumnSpan ?? 3,
+      }))
+  },
+  set(val) {
+    // Write back registration layout properties to the main attributeConfigs
+    const lookup = new Map(val.map((v, i) => [v.attributeName, { ...v, registrationDisplayOrder: i }]))
+    profile.value.attributeConfigs = profile.value.attributeConfigs.map(a => {
+      const updated = lookup.get(a.attributeName)
+      if (updated) {
+        return {
+          ...a,
+          registrationSectionName: updated.sectionName || '',
+          registrationColumnSpan: updated.columnSpan ?? 3,
+          registrationDisplayOrder: updated.registrationDisplayOrder,
+        }
+      }
+      return a
+    })
+  }
+})
+
+const modalTabs = computed(() => {
+  const tabs = [
+    { id: 'general', label: 'General' },
+    { id: 'attributes', label: 'Attributes' },
+    { id: 'admin-layout', label: 'Admin Layout' },
+    { id: 'registration-layout', label: 'Self-registration Layout' },
+    { id: 'groups', label: 'Groups' },
+    { id: 'lifecycle', label: 'Lifecycle' },
+    { id: 'approval', label: 'Approval' },
+  ]
+  return tabs
+})
+
 function toggleApprover(accountId) {
   const idx = profileApprovers.value.indexOf(accountId)
   if (idx >= 0) profileApprovers.value.splice(idx, 1)
@@ -434,11 +496,11 @@ function toggleApprover(accountId) {
       <div class="space-y-4">
         <!-- Tab Navigation -->
         <div class="flex border-b gap-1">
-          <button v-for="tab in ['general', 'attributes', 'layout', 'groups', 'lifecycle', 'approval']" :key="tab"
-            :class="['px-4 py-2 text-sm font-medium border-b-2 -mb-px',
-              modalTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']"
-            @click="modalTab = tab">
-            {{ tab.charAt(0).toUpperCase() + tab.slice(1) }}
+          <button v-for="tab in modalTabs" :key="tab.id"
+            :class="['px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap',
+              modalTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']"
+            @click="modalTab = tab.id">
+            {{ tab.label }}
           </button>
         </div>
 
@@ -463,10 +525,10 @@ function toggleApprover(accountId) {
             <DnPicker v-model="profile.targetOuDn" :directory-id="selectedDirId"
               placeholder="e.g. ou=engineers,ou=people,dc=corp" />
           </div>
-          <div class="grid grid-cols-3 gap-4">
+          <div class="grid grid-cols-3 gap-4 items-end">
             <div class="col-span-2">
               <label class="block text-sm font-medium text-gray-700 mb-1">Object Classes</label>
-              <div class="flex gap-2 mb-2 flex-wrap">
+              <div v-if="profile.objectClassNames.length" class="flex gap-2 mb-2 flex-wrap">
                 <span v-for="oc in profile.objectClassNames" :key="oc"
                   class="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
                   {{ oc }}
@@ -498,9 +560,6 @@ function toggleApprover(accountId) {
           <div class="flex gap-6">
             <label class="flex items-center gap-2 text-sm">
               <input type="checkbox" v-model="profile.enabled" /> Enabled
-            </label>
-            <label class="flex items-center gap-2 text-sm">
-              <input type="checkbox" v-model="profile.showDnField" /> Show DN field
             </label>
             <label class="flex items-center gap-2 text-sm">
               <input type="checkbox" v-model="profile.selfRegistrationAllowed" /> Self-registration
@@ -572,11 +631,24 @@ function toggleApprover(accountId) {
           </div>
         </div>
 
-        <!-- Layout Tab -->
-        <div v-if="modalTab === 'layout'">
+        <!-- Admin Layout Tab -->
+        <div v-if="modalTab === 'admin-layout'">
           <FormLayoutDesigner
             v-model:attributeConfigs="layoutAttributeConfigs"
             v-model:showDnField="profile.showDnField"
+          />
+        </div>
+
+        <!-- Self-registration Layout Tab -->
+        <div v-if="modalTab === 'registration-layout'">
+          <div v-if="registrationAttributeConfigs.length === 0" class="text-gray-500 text-sm py-4">
+            No self-service-editable attributes configured. Mark attributes as "Self-service" on the Attributes tab to include them in the registration form.
+          </div>
+          <FormLayoutDesigner
+            v-else
+            v-model:attributeConfigs="registrationAttributeConfigs"
+            :showDnField="false"
+            :hideDnToggle="true"
           />
         </div>
 
