@@ -95,13 +95,23 @@
         <!-- Approval Workflow (only shown when editing) -->
         <div v-if="editing" class="border-t border-gray-200 pt-4 mt-4">
           <h3 class="text-sm font-semibold text-gray-800 mb-3">Approval Workflow</h3>
-          <label class="flex items-center gap-2 mb-3">
+          <label class="flex items-center gap-2 mb-2">
             <input type="checkbox" v-model="approvalEnabled"
               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
             <span class="text-sm text-gray-700">Require approval for user creation</span>
           </label>
+          <label class="flex items-center gap-2 mb-2">
+            <input type="checkbox" v-model="moveApprovalEnabled"
+              class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+            <span class="text-sm text-gray-700">Require approval for user move</span>
+          </label>
+          <label class="flex items-center gap-2 mb-3">
+            <input type="checkbox" v-model="groupAddApprovalEnabled"
+              class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+            <span class="text-sm text-gray-700">Require approval for group member addition</span>
+          </label>
 
-          <div v-if="approvalEnabled">
+          <div v-if="approvalEnabled || moveApprovalEnabled || groupAddApprovalEnabled">
             <div v-if="ldapAuthEnabled" class="space-y-2">
               <FormField label="Approver Group DN" v-model="approverGroupDn"
                 placeholder="cn=ldap-approvers,ou=groups,dc=example,dc=com" />
@@ -168,6 +178,8 @@ const form = ref(emptyForm())
 
 // Approval workflow state
 const approvalEnabled = ref(false)
+const moveApprovalEnabled = ref(false)
+const groupAddApprovalEnabled = ref(false)
 const approverGroupDn = ref('')
 const ldapAuthEnabled = ref(false)
 const selectedApproverIds = ref([])
@@ -228,6 +240,8 @@ async function openEdit(r) {
     ])
     const settings = settingsRes.data.settings || {}
     approvalEnabled.value = settings['approval.user_create.enabled'] === 'true'
+    moveApprovalEnabled.value = settings['approval.user_move.enabled'] === 'true'
+    groupAddApprovalEnabled.value = settings['approval.group_member_add.enabled'] === 'true'
     approverGroupDn.value = settings['approval.approver_group_dn'] || ''
     ldapAuthEnabled.value = configRes.data.ldapAuthEnabled || false
 
@@ -263,14 +277,17 @@ async function save() {
       // Save approval settings
       const approvalSettings = {
         'approval.user_create.enabled': approvalEnabled.value ? 'true' : 'false',
+        'approval.user_move.enabled': moveApprovalEnabled.value ? 'true' : 'false',
+        'approval.group_member_add.enabled': groupAddApprovalEnabled.value ? 'true' : 'false',
       }
-      if (ldapAuthEnabled.value && approvalEnabled.value) {
+      const anyApprovalEnabled = approvalEnabled.value || moveApprovalEnabled.value || groupAddApprovalEnabled.value
+      if (ldapAuthEnabled.value && anyApprovalEnabled) {
         approvalSettings['approval.approver_group_dn'] = approverGroupDn.value
       }
       await updateRealmSettings(targetDirId, editing.value, approvalSettings)
 
       // Save approvers if not LDAP auth mode
-      if (!ldapAuthEnabled.value && approvalEnabled.value) {
+      if (!ldapAuthEnabled.value && anyApprovalEnabled) {
         try {
           await setRealmApprovers(targetDirId, editing.value, selectedApproverIds.value)
         } catch (e) {

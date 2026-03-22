@@ -5,6 +5,7 @@ import com.ldapadmin.dto.approval.PendingApprovalResponse;
 import com.ldapadmin.dto.csv.BulkImportRequest;
 import com.ldapadmin.dto.ldap.CreateEntryRequest;
 import com.ldapadmin.dto.ldap.LdapEntryResponse;
+import com.ldapadmin.dto.ldap.MoveUserRequest;
 import com.ldapadmin.entity.Account;
 import com.ldapadmin.entity.PendingApproval;
 import com.ldapadmin.entity.Realm;
@@ -45,6 +46,16 @@ public class ApprovalWorkflowService {
     @Transactional(readOnly = true)
     public boolean isApprovalRequired(UUID realmId) {
         return realmSettingService.isApprovalRequired(realmId);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isMoveApprovalRequired(UUID realmId) {
+        return realmSettingService.isMoveApprovalRequired(realmId);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isGroupMemberAddApprovalRequired(UUID realmId) {
+        return realmSettingService.isGroupMemberAddApprovalRequired(realmId);
     }
 
     /**
@@ -137,6 +148,10 @@ public class ApprovalWorkflowService {
             executeUserCreate(pa, approver);
         } else if (pa.getRequestType() == ApprovalRequestType.BULK_IMPORT) {
             executeBulkImport(pa, approver);
+        } else if (pa.getRequestType() == ApprovalRequestType.USER_MOVE) {
+            executeUserMove(pa, approver);
+        } else if (pa.getRequestType() == ApprovalRequestType.GROUP_MEMBER_ADD) {
+            executeGroupMemberAdd(pa, approver);
         }
 
         pa.setStatus(ApprovalStatus.APPROVED);
@@ -208,6 +223,30 @@ public class ApprovalWorkflowService {
             throw new IllegalStateException("Failed to deserialize bulk import payload", e);
         } catch (java.io.IOException e) {
             throw new IllegalStateException("Failed to execute bulk import", e);
+        }
+    }
+
+    private void executeUserMove(PendingApproval pa, AuthPrincipal approver) {
+        try {
+            JsonNode root = objectMapper.readTree(pa.getPayload());
+            String dn = root.get("dn").asText();
+            MoveUserRequest req = objectMapper.treeToValue(root.get("request"), MoveUserRequest.class);
+            ldapOperationService.moveUser(pa.getDirectoryId(), approver, dn, req);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to deserialize user move payload", e);
+        }
+    }
+
+    private void executeGroupMemberAdd(PendingApproval pa, AuthPrincipal approver) {
+        try {
+            JsonNode root = objectMapper.readTree(pa.getPayload());
+            String groupDn = root.get("groupDn").asText();
+            String memberAttribute = root.get("memberAttribute").asText();
+            String memberValue = root.get("memberValue").asText();
+            ldapOperationService.addGroupMember(
+                    pa.getDirectoryId(), approver, groupDn, memberAttribute, memberValue);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to deserialize group member add payload", e);
         }
     }
 

@@ -36,7 +36,8 @@ public class AuditQueryService {
 
         PageRequest pageable = PageRequest.of(page, clampSize(size),
                 Sort.by(Sort.Direction.DESC, "occurredAt"));
-        return auditRepo.findAll(directoryId, actorId, action, from, to, pageable)
+        String actionStr = action != null ? action.getDbValue() : null;
+        return auditRepo.findAll(directoryId, actorId, actionStr, from, to, pageable)
                 .map(AuditEventResponse::from);
     }
 

@@ -385,18 +385,24 @@ async function save() {
       } else {
         // Add user to any groups selected during creation
         const pending = f._pendingGroups || []
+        let pendingApprovalCount = 0
         for (const pg of pending) {
           try {
-            await groupsApi.addGroupMember(dirId, pg.dn, {
+            const groupRes = await groupsApi.addGroupMember(dirId, pg.dn, {
               memberAttribute: pg.memberAttr,
               memberValue: dn,
             })
+            if (groupRes.status === 202) pendingApprovalCount++
           } catch (e) {
               console.warn('Failed to add user to group', pg.dn, e)
               notif.error(`Failed to add user to group: ${pg.dn}`)
             }
         }
-        notif.success(pending.length ? `User created and added to ${pending.length} group(s)` : 'User created')
+        if (pendingApprovalCount > 0) {
+          notif.success(`User created. ${pendingApprovalCount} group membership(s) submitted for approval`)
+        } else {
+          notif.success(pending.length ? `User created and added to ${pending.length} group(s)` : 'User created')
+        }
       }
     }
     showModal.value = false
@@ -423,8 +429,12 @@ function openMove(row) {
 async function doMove() {
   saving.value = true
   try {
-    await usersApi.moveUser(dirId, moveTarget.value.dn, { newParentDn: newParentDn.value })
-    notif.success('User moved')
+    const res = await usersApi.moveUser(dirId, moveTarget.value.dn, { newParentDn: newParentDn.value })
+    if (res.status === 202) {
+      notif.success('User move submitted for approval')
+    } else {
+      notif.success('User moved')
+    }
     showMove.value = false
     await load()
   } catch (e) {
