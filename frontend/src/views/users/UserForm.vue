@@ -19,26 +19,6 @@
 
       <!-- ── Create mode ── -->
       <div v-if="!isEdit" class="space-y-3">
-        <!-- Row 1: RDN (1/3) + DN (2/3) -->
-        <div v-if="rdnAttr" class="grid grid-cols-3 gap-3">
-          <FormField
-            :label="(rdnAttr.customLabel || rdnAttr.attributeName) + ' (RDN)'"
-            v-model="local.rdnValue"
-            :type="mapInputType(rdnAttr.inputType)"
-            required
-            :placeholder="rdnAttr.attributeName"
-          />
-          <div class="col-span-2">
-            <FormField
-              label="DN"
-              :model-value="computedDn"
-              placeholder="uid=jsmith,ou=people,dc=example,dc=com"
-              required
-              disabled
-            />
-          </div>
-        </div>
-
         <!-- Fallback RDN + DN row when no user form config -->
         <div v-if="!userTemplateConfig" class="grid grid-cols-3 gap-3">
           <FormField label="RDN Attribute" v-model="local.rdnAttribute" placeholder="uid" required />
@@ -56,27 +36,52 @@
         <!-- RDN Value when using fallback (no user form config) -->
         <FormField v-if="!userTemplateConfig" label="RDN Value" v-model="local.rdnValue" placeholder="jsmith" required />
 
-        <!-- Dynamic fields from user form config (non-RDN attributes) -->
+        <!-- Dynamic fields from user form config (all attributes in layout order) -->
         <template v-if="userTemplateConfig?.attributeConfigs?.length">
           <template v-for="(section, sIdx) in createSections" :key="sIdx">
             <fieldset v-if="section.fields.length" class="space-y-3">
               <legend v-if="section.name" class="text-sm font-semibold text-gray-800 pb-1 border-b border-gray-100 w-full mb-2">{{ section.name }}</legend>
               <div class="grid grid-cols-3 gap-3">
-                <div
+                <template
                   v-for="attr in section.fields"
                   :key="attr.id || attr.attributeName"
-                  :style="{ gridColumn: `span ${attr.columnSpan || 3}` }"
                 >
-                  <FormField
-                    :label="attr.customLabel || attr.attributeName"
-                    v-model="local.attributes[attr.attributeName]"
-                    :type="mapInputType(attr.inputType)"
-                    :required="attr.requiredOnCreate"
-                    :disabled="!attr.editableOnCreate"
-                    :rows="attr.inputType === 'TEXTAREA' || attr.inputType === 'MULTI_VALUE' ? 3 : undefined"
-                    :hint="attr.inputType === 'MULTI_VALUE' ? 'One value per line' : undefined"
-                  />
-                </div>
+                  <!-- RDN field -->
+                  <div v-if="attr.rdn" :style="{ gridColumn: showDnField ? 'span 1' : `span ${attr.columnSpan || 3}` }">
+                    <FormField
+                      :label="(attr.customLabel || attr.attributeName) + ' (RDN)'"
+                      v-model="local.rdnValue"
+                      :type="mapInputType(attr.inputType)"
+                      required
+                      :placeholder="attr.attributeName"
+                    />
+                  </div>
+                  <!-- Computed DN (shown after RDN when enabled) -->
+                  <div v-if="attr.rdn && showDnField" class="col-span-2">
+                    <FormField
+                      label="DN"
+                      :model-value="computedDn"
+                      placeholder="uid=jsmith,ou=people,dc=example,dc=com"
+                      required
+                      disabled
+                    />
+                  </div>
+                  <!-- Regular field -->
+                  <div
+                    v-if="!attr.rdn"
+                    :style="{ gridColumn: `span ${attr.columnSpan || 3}` }"
+                  >
+                    <FormField
+                      :label="attr.customLabel || attr.attributeName"
+                      v-model="local.attributes[attr.attributeName]"
+                      :type="mapInputType(attr.inputType)"
+                      :required="attr.requiredOnCreate"
+                      :disabled="!attr.editableOnCreate"
+                      :rows="attr.inputType === 'TEXTAREA' || attr.inputType === 'MULTI_VALUE' ? 3 : undefined"
+                      :hint="attr.inputType === 'MULTI_VALUE' ? 'One value per line' : undefined"
+                    />
+                  </div>
+                </template>
               </div>
             </fieldset>
           </template>
@@ -101,21 +106,46 @@
             <fieldset v-if="section.fields.length" class="space-y-3">
               <legend v-if="section.name" class="text-sm font-semibold text-gray-800 pb-1 border-b border-gray-100 w-full mb-2">{{ section.name }}</legend>
               <div class="grid grid-cols-3 gap-3">
-                <div
+                <template
                   v-for="attr in section.fields"
                   :key="attr.id || attr.attributeName"
-                  :style="{ gridColumn: `span ${attr.columnSpan || 3}` }"
                 >
-                  <FormField
-                    :label="attr.customLabel || attr.attributeName"
-                    v-model="local.attributes[attr.attributeName]"
-                    :type="mapInputType(attr.inputType)"
-                    :required="attr.requiredOnCreate"
-                    :disabled="attr.rdn"
-                    :rows="attr.inputType === 'TEXTAREA' || attr.inputType === 'MULTI_VALUE' ? 3 : undefined"
-                    :hint="attr.inputType === 'MULTI_VALUE' ? 'One value per line' : undefined"
-                  />
-                </div>
+                  <!-- RDN field in edit mode -->
+                  <div v-if="attr.rdn" :style="{ gridColumn: showDnField ? 'span 1' : `span ${attr.columnSpan || 3}` }">
+                    <FormField
+                      :label="attr.customLabel || attr.attributeName"
+                      v-model="local.attributes[attr.attributeName]"
+                      :type="mapInputType(attr.inputType)"
+                      :required="attr.requiredOnCreate"
+                      disabled
+                      :rows="attr.inputType === 'TEXTAREA' || attr.inputType === 'MULTI_VALUE' ? 3 : undefined"
+                      :hint="attr.inputType === 'MULTI_VALUE' ? 'One value per line' : undefined"
+                    />
+                  </div>
+                  <!-- DN field (shown after RDN when enabled, edit mode) -->
+                  <div v-if="attr.rdn && showDnField" class="col-span-2">
+                    <FormField
+                      label="DN"
+                      :model-value="local.dn"
+                      disabled
+                    />
+                  </div>
+                  <!-- Regular field -->
+                  <div
+                    v-if="!attr.rdn"
+                    :style="{ gridColumn: `span ${attr.columnSpan || 3}` }"
+                  >
+                    <FormField
+                      :label="attr.customLabel || attr.attributeName"
+                      v-model="local.attributes[attr.attributeName]"
+                      :type="mapInputType(attr.inputType)"
+                      :required="attr.requiredOnCreate"
+                      :disabled="attr.rdn"
+                      :rows="attr.inputType === 'TEXTAREA' || attr.inputType === 'MULTI_VALUE' ? 3 : undefined"
+                      :hint="attr.inputType === 'MULTI_VALUE' ? 'One value per line' : undefined"
+                    />
+                  </div>
+                </template>
               </div>
             </fieldset>
           </template>
@@ -251,7 +281,7 @@ const editableAttributes = computed(() => {
   return result
 })
 
-/** Attributes from the form config to show in edit mode (excludes objectClass and hidden). */
+/** Attributes from the form config to show in edit mode (excludes objectClass and hidden, includes RDN). */
 const editFormAttributes = computed(() => {
   if (!props.userTemplateConfig?.attributeConfigs) return []
   return props.userTemplateConfig.attributeConfigs.filter(
@@ -304,14 +334,17 @@ const computedDn = computed(() => {
   return `${attr}=${val},${base}`
 })
 
-/** All non-RDN, non-hidden attributes, preserving the order defined in the user form config. */
-const nonRdnAttributes = computed(() => {
+/** Whether to show the DN field alongside the RDN. */
+const showDnField = computed(() => props.userTemplateConfig?.showDnField !== false)
+
+/** All non-hidden attributes (including RDN), preserving the order defined in the user form config. */
+const allVisibleAttributes = computed(() => {
   if (!props.userTemplateConfig?.attributeConfigs) return []
-  return props.userTemplateConfig.attributeConfigs.filter(a => !a.rdn && !a.hidden && a.attributeName.toLowerCase() !== 'objectclass')
+  return props.userTemplateConfig.attributeConfigs.filter(a => !a.hidden && a.attributeName.toLowerCase() !== 'objectclass')
 })
 
-/** Group non-RDN attributes into sections for create mode. */
-const createSections = computed(() => groupIntoSections(nonRdnAttributes.value))
+/** Group all visible attributes into sections for create mode. */
+const createSections = computed(() => groupIntoSections(allVisibleAttributes.value))
 
 /** Group edit-mode attributes into sections. */
 const editSections = computed(() => groupIntoSections(editFormAttributes.value))

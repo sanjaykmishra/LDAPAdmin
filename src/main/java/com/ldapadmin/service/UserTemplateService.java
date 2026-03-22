@@ -51,6 +51,7 @@ public class UserTemplateService {
         template.setDirectoryConnection(resolveDirectory(req.directoryId()));
         template.setObjectClassNames(new ArrayList<>(req.objectClassNames()));
         template.setTemplateName(req.templateName());
+        template.setShowDnField(req.showDnField());
         template = templateRepo.save(template);
 
         List<UserTemplateAttributeConfig> configs = saveConfigs(template, req.attributeConfigs());
@@ -64,6 +65,7 @@ public class UserTemplateService {
         template.setDirectoryConnection(resolveDirectory(req.directoryId()));
         template.setObjectClassNames(new ArrayList<>(req.objectClassNames()));
         template.setTemplateName(req.templateName());
+        template.setShowDnField(req.showDnField());
         template = templateRepo.save(template);
 
         configRepo.deleteAllByUserTemplateId(id);

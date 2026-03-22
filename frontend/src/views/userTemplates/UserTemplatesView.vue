@@ -179,7 +179,9 @@
         <div v-show="modalTab === 'layout'">
           <FormLayoutDesigner
             :attribute-configs="template.attributeConfigs"
+            :show-dn-field="template.showDnField"
             @update:attribute-configs="onLayoutUpdate"
+            @update:show-dn-field="v => template.showDnField = v"
           />
         </div>
 
@@ -422,6 +424,7 @@ function emptyTemplate() {
   return {
     directoryId: null,
     templateName: '',
+    showDnField: true,
     objectClassNames: [],
     attributeConfigs: [],
   }
@@ -515,6 +518,7 @@ async function openEdit(t) {
   template.value = {
     directoryId: t.directoryId || null,
     templateName: t.templateName,
+    showDnField: t.showDnField !== false,
     objectClassNames: [...(t.objectClassNames || [])],
     attributeConfigs: (t.attributeConfigs || []).map(a => ({
       attributeName: a.attributeName,
