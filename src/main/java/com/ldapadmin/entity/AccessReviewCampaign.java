@@ -32,12 +32,18 @@ public class AccessReviewCampaign {
     private String description;
 
     @Enumerated(EnumType.STRING)
-    private CampaignStatus status = CampaignStatus.DRAFT;
+    private CampaignStatus status = CampaignStatus.UPCOMING;
 
     private OffsetDateTime startsAt;
     private OffsetDateTime deadline;
+    private Integer deadlineDays;
     private boolean autoRevoke;
     private boolean autoRevokeOnExpiry;
+    private Integer recurrenceMonths;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_campaign_id")
+    private AccessReviewCampaign sourceCampaign;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by")

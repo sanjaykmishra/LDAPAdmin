@@ -44,23 +44,29 @@ public class AccessReviewCampaignService {
         DirectoryConnection dir = directoryRepo.findById(directoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("DirectoryConnection", directoryId));
 
-        if (req.deadline().isBefore(OffsetDateTime.now())) {
-            throw new LdapAdminException("Deadline must be in the future");
+        if (req.deadlineDays() < 1) {
+            throw new LdapAdminException("Deadline must be at least 1 day");
+        }
+        if (req.recurrenceMonths() != null && req.recurrenceMonths() < 1) {
+            throw new LdapAdminException("Recurrence interval must be at least 1 month");
         }
 
         Account creator = accountRepo.findById(principal.id())
                 .orElseThrow(() -> new ResourceNotFoundException("Account", principal.id()));
 
+        OffsetDateTime deadline = OffsetDateTime.now().plusDays(req.deadlineDays());
+
         AccessReviewCampaign campaign = new AccessReviewCampaign();
         campaign.setDirectory(dir);
         campaign.setName(req.name());
         campaign.setDescription(req.description());
-        campaign.setStartsAt(req.startsAt());
-        campaign.setDeadline(req.deadline());
+        campaign.setDeadline(deadline);
+        campaign.setDeadlineDays(req.deadlineDays());
+        campaign.setRecurrenceMonths(req.recurrenceMonths());
         campaign.setAutoRevoke(req.autoRevoke());
         campaign.setAutoRevokeOnExpiry(req.autoRevokeOnExpiry());
         campaign.setCreatedBy(creator);
-        campaign.setStatus(CampaignStatus.DRAFT);
+        campaign.setStatus(CampaignStatus.UPCOMING);
 
         for (CreateCampaignRequest.GroupAssignment ga : req.groups()) {
             Account reviewer = accountRepo.findById(ga.reviewerAccountId())
@@ -85,7 +91,7 @@ public class AccessReviewCampaignService {
         }
 
         campaign = campaignRepo.save(campaign);
-        recordHistory(campaign, null, CampaignStatus.DRAFT, creator, "Campaign created");
+        recordHistory(campaign, null, CampaignStatus.UPCOMING, creator, "Campaign created");
 
         auditService.record(principal, directoryId, AuditAction.CAMPAIGN_CREATED,
                 null, Map.of("campaignName", req.name(), "campaignId", campaign.getId().toString()));
@@ -96,8 +102,8 @@ public class AccessReviewCampaignService {
     @Transactional
     public AccessReviewCampaign activate(UUID campaignId, AuthPrincipal principal) {
         AccessReviewCampaign campaign = getCampaignOrThrow(campaignId);
-        if (campaign.getStatus() != CampaignStatus.DRAFT) {
-            throw new LdapAdminException("Can only activate campaigns in DRAFT status");
+        if (campaign.getStatus() != CampaignStatus.UPCOMING) {
+            throw new LdapAdminException("Can only activate campaigns in UPCOMING status");
         }
 
         DirectoryConnection dir = campaign.getDirectory();
@@ -166,14 +172,23 @@ public class AccessReviewCampaignService {
         auditService.record(principal, dir.getId(), AuditAction.CAMPAIGN_CLOSED,
                 null, Map.of("campaignId", campaignId.toString(), "campaignName", campaign.getName()));
 
+        // Create recurring follow-up if configured
+        if (campaign.getRecurrenceMonths() != null) {
+            try {
+                createRecurringFollowUp(campaign, principal);
+            } catch (Exception e) {
+                log.error("Failed to create recurring follow-up for campaign {}: {}", campaignId, e.getMessage(), e);
+            }
+        }
+
         return campaign;
     }
 
     @Transactional
     public AccessReviewCampaign cancel(UUID campaignId, AuthPrincipal principal) {
         AccessReviewCampaign campaign = getCampaignOrThrow(campaignId);
-        if (campaign.getStatus() != CampaignStatus.DRAFT && campaign.getStatus() != CampaignStatus.ACTIVE) {
-            throw new LdapAdminException("Can only cancel campaigns in DRAFT or ACTIVE status");
+        if (campaign.getStatus() != CampaignStatus.UPCOMING && campaign.getStatus() != CampaignStatus.ACTIVE) {
+            throw new LdapAdminException("Can only cancel campaigns in UPCOMING or ACTIVE status");
         }
 
         Account actor = accountRepo.findById(principal.id())
@@ -279,6 +294,59 @@ public class AccessReviewCampaignService {
                 null, Map.of("campaignId", campaign.getId().toString(), "campaignName", campaign.getName()));
     }
 
+    // ── Recurrence support ────────────────────────────────────────────────
+
+    @Transactional
+    public AccessReviewCampaign createRecurringFollowUp(AccessReviewCampaign source, AuthPrincipal systemPrincipal) {
+        if (source.getRecurrenceMonths() == null || source.getDeadlineDays() == null) {
+            return null;
+        }
+
+        Account creator = accountRepo.findById(systemPrincipal.id()).orElse(null);
+        if (creator == null) {
+            log.warn("Cannot create recurring follow-up: system principal not found");
+            return null;
+        }
+
+        OffsetDateTime deadline = OffsetDateTime.now().plusDays(source.getDeadlineDays());
+
+        AccessReviewCampaign followUp = new AccessReviewCampaign();
+        followUp.setDirectory(source.getDirectory());
+        followUp.setName(source.getName());
+        followUp.setDescription(source.getDescription());
+        followUp.setDeadline(deadline);
+        followUp.setDeadlineDays(source.getDeadlineDays());
+        followUp.setRecurrenceMonths(source.getRecurrenceMonths());
+        followUp.setAutoRevoke(source.isAutoRevoke());
+        followUp.setAutoRevokeOnExpiry(source.isAutoRevokeOnExpiry());
+        followUp.setCreatedBy(creator);
+        followUp.setStatus(CampaignStatus.UPCOMING);
+        followUp.setSourceCampaign(source);
+
+        for (AccessReviewGroup srcGroup : source.getReviewGroups()) {
+            AccessReviewGroup group = new AccessReviewGroup();
+            group.setCampaign(followUp);
+            group.setGroupDn(srcGroup.getGroupDn());
+            group.setGroupName(srcGroup.getGroupName());
+            group.setMemberAttribute(srcGroup.getMemberAttribute());
+            group.setReviewer(srcGroup.getReviewer());
+            followUp.getReviewGroups().add(group);
+        }
+
+        followUp = campaignRepo.save(followUp);
+        recordHistory(followUp, null, CampaignStatus.UPCOMING, creator,
+                "Recurring follow-up created from campaign '" + source.getName() + "'");
+
+        auditService.record(systemPrincipal, source.getDirectory().getId(), AuditAction.CAMPAIGN_CREATED,
+                null, Map.of("campaignName", followUp.getName(), "campaignId", followUp.getId().toString(),
+                        "sourceCampaignId", source.getId().toString(), "recurring", "true"));
+
+        log.info("Created recurring follow-up campaign '{}' (id={}) from source campaign id={}",
+                followUp.getName(), followUp.getId(), source.getId());
+
+        return followUp;
+    }
+
     // ── Private helpers ─────────────────────────────────────────────────────
 
     private void executeRevocations(AccessReviewCampaign campaign, DirectoryConnection dir, AuthPrincipal principal) {
@@ -347,7 +415,9 @@ public class AccessReviewCampaignService {
     private CampaignSummaryDto toSummaryDto(AccessReviewCampaign c) {
         return new CampaignSummaryDto(
                 c.getId(), c.getName(), c.getStatus(),
-                c.getStartsAt(), c.getDeadline(), c.getCreatedAt(),
+                c.getStartsAt(), c.getDeadline(),
+                c.getDeadlineDays(), c.getRecurrenceMonths(),
+                c.getCreatedAt(),
                 c.getCreatedBy().getUsername(),
                 buildProgress(c.getId()));
     }
@@ -359,6 +429,7 @@ public class AccessReviewCampaignService {
         return new CampaignDetailDto(
                 c.getId(), c.getName(), c.getDescription(), c.getStatus(),
                 c.getStartsAt(), c.getDeadline(),
+                c.getDeadlineDays(), c.getRecurrenceMonths(),
                 c.isAutoRevoke(), c.isAutoRevokeOnExpiry(),
                 c.getCreatedAt(), c.getCompletedAt(),
                 c.getCreatedBy().getUsername(),

@@ -44,6 +44,16 @@ public class AccessReviewScheduler {
             try {
                 log.info("Expiring campaign '{}' (id={})", campaign.getName(), campaign.getId());
                 campaignService.expireCampaign(campaign, systemPrincipal);
+
+                // Create recurring follow-up if configured
+                if (campaign.getRecurrenceMonths() != null) {
+                    try {
+                        campaignService.createRecurringFollowUp(campaign, systemPrincipal);
+                    } catch (Exception e) {
+                        log.error("Failed to create recurring follow-up for campaign {}: {}",
+                                campaign.getId(), e.getMessage(), e);
+                    }
+                }
             } catch (Exception e) {
                 log.error("Failed to expire campaign {}: {}", campaign.getId(), e.getMessage(), e);
             }

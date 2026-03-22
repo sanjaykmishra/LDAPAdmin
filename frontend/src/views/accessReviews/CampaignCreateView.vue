@@ -23,14 +23,18 @@
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Starts At (optional)</label>
-            <input v-model="form.startsAt" type="datetime-local"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+            <label class="block text-sm font-medium text-gray-700 mb-1">Deadline (days from start) *</label>
+            <input v-model.number="form.deadlineDays" type="number" min="1" required
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="30" />
+            <p class="text-xs text-gray-400 mt-1">Number of days reviewers have to complete the review</p>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Deadline *</label>
-            <input v-model="form.deadline" type="datetime-local" required
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+            <label class="block text-sm font-medium text-gray-700 mb-1">Repeat every (months)</label>
+            <input v-model.number="form.recurrenceMonths" type="number" min="1"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="e.g. 3 for quarterly" />
+            <p class="text-xs text-gray-400 mt-1">Leave empty for one-time campaigns</p>
           </div>
         </div>
 
@@ -114,8 +118,8 @@ const admins = ref([])
 const form = reactive({
   name: '',
   description: '',
-  startsAt: '',
-  deadline: '',
+  deadlineDays: 30,
+  recurrenceMonths: null,
   autoRevoke: false,
   autoRevokeOnExpiry: false,
   groups: [{ groupDn: '', memberAttribute: 'member', reviewerAccountId: '' }],
@@ -129,8 +133,8 @@ async function handleSubmit() {
   const payload = {
     name: form.name,
     description: form.description || null,
-    startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null,
-    deadline: new Date(form.deadline).toISOString(),
+    deadlineDays: form.deadlineDays,
+    recurrenceMonths: form.recurrenceMonths || null,
     autoRevoke: form.autoRevoke,
     autoRevokeOnExpiry: form.autoRevokeOnExpiry,
     groups: form.groups.map(g => ({

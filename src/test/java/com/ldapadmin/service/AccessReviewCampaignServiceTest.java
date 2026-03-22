@@ -88,30 +88,55 @@ class AccessReviewCampaignServiceTest {
 
         var groups = List.of(new CreateCampaignRequest.GroupAssignment(
                 "cn=admins,dc=test", "member", reviewerId));
-        var req = new CreateCampaignRequest("Q1 Review", "Test", null,
-                OffsetDateTime.now().plusDays(30), false, false, groups);
+        var req = new CreateCampaignRequest("Q1 Review", "Test",
+                30, null, false, false, groups);
 
         AccessReviewCampaign result = service.create(directoryId, req, principal);
 
-        assertThat(result.getStatus()).isEqualTo(CampaignStatus.DRAFT);
+        assertThat(result.getStatus()).isEqualTo(CampaignStatus.UPCOMING);
         assertThat(result.getName()).isEqualTo("Q1 Review");
+        assertThat(result.getDeadlineDays()).isEqualTo(30);
+        assertThat(result.getDeadline()).isAfter(OffsetDateTime.now().plusDays(29));
         assertThat(result.getReviewGroups()).hasSize(1);
         verify(historyRepo).save(any());
         verify(auditService).record(eq(principal), eq(directoryId), any(), any(), any());
     }
 
     @Test
-    void create_pastDeadline_throwsException() {
+    void create_withRecurrence_storesRecurrenceMonths() {
+        when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount));
+        when(accountRepo.findById(reviewerId)).thenReturn(Optional.of(reviewerAccount));
+        when(ldapGroupService.getGroup(any(), any(), any()))
+                .thenReturn(new LdapGroup("cn=admins,dc=test", Map.of("cn", List.of("admins"))));
+        when(campaignRepo.save(any())).thenAnswer(inv -> {
+            AccessReviewCampaign c = inv.getArgument(0);
+            c.setId(UUID.randomUUID());
+            return c;
+        });
+
+        var groups = List.of(new CreateCampaignRequest.GroupAssignment(
+                "cn=admins,dc=test", "member", reviewerId));
+        var req = new CreateCampaignRequest("Quarterly Review", "Test",
+                30, 3, false, false, groups);
+
+        AccessReviewCampaign result = service.create(directoryId, req, principal);
+
+        assertThat(result.getRecurrenceMonths()).isEqualTo(3);
+    }
+
+    @Test
+    void create_invalidDeadlineDays_throwsException() {
         when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
 
         var groups = List.of(new CreateCampaignRequest.GroupAssignment(
                 "cn=admins,dc=test", "member", reviewerId));
-        var req = new CreateCampaignRequest("Q1 Review", null, null,
-                OffsetDateTime.now().minusDays(1), false, false, groups);
+        var req = new CreateCampaignRequest("Q1 Review", null,
+                0, null, false, false, groups);
 
         assertThatThrownBy(() -> service.create(directoryId, req, principal))
                 .isInstanceOf(LdapAdminException.class)
-                .hasMessageContaining("future");
+                .hasMessageContaining("at least 1 day");
     }
 
     @Test
@@ -140,7 +165,7 @@ class AccessReviewCampaignServiceTest {
 
         assertThatThrownBy(() -> service.activate(campaign.getId(), principal))
                 .isInstanceOf(LdapAdminException.class)
-                .hasMessageContaining("DRAFT");
+                .hasMessageContaining("UPCOMING");
     }
 
     @Test
@@ -170,6 +195,26 @@ class AccessReviewCampaignServiceTest {
     }
 
     @Test
+    void close_recurringCampaign_createsFollowUp() {
+        AccessReviewCampaign campaign = buildActiveCampaign();
+        campaign.setRecurrenceMonths(3);
+        campaign.setDeadlineDays(30);
+        when(campaignRepo.findById(campaign.getId())).thenReturn(Optional.of(campaign));
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount));
+        when(decisionRepo.countPendingByCampaignId(campaign.getId())).thenReturn(0L);
+        when(campaignRepo.save(any())).thenAnswer(inv -> {
+            AccessReviewCampaign c = inv.getArgument(0);
+            if (c.getId() == null) c.setId(UUID.randomUUID());
+            return c;
+        });
+
+        service.close(campaign.getId(), false, principal);
+
+        // save called twice: once for close, once for follow-up
+        verify(campaignRepo, atLeast(2)).save(any());
+    }
+
+    @Test
     void cancel_activeCampaign_cancels() {
         AccessReviewCampaign campaign = buildActiveCampaign();
         when(campaignRepo.findById(campaign.getId())).thenReturn(Optional.of(campaign));
@@ -189,7 +234,30 @@ class AccessReviewCampaignServiceTest {
 
         assertThatThrownBy(() -> service.cancel(campaign.getId(), principal))
                 .isInstanceOf(LdapAdminException.class)
-                .hasMessageContaining("DRAFT or ACTIVE");
+                .hasMessageContaining("UPCOMING or ACTIVE");
+    }
+
+    @Test
+    void createRecurringFollowUp_createsNewDraftCampaign() {
+        AccessReviewCampaign source = buildActiveCampaign();
+        source.setRecurrenceMonths(3);
+        source.setDeadlineDays(30);
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount));
+        when(campaignRepo.save(any())).thenAnswer(inv -> {
+            AccessReviewCampaign c = inv.getArgument(0);
+            c.setId(UUID.randomUUID());
+            return c;
+        });
+
+        AccessReviewCampaign followUp = service.createRecurringFollowUp(source, principal);
+
+        assertThat(followUp).isNotNull();
+        assertThat(followUp.getStatus()).isEqualTo(CampaignStatus.UPCOMING);
+        assertThat(followUp.getName()).isEqualTo(source.getName());
+        assertThat(followUp.getRecurrenceMonths()).isEqualTo(3);
+        assertThat(followUp.getDeadlineDays()).isEqualTo(30);
+        assertThat(followUp.getSourceCampaign()).isEqualTo(source);
+        assertThat(followUp.getReviewGroups()).hasSize(1);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -199,8 +267,9 @@ class AccessReviewCampaignServiceTest {
         c.setId(UUID.randomUUID());
         c.setDirectory(directory);
         c.setName("Test Campaign");
-        c.setStatus(CampaignStatus.DRAFT);
+        c.setStatus(CampaignStatus.UPCOMING);
         c.setDeadline(OffsetDateTime.now().plusDays(30));
+        c.setDeadlineDays(30);
         c.setCreatedBy(adminAccount);
 
         AccessReviewGroup g = new AccessReviewGroup();
