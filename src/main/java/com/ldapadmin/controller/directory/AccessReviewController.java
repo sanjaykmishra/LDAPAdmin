@@ -4,9 +4,11 @@ import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.auth.DirectoryId;
 import com.ldapadmin.auth.RequiresFeature;
 import com.ldapadmin.dto.accessreview.*;
+import com.ldapadmin.dto.admin.AdminAccountResponse;
 import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.service.AccessReviewCampaignService;
 import com.ldapadmin.service.AccessReviewDecisionService;
+import com.ldapadmin.service.AdminManagementService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -30,6 +32,16 @@ public class AccessReviewController {
 
     private final AccessReviewCampaignService campaignService;
     private final AccessReviewDecisionService decisionService;
+    private final AdminManagementService adminService;
+
+    // ── Reviewer lookup ─────────────────────────────────────────────────────
+
+    @GetMapping("/reviewers")
+    @RequiresFeature(FeatureKey.ACCESS_REVIEW_MANAGE)
+    public List<AdminAccountResponse> listReviewers(
+            @DirectoryId @PathVariable UUID directoryId) {
+        return adminService.listAdmins();
+    }
 
     // ── Campaign CRUD ────────────────────────────────────────────────────────
 

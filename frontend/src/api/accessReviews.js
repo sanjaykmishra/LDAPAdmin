@@ -37,3 +37,6 @@ export const exportCampaign = (dirId, campaignId, format = 'csv') =>
 
 export const getCampaignHistory = (dirId, campaignId) =>
   client.get(`${base(dirId)}/${campaignId}/history`)
+
+export const listReviewers = (dirId) =>
+  client.get(`${base(dirId)}/reviewers`)
