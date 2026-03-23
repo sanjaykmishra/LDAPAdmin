@@ -143,6 +143,11 @@ public class ApprovalNotificationService {
         sendEmail(recipientEmail, subject, body);
     }
 
+    @Async
+    public void sendGenericEmail(String recipientEmail, String subject, String body) {
+        sendEmail(recipientEmail, subject, body);
+    }
+
     private void sendEmail(String to, String subject, String body) {
         ApplicationSettings settings = appSettingsService.getEntity();
         if (settings.getSmtpHost() == null || settings.getSmtpHost().isBlank()
