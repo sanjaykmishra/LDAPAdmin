@@ -85,14 +85,14 @@ public class UserController {
             req = new CreateEntryRequest(req.dn(), attrs);
         }
 
-        if (profile.isPresent() && approvalService.isApprovalRequired(profile.get().getId())) {
-            PendingApproval pa = approvalService.submitForApproval(
-                    directoryId, profile.get().getId(), principal,
-                    ApprovalRequestType.USER_CREATE, req);
+        // Submit for approval — handles both profiled and unprovisioned OUs
+        Optional<PendingApproval> pendingApproval = approvalService.checkAndSubmitForApproval(
+                directoryId, req.dn(), principal, ApprovalRequestType.USER_CREATE, req);
+        if (pendingApproval.isPresent()) {
             return ResponseEntity.status(HttpStatus.ACCEPTED)
                     .body(Map.of(
                             "message", "User creation submitted for approval",
-                            "approvalId", pa.getId()));
+                            "approvalId", pendingApproval.get().getId()));
         }
 
         LdapEntryResponse result = service.createUser(directoryId, principal, req);
@@ -193,16 +193,14 @@ public class UserController {
             @RequestParam String dn,
             @Valid @RequestBody MoveUserRequest req) {
 
-        Optional<ProvisioningProfile> profile = approvalService.findProfileForDn(directoryId, dn);
-        if (profile.isPresent() && approvalService.isApprovalRequired(profile.get().getId())) {
-            PendingApproval pa = approvalService.submitForApproval(
-                    directoryId, profile.get().getId(), principal,
-                    ApprovalRequestType.USER_MOVE,
-                    Map.of("dn", dn, "request", req));
+        Optional<PendingApproval> pendingApproval = approvalService.checkAndSubmitForApproval(
+                directoryId, dn, principal, ApprovalRequestType.USER_MOVE,
+                Map.of("dn", dn, "request", req));
+        if (pendingApproval.isPresent()) {
             return ResponseEntity.status(HttpStatus.ACCEPTED)
                     .body(Map.of(
                             "message", "User move submitted for approval",
-                            "approvalId", pa.getId()));
+                            "approvalId", pendingApproval.get().getId()));
         }
 
         service.moveUser(directoryId, principal, dn, req);

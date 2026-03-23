@@ -68,6 +68,42 @@ public class ApprovalWorkflowService {
         return profileService.resolveProfileForDn(directoryId, dn);
     }
 
+    /**
+     * Checks whether the given operation on a DN requires approval, handling both
+     * profiled and unprovisioned OUs. Returns the submitted PendingApproval if
+     * approval is required, or empty if the operation can proceed immediately.
+     *
+     * <p>When no profile matches the target DN, the operation is still submitted
+     * for approval (with a null profileId) to prevent the bypass described in
+     * finding C2. A warning is logged so operators can configure a profile for
+     * the target OU.
+     */
+    @Transactional
+    public Optional<PendingApproval> checkAndSubmitForApproval(
+            UUID directoryId, String targetDn, AuthPrincipal requester,
+            ApprovalRequestType type, Object payload) {
+
+        Optional<ProvisioningProfile> profile = findProfileForDn(directoryId, targetDn);
+
+        if (profile.isPresent()) {
+            if (isApprovalRequired(profile.get().getId())) {
+                PendingApproval pa = submitForApproval(
+                        directoryId, profile.get().getId(), requester, type, payload);
+                return Optional.of(pa);
+            }
+            return Optional.empty();
+        }
+
+        // No profile matches this DN — submit for directory-level approval to
+        // prevent the unprovisioned-OU bypass (C2). The approval will have a null
+        // profileId, so superadmins or directory-level approvers can review it.
+        log.warn("No provisioning profile matches DN [{}] in directory [{}]. "
+                + "Submitting for directory-level approval.", targetDn, directoryId);
+        PendingApproval pa = submitForApproval(
+                directoryId, null, requester, type, payload);
+        return Optional.of(pa);
+    }
+
     @Transactional
     public PendingApproval submitForApproval(UUID directoryId, UUID profileId,
                                               AuthPrincipal requester,

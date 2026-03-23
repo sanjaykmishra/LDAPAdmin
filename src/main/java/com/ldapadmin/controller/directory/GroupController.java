@@ -11,7 +11,6 @@ import com.ldapadmin.dto.ldap.LdapEntryResponse;
 import com.ldapadmin.dto.ldap.MemberRequest;
 import com.ldapadmin.dto.ldap.UpdateEntryRequest;
 import com.ldapadmin.entity.PendingApproval;
-import com.ldapadmin.entity.ProvisioningProfile;
 import com.ldapadmin.entity.enums.ApprovalRequestType;
 import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.service.ApprovalWorkflowService;
@@ -147,19 +146,17 @@ public class GroupController {
             @RequestParam String dn,
             @Valid @RequestBody MemberRequest req) {
 
-        // Check approval for the profile containing the group
-        Optional<ProvisioningProfile> profile = approvalService.findProfileForDn(directoryId, dn);
-        if (profile.isPresent() && approvalService.isApprovalRequired(profile.get().getId())) {
-            PendingApproval pa = approvalService.submitForApproval(
-                    directoryId, profile.get().getId(), principal,
-                    ApprovalRequestType.GROUP_MEMBER_ADD,
-                    Map.of("groupDn", dn,
-                            "memberAttribute", req.memberAttribute(),
-                            "memberValue", req.memberValue()));
+        // Check approval — handles both profiled and unprovisioned OUs
+        Optional<PendingApproval> pendingApproval = approvalService.checkAndSubmitForApproval(
+                directoryId, dn, principal, ApprovalRequestType.GROUP_MEMBER_ADD,
+                Map.of("groupDn", dn,
+                        "memberAttribute", req.memberAttribute(),
+                        "memberValue", req.memberValue()));
+        if (pendingApproval.isPresent()) {
             return ResponseEntity.status(HttpStatus.ACCEPTED)
                     .body(Map.of(
                             "message", "Group member addition submitted for approval",
-                            "approvalId", pa.getId()));
+                            "approvalId", pendingApproval.get().getId()));
         }
 
         service.addGroupMember(directoryId, principal, dn, req.memberAttribute(), req.memberValue());
@@ -179,11 +176,24 @@ public class GroupController {
 
     @PostMapping("/members/bulk")
     @RequiresFeature(FeatureKey.GROUP_MANAGE_MEMBERS)
-    public BulkMemberResult addMembersBulk(
+    public ResponseEntity<?> addMembersBulk(
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam String dn,
             @Valid @RequestBody BulkMemberRequest req) {
+
+        // Check approval for the group DN — same gate as single-member endpoint
+        Optional<PendingApproval> pendingApproval = approvalService.checkAndSubmitForApproval(
+                directoryId, dn, principal, ApprovalRequestType.GROUP_MEMBER_ADD,
+                Map.of("groupDn", dn,
+                        "memberAttribute", req.memberAttribute(),
+                        "memberValues", req.memberValues()));
+        if (pendingApproval.isPresent()) {
+            return ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body(Map.of(
+                            "message", "Bulk group member addition submitted for approval",
+                            "approvalId", pendingApproval.get().getId()));
+        }
 
         int added = 0;
         List<BulkMemberError> errors = new ArrayList<>();
@@ -198,6 +208,6 @@ public class GroupController {
             }
         }
 
-        return new BulkMemberResult(added, errors.size(), errors);
+        return ResponseEntity.ok(new BulkMemberResult(added, errors.size(), errors));
     }
 }

@@ -8,7 +8,6 @@ import com.ldapadmin.dto.csv.BulkImportPreviewResult;
 import com.ldapadmin.dto.csv.BulkImportRequest;
 import com.ldapadmin.dto.csv.BulkImportResult;
 import com.ldapadmin.entity.PendingApproval;
-import com.ldapadmin.entity.ProvisioningProfile;
 import com.ldapadmin.entity.enums.ApprovalRequestType;
 import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.service.ApprovalWorkflowService;
@@ -90,19 +89,18 @@ public class BulkUserController {
 
         rateLimiter.check(principal.username(), "bulk-import");
 
-        // Check if approval is required for the target profile
-        Optional<ProvisioningProfile> profile = approvalService.findProfileForDn(directoryId, request.parentDn());
-        if (profile.isPresent() && approvalService.isApprovalRequired(profile.get().getId())) {
-            Map<String, Object> payload = Map.of(
-                    "request", request,
-                    "csvContent", java.util.Base64.getEncoder().encodeToString(file.getBytes()));
-            PendingApproval pa = approvalService.submitForApproval(
-                    directoryId, profile.get().getId(), principal,
-                    ApprovalRequestType.BULK_IMPORT, payload);
+        // Check if approval is required — handles both profiled and unprovisioned OUs
+        Map<String, Object> payload = Map.of(
+                "request", request,
+                "csvContent", java.util.Base64.getEncoder().encodeToString(file.getBytes()));
+        Optional<PendingApproval> pendingApproval = approvalService.checkAndSubmitForApproval(
+                directoryId, request.parentDn(), principal,
+                ApprovalRequestType.BULK_IMPORT, payload);
+        if (pendingApproval.isPresent()) {
             return ResponseEntity.status(HttpStatus.ACCEPTED)
                     .body(Map.of(
                             "message", "Bulk import submitted for approval",
-                            "approvalId", pa.getId()));
+                            "approvalId", pendingApproval.get().getId()));
         }
 
         BulkImportResult result = service.bulkImportUsers(
