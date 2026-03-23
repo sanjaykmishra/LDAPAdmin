@@ -7,7 +7,10 @@ import com.ldapadmin.auth.RequiresFeature;
 import com.ldapadmin.dto.csv.BulkImportPreviewResult;
 import com.ldapadmin.dto.csv.BulkImportRequest;
 import com.ldapadmin.dto.csv.BulkImportResult;
+import com.ldapadmin.entity.PendingApproval;
+import com.ldapadmin.entity.enums.ApprovalRequestType;
 import com.ldapadmin.entity.enums.FeatureKey;
+import com.ldapadmin.service.ApprovalWorkflowService;
 import com.ldapadmin.service.LdapOperationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,9 +27,13 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.springframework.http.HttpStatus;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -44,6 +51,7 @@ import java.util.UUID;
 public class BulkGroupController {
 
     private final LdapOperationService service;
+    private final ApprovalWorkflowService approvalService;
     private final ApiRateLimiter       rateLimiter;
 
     @PostMapping(value = "/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -62,7 +70,7 @@ public class BulkGroupController {
 
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @RequiresFeature(FeatureKey.BULK_IMPORT)
-    public ResponseEntity<BulkImportResult> importGroups(
+    public ResponseEntity<?> importGroups(
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestPart("file") MultipartFile file,
@@ -71,6 +79,23 @@ public class BulkGroupController {
             @RequestParam(defaultValue = "groupOfNames") String objectClass) throws IOException {
 
         rateLimiter.check(principal.username(), "bulk-group-import");
+
+        // Check approval — consistent with BulkUserController
+        Map<String, Object> payload = Map.of(
+                "request", request,
+                "csvContent", java.util.Base64.getEncoder().encodeToString(file.getBytes()),
+                "memberAttribute", memberAttribute,
+                "objectClass", objectClass);
+        Optional<PendingApproval> pendingApproval = approvalService.checkAndSubmitForApproval(
+                directoryId, request.parentDn(), principal,
+                ApprovalRequestType.BULK_IMPORT, payload);
+        if (pendingApproval.isPresent()) {
+            return ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body(Map.of(
+                            "message", "Bulk group import submitted for approval",
+                            "approvalId", pendingApproval.get().getId()));
+        }
+
         BulkImportResult result = service.bulkImportGroups(
                 directoryId, principal, file.getInputStream(), request,
                 memberAttribute, objectClass);

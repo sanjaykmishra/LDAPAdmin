@@ -40,6 +40,7 @@ public class LifecyclePlaybookService {
     private final LdapGroupService ldapGroupService;
     private final AuditService auditService;
     private final ApprovalNotificationService notificationService;
+    private final ApprovalWorkflowService approvalService;
     private final ObjectMapper objectMapper;
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
@@ -127,6 +128,22 @@ public class LifecyclePlaybookService {
     public PlaybookExecutionResponse execute(UUID directoryId, UUID playbookId,
                                               String targetDn, AuthPrincipal principal) {
         LifecyclePlaybook pb = requirePlaybook(directoryId, playbookId);
+
+        // Enforce the requireApproval flag (C3 fix)
+        if (pb.isRequireApproval()) {
+            UUID profileId = pb.getProfile() != null ? pb.getProfile().getId() : null;
+            Map<String, Object> payload = Map.of(
+                    "playbookId", playbookId.toString(),
+                    "playbookName", pb.getName(),
+                    "targetDn", targetDn);
+            PendingApproval pa = approvalService.submitForApproval(
+                    directoryId, profileId, principal,
+                    ApprovalRequestType.PLAYBOOK_EXECUTE, payload);
+            log.info("Playbook execution submitted for approval: playbook={}, target={}, approvalId={}",
+                    pb.getName(), targetDn, pa.getId());
+            return PlaybookExecutionResponse.pending(pb.getName(), pa.getId());
+        }
+
         DirectoryConnection dc = requireDirectory(directoryId);
         List<PlaybookStep> steps = stepRepo.findAllByPlaybookIdOrderByStepOrderAsc(playbookId);
 

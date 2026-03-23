@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Enforces the permission model for admins.
@@ -46,8 +47,7 @@ public class PermissionService {
      */
     private static final Set<FeatureKey> READONLY_DEFAULT_FEATURES = Set.of(
             FeatureKey.BULK_EXPORT,
-            FeatureKey.REPORTS_RUN,
-            FeatureKey.REPORTS_EXPORT
+            FeatureKey.REPORTS_RUN
     );
 
     private final AdminProfileRoleRepository        profileRoleRepo;
@@ -120,6 +120,19 @@ public class PermissionService {
             throw new AccessDeniedException(
                     "READ_ONLY role does not grant feature [" + feature.getDbValue() + "]");
         }
+    }
+
+    /**
+     * Returns the set of directory IDs the admin has access to (via profile roles).
+     * Returns empty set for superadmins (meaning unrestricted).
+     */
+    public Set<UUID> getAuthorizedDirectoryIds(AuthPrincipal principal) {
+        if (principal.isSuperadmin()) {
+            return Set.of();
+        }
+        return profileRoleRepo.findAllByAdminAccountId(principal.id()).stream()
+                .map(r -> r.getProfile().getDirectory().getId())
+                .collect(Collectors.toSet());
     }
 
 }

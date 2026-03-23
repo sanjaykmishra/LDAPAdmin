@@ -61,4 +61,8 @@ public class PendingApproval {
 
     @Column(name = "reviewed_at")
     private OffsetDateTime reviewedAt;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 }

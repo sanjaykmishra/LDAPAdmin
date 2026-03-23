@@ -19,5 +19,7 @@ public interface AdminProfileRoleRepository extends JpaRepository<AdminProfileRo
 
     boolean existsByAdminAccountIdAndProfileDirectoryId(UUID adminAccountId, UUID directoryId);
 
+    List<AdminProfileRole> findAllByProfileDirectoryId(UUID directoryId);
+
     void deleteByAdminAccountIdAndProfileId(UUID adminAccountId, UUID profileId);
 }

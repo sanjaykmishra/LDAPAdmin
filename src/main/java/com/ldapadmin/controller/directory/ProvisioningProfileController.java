@@ -2,6 +2,7 @@ package com.ldapadmin.controller.directory;
 
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.dto.profile.*;
+import com.ldapadmin.auth.PermissionService;
 import com.ldapadmin.service.PasswordGeneratorService;
 import com.ldapadmin.service.ProvisioningProfileService;
 import com.ldapadmin.entity.ProvisioningProfile;
@@ -46,6 +47,7 @@ public class ProvisioningProfileController {
 
     private final ProvisioningProfileService service;
     private final PasswordGeneratorService passwordGenerator;
+    private final PermissionService permissionService;
 
     // ── Profile CRUD (directory-scoped) ───────────────────────────────────────
 
@@ -122,7 +124,10 @@ public class ProvisioningProfileController {
 
     @PostMapping("/api/v1/profiles/{profileId}/generate-password")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
-    public Map<String, String> generatePassword(@PathVariable UUID profileId) {
+    public Map<String, String> generatePassword(
+            @PathVariable UUID profileId,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        permissionService.requireProfileAccess(principal, profileId);
         return Map.of("password", service.generatePassword(profileId));
     }
 

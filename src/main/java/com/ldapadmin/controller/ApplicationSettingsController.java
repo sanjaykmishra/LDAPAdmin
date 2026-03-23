@@ -6,6 +6,7 @@ import com.ldapadmin.dto.settings.UpdateApplicationSettingsRequest;
 import com.ldapadmin.service.ApplicationSettingsService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,8 +28,9 @@ public class ApplicationSettingsController {
 
     private final ApplicationSettingsService service;
 
-    /** Returns current settings (authenticated). */
+    /** Returns current settings (superadmin only). */
     @GetMapping
+    @PreAuthorize("hasRole('SUPERADMIN')")
     public ApplicationSettingsDto get() {
         return service.get();
     }
@@ -40,6 +42,7 @@ public class ApplicationSettingsController {
     }
 
     @PutMapping
+    @PreAuthorize("hasRole('SUPERADMIN')")
     public ApplicationSettingsDto upsert(@Valid @RequestBody UpdateApplicationSettingsRequest req) {
         return service.upsert(req);
     }

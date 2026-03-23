@@ -49,6 +49,17 @@ public class AdminManagementService {
                 .toList();
     }
 
+    /**
+     * Lists admins who have at least one profile role in the given directory.
+     */
+    public List<AdminAccountResponse> listAdminsByDirectory(UUID directoryId) {
+        return profileRoleRepo.findAllByProfileDirectoryId(directoryId).stream()
+                .map(apr -> apr.getAdminAccount())
+                .distinct()
+                .map(AdminAccountResponse::from)
+                .toList();
+    }
+
     public AdminAccountResponse getAdmin(UUID adminId) {
         return AdminAccountResponse.from(requireAccount(adminId));
     }

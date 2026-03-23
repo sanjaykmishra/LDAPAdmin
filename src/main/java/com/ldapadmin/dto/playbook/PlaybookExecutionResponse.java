@@ -28,4 +28,10 @@ public record PlaybookExecutionResponse(
                 e.getStartedAt(),
                 e.getCompletedAt());
     }
+
+    public static PlaybookExecutionResponse pending(String playbookName, UUID approvalId) {
+        return new PlaybookExecutionResponse(
+                approvalId, null, playbookName, null, null,
+                "PENDING_APPROVAL", null, null, null);
+    }
 }

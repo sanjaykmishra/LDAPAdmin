@@ -1,18 +1,23 @@
 package com.ldapadmin.controller;
 
+import com.ldapadmin.auth.AuthPrincipal;
+import com.ldapadmin.auth.PermissionService;
 import com.ldapadmin.dto.audit.AuditEventResponse;
 import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.service.AuditQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.OffsetDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -31,9 +36,14 @@ import java.util.UUID;
 public class AuditLogController {
 
     private final AuditQueryService queryService;
+    private final PermissionService permissionService;
 
     /**
      * Returns audit events with optional filters.
+     *
+     * <p>Non-superadmins can only query directories they have profile access to.
+     * If no directoryId filter is provided, results are restricted to the admin's
+     * authorized directories.</p>
      *
      * @param directoryId filter by directory (optional)
      * @param actorId     filter by admin actor UUID (optional)
@@ -46,6 +56,7 @@ public class AuditLogController {
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
     public Page<AuditEventResponse> get(
+            @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam(required = false) UUID directoryId,
             @RequestParam(required = false) UUID actorId,
             @RequestParam(required = false) AuditAction action,
@@ -56,6 +67,21 @@ public class AuditLogController {
                     OffsetDateTime to,
             @RequestParam(defaultValue = "0")  int page,
             @RequestParam(defaultValue = "50") int size) {
+
+        // Non-superadmins can only query their authorized directories
+        Set<UUID> authorizedDirs = permissionService.getAuthorizedDirectoryIds(principal);
+        if (!authorizedDirs.isEmpty()) {
+            if (directoryId != null && !authorizedDirs.contains(directoryId)) {
+                throw new AccessDeniedException(
+                        "No access to audit logs for directory [" + directoryId + "]");
+            }
+            if (directoryId == null) {
+                // Query each authorized directory and merge — or require directoryId
+                // For now, require non-superadmins to specify a directoryId filter
+                return queryService.queryForDirectories(
+                        authorizedDirs, actorId, action, targetDn, from, to, page, size);
+            }
+        }
 
         return queryService.query(directoryId, actorId, action, targetDn, from, to, page, size);
     }
