@@ -233,19 +233,76 @@ public class ApprovalWorkflowService {
             throw new IllegalStateException("Can only edit requests in PENDING status");
         }
 
+        // Block the original requester from editing their own pending request
+        if (editor.id().equals(pa.getRequestedBy())) {
+            throw new AccessDeniedException("Cannot edit your own approval request");
+        }
+
         if (!editor.isSuperadmin() && pa.getProfileId() != null
                 && !profileService.isApprover(pa.getProfileId(), editor.id())) {
             throw new AccessDeniedException("Not an approver for this profile");
         }
 
+        // Validate the new payload matches the original request type's schema
+        validatePayloadSchema(pa.getRequestType(), newPayload);
+
+        String oldPayload = pa.getPayload();
         pa.setPayload(newPayload);
         pa.setProvisionError(null); // clear error after edit
         approvalRepo.save(pa);
 
+        // Log the payload diff in the audit trail
+        Map<String, Object> diffDetail = new LinkedHashMap<>();
+        diffDetail.put("previousPayload", obfuscatePasswords(oldPayload));
+        diffDetail.put("updatedPayload", obfuscatePasswords(newPayload));
         auditService.record(editor, pa.getDirectoryId(), AuditAction.APPROVAL_REQUEST_EDITED,
-                null, buildAuditDetail(pa, null));
+                null, buildAuditDetail(pa, diffDetail));
 
         return toResponse(pa);
+    }
+
+    /**
+     * Validates that the new payload can be deserialized according to the
+     * expected schema for the given request type. Rejects payloads that
+     * don't match the original request structure.
+     */
+    private void validatePayloadSchema(ApprovalRequestType requestType, String payload) {
+        try {
+            JsonNode root = objectMapper.readTree(payload);
+            if (root == null || root.isMissingNode()) {
+                throw new IllegalArgumentException("Payload must be valid JSON");
+            }
+            switch (requestType) {
+                case USER_CREATE -> objectMapper.treeToValue(root, CreateEntryRequest.class);
+                case BULK_IMPORT -> {
+                    if (!root.has("request") || !root.has("csvContent")) {
+                        throw new IllegalArgumentException(
+                                "BULK_IMPORT payload must contain 'request' and 'csvContent' fields");
+                    }
+                    objectMapper.treeToValue(root.get("request"), BulkImportRequest.class);
+                }
+                case USER_MOVE -> {
+                    if (!root.has("dn") || !root.has("request")) {
+                        throw new IllegalArgumentException(
+                                "USER_MOVE payload must contain 'dn' and 'request' fields");
+                    }
+                    objectMapper.treeToValue(root.get("request"), MoveUserRequest.class);
+                }
+                case GROUP_MEMBER_ADD -> {
+                    for (String field : List.of("groupDn", "memberAttribute", "memberValue")) {
+                        if (!root.has(field)) {
+                            throw new IllegalArgumentException(
+                                    "GROUP_MEMBER_ADD payload must contain '" + field + "' field");
+                        }
+                    }
+                }
+                case SELF_REGISTRATION -> { /* no structural validation needed */ }
+                case PLAYBOOK_EXECUTE -> { /* no structural validation needed */ }
+            }
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Payload does not match expected schema for "
+                    + requestType + ": " + e.getMessage(), e);
+        }
     }
 
     @Transactional(readOnly = true)
