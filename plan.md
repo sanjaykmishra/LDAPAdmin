@@ -1,196 +1,152 @@
-# Approval Workflow for User Creation
+# Password Policy & Generation — Implementation Plan
 
-## Overview
-Add an approval workflow so that user creation (individual + bulk import) requires
-approval by a designated approver before the LDAP entry is actually created.
-The workflow is configurable per-realm.
+## Summary
+Add profile-level password policy configuration, server-side password generation, email delivery of generated passwords, and a password visibility toggle on self-service forms.
 
 ---
 
-## 1. Database Changes (new Flyway migration)
+## 1. Database Migration
 
-### New table: `realm_settings`
-Stores per-realm configuration flags.
+**New file:** `V30__profile_password_policy.sql`
 
+Add columns to `provisioning_profiles`:
 ```sql
-CREATE TABLE realm_settings (
-    id        UUID        NOT NULL DEFAULT gen_random_uuid(),
-    realm_id  UUID        NOT NULL,
-    key       VARCHAR(100) NOT NULL,
-    value     VARCHAR(500) NOT NULL,
-    CONSTRAINT pk_realm_settings PRIMARY KEY (id),
-    CONSTRAINT uq_realm_setting  UNIQUE (realm_id, key),
-    CONSTRAINT fk_rs_realm FOREIGN KEY (realm_id) REFERENCES realms (id) ON DELETE CASCADE
-);
+password_length          INT     NOT NULL DEFAULT 16,
+password_uppercase       BOOLEAN NOT NULL DEFAULT true,
+password_lowercase       BOOLEAN NOT NULL DEFAULT true,
+password_digits          BOOLEAN NOT NULL DEFAULT true,
+password_special         BOOLEAN NOT NULL DEFAULT true,
+password_special_chars   VARCHAR(50) NOT NULL DEFAULT '!@#$%^&*',
+email_password_to_user   BOOLEAN NOT NULL DEFAULT false
 ```
 
-Initial key: `approval.user_create.enabled` → `true` / `false`
+No enum for password mode — the admin create form always shows a manual password field with a "Generate" button next to it. The generation settings control what the button produces.
 
-### New table: `pending_approvals`
-Stores pending user creation requests awaiting approval.
+---
 
-```sql
-CREATE TABLE pending_approvals (
-    id              UUID         NOT NULL DEFAULT gen_random_uuid(),
-    directory_id    UUID         NOT NULL,
-    realm_id        UUID         NOT NULL,
-    requested_by    UUID         NOT NULL,   -- account.id of requester
-    status          VARCHAR(20)  NOT NULL DEFAULT 'PENDING',  -- PENDING, APPROVED, REJECTED
-    request_type    VARCHAR(30)  NOT NULL,   -- USER_CREATE, BULK_IMPORT
-    payload         JSONB        NOT NULL,   -- serialised create request or bulk import data
-    reject_reason   TEXT,
-    reviewed_by     UUID,                    -- account.id of approver/rejecter
-    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    reviewed_at     TIMESTAMPTZ,
-    CONSTRAINT pk_pending_approvals PRIMARY KEY (id),
-    CONSTRAINT fk_pa_directory FOREIGN KEY (directory_id) REFERENCES directory_connections (id) ON DELETE CASCADE,
-    CONSTRAINT fk_pa_realm     FOREIGN KEY (realm_id)     REFERENCES realms (id) ON DELETE CASCADE,
-    CONSTRAINT fk_pa_requester FOREIGN KEY (requested_by) REFERENCES accounts (id),
-    CONSTRAINT fk_pa_reviewer  FOREIGN KEY (reviewed_by)  REFERENCES accounts (id),
-    CONSTRAINT chk_pa_status   CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED'))
-);
-CREATE INDEX idx_pa_realm_status ON pending_approvals (realm_id, status);
+## 2. Backend Entity
+
+**File:** `ProvisioningProfile.java`
+
+Add the 7 new fields with JPA annotations matching the migration columns.
+
+---
+
+## 3. Backend DTOs
+
+**Files:** `CreateProfileRequest.java`, `UpdateProfileRequest.java`, `ProfileResponse.java`
+
+Add the 7 fields to all three DTOs. Use `@JsonProperty` defaults where appropriate so existing clients that don't send these fields get sensible defaults.
+
+---
+
+## 4. Backend Service — `applyCommonFields()`
+
+**File:** `ProvisioningProfileService.java`
+
+Update `applyCommonFields()` to copy the 7 new fields from request DTO to entity.
+
+Update `toResponse()` (or the mapping method) to include the new fields in `ProfileResponse`.
+
+---
+
+## 5. Password Generator Service
+
+**New file:** `PasswordGeneratorService.java`
+
+- `String generate(ProvisioningProfile profile)` — generates a password using the profile's settings
+- Uses `java.security.SecureRandom`
+- Builds a character pool from the enabled classes (upper/lower/digit/special)
+- Guarantees at least one character from each enabled class
+- Validates against LDAP `pwdMinLength` if available (via `PasswordPolicyService`)
+- Takes the greater of `profile.passwordLength` and LDAP `pwdMinLength`
+
+---
+
+## 6. Password Generation API Endpoint
+
+**File:** `ProvisioningProfileController.java`
+
+```
+POST /api/v1/profiles/{profileId}/generate-password
 ```
 
-### New feature key
-Add `APPROVAL_MANAGE` to the `FeatureKey` enum and DB constraint — grants the
-ability to approve/reject pending requests (designated approver permission).
+Response: `{ "password": "xK9#mP2v..." }`
 
-Update `admin_feature_permissions` constraint to include `'approval.manage'`.
+This endpoint is called by the admin create form's "Generate" button. The generated password is returned to the frontend (over HTTPS) and populated into the password field.
 
 ---
 
-## 2. Backend: New Entities
+## 7. Email Password to User
 
-### `RealmSetting` entity
-- Fields: `id`, `realm` (ManyToOne), `key`, `value`
-- Repository: `RealmSettingRepository` with `findByRealmIdAndKey()`
+**File:** `ApprovalNotificationService.java` (or a new `UserNotificationService.java`)
 
-### `PendingApproval` entity
-- Fields: `id`, `directoryId`, `realmId`, `requestedBy`, `status` (enum),
-  `requestType` (enum), `payload` (JSON string), `rejectReason`,
-  `reviewedBy`, `createdAt`, `reviewedAt`
-- Enums: `ApprovalStatus { PENDING, APPROVED, REJECTED }`,
-  `ApprovalRequestType { USER_CREATE, BULK_IMPORT }`
-- Repository: `PendingApprovalRepository`
-  - `findByRealmIdAndStatus(realmId, status)`
-  - `findByDirectoryIdAndStatus(directoryId, status)`
-  - `countByRealmIdAndStatus(realmId, PENDING)` (for badge counts)
+Add method: `sendPasswordEmail(String recipientEmail, String userName, String password, String directoryName)`
+
+**Called from:** `ProvisioningProfileService.provisionUser()` — after successful LDAP user creation, if `profile.emailPasswordToUser` is true and the user has a `mail` attribute, send the password via email.
 
 ---
 
-## 3. Backend: Service Layer
+## 8. Frontend — Profile Editor (Password Policy Settings)
 
-### `ApprovalWorkflowService`
-```java
-@Service
-public class ApprovalWorkflowService {
-    // Check if approval is required for a realm
-    boolean isApprovalRequired(UUID realmId);
+**File:** `SuperadminProfilesView.vue`
 
-    // Submit a user-create request for approval (returns PendingApproval)
-    PendingApproval submitForApproval(UUID directoryId, UUID realmId,
-        AuthPrincipal requester, ApprovalRequestType type, Object payload);
+Add password generation settings to the **General** tab (below existing fields):
 
-    // List pending approvals (filtered by realms the caller can approve)
-    List<PendingApproval> listPending(UUID directoryId, AuthPrincipal principal);
+- **Password Generation Settings** fieldset:
+  - Password Length (number input, min 8, max 128)
+  - Character classes: 4 checkboxes (Uppercase, Lowercase, Digits, Special)
+  - Special Characters (text input, shown when Special is checked)
+  - "Email generated password to user" checkbox
 
-    // Approve: creates the LDAP entry from the stored payload
-    PendingApproval approve(UUID approvalId, AuthPrincipal approver);
-
-    // Reject with reason
-    PendingApproval reject(UUID approvalId, AuthPrincipal approver, String reason);
-}
-```
-
-**Approve flow:**
-1. Load the `PendingApproval` record
-2. Verify approver ≠ requester
-3. Verify approver has `APPROVAL_MANAGE` feature permission
-4. Deserialise the payload
-5. Execute the LDAP create via `LdapOperationService`
-6. Update status → APPROVED, set `reviewedBy` and `reviewedAt`
-7. Audit the action
-
-### Integration with existing user creation
-
-Modify `UserController.createUser()`:
-- Before creating, check `approvalWorkflowService.isApprovalRequired(realmId)`
-- If required: call `submitForApproval()` and return **202 Accepted** with the
-  pending approval ID instead of creating immediately
-- If not required: proceed as before (201 Created)
-
-Modify `BulkUserController.importUsers()`:
-- Same check per realm
-- If required: store the entire import request + CSV as the payload, return 202
-- If not required: proceed as before
-
-### `RealmSettingService`
-- `getSetting(realmId, key)` → Optional<String>
-- `setSetting(realmId, key, value)`
-- `isApprovalRequired(realmId)` → boolean (convenience)
+Update `emptyProfile()` to include defaults for the new fields.
+Update the `openEdit()` mapping to include the new fields.
 
 ---
 
-## 4. Backend: Controller
+## 9. Frontend — Admin User Create Form
 
-### `ApprovalController` — under `/api/v1/directories/{directoryId}/approvals`
+**File:** `UserForm.vue`
 
-| Method | Path | Description | Permission |
-|--------|------|-------------|------------|
-| GET    | `/`  | List pending approvals for this directory | APPROVAL_MANAGE |
-| GET    | `/{id}` | Get approval details | APPROVAL_MANAGE |
-| POST   | `/{id}/approve` | Approve a pending request | APPROVAL_MANAGE |
-| POST   | `/{id}/reject` | Reject with reason body | APPROVAL_MANAGE |
+For the `userPassword` field (when `inputType === 'PASSWORD'`):
+- Add a "Generate" button (key icon) next to the password input
+- On click: call `POST /profiles/{profileId}/generate-password`
+- Populate the returned password into the field
+- Temporarily show the password in cleartext so the admin can see/copy it
+- Add a copy-to-clipboard button
 
-### `RealmSettingController` — extend existing RealmController
-
-| Method | Path | Description | Permission |
-|--------|------|-------------|------------|
-| GET    | `/realms/{realmId}/settings` | Get realm settings | SUPERADMIN |
-| PUT    | `/realms/{realmId}/settings` | Update realm settings | SUPERADMIN |
+This requires passing the `profileId` as a prop to `UserForm.vue`.
 
 ---
 
-## 5. Frontend Changes
+## 10. Frontend — Password Visibility Toggle (Self-Registration & Self-Service)
 
-### New API module: `frontend/src/api/approvals.js`
-```js
-export const listPendingApprovals = (dirId) => client.get(`/directories/${dirId}/approvals`)
-export const getApproval = (dirId, id) => client.get(`/directories/${dirId}/approvals/${id}`)
-export const approveRequest = (dirId, id) => client.post(`/directories/${dirId}/approvals/${id}/approve`)
-export const rejectRequest = (dirId, id, reason) => client.post(`/directories/${dirId}/approvals/${id}/reject`, { reason })
-```
+**Files:** `RegisterView.vue`, self-service password change form
 
-### New view: `PendingApprovalsView.vue`
-- Table of pending requests with: requester, type, created date, summary
-- Click to expand/view full payload details
-- Approve / Reject buttons with confirmation
-- Badge count on nav item showing pending count
+Add an eye icon button to password fields:
+- On mousedown/touchstart: change input type from `password` to `text`
+- On mouseup/touchend/mouseleave: change back to `password`
+- Uses press-and-hold behavior (shows password only while pressed)
 
-### Modify user creation flow
-- Handle 202 response from create user → show "Submitted for approval" notification
-- Handle 202 from bulk import → show "Import submitted for approval" notification
-
-### Realm settings UI
-- Add toggle in realm edit form: "Require approval for user creation"
-
-### Navigation
-- Add "Pending Approvals" nav item (visible when user has APPROVAL_MANAGE)
-- Show badge with pending count
+This is a UI-only change — wrap the password input in a relative container with an absolutely-positioned icon button.
 
 ---
 
-## 6. Implementation Order
+## File Change Summary
 
-1. **Database migration** — new tables + feature key
-2. **Entities + Repositories** — RealmSetting, PendingApproval
-3. **RealmSettingService** — per-realm config
-4. **ApprovalWorkflowService** — core logic
-5. **ApprovalController** — REST endpoints
-6. **Modify UserController** — intercept creates when approval required
-7. **Modify BulkUserController** — intercept imports when approval required
-8. **Frontend API + PendingApprovalsView** — approval UI
-9. **Frontend user create handling** — handle 202 responses
-10. **Realm settings UI** — toggle in realm edit form
-11. **Tests** — service + controller tests
+| File | Change |
+|------|--------|
+| `V30__profile_password_policy.sql` | **New** — migration |
+| `ProvisioningProfile.java` | Add 7 fields |
+| `CreateProfileRequest.java` | Add 7 fields |
+| `UpdateProfileRequest.java` | Add 7 fields |
+| `ProfileResponse.java` | Add 7 fields |
+| `ProvisioningProfileService.java` | Update `applyCommonFields()` and response mapping |
+| `PasswordGeneratorService.java` | **New** — generation logic |
+| `ProvisioningProfileController.java` | Add generate-password endpoint |
+| `ApprovalNotificationService.java` | Add `sendPasswordEmail()` |
+| `SuperadminProfilesView.vue` | Password policy config UI |
+| `profiles.js` (frontend API) | Add `generatePassword()` API call |
+| `UserForm.vue` | Generate button + show/copy for admin create |
+| `RegisterView.vue` | Eye icon visibility toggle |
+| Self-service password change view | Eye icon visibility toggle |
