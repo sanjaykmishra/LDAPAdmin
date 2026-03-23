@@ -111,6 +111,8 @@ public class GroupController {
         return service.updateGroup(directoryId, principal, dn, req);
     }
 
+    // NOTE (M4): Group delete and member remove intentionally have NO approval workflow.
+    // See UserController for the full rationale. Gated by feature permissions only.
     @DeleteMapping("/entry")
     @RequiresFeature(FeatureKey.GROUP_CREATE_DELETE)
     public ResponseEntity<Void> delete(

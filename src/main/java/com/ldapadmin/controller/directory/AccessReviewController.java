@@ -22,7 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 import java.util.UUID;
@@ -42,7 +42,7 @@ public class AccessReviewController {
     @RequiresFeature(FeatureKey.ACCESS_REVIEW_MANAGE)
     public List<AdminAccountResponse> listReviewers(
             @DirectoryId @PathVariable UUID directoryId) {
-        return adminService.listAdmins();
+        return adminService.listAdminsByDirectory(directoryId);
     }
 
     // ── Campaign CRUD ────────────────────────────────────────────────────────
@@ -58,13 +58,11 @@ public class AccessReviewController {
 
     @PostMapping
     @RequiresFeature(FeatureKey.ACCESS_REVIEW_MANAGE)
+    @PreAuthorize("hasRole('SUPERADMIN')")
     public ResponseEntity<CampaignDetailDto> create(
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody CreateCampaignRequest req) {
-        if (!principal.isSuperadmin()) {
-            throw new AccessDeniedException("Only superadmins can create access review campaigns");
-        }
         var campaign = campaignService.create(directoryId, req, principal);
         return ResponseEntity.status(HttpStatus.CREATED).body(campaignService.get(campaign.getId()));
     }

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -50,6 +51,27 @@ public class AuditQueryService {
         PageRequest pageable = PageRequest.of(page, clampSize(size));
         String actionStr = action != null ? action.getDbValue() : null;
         return auditRepo.findAll(directoryId, actorId, actionStr, targetDn, from, to, pageable)
+                .map(AuditEventResponse::from);
+    }
+
+    /**
+     * Queries audit events restricted to a set of authorized directories.
+     * Used for non-superadmins who haven't specified a directoryId filter.
+     */
+    @Transactional(readOnly = true)
+    public Page<AuditEventResponse> queryForDirectories(
+            Set<UUID> directoryIds,
+            UUID actorId,
+            AuditAction action,
+            String targetDn,
+            OffsetDateTime from,
+            OffsetDateTime to,
+            int page,
+            int size) {
+
+        PageRequest pageable = PageRequest.of(page, clampSize(size));
+        String actionStr = action != null ? action.getDbValue() : null;
+        return auditRepo.findAllByDirectoryIds(directoryIds, actorId, actionStr, targetDn, from, to, pageable)
                 .map(AuditEventResponse::from);
     }
 

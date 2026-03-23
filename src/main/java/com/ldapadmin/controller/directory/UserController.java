@@ -135,6 +135,13 @@ public class UserController {
         return service.updateUser(directoryId, principal, dn, req);
     }
 
+    // NOTE (M4): The following destructive operations (delete, enable/disable, password
+    // reset, bulk attribute update) intentionally have NO approval workflow. This is a
+    // deliberate product decision: approval gates cover creation and movement workflows
+    // where new accounts/access are provisioned. Destructive operations are gated only
+    // by feature permissions (USER_DELETE, USER_ENABLE_DISABLE, USER_RESET_PASSWORD,
+    // BULK_ATTRIBUTE_UPDATE). If approval is needed for these in the future, wire them
+    // through ApprovalWorkflowService.checkAndSubmitForApproval() with new request types.
     @DeleteMapping("/entry")
     @RequiresFeature(FeatureKey.USER_DELETE)
     public ResponseEntity<Void> delete(
