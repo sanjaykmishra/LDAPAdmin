@@ -1,0 +1,881 @@
+================================================================================
+  PLAN: Permission & Authorization Architecture Audit + Remediation
+================================================================================
+
+STATUS: Draft — not yet implemented
+DATE:   2026-03-23
+
+================================================================================
+  PART I — PROFILE-VS-DIRECTORY SCOPE MISMATCH
+================================================================================
+
+--------------------------------------------------------------------------------
+1. PROBLEM STATEMENT
+--------------------------------------------------------------------------------
+
+Admins are assigned to provisioning profiles via AdminProfileRole, where each
+profile has a targetOuDn (e.g. ou=engineering,dc=example,dc=com). However, most
+operations gate access using PermissionService.requireDirectoryAccess(), which
+only checks whether the admin has a role in ANY profile belonging to that
+directory. Once past that gate, no further DN-level restriction is applied.
+
+Consequence: an admin scoped to profile "Engineering" (ou=engineering) can:
+  - Search/list users in ou=sales
+  - Bulk-import users into ou=sales
+  - Bulk-export the entire directory tree
+  - Execute playbooks against users in any OU
+  - Create/view access review campaigns for any group in the directory
+
+This defeats the purpose of profile-scoped admin assignment.
+
+Affected call sites:
+  - LdapOperationService.searchUsers()           — baseDn from client, unchecked
+  - BulkUserController.importUsers()              — parentDn from client, unchecked
+  - BulkUserController.exportUsers()              — baseDn from client, unchecked
+  - LifecyclePlaybookService.execute()            — targetDn from client, unchecked
+  - LifecyclePlaybookService.preview()            — targetDn from client, unchecked
+  - AccessReviewCampaignService.create()          — groupDn from client, unchecked
+
+--------------------------------------------------------------------------------
+2. OPTION A — ENFORCE DN-LEVEL PROFILE SCOPING (incremental)
+--------------------------------------------------------------------------------
+
+Phase 1: Core infrastructure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+a) Add to PermissionService:
+
+     List<String> getAuthorizedOuDns(AuthPrincipal principal, UUID directoryId)
+       - Returns the set of targetOuDn values from all profiles the admin has
+         access to in this directory.
+       - Superadmins return empty list (meaning "unrestricted").
+
+     void requireDnWithinScope(AuthPrincipal p, UUID dirId, String targetDn)
+       - Calls getAuthorizedOuDns().
+       - If the list is non-empty, asserts that targetDn ends with (is a
+         descendant of) at least one of the authorized OUs.
+       - Throws AccessDeniedException otherwise.
+
+     void requireDnWithinScope(AuthPrincipal p, UUID dirId, List<String> dns)
+       - Batch variant for multi-target operations (playbook batch execute,
+         bulk import).
+
+b) Add to AdminProfileRoleRepository:
+
+     @Query("SELECT DISTINCT p.targetOuDn FROM AdminProfileRole apr "
+          + "JOIN apr.profile p "
+          + "WHERE apr.adminAccount.id = :adminId "
+          + "AND p.directory.id = :directoryId AND p.enabled = true")
+     List<String> findAuthorizedOuDns(@Param("adminId") UUID adminId,
+                                      @Param("directoryId") UUID directoryId);
+
+Phase 2: Wire into high-risk paths (playbooks + bulk import)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+c) LifecyclePlaybookService.execute() — after line 130:
+     permissionService.requireDnWithinScope(principal, directoryId, targetDn);
+
+d) LifecyclePlaybookService.preview() — same treatment.
+
+e) BulkUserController.importUsers() — after line 91:
+     permissionService.requireDnWithinScope(principal, directoryId, request.parentDn());
+
+Phase 3: Wire into read paths
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+f) LdapOperationService.searchUsers() — constrain baseDn:
+     If baseDn is null or equals the directory root, replace it with the union
+     of the admin's authorized OUs. Execute one LDAP search per OU and merge
+     results. If baseDn is explicitly provided, run requireDnWithinScope on it.
+
+g) BulkUserController.exportUsers() — same baseDn constraint as (f).
+
+Phase 4: Wire into access reviews
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+h) AccessReviewCampaignService.create() — for each groupDn in the request,
+     resolve its parent OU and call requireDnWithinScope. This ensures an admin
+     can only create review campaigns for groups within their profile OUs.
+
+i) Consider adding an optional profileId field to AccessReviewCampaign for
+     organizational filtering, but this is not strictly required if DN checks
+     are in place.
+
+Phase 5: Tests
+~~~~~~~~~~~~~~~
+j) Unit tests for PermissionService.requireDnWithinScope:
+     - Admin in profile with targetOuDn=ou=eng → allowed for cn=jdoe,ou=eng
+     - Same admin → denied for cn=jdoe,ou=sales
+     - Admin in two profiles → allowed for either OU
+     - Superadmin → always allowed
+     - Edge: DN case-insensitivity (LDAP DNs are case-insensitive)
+
+k) Integration tests for each wired call site.
+
+Estimated scope: ~150-200 lines of new code, touches 5-6 files.
+
+--------------------------------------------------------------------------------
+3. ALTERNATIVE: ADMINS ARE DIRECTORY-SCOPED; PROFILES ARE PROVISIONING-ONLY
+--------------------------------------------------------------------------------
+
+Instead of tightening profile scoping, we accept the current model and make it
+explicit: an admin granted access to ANY profile in a directory has full
+directory-level visibility and operational access. Profiles become purely a
+provisioning mechanism — they define HOW users are created (which OU, which
+object classes, which groups, which form fields) but not WHO the admin can see
+or act on.
+
+What this means in practice:
+
+  Permissions:
+    - AdminProfileRole still exists, but its semantic is "this admin can
+      provision users using this profile" rather than "this admin can only
+      see users in this profile's OU."
+    - An admin with role on profile "Engineering" can still view, export,
+      and run playbooks on users in ou=sales — because they have directory
+      access.
+    - Profile assignment becomes an operational capability ("you can create
+      engineers") not a visibility boundary.
+
+  What you gain:
+    - Simplicity. No DN-scoping logic to maintain. No per-search OU
+      filtering. No multi-OU query merging. No edge cases around users who
+      live outside any profile's OU (service accounts, legacy entries).
+    - Cross-OU operations just work. An offboarding playbook that moves a
+      user from ou=engineering to ou=disabled doesn't need an exception.
+      Bulk exports for compliance cover the whole directory.
+    - Fewer authorization failures in legitimate workflows. Admins won't be
+      blocked when a manager needs to review a cross-team transfer.
+
+  What you lose:
+    - OU-level isolation between admin teams. If you have HR admins who
+      should only see ou=hr and IT admins who should only see ou=it, this
+      model doesn't support that — both see the full directory.
+    - Least-privilege at the data level. An admin who only needs to provision
+      engineers can browse all users. This may not satisfy audit requirements
+      in regulated environments (SOX, HIPAA, ISO 27001).
+    - Profile becomes a weaker abstraction. It no longer answers "what can
+      this admin do?" — only "what templates can this admin use to create?"
+
+  Where this model works well:
+    - Small-to-medium orgs with a single admin team per directory
+    - Environments where all admins are trusted with directory-wide visibility
+    - Setups where directories already map 1:1 to organizational boundaries
+      (e.g. one AD domain per business unit)
+
+  Where this model breaks down:
+    - Multi-tenant or delegated-admin scenarios within a single directory
+    - Compliance environments requiring demonstrable access segmentation
+    - Large directories where admin teams are organized by OU responsibility
+
+  What you'd want to do if you go this route:
+    1. Rename or document AdminProfileRole to clarify it grants directory
+       access + profile provisioning capability (not OU-scoped visibility).
+    2. Remove the profile_id FK from LifecyclePlaybook — playbooks become
+       directory-level resources, full stop.
+    3. Remove PermissionService.requireProfileAccess() from any path that
+       isn't directly about provisioning (form rendering, template selection).
+    4. Update the admin UI to stop showing profile-based filtering in user
+       lists (since it would be misleading about actual access boundaries).
+    5. Add a clear note in admin documentation: "Profile assignment controls
+       which provisioning templates an admin can use. It does not restrict
+       which users they can view or manage."
+
+--------------------------------------------------------------------------------
+4. RECOMMENDATION (PROFILE SCOPING)
+--------------------------------------------------------------------------------
+
+If the deployment model is "multiple admin teams sharing one directory with
+different OU responsibilities" → go with Option A. The incremental approach
+(phases 1-2 first) gets the highest-risk paths locked down quickly.
+
+If the deployment model is "one trusted admin team per directory, profiles are
+just convenience groupings" → go with the alternative and make the semantics
+explicit. Trying to enforce OU boundaries that nobody actually needs adds
+complexity for no security benefit.
+
+A hybrid is also viable: add a boolean flag to DirectoryConnection like
+`enforceProfileScoping` (default false). When true, activate the DN checks
+from Option A. When false, profiles are provisioning-only. This lets each
+deployment choose its model, but adds a configuration surface that must be
+documented and tested.
+
+
+================================================================================
+  PART II — BROADER PERMISSION/ACTION AUDIT FINDINGS
+================================================================================
+
+Full architecture audit performed 2026-03-23. Findings are grouped by severity
+and include compounding relationships.
+
+--------------------------------------------------------------------------------
+5. CRITICAL FINDINGS
+--------------------------------------------------------------------------------
+
+C1. Application settings writable by any admin
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   ApplicationSettingsController.java:42
+  Route:  PUT /api/v1/settings
+  Issue:  No @PreAuthorize annotation. Falls through to SecurityConfig catch-all
+          which permits any ADMIN or SUPERADMIN. A regular admin can modify:
+            - SMTP configuration
+            - S3 credentials
+            - OIDC client settings
+            - Session timeout
+            - superadminBypassApproval flag
+  Impact: An admin enables superadminBypassApproval → any superadmin's future
+          operations auto-approve without oversight.
+  Fix:    Add @PreAuthorize("hasRole('SUPERADMIN')") to both get() and upsert()
+          methods in ApplicationSettingsController.
+
+C2. Approval bypass via unprovisioned OUs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Files:  UserController.java:79-96
+          BulkUserController.java:93-106
+          GroupController.java:142-167
+  Issue:  Approval check is conditional on findProfileForDn() returning a match:
+            Optional<ProvisioningProfile> profile =
+                approvalService.findProfileForDn(directoryId, req.dn());
+            if (profile.isPresent() && approvalService.isApprovalRequired(...))
+          If the target DN doesn't match any profile's targetOuDn, the operation
+          executes immediately — no approval, no record of the bypass.
+  Attack: Admin targets ou=temp (no profile configured) → creates users with no
+          approval gate. Bulk import variant can create hundreds of accounts.
+  Fix:    Two options:
+          (a) Deny operations targeting DNs that don't resolve to a profile
+              (strict — may break legitimate use cases for service accounts).
+          (b) Require approval for ALL operations when no profile is resolved,
+              routing to a directory-level default approver.
+          Either way, log when profile resolution fails.
+
+C3. Playbook requireApproval flag is stored but never enforced
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   LifecyclePlaybookService.java:127-189
+  Entity: LifecyclePlaybook.requireApproval (boolean field)
+  Issue:  execute() never checks pb.isRequireApproval(). Any ADMIN can execute
+          a playbook that disables accounts, removes group memberships, or
+          modifies attributes — even when the playbook was explicitly configured
+          to require approval.
+  Fix:    At the top of execute(), check:
+            if (pb.isRequireApproval()) {
+                approvalService.submitForApproval(
+                    directoryId, pb.getProfile().getId(), principal,
+                    ApprovalRequestType.PLAYBOOK_EXECUTION, payload);
+                return pendingResponse;
+            }
+
+--------------------------------------------------------------------------------
+6. HIGH FINDINGS
+--------------------------------------------------------------------------------
+
+H1. Bulk group-member add bypasses single-member approval
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   GroupController.java:180-202
+  Route:  POST /api/v1/directories/{directoryId}/groups/members/bulk
+  Issue:  Single-member endpoint (POST /groups/members) checks approval at the
+          controller level. The bulk variant iterates and calls
+          service.addGroupMember() directly, skipping the approval check.
+  Fix:    Extract the approval-check logic into a shared method. Call it for
+          each member in the bulk loop, or submit the entire batch as one
+          approval request.
+
+H2. Approval payload tampering by approvers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   ApprovalWorkflowService.java:227-249
+  Route:  PUT /api/v1/directories/{directoryId}/approvals/{approvalId}/payload
+  Issue:  Approvers can modify the payload (user attributes, target DN, group
+          memberships) before approving. No validation that the new payload
+          matches the original request. Additionally, the original requester can
+          edit their own pending request — the self-approval guard (line 146-148)
+          only applies to approve(), not updatePayload().
+  Fix:    (a) Validate payload schema matches the original request type.
+          (b) Prevent the original requester from editing their own payload.
+          (c) Record payload diffs in the approval audit trail.
+
+H3. Race condition on concurrent approval
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   ApprovalWorkflowService.java:137-189
+  Issue:  approve() checks status == PENDING, then executes the LDAP operation,
+          then sets status to APPROVED. No pessimistic lock or @Version
+          optimistic check. Two concurrent approve calls can both pass the
+          status check and execute the operation twice.
+  Fix:    Add @Version to PendingApproval entity, or use a pessimistic write
+          lock:
+            @Lock(LockModeType.PESSIMISTIC_WRITE)
+            Optional<PendingApproval> findByIdForUpdate(UUID id);
+
+H4. REPORTS_EXPORT feature key defined but never enforced
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   FeatureKey.java:25 (definition)
+          PermissionService.java:49 (in READONLY_DEFAULT_FEATURES)
+  Issue:  No @RequiresFeature(FeatureKey.REPORTS_EXPORT) annotation exists
+          anywhere. The feature key is dead code — if a report export endpoint
+          exists, it's ungated.
+  Fix:    Either add @RequiresFeature(REPORTS_EXPORT) to the appropriate
+          endpoint, or remove the enum value if no separate export path exists.
+
+H5. generatePassword lacks profile-scope check
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   ProvisioningProfileController.java:123-127
+  Route:  POST /api/v1/profiles/{profileId}/generate-password
+  Issue:  Accepts any profileId with only hasAnyRole('ADMIN', 'SUPERADMIN').
+          No check that the admin has access to that profile. Leaks password
+          policy details (length, character requirements) for profiles outside
+          the admin's scope.
+  Fix:    Add permissionService.requireProfileAccess(principal, profileId)
+          before generating.
+
+--------------------------------------------------------------------------------
+7. MEDIUM FINDINGS
+--------------------------------------------------------------------------------
+
+M1. Audit log not directory-scoped for non-superadmins
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   AuditLogController.java:47
+  Issue:  hasAnyRole('ADMIN', 'SUPERADMIN') with no directory filtering. A
+          regular admin can query audit records for directories they have no
+          profile access to, exposing user DNs, actions, and operational
+          history across the entire deployment.
+  Fix:    For non-superadmins, intersect the query's directoryId filter with
+          the admin's authorized directories (from their profile roles).
+
+M2. Access review listReviewers returns all admins
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   AccessReviewController.java:42-46
+  Route:  GET /api/v1/directories/{directoryId}/access-reviews/reviewers
+  Issue:  Returns all admin accounts regardless of directory. Leaks the full
+          admin roster to any admin with ACCESS_REVIEW_MANAGE feature access.
+  Fix:    Filter to admins who have at least one profile role in the given
+          directoryId.
+
+M3. Campaign creation superadmin check is buried at runtime
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   AccessReviewController.java:60-70
+  Issue:  Checks principal.isSuperadmin() inside the method body instead of
+          declaring @PreAuthorize("hasRole('SUPERADMIN')"). The authorization
+          rule isn't visible at the API contract level and could be bypassed
+          if the service method is called from another code path.
+  Fix:    Replace the runtime check with @PreAuthorize("hasRole('SUPERADMIN')")
+          on the controller method.
+
+M4. No approval coverage for destructive operations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Files:  UserController.java:128-186, GroupController.java:115-123
+  Issue:  Approval workflows only cover: user create, user move, bulk import,
+          group member add, self-registration. These have NO approval path:
+            - User delete, enable/disable, attribute update, password reset
+            - Group delete, member remove
+            - Bulk attribute update
+  Note:   This may be intentional (approval for destructive ops is uncommon
+          in LDAP tooling). Flag for product decision — not necessarily a bug,
+          but should be a conscious choice documented somewhere.
+
+M5. Bulk group import has no approval workflow
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   BulkGroupController.java:63-78
+  Route:  POST /api/v1/directories/{directoryId}/groups/import
+  Issue:  Has @RequiresFeature(BULK_IMPORT) but unlike BulkUserController,
+          does not check for approval. Hundreds of groups can be created
+          without review.
+  Fix:    Add approval check consistent with BulkUserController, or document
+          the intentional difference.
+
+--------------------------------------------------------------------------------
+8. COMPOUNDING RELATIONSHIPS
+--------------------------------------------------------------------------------
+
+These findings interact to create escalation paths:
+
+  C1 + C3: Admin modifies global settings to enable superadminBypassApproval.
+           Superadmin then executes playbooks with requireApproval=true — the
+           flag is ignored anyway (C3), but even if it were enforced, the
+           bypass setting (C1) would auto-approve.
+
+  C2 + H1: Admin targets an OU with no provisioning profile. Approval never
+           triggers for single operations (C2). Bulk group-member add also
+           skips approval (H1). Combined: mass group membership changes with
+           zero oversight.
+
+  H2 + H3: Approver tampers with payload (H2) while a second approver
+           concurrently approves the original (H3). Result: the tampered
+           version executes once AND the original executes once — two LDAP
+           operations, one with modified data.
+
+  C2 + M4: Operations on unprovisioned OUs bypass approval (C2), and
+           destructive operations have no approval path at all (M4). An admin
+           can delete or disable users in unprovisioned OUs with no checks
+           beyond the directory-level feature gate.
+
+  M1 + M2: Non-superadmin can enumerate all admins (M2) and query audit logs
+           across all directories (M1), building a full picture of who did
+           what across the entire deployment.
+
+--------------------------------------------------------------------------------
+9. PRIORITIZED REMEDIATION ORDER
+--------------------------------------------------------------------------------
+
+Priority is based on: exploitability, blast radius, and fix complexity.
+
+  ┌──────┬──────────┬────────────────────────────────────────────────┬──────────┐
+  │ Step │ Finding  │ What to do                                     │ Effort   │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  1   │ C1       │ Add @PreAuthorize("hasRole('SUPERADMIN')")     │ 5 min    │
+  │      │          │ to ApplicationSettingsController get + upsert.  │          │
+  │      │          │ Immediate — blocks the escalation chain.        │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  2   │ H3       │ Add @Version to PendingApproval or use         │ 30 min   │
+  │      │          │ pessimistic lock in approve(). Prevents double  │          │
+  │      │          │ execution.                                      │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  3   │ H2       │ Block requester from editing own payload.       │ 30 min   │
+  │      │          │ Add payload diff logging. Validate schema       │          │
+  │      │          │ matches original request type.                   │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  4   │ C3       │ Enforce requireApproval in playbook execute().  │ 1 hr     │
+  │      │          │ Route to profile approvers or directory-level   │          │
+  │      │          │ fallback. Add PLAYBOOK_EXECUTION request type.  │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  5   │ C2       │ Decide policy: deny if no profile resolved, or │ 2 hr     │
+  │      │          │ route to default approver. Implement in the     │          │
+  │      │          │ shared approval-check path. Add logging.        │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  6   │ H1       │ Extract approval check into shared method.      │ 1 hr     │
+  │      │          │ Call from both single and bulk group-member      │          │
+  │      │          │ endpoints.                                       │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  7   │ H5       │ Add requireProfileAccess() to generate-        │ 10 min   │
+  │      │          │ Password endpoint.                               │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  8   │ H4       │ Add @RequiresFeature(REPORTS_EXPORT) to the    │ 10 min   │
+  │      │          │ export endpoint, or remove dead enum value.      │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  9   │ M3       │ Replace runtime superadmin check with           │ 5 min    │
+  │      │          │ @PreAuthorize in AccessReviewController.create.  │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  10  │ M1       │ Filter audit queries by admin's authorized      │ 1 hr     │
+  │      │          │ directories for non-superadmins.                 │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  11  │ M2       │ Filter listReviewers by directory.              │ 30 min   │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  12  │ M5       │ Add approval workflow to bulk group import, or  │ 1 hr     │
+  │      │          │ document the intentional omission.               │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  13  │ M4       │ Product decision: which destructive operations  │ varies   │
+  │      │          │ need approval gates? Implement accordingly.      │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  14  │ Part I   │ Profile-vs-directory scoping (Option A or       │ 2-3 days │
+  │      │          │ Alternative — see sections 2-4 above).           │          │
+  └──────┴──────────┴────────────────────────────────────────────────┴──────────┘
+
+Steps 1-3 should be done immediately — they are low-effort, high-impact fixes
+that close the worst escalation paths. Steps 4-8 form a second batch. Steps
+9-13 are cleanup. Step 14 (profile scoping) is the largest piece and should
+be a deliberate architectural decision.
+
+Total estimated effort (excluding step 14): ~7-8 hours of implementation +
+testing. Step 14 adds 2-3 days depending on which option is chosen.
+
+
+================================================================================
+  PART III — AUTHORIZATION MODEL EVALUATION
+================================================================================
+
+Evaluation of the current permission/authorization architecture for robustness,
+ease of application, and runtime efficiency. Performed 2026-03-23.
+
+--------------------------------------------------------------------------------
+10. ARCHITECTURE OVERVIEW
+--------------------------------------------------------------------------------
+
+The model has four dimensions, layered bottom-to-top:
+
+  Layer 4  │ Feature override    │ AdminFeaturePermission (per-admin, per-feature)
+  Layer 3  │ Base role defaults  │ ADMIN → all features; READ_ONLY → export/reports
+  Layer 2  │ Profile access      │ AdminProfileRole (admin × profile × base role)
+  Layer 1  │ Directory access    │ "has role in ANY profile in this directory"
+  Layer 0  │ Principal type      │ SecurityConfig: SUPERADMIN / ADMIN / SELF_SERVICE
+
+Enforcement is split across three mechanisms:
+  - SecurityConfig  — URL-pattern matching, coarse role check (layer 0)
+  - @PreAuthorize   — Spring Security SpEL on controller methods (layer 0)
+  - @RequiresFeature + AOP aspect — directory + feature check (layers 1-4)
+
+Key files:
+  - auth/AuthPrincipal.java              — immutable JWT-derived principal
+  - auth/PermissionService.java          — 4-dimension permission logic
+  - auth/FeaturePermissionAspect.java    — AOP interceptor for @RequiresFeature
+  - auth/RequiresFeature.java            — annotation definition
+  - auth/DirectoryId.java                — parameter marker for aspect
+  - config/SecurityConfig.java           — global filter chain + URL rules
+  - entity/enums/FeatureKey.java         — 17 feature permission keys
+  - entity/enums/BaseRole.java           — ADMIN, READ_ONLY
+  - entity/AdminProfileRole.java         — admin × profile assignment
+  - entity/AdminFeaturePermission.java   — per-admin feature overrides
+
+--------------------------------------------------------------------------------
+11. ROBUSTNESS
+--------------------------------------------------------------------------------
+
+Strengths:
+
+  a) AuthPrincipal is immutable.
+     A Java record derived from cryptographically-signed JWT claims. No DB hit
+     during authentication. Cannot be tampered with post-issuance. Role, account
+     ID, and username are all embedded in the token.
+
+  b) Feature override model (layer 4) is well-designed.
+     Explicit enable/disable per-admin per-feature, with base-role defaults as
+     fallback. This gives fine-grained control without requiring a row for every
+     admin × feature combination. The READONLY_DEFAULT_FEATURES set
+     (BULK_EXPORT, REPORTS_RUN, REPORTS_EXPORT) is appropriately conservative —
+     all truly read-only operations.
+
+  c) Superadmin controllers are consistently locked down.
+     All 6 controllers under /superadmin/ use class-level
+     @PreAuthorize("hasRole('SUPERADMIN')"). No exceptions, no leaks.
+
+  d) No ad-hoc SecurityContextHolder usage.
+     Only FeaturePermissionAspect and JwtAuthenticationFilter touch the
+     SecurityContext directly. Controllers use @AuthenticationPrincipal
+     injection. No scattered manual principal extraction.
+
+Weaknesses:
+
+  e) Three competing authorization mechanisms with no enforced convention.
+     Of 22 controllers:
+       - 6 use @RequiresFeature (with @DirectoryId)
+       - 8 use @PreAuthorize
+       - 4 use neither (relying on SecurityConfig catch-all)
+       - 4 mix approaches within the same controller
+
+     Within the same URL hierarchy (/api/v1/directories/{id}/...), some
+     endpoints are feature-gated and some aren't. There is no enforced rule
+     for when to use which mechanism. Every new endpoint is a judgment call
+     that can silently go wrong.
+
+  f) The SecurityConfig catch-all is too permissive as a safety net.
+     Line 84: .requestMatchers("/api/v1/**").hasAnyRole("SUPERADMIN", "ADMIN")
+     Any endpoint that forgets to add @PreAuthorize or @RequiresFeature is
+     still reachable by any admin. A deny-by-default posture would be safer:
+     require explicit annotation, reject at startup if missing.
+
+  g) READ endpoints are systematically unprotected.
+     UserController.search(), GroupController.search(), SchemaController.*,
+     DirectoryBrowseController.browse() — none have feature gates. Any admin
+     with access to any profile in a directory can enumerate all users, groups,
+     and schema objects. This is inconsistent with AccessReviewController,
+     which requires ACCESS_REVIEW_MANAGE even for listing campaigns.
+
+  h) Layer 1 (directory access) is a blunt instrument.
+     existsByAdminAccountIdAndProfileDirectoryId() grants access if the admin
+     has a role in ANY profile. This collapses all profile boundaries into a
+     single directory-level gate (covered in detail in Part I).
+
+  i) @PreAuthorize and @RequiresFeature don't compose.
+     They are parallel systems. @PreAuthorize checks role from JWT.
+     @RequiresFeature checks directory access + feature from DB. If an
+     endpoint needs both "must be SUPERADMIN" AND "must have feature X", you
+     must use both annotations or bury one check in service code (as
+     AccessReviewController.create() does). There is no unified annotation.
+
+  j) No compile-time or startup-time enforcement.
+     If a developer adds a new @PostMapping and forgets @RequiresFeature, the
+     code compiles, tests pass (unless there's a specific auth test), and the
+     endpoint silently falls through to the catch-all. No annotation processor,
+     no startup scan, no "every endpoint must have at least one auth
+     annotation" check.
+
+Robustness rating: MODERATE
+  The individual pieces (JWT, feature overrides, superadmin lockdown) are solid.
+  The weakness is structural: three parallel mechanisms with no enforced
+  convention, making it easy to leave gaps when adding new endpoints.
+
+--------------------------------------------------------------------------------
+12. EASE OF APPLICATION
+--------------------------------------------------------------------------------
+
+Strengths:
+
+  a) @RequiresFeature is ergonomic when used.
+     One annotation, one enum value, automatic directoryId extraction via
+     @DirectoryId. A developer adding a new endpoint writes:
+       @RequiresFeature(FeatureKey.USER_CREATE)
+     and gets directory access + feature permission checking for free. The AOP
+     aspect handles everything. This is the model's strongest design point.
+
+  b) FeatureKey enum is self-documenting.
+     17 values with dot-notation DB representation. Adding a new feature is:
+     add an enum value, annotate the endpoint, done. The JPA converter handles
+     serialization transparently.
+
+  c) @DirectoryId fallback to parameter name is a nice ergonomic touch.
+     Existing code without the annotation still works via the "directoryId"
+     parameter name convention in FeaturePermissionAspect.
+
+Weaknesses:
+
+  d) Three different places to check when auditing an endpoint.
+     To understand what's actually enforced on any given endpoint, a reviewer
+     must check:
+       1. SecurityConfig URL patterns (global)
+       2. @PreAuthorize on controller class or method
+       3. @RequiresFeature on method
+     All three can be present, absent, or contradictory. This is error-prone
+     for code review and security audits.
+
+  e) No clear rule for when to use which mechanism.
+     The codebase has no documented convention. Observed heuristics:
+       - Superadmin-only endpoints → @PreAuthorize("hasRole('SUPERADMIN')")
+       - Feature-gated write endpoints → @RequiresFeature
+       - Read endpoints → nothing (catch-all)
+       - Playbooks → @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
+     But these are inconsistently applied and undocumented.
+
+  f) requireProfileAccess() is barely used.
+     It exists in PermissionService but almost nothing calls it. Most code uses
+     requireDirectoryAccess or requireFeature (which internally calls
+     requireDirectoryAccess). If a developer wants to scope an operation to a
+     specific profile, they have to know to call requireProfileAccess()
+     manually — and there is no annotation equivalent like @RequiresProfile.
+
+  g) No feature permission matrix documentation.
+     The mapping of features to endpoints is implicit (scattered across
+     @RequiresFeature annotations). An admin configuring feature overrides
+     must guess which features gate which operations. A superadmin setting up
+     a READ_ONLY admin has no reference for what they'll actually be able to
+     do beyond the three default features.
+
+  h) Mixed authorization in same controller is confusing.
+     AccessReviewController: most methods use @RequiresFeature, but create()
+     adds a manual isSuperadmin() check inside the method body.
+     GroupController: write methods use @RequiresFeature, read methods use
+     nothing. UserController: same pattern. A developer extending these
+     controllers has no consistent template to follow.
+
+Ease of application rating: MIXED
+  @RequiresFeature is well-designed and easy to use. But the lack of a single
+  enforced mechanism, plus undocumented conventions and three places to check,
+  means developers need tribal knowledge to apply authorization correctly.
+
+--------------------------------------------------------------------------------
+13. RUNTIME EFFICIENCY
+--------------------------------------------------------------------------------
+
+Strengths:
+
+  a) JWT validation is zero-cost to the database.
+     JwtTokenService.parse() is pure cryptographic signature verification.
+     Role, account ID, and username are embedded in the token. Authentication
+     never touches the database.
+
+  b) @PreAuthorize is zero-cost to the database.
+     Role checks come from the JWT-derived authority set already in the
+     SecurityContext. No additional query.
+
+  c) AdminFeaturePermissionRepository is well-indexed.
+     Explicit idx_afp_admin on admin_account_id, plus unique constraint on
+     (admin_account_id, feature_key). Feature override lookups are fast.
+
+Weaknesses:
+
+  d) 3 DB queries per @RequiresFeature request, with zero caching.
+     Every request hitting a @RequiresFeature endpoint triggers:
+
+       Query 1: existsByAdminAccountIdAndProfileDirectoryId()
+                → directory access check (join: admin_profile_roles → profiles)
+       Query 2: findByAdminAccountIdAndFeatureKey()
+                → feature override lookup
+       Query 3: findAllByAdminAccountId()
+                → base role fallback (conditional — only if no override found)
+
+     These are small queries, but they execute on every single request. For a
+     tool where admins do rapid user lookups or process bulk operations, this
+     accumulates. An admin browsing a user list triggers 3 DB round-trips
+     before the LDAP query even starts.
+
+  e) No permission caching at any level.
+     No @Cacheable, no CacheManager, no request-scoped cache. An admin's
+     profile roles and feature overrides change rarely (only when a superadmin
+     reconfigures them), yet they are re-queried on every API call.
+
+     A simple request-scoped cache (load once per HTTP request, reuse within
+     that request) would eliminate redundant queries when multiple permission
+     checks occur in the same request. A short-TTL application-level cache
+     (e.g. 60 seconds via Caffeine) would reduce DB load further, at the cost
+     of slightly delayed permission changes.
+
+  f) Missing index on admin_profile_roles.admin_account_id.
+     The existsByAdminAccountIdAndProfileDirectoryId() query (Query 1 — the
+     hottest path) joins admin_profile_roles → provisioning_profiles to check
+     directory_id. The only index is the unique constraint on
+     (admin_account_id, profile_id). For admins with many profiles across
+     directories, this may degrade to a sequential scan on the join.
+
+     Fix: CREATE INDEX idx_apr_admin ON admin_profile_roles(admin_account_id);
+
+  g) findAllByAdminAccountId() in Query 3 is over-fetched.
+     It loads ALL profile roles for the admin across ALL directories just to
+     check if any has BaseRole.ADMIN. A simple exists query would suffice:
+
+       existsByAdminAccountIdAndBaseRole(UUID adminId, BaseRole role)
+
+     This avoids transferring unnecessary rows and simplifies the logic from
+     a stream().anyMatch() to a boolean return.
+
+  h) No batch optimization for multi-operation requests.
+     Playbook execution calls execute() per target DN. Each invocation
+     re-runs the full 3-query permission check. For a playbook targeting 50
+     users, that's 150 permission queries. A batch-aware permission check
+     (validate once, execute many) would reduce this to 3 queries total.
+
+Efficiency rating: ADEQUATE but wasteful
+  Works fine for low-volume admin usage. Would degrade under high-concurrency
+  scenarios (bulk operations, many admins). The fixes are straightforward:
+  add one index, add one cache, fix one over-fetch.
+
+--------------------------------------------------------------------------------
+14. AUTHORIZATION CONSISTENCY ANALYSIS
+--------------------------------------------------------------------------------
+
+Distribution of authorization mechanisms across 22 controllers:
+
+  Mechanism                               │ Controllers │ Count
+  ────────────────────────────────────────┼─────────────┼──────
+  @RequiresFeature only                   │ AccessReview, BulkGroup,     │  6
+                                          │ BulkUser, ScheduledReport,   │
+                                          │ User (writes), Group (writes)│
+  @PreAuthorize only                      │ All 6 superadmin controllers,│  8
+                                          │ LifecyclePlaybook,           │
+                                          │ ProvisioningProfile          │
+  Neither (SecurityConfig catch-all only) │ Approval, CsvMappingTemplate,│  4
+                                          │ DirectoryBrowse, Schema      │
+  Mixed within same controller            │ AccessReview (feature +      │  4
+                                          │ manual superadmin check),    │
+                                          │ User (feature for writes,    │
+                                          │ nothing for reads), Group    │
+                                          │ (same), ProvisioningProfile  │
+                                          │ (mixed superadmin/admin)     │
+
+Anti-patterns observed:
+
+  1. Same URL hierarchy, different auth mechanisms.
+     /api/v1/directories/{id}/users (POST) → @RequiresFeature(USER_CREATE)
+     /api/v1/directories/{id}/users (GET)  → nothing
+     /api/v1/directories/{id}/groups (POST) → @RequiresFeature(GROUP_CREATE_DELETE)
+     /api/v1/directories/{id}/groups (GET)  → nothing
+
+  2. Unvalidated directoryId in @PreAuthorize-only controllers.
+     LifecyclePlaybookController takes @PathVariable UUID directoryId but
+     doesn't use @DirectoryId or @RequiresFeature. Directory-level access
+     is checked only in the service layer. If the service has a bug, the
+     controller provides no safety net.
+
+  3. Controllers with both directoryId and profileId but no scope reconciliation.
+     ProvisioningProfileController routes like:
+       /api/v1/directories/{directoryId}/profiles/{profileId}
+     rely entirely on service-layer validation that profileId belongs to
+     directoryId. No controller-level or aspect-level cross-validation.
+
+  4. Manual ad-hoc authorization in one method of an otherwise annotation-driven
+     controller (AccessReviewController.create — runtime isSuperadmin() check
+     alongside @RequiresFeature on every other method).
+
+  5. ApprovalController has ZERO authorization annotations on any of its 6
+     endpoints, despite performing state-changing operations (approve, reject,
+     updatePayload). All authorization is implicit via SecurityConfig catch-all
+     + service-layer checks.
+
+--------------------------------------------------------------------------------
+15. RECOMMENDED STRUCTURAL IMPROVEMENT
+--------------------------------------------------------------------------------
+
+If one structural change were made, it should be:
+
+  Standardize on @RequiresFeature as the SINGLE authorization mechanism for
+  all directory-scoped endpoints.
+
+What this entails:
+
+  a) Add feature keys for read operations.
+     New keys: USER_VIEW, GROUP_VIEW (or a single DIRECTORY_BROWSE).
+     Apply @RequiresFeature to search(), get(), browse() endpoints.
+     This closes the "unprotected reads" gap and makes the READ_ONLY role
+     meaningful at the feature level.
+
+  b) Add feature keys for currently ungated operations.
+     New keys: APPROVAL_MANAGE, PLAYBOOK_EXECUTE, PLAYBOOK_MANAGE.
+     Apply to ApprovalController, LifecyclePlaybookController.
+     Replace @PreAuthorize on playbook endpoints with @RequiresFeature.
+
+  c) Add a startup-time scan that rejects unannotated endpoints.
+     A Spring ApplicationListener<ContextRefreshedEvent> that introspects all
+     @RequestMapping methods under /api/v1/directories/** and fails startup if
+     any lack @RequiresFeature. This makes the "forget to annotate" failure
+     mode impossible.
+
+       @Component
+       public class AuthAnnotationValidator implements
+               ApplicationListener<ContextRefreshedEvent> {
+           @Override
+           public void onApplicationEvent(ContextRefreshedEvent event) {
+               // Scan all @RequestMapping methods in directory controllers
+               // Throw if any lacks @RequiresFeature
+           }
+       }
+
+  d) Add a request-scoped permission cache.
+     On the first @RequiresFeature check in a request, load the admin's
+     profile roles and feature overrides into a request-scoped bean. Reuse
+     on subsequent checks in the same request. This collapses 3N queries
+     (where N = permission checks per request) down to 3.
+
+       @RequestScope
+       @Component
+       public class PermissionContext {
+           private List<AdminProfileRole> profileRoles;
+           private List<AdminFeaturePermission> featureOverrides;
+           // Lazy-loaded, cached for request duration
+       }
+
+  e) Add the missing index.
+     Migration V_next:
+       CREATE INDEX idx_apr_admin ON admin_profile_roles(admin_account_id);
+
+  f) Replace over-fetched query.
+     Change findAllByAdminAccountId() call in requireFeature() to:
+       existsByAdminAccountIdAndBaseRole(adminId, BaseRole.ADMIN)
+
+  g) Document the feature permission matrix.
+     Generate from @RequiresFeature annotations at build time (annotation
+     processor or test that outputs a markdown table). This gives superadmins
+     a reference for what each feature key actually gates.
+
+Result: a single authorization mechanism, enforced at startup, cached per
+request, with a documented permission matrix. The three-mechanism ambiguity
+disappears. New endpoints get a compiler-like check. Performance improves.
+Security audits become a matter of reviewing one enum and one annotation.
+
+Estimated effort: 2-3 days (can be done alongside or after the remediation
+steps in section 9).
+
+--------------------------------------------------------------------------------
+16. EVALUATION SUMMARY
+--------------------------------------------------------------------------------
+
+  ┌─────────────────────┬───────────┬────────────────────────────────────────────┐
+  │ Dimension           │ Rating    │ Key issue                                  │
+  ├─────────────────────┼───────────┼────────────────────────────────────────────┤
+  │ Robustness          │ Moderate  │ Three competing auth mechanisms with no    │
+  │                     │           │ enforced convention; catch-all too         │
+  │                     │           │ permissive; READs unprotected             │
+  ├─────────────────────┼───────────┼────────────────────────────────────────────┤
+  │ Ease of application │ Mixed     │ @RequiresFeature is ergonomic; everything │
+  │                     │           │ else requires tribal knowledge of which    │
+  │                     │           │ mechanism to use where                     │
+  ├─────────────────────┼───────────┼────────────────────────────────────────────┤
+  │ Efficiency          │ Adequate  │ 3 uncached DB queries per request; missing │
+  │                     │           │ index on hottest path; over-fetch in       │
+  │                     │           │ base-role fallback                         │
+  └─────────────────────┴───────────┴────────────────────────────────────────────┘
+
+The authorization model's strongest asset is the @RequiresFeature + FeatureKey
+pattern. Its weakest aspect is that this pattern isn't the only one — two other
+mechanisms coexist without clear boundaries, making the system harder to audit,
+extend, and trust. The recommended path forward is to promote @RequiresFeature
+to the single standard, enforce it at startup, and cache it per request.

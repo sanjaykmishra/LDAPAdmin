@@ -35,7 +35,7 @@ public class LifecyclePlaybookController {
     }
 
     @PostMapping("/api/v1/directories/{directoryId}/playbooks")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
     public ResponseEntity<PlaybookResponse> create(@PathVariable UUID directoryId,
                                                     @Valid @RequestBody CreatePlaybookRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -50,7 +50,7 @@ public class LifecyclePlaybookController {
     }
 
     @PutMapping("/api/v1/directories/{directoryId}/playbooks/{playbookId}")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
     public PlaybookResponse update(@PathVariable UUID directoryId,
                                     @PathVariable UUID playbookId,
                                     @Valid @RequestBody UpdatePlaybookRequest req) {
@@ -58,7 +58,7 @@ public class LifecyclePlaybookController {
     }
 
     @DeleteMapping("/api/v1/directories/{directoryId}/playbooks/{playbookId}")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
     public ResponseEntity<Void> delete(@PathVariable UUID directoryId,
                                         @PathVariable UUID playbookId) {
         service.delete(directoryId, playbookId);
@@ -89,7 +89,7 @@ public class LifecyclePlaybookController {
     // ── Rollback ──────────────────────────────────────────────────────────────
 
     @PostMapping("/api/v1/directories/{directoryId}/playbooks/executions/{executionId}/rollback")
-    @PreAuthorize("hasRole('SUPERADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
     public PlaybookExecutionResponse rollback(@PathVariable UUID directoryId,
                                                @PathVariable UUID executionId,
                                                @AuthenticationPrincipal AuthPrincipal principal) {
