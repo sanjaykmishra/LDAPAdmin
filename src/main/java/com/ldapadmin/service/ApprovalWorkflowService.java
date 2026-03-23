@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.*;
 
 @Service
@@ -283,6 +284,12 @@ public class ApprovalWorkflowService {
     private void executeUserCreate(PendingApproval pa, AuthPrincipal approver) {
         try {
             CreateEntryRequest req = objectMapper.readValue(pa.getPayload(), CreateEntryRequest.class);
+            // Re-apply computed/default/fixed attributes in case the payload was edited
+            if (pa.getProfileId() != null) {
+                Map<String, List<String>> attrs = new LinkedHashMap<>(req.attributes());
+                profileService.applyDefaults(pa.getProfileId(), attrs);
+                req = new CreateEntryRequest(req.dn(), attrs);
+            }
             ldapOperationService.createUser(pa.getDirectoryId(), approver, req);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to deserialize user creation payload", e);
