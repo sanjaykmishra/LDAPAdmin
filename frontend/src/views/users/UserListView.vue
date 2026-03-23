@@ -411,8 +411,21 @@ async function openEdit(row) {
     }
   }
 
+  // The backend lower-cases all LDAP attribute names, but the profile config
+  // stores them with original casing (e.g. "givenName" vs "givenname").
+  // Build a lookup to re-key the attributes to the profile-configured casing
+  // so that v-model bindings in edit mode find the values.
+  const caseMap = {}
+  if (profileConfig.value?.attributeConfigs) {
+    for (const ac of profileConfig.value.attributeConfigs) {
+      caseMap[ac.attributeName.toLowerCase()] = ac.attributeName
+    }
+  }
   form.value = { dn: row.dn, attributes: Object.fromEntries(
-    Object.entries(attrs).map(([k, v]) => [k, Array.isArray(v) ? v.join('\n') : v])
+    Object.entries(attrs).map(([k, v]) => [
+      caseMap[k.toLowerCase()] || k,
+      Array.isArray(v) ? v.join('\n') : v,
+    ])
   )}
   showModal.value = true
 }
