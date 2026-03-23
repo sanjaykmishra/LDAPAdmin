@@ -31,6 +31,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -49,6 +50,7 @@ public class UserController {
 
     private final LdapOperationService service;
     private final ApprovalWorkflowService approvalService;
+    private final com.ldapadmin.service.ProvisioningProfileService profileService;
     private final com.ldapadmin.service.PasswordPolicyService passwordPolicyService;
     private final com.ldapadmin.service.ApprovalNotificationService notificationService;
 
@@ -75,6 +77,14 @@ public class UserController {
 
         // Check if approval is required for the matching profile
         Optional<ProvisioningProfile> profile = approvalService.findProfileForDn(directoryId, req.dn());
+
+        // Apply computed/default/fixed attribute values from the profile
+        if (profile.isPresent()) {
+            Map<String, List<String>> attrs = new LinkedHashMap<>(req.attributes());
+            profileService.applyDefaults(profile.get().getId(), attrs);
+            req = new CreateEntryRequest(req.dn(), attrs);
+        }
+
         if (profile.isPresent() && approvalService.isApprovalRequired(profile.get().getId())) {
             PendingApproval pa = approvalService.submitForApproval(
                     directoryId, profile.get().getId(), principal,

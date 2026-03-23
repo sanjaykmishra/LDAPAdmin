@@ -65,19 +65,27 @@ public class LdapBrowseService {
         List<ChildEntry> children = new ArrayList<>();
 
         try {
-            SearchRequest request = new SearchRequest(
-                    baseDn, SearchScope.ONE,
-                    Filter.createPresenceFilter("objectClass"),
-                    "dn");
-            request.addControl(new SimplePagedResultsControl(dc.getPagingSize(), null));
+            ASN1OctetString cookie = null;
+            do {
+                SearchRequest request = new SearchRequest(
+                        baseDn, SearchScope.ONE,
+                        Filter.createPresenceFilter("objectClass"),
+                        "dn");
+                request.addControl(new SimplePagedResultsControl(dc.getPagingSize(), cookie));
 
-            SearchResult result = conn.search(request);
-            for (SearchResultEntry child : result.getSearchEntries()) {
-                String childDn = child.getDN();
-                String rdn = extractRdn(childDn, baseDn);
-                boolean hasChildren = hasSubEntries(conn, childDn);
-                children.add(new ChildEntry(childDn, rdn, hasChildren));
-            }
+                SearchResult result = conn.search(request);
+                for (SearchResultEntry child : result.getSearchEntries()) {
+                    String childDn = child.getDN();
+                    String rdn = extractRdn(childDn, baseDn);
+                    boolean hasChildren = hasSubEntries(conn, childDn);
+                    children.add(new ChildEntry(childDn, rdn, hasChildren));
+                }
+
+                SimplePagedResultsControl pageResponse =
+                        SimplePagedResultsControl.get(result);
+                cookie = (pageResponse != null && pageResponse.moreResultsToReturn())
+                        ? pageResponse.getCookie() : null;
+            } while (cookie != null && cookie.getValue().length > 0);
         } catch (LDAPSearchException e) {
             if (e.getResultCode() == ResultCode.NO_SUCH_OBJECT) {
                 log.debug("Base '{}' does not exist — returning empty children", baseDn);
