@@ -52,6 +52,10 @@ public enum AuditAction {
     REVIEW_REVOKED       ("review.revoked"),
     REVIEW_AUTO_REVOKED  ("review.auto_revoked"),
 
+    // ── Lifecycle playbooks ─────────────────────────────────────────────────
+    PLAYBOOK_EXECUTED    ("playbook.executed"),
+    PLAYBOOK_ROLLED_BACK ("playbook.rolled_back"),
+
     // ── Changelog-sourced (raw LDAP changelog entry) ──────────────────────────
     LDAP_CHANGE          ("ldap.change");
 

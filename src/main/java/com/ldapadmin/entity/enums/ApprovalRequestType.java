@@ -5,5 +5,6 @@ public enum ApprovalRequestType {
     BULK_IMPORT,
     USER_MOVE,
     GROUP_MEMBER_ADD,
-    SELF_REGISTRATION
+    SELF_REGISTRATION,
+    PLAYBOOK_EXECUTE
 }

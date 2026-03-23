@@ -1,0 +1,31 @@
+package com.ldapadmin.dto.playbook;
+
+import com.ldapadmin.entity.PlaybookExecution;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+public record PlaybookExecutionResponse(
+        UUID id,
+        UUID playbookId,
+        String playbookName,
+        String targetDn,
+        UUID executedBy,
+        String status,
+        String stepResults,
+        OffsetDateTime startedAt,
+        OffsetDateTime completedAt) {
+
+    public static PlaybookExecutionResponse from(PlaybookExecution e, String playbookName) {
+        return new PlaybookExecutionResponse(
+                e.getId(),
+                e.getPlaybook().getId(),
+                playbookName,
+                e.getTargetDn(),
+                e.getExecutedBy(),
+                e.getStatus().name(),
+                e.getStepResults(),
+                e.getStartedAt(),
+                e.getCompletedAt());
+    }
+}

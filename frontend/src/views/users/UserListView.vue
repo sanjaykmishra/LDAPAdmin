@@ -53,6 +53,7 @@
           <button @click="toggleEnabled(row)" class="text-xs font-medium" :class="row.enabled !== false ? 'text-amber-600 hover:text-amber-800' : 'text-green-600 hover:text-green-800'">{{ row.enabled !== false ? 'Disable' : 'Enable' }}</button>
           <button @click="openResetPassword(row)" class="text-purple-600 hover:text-purple-800 text-xs font-medium">Password</button>
           <button @click="openMove(row)" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Move</button>
+          <button @click="openPlaybookRun(row)" class="text-teal-600 hover:text-teal-800 text-xs font-medium">Playbook</button>
           <button @click="timelineTarget = row; showTimeline = true" class="text-gray-500 hover:text-gray-700 text-xs font-medium">History</button>
           <button @click="confirmDelete(row)" class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
         </div>
@@ -213,6 +214,60 @@
     </AppModal>
 
     <ConfirmDialog v-model="showDelete" title="Delete User" :message="`Delete '${deleteTarget?.dn}'?`" confirm-label="Delete" danger @confirm="doDelete" />
+
+    <!-- Playbook Run Modal -->
+    <AppModal v-model="showPlaybookModal" title="Run Playbook" size="md">
+      <div class="space-y-4">
+        <p class="text-sm text-gray-600">Target: <code class="bg-gray-100 px-1 rounded text-xs">{{ playbookTarget?.dn }}</code></p>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Select Playbook</label>
+          <select v-model="selectedPlaybookId" @change="playbookPreview = null" class="input w-full">
+            <option :value="null" disabled>Choose a playbook...</option>
+            <option v-for="pb in availablePlaybooks" :key="pb.id" :value="pb.id">
+              {{ pb.name }} ({{ pb.type }})
+            </option>
+          </select>
+        </div>
+        <button v-if="selectedPlaybookId" @click="doPlaybookPreview" class="btn-secondary text-sm">Preview Steps</button>
+        <div v-if="playbookPreview" class="border rounded-lg divide-y">
+          <div v-for="step in playbookPreview.steps" :key="step.stepOrder" class="px-3 py-2 text-sm flex items-start gap-2">
+            <span class="text-gray-400 font-mono w-5 shrink-0">{{ step.stepOrder + 1 }}.</span>
+            <div>
+              <span class="font-medium">{{ step.description }}</span>
+              <span v-if="!step.reversible" class="ml-2 text-red-500 text-xs font-medium">IRREVERSIBLE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <button @click="showPlaybookModal = false" class="btn-secondary">Cancel</button>
+        <button @click="doPlaybookExecute" :disabled="playbookExecuting || !playbookPreview" class="btn-primary">
+          {{ playbookExecuting ? 'Executing...' : 'Execute' }}
+        </button>
+      </template>
+    </AppModal>
+
+    <!-- Playbook Result Modal -->
+    <AppModal v-model="showPlaybookResult" title="Playbook Result" size="md">
+      <template v-if="playbookResult">
+        <div class="mb-3">
+          <span class="text-sm font-medium">Status: </span>
+          <span :class="{ 'text-green-600': playbookResult.status === 'SUCCESS', 'text-red-600': playbookResult.status === 'FAILED', 'text-amber-600': playbookResult.status === 'PARTIAL' }" class="font-medium">
+            {{ playbookResult.status }}
+          </span>
+        </div>
+        <div class="border rounded-lg divide-y max-h-60 overflow-y-auto">
+          <div v-for="step in parsedPlaybookResults(playbookResult.stepResults)" :key="step.stepOrder" class="px-3 py-2 text-sm flex items-center gap-2">
+            <span class="font-mono text-gray-400 w-5">{{ step.stepOrder + 1 }}.</span>
+            <span class="font-medium">{{ step.action }}</span>
+            <span :class="{ 'text-green-600': step.status === 'SUCCESS', 'text-red-600': step.status === 'FAILED', 'text-gray-400': step.status === 'SKIPPED' }" class="ml-auto text-xs font-medium">{{ step.status }}</span>
+          </div>
+        </div>
+        <div v-if="playbookResult.status === 'PARTIAL'" class="mt-4 flex justify-end">
+          <button @click="doPlaybookRollback(playbookResult.id)" class="btn-secondary text-sm text-amber-600">Rollback Completed Steps</button>
+        </div>
+      </template>
+    </AppModal>
   </div>
 </template>
 
@@ -224,6 +279,7 @@ import { useApi } from '@/composables/useApi'
 import * as usersApi from '@/api/users'
 import * as groupsApi from '@/api/groups'
 import { listProfiles, getProfile } from '@/api/profiles'
+import { listEnabled as listEnabledPlaybooks, previewPlaybook, executePlaybook, rollbackExecution } from '@/api/playbooks'
 import DataTable from '@/components/DataTable.vue'
 import AppModal from '@/components/AppModal.vue'
 import FormField from '@/components/FormField.vue'
@@ -611,6 +667,64 @@ function confirmDelete(row) { deleteTarget.value = row; showDelete.value = true 
 async function doDelete() {
   await call(() => usersApi.deleteUser(dirId, deleteTarget.value.dn), { successMsg: 'User deleted' })
   await load()
+}
+
+// ── Playbook run from user actions ────────────────────────────────────────
+
+const showPlaybookModal = ref(false)
+const availablePlaybooks = ref([])
+const playbookTarget = ref(null)
+const selectedPlaybookId = ref(null)
+const playbookPreview = ref(null)
+const playbookExecuting = ref(false)
+const playbookResult = ref(null)
+const showPlaybookResult = ref(false)
+
+async function openPlaybookRun(row) {
+  playbookTarget.value = row
+  selectedPlaybookId.value = null
+  playbookPreview.value = null
+  playbookResult.value = null
+  try {
+    const { data } = await listEnabledPlaybooks(dirId)
+    availablePlaybooks.value = data
+    showPlaybookModal.value = true
+  } catch (e) {
+    notif.error('Failed to load playbooks')
+  }
+}
+
+async function doPlaybookPreview() {
+  if (!selectedPlaybookId.value) return
+  try {
+    const { data } = await previewPlaybook(dirId, selectedPlaybookId.value, playbookTarget.value.dn)
+    playbookPreview.value = data
+  } catch (e) { notif.error(e.response?.data?.detail || e.message) }
+}
+
+async function doPlaybookExecute() {
+  playbookExecuting.value = true
+  try {
+    const { data } = await executePlaybook(dirId, selectedPlaybookId.value, [playbookTarget.value.dn])
+    playbookResult.value = data[0]
+    showPlaybookModal.value = false
+    showPlaybookResult.value = true
+    await load()
+  } catch (e) { notif.error(e.response?.data?.detail || e.message) }
+  finally { playbookExecuting.value = false }
+}
+
+async function doPlaybookRollback(executionId) {
+  try {
+    await rollbackExecution(dirId, executionId)
+    notif.success('Rollback completed')
+    showPlaybookResult.value = false
+    await load()
+  } catch (e) { notif.error(e.response?.data?.detail || e.message) }
+}
+
+function parsedPlaybookResults(json) {
+  try { return JSON.parse(json) } catch { return [] }
 }
 
 async function loadProfiles() {
