@@ -125,10 +125,9 @@ public class LdapOperationService {
                                                int limit, String[] attributes) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
-        // Exclude container/structural objectClasses so only user entries are returned
+        // Default to person entries (covers person, organizationalPerson, inetOrgPerson)
         String effectiveFilter = (filter == null || filter.isBlank())
-                ? "(&(objectClass=*)(!(objectClass=organizationalUnit))(!(objectClass=organization))(!(objectClass=domain))(!(objectClass=dcObject))(!(objectClass=container)))"
-                : filter;
+                ? "(objectClass=person)" : filter;
         return userService.searchUsers(dc, effectiveFilter, baseDn, limit, attributes)
                 .stream().map(LdapEntryResponse::from).toList();
     }
