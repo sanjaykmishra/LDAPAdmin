@@ -110,8 +110,12 @@
         <p class="text-sm text-gray-600">Reset password for:</p>
         <p class="text-sm font-mono text-gray-900 bg-gray-50 px-3 py-2 rounded-lg break-all">{{ resetPwTarget?.dn }}</p>
         <PasswordPolicyStatus v-if="resetPwTarget" :directory-id="dirId" :user-dn="resetPwTarget.dn" />
-        <FormField label="New Password" v-model="resetPwNew" type="password" required />
-        <FormField label="Confirm Password" v-model="resetPwConfirm" type="password" required />
+        <FormField label="New Password" v-model="resetPwNew" :type="resetPwVisible ? 'text' : 'password'" required />
+        <FormField label="Confirm Password" v-model="resetPwConfirm" :type="resetPwVisible ? 'text' : 'password'" required />
+        <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+          <input type="checkbox" v-model="resetPwVisible" class="rounded border-gray-300" />
+          Show password
+        </label>
         <div v-if="resetPwNew" class="flex items-center gap-2">
           <div class="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
             <div class="h-full rounded-full transition-all" :class="pwStrengthColor" :style="{ width: pwStrengthPct + '%' }"></div>
@@ -230,6 +234,7 @@ const resetPwTarget      = ref(null)
 const resetPwNew         = ref('')
 const resetPwConfirm     = ref('')
 const resetPwError       = ref('')
+const resetPwVisible     = ref(false)
 
 function computePasswordStrength(pw) {
   if (!pw) return 0
@@ -489,6 +494,7 @@ function openResetPassword(row) {
   resetPwNew.value     = ''
   resetPwConfirm.value = ''
   resetPwError.value   = ''
+  resetPwVisible.value = false
   showResetPassword.value = true
 }
 
