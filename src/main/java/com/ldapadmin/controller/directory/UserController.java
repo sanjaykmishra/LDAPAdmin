@@ -53,6 +53,7 @@ public class UserController {
     private final com.ldapadmin.service.ProvisioningProfileService profileService;
     private final com.ldapadmin.service.PasswordPolicyService passwordPolicyService;
     private final com.ldapadmin.service.ApprovalNotificationService notificationService;
+    private final com.ldapadmin.service.PermissionService permissionService;
 
     @GetMapping
     public List<LdapEntryResponse> search(
@@ -78,8 +79,10 @@ public class UserController {
         // Check if approval is required for the matching profile
         Optional<ProvisioningProfile> profile = approvalService.findProfileForDn(directoryId, req.dn());
 
-        // Apply computed/default/fixed attribute values from the profile
+        // Enforce profile-level scope before applying defaults — an admin must
+        // have a role in the matched profile, not just any profile in the directory.
         if (profile.isPresent()) {
+            permissionService.requireProfileAccess(principal, profile.get().getId());
             Map<String, List<String>> attrs = new LinkedHashMap<>(req.attributes());
             profileService.applyDefaults(profile.get().getId(), attrs);
             req = new CreateEntryRequest(req.dn(), attrs);

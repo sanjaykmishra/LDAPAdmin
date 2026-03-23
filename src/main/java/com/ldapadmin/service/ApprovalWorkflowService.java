@@ -397,6 +397,10 @@ public class ApprovalWorkflowService {
     private void executeUserCreate(PendingApproval pa, AuthPrincipal approver) {
         try {
             CreateEntryRequest req = objectMapper.readValue(pa.getPayload(), CreateEntryRequest.class);
+            // Enforce that the approver has access to the target profile
+            if (pa.getProfileId() != null) {
+                permissionService.requireProfileAccess(approver, pa.getProfileId());
+            }
             // Re-apply computed/default/fixed attributes in case the payload was edited
             if (pa.getProfileId() != null) {
                 Map<String, List<String>> attrs = new LinkedHashMap<>(req.attributes());
@@ -410,6 +414,9 @@ public class ApprovalWorkflowService {
     }
 
     private void executeBulkImport(PendingApproval pa, AuthPrincipal approver) {
+        if (pa.getProfileId() != null) {
+            permissionService.requireProfileAccess(approver, pa.getProfileId());
+        }
         try {
             JsonNode root = objectMapper.readTree(pa.getPayload());
             BulkImportRequest req = objectMapper.treeToValue(root.get("request"), BulkImportRequest.class);
@@ -426,6 +433,9 @@ public class ApprovalWorkflowService {
     }
 
     private void executeUserMove(PendingApproval pa, AuthPrincipal approver) {
+        if (pa.getProfileId() != null) {
+            permissionService.requireProfileAccess(approver, pa.getProfileId());
+        }
         try {
             JsonNode root = objectMapper.readTree(pa.getPayload());
             String dn = root.get("dn").asText();
@@ -437,6 +447,9 @@ public class ApprovalWorkflowService {
     }
 
     private void executeGroupMemberAdd(PendingApproval pa, AuthPrincipal approver) {
+        if (pa.getProfileId() != null) {
+            permissionService.requireProfileAccess(approver, pa.getProfileId());
+        }
         try {
             JsonNode root = objectMapper.readTree(pa.getPayload());
             String groupDn = root.get("groupDn").asText();
