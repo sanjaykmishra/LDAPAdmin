@@ -64,7 +64,7 @@ class AccessReviewControllerTest extends BaseControllerTest {
     void listReviewers_returns200() throws Exception {
         var reviewer = new AdminAccountResponse(UUID.randomUUID(), "reviewer1", "Reviewer One",
                 "r@test.com", AccountRole.ADMIN, AccountType.LOCAL, null, true, null, null, null);
-        when(adminService.listAdmins()).thenReturn(List.of(reviewer));
+        when(adminService.listAdminsByDirectory(dirId)).thenReturn(List.of(reviewer));
 
         mvc.perform(get("/api/v1/directories/{dirId}/access-reviews/reviewers", dirId)
                         .with(authentication(superadminAuth())))

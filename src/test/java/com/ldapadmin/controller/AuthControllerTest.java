@@ -8,7 +8,10 @@ import com.ldapadmin.auth.OidcAuthenticationService;
 import com.ldapadmin.auth.PrincipalType;
 import com.ldapadmin.auth.dto.LoginRequest;
 import com.ldapadmin.auth.dto.LoginResponse;
+import com.ldapadmin.ldap.LdapConnectionFactory;
+import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.repository.AdminProfileRoleRepository;
+import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.repository.ProvisioningProfileRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +45,9 @@ class AuthControllerTest extends BaseControllerTest {
     @MockBean LoginRateLimiter          loginRateLimiter;
     @MockBean AdminProfileRoleRepository adminProfileRoleRepository;
     @MockBean ProvisioningProfileRepository provisioningProfileRepository;
+    @MockBean DirectoryConnectionRepository directoryConnectionRepository;
+    @MockBean LdapConnectionFactory ldapConnectionFactory;
+    @MockBean LdapUserService ldapUserService;
 
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 

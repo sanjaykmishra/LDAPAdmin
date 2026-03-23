@@ -70,7 +70,7 @@ class ApplicationSettingsControllerTest extends BaseControllerTest {
     void getSettings_authenticated_returns200() throws Exception {
         given(settingsService.get()).willReturn(sampleSettings());
 
-        mockMvc.perform(get(BASE_URL).with(authentication(adminAuth())))
+        mockMvc.perform(get(BASE_URL).with(authentication(superadminAuth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.appName").value("LDAPAdmin"));
     }
@@ -99,7 +99,7 @@ class ApplicationSettingsControllerTest extends BaseControllerTest {
         given(settingsService.upsert(any())).willReturn(sampleSettings());
 
         mockMvc.perform(put(BASE_URL)
-                        .with(authentication(adminAuth()))
+                        .with(authentication(superadminAuth()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(sampleUpdateRequest())))
                 .andExpect(status().isOk())
