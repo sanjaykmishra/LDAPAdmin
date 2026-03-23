@@ -12,5 +12,10 @@ export const approveRequest = (dirId, id) =>
 export const rejectRequest = (dirId, id, reason) =>
     client.post(`/directories/${dirId}/approvals/${id}/reject`, { reason })
 
+export const updateApprovalPayload = (dirId, id, payload) =>
+    client.put(`/directories/${dirId}/approvals/${id}/payload`, payload, {
+      headers: { 'Content-Type': 'application/json' }
+    })
+
 export const countPendingApprovals = (dirId) =>
     client.get(`/directories/${dirId}/approvals/count`)

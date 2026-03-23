@@ -1,7 +1,9 @@
 package com.ldapadmin.controller.directory;
 
 import com.ldapadmin.dto.profile.*;
+import com.ldapadmin.service.PasswordGeneratorService;
 import com.ldapadmin.service.ProvisioningProfileService;
+import com.ldapadmin.entity.ProvisioningProfile;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -39,6 +41,7 @@ import java.util.UUID;
 public class ProvisioningProfileController {
 
     private final ProvisioningProfileService service;
+    private final PasswordGeneratorService passwordGenerator;
 
     // ── Profile CRUD (directory-scoped) ───────────────────────────────────────
 
@@ -92,6 +95,14 @@ public class ProvisioningProfileController {
         }
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(service.clone(directoryId, profileId, newName));
+    }
+
+    // ── Password Generation ──────────────────────────────────────────────────
+
+    @PostMapping("/api/v1/profiles/{profileId}/generate-password")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
+    public Map<String, String> generatePassword(@PathVariable UUID profileId) {
+        return Map.of("password", service.generatePassword(profileId));
     }
 
     // ── Lifecycle Policy ──────────────────────────────────────────────────────

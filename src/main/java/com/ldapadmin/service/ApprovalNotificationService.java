@@ -130,6 +130,19 @@ public class ApprovalNotificationService {
         }
     }
 
+    @Async
+    public void sendPasswordEmail(String recipientEmail, String userName, String password) {
+        String subject = "[LDAPAdmin] Your account has been created";
+        String body = String.format(
+                "Hello %s,\n\n"
+                + "Your account has been created. Your temporary password is:\n\n"
+                + "    %s\n\n"
+                + "Please log in and change your password at your earliest convenience.\n\n"
+                + "— LDAPAdmin",
+                userName, password);
+        sendEmail(recipientEmail, subject, body);
+    }
+
     private void sendEmail(String to, String subject, String body) {
         ApplicationSettings settings = appSettingsService.getEntity();
         if (settings.getSmtpHost() == null || settings.getSmtpHost().isBlank()

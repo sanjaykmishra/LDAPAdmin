@@ -25,7 +25,7 @@
     </DataTable>
 
     <!-- Detail Modal -->
-    <AppModal v-model="detailModal" title="Approval Details">
+    <AppModal v-model="detailModal" title="Approval Details" size="lg">
       <div v-if="selectedApproval" class="space-y-3">
         <div><strong>Request Type:</strong> {{ formatType(selectedApproval.requestType) }}</div>
         <div><strong>Requester:</strong> {{ selectedApproval.requesterUsername }}</div>
@@ -41,15 +41,43 @@
           <strong>Reject Reason:</strong> {{ selectedApproval.rejectReason }}
         </div>
 
-        <details class="mt-4">
+        <!-- Provisioning Error -->
+        <div v-if="selectedApproval.provisionError"
+          class="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+          <strong>Provisioning Error:</strong> {{ selectedApproval.provisionError }}
+          <p class="text-xs text-red-500 mt-1">Edit the request attributes below to fix the issue, then approve again.</p>
+        </div>
+
+        <!-- Edit mode for attributes -->
+        <div v-if="editMode && isEditablePayload(selectedApproval)" class="space-y-3 border rounded-lg p-3 bg-gray-50">
+          <div class="text-sm font-semibold text-gray-700">Edit Request Attributes</div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">DN</label>
+            <input v-model="editPayload.dn" class="input w-full text-sm" />
+          </div>
+          <div v-for="(values, attrName) in editPayload.attributes" :key="attrName">
+            <label class="block text-xs text-gray-500 mb-1">{{ attrName }}</label>
+            <input v-model="editPayload.attributes[attrName][0]" class="input w-full text-sm" />
+          </div>
+          <div class="flex gap-2">
+            <button @click="savePayload" :disabled="savingPayload"
+              class="btn-primary text-sm">{{ savingPayload ? 'Saving...' : 'Save Changes' }}</button>
+            <button @click="editMode = false" class="btn-secondary text-sm">Cancel</button>
+          </div>
+        </div>
+
+        <!-- Read-only payload -->
+        <details v-if="!editMode" class="mt-4">
           <summary class="cursor-pointer text-sm text-blue-600 hover:text-blue-800">Show Payload</summary>
           <pre class="mt-2 bg-gray-50 border rounded p-3 text-xs overflow-auto max-h-64">{{ formatPayload(selectedApproval.payload) }}</pre>
         </details>
 
         <div v-if="selectedApproval.status === 'PENDING'" class="flex gap-2 mt-4 pt-4 border-t">
           <template v-if="!isOwnRequest(selectedApproval)">
-            <button @click="handleApprove(selectedApproval); detailModal = false" class="btn-primary">Approve</button>
-            <button @click="detailModal = false; openReject(selectedApproval)" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Reject</button>
+            <button v-if="!editMode && isEditablePayload(selectedApproval)"
+              @click="startEdit(selectedApproval)" class="btn-secondary">Edit</button>
+            <button v-if="!editMode" @click="handleApprove(selectedApproval); detailModal = false" class="btn-primary">Approve</button>
+            <button v-if="!editMode" @click="detailModal = false; openReject(selectedApproval)" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Reject</button>
           </template>
           <span v-else class="text-sm text-gray-400 italic">You cannot approve or reject your own request</span>
         </div>
@@ -84,11 +112,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useApi } from '@/composables/useApi'
-import { listPendingApprovals, approveRequest, rejectRequest } from '@/api/approvals'
+import { listPendingApprovals, approveRequest, rejectRequest, updateApprovalPayload } from '@/api/approvals'
 import DataTable from '@/components/DataTable.vue'
 import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -106,6 +134,9 @@ const rejectModal = ref(false)
 const rejectReason = ref('')
 const confirmApprove = ref(false)
 const approvalToAction = ref(null)
+const editMode = ref(false)
+const editPayload = reactive({ dn: '', attributes: {} })
+const savingPayload = ref(false)
 
 const cols = [
   { key: 'requestType', label: 'Type' },
@@ -155,7 +186,49 @@ function isOwnRequest(approval) {
 
 function openDetail(approval) {
   selectedApproval.value = approval
+  editMode.value = false
   detailModal.value = true
+}
+
+function isEditablePayload(approval) {
+  return ['USER_CREATE', 'SELF_REGISTRATION'].includes(approval.requestType)
+}
+
+function startEdit(approval) {
+  try {
+    const parsed = JSON.parse(approval.payload)
+    editPayload.dn = parsed.dn || ''
+    // Deep copy attributes so edits don't mutate the original
+    const attrs = {}
+    for (const [key, val] of Object.entries(parsed.attributes || {})) {
+      attrs[key] = Array.isArray(val) ? [...val] : [val]
+    }
+    editPayload.attributes = attrs
+    editMode.value = true
+  } catch {
+    editPayload.dn = ''
+    editPayload.attributes = {}
+  }
+}
+
+async function savePayload() {
+  savingPayload.value = true
+  try {
+    const newPayload = JSON.stringify({
+      dn: editPayload.dn,
+      attributes: editPayload.attributes
+    })
+    const { data } = await updateApprovalPayload(dirId, selectedApproval.value.id, newPayload)
+    // Update the local approval data
+    selectedApproval.value = data
+    const idx = approvals.value.findIndex(a => a.id === data.id)
+    if (idx >= 0) approvals.value[idx] = data
+    editMode.value = false
+  } catch (e) {
+    alert(e.response?.data?.detail || 'Failed to save changes')
+  } finally {
+    savingPayload.value = false
+  }
 }
 
 function openReject(approval) {
@@ -171,7 +244,11 @@ function handleApprove(approval) {
 
 async function doApprove() {
   confirmApprove.value = false
-  await call(() => approveRequest(dirId, approvalToAction.value.id), { successMsg: 'Request approved' })
+  try {
+    await call(() => approveRequest(dirId, approvalToAction.value.id), { successMsg: 'Request approved' })
+  } catch {
+    // Provisioning may have failed — reload to show the error
+  }
   await loadApprovals()
 }
 

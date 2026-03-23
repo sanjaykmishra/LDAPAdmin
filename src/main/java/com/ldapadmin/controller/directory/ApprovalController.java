@@ -54,6 +54,15 @@ public class ApprovalController {
         return service.reject(approvalId, principal, req.reason());
     }
 
+    @PutMapping("/{approvalId}/payload")
+    public PendingApprovalResponse updatePayload(
+            @DirectoryId @PathVariable UUID directoryId,
+            @PathVariable UUID approvalId,
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @RequestBody String payload) {
+        return service.updatePayload(approvalId, principal, payload);
+    }
+
     @GetMapping("/count")
     public Map<String, Long> countPending(
             @DirectoryId @PathVariable UUID directoryId,

@@ -102,10 +102,26 @@
                   type="date" :required="field.required"
                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
 
-                <input v-else-if="field.inputType === 'PASSWORD'"
-                  v-model="attributeValues[field.attributeName]"
-                  type="password" :required="field.required"
-                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                <div v-else-if="field.inputType === 'PASSWORD'" class="relative">
+                  <input
+                    v-model="attributeValues[field.attributeName]"
+                    :type="regPasswordVisible[field.attributeName] ? 'text' : 'password'"
+                    :required="field.required"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-9" />
+                  <button type="button"
+                    class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    @mousedown.prevent="regPasswordVisible[field.attributeName] = true"
+                    @mouseup.prevent="regPasswordVisible[field.attributeName] = false"
+                    @mouseleave="regPasswordVisible[field.attributeName] = false"
+                    @touchstart.prevent="regPasswordVisible[field.attributeName] = true"
+                    @touchend.prevent="regPasswordVisible[field.attributeName] = false"
+                    title="Hold to show password">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path v-if="!regPasswordVisible[field.attributeName]" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M3 3l18 18" />
+                    </svg>
+                  </button>
+                </div>
 
                 <input v-else
                   v-model="attributeValues[field.attributeName]"
@@ -169,6 +185,7 @@ import {
 
 const loading = ref(false)
 const loadingForm = ref(false)
+const regPasswordVisible = reactive({})
 const errorMsg = ref('')
 const submitted = ref(false)
 const submitResult = ref(null)
