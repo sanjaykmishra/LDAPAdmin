@@ -268,7 +268,7 @@ public class SelfServiceService {
         return attrConfigRepo.findAllByProfileIdOrderByDisplayOrderAsc(profileId).stream()
                 .filter(c -> c.isSelfRegistrationEdit() && !c.isHidden()
                         && !"HIDDEN_FIXED".equals(c.getInputType().name()))
-                .sorted(Comparator.comparingInt(ProfileAttributeConfig::getRegistrationDisplayOrder))
+                .sorted(Comparator.comparing(ProfileAttributeConfig::getRegistrationDisplayOrder, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(c -> new SelfServiceFieldConfig(
                         c.getAttributeName(),
                         c.getCustomLabel() != null ? c.getCustomLabel() : humanize(c.getAttributeName()),
