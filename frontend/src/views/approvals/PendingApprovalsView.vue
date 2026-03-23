@@ -14,7 +14,7 @@
       <template #cell-actions="{ row }">
         <div class="flex gap-2" v-if="row.status === 'PENDING'">
           <button @click="openDetail(row)" class="btn-secondary text-xs">View</button>
-          <button v-if="!isOwnRequest(row)" @click="handleApprove(row)" class="btn-primary text-xs">Approve</button>
+          <button v-if="!isOwnRequest(row)" @click="handleApprove(row)" class="text-xs px-3 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700 font-medium">Approve</button>
           <button v-if="!isOwnRequest(row)" @click="openReject(row)" class="text-xs px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700">Reject</button>
           <span v-if="isOwnRequest(row)" class="text-xs text-gray-400 italic self-center">Own request</span>
         </div>
@@ -76,7 +76,7 @@
           <template v-if="!isOwnRequest(selectedApproval)">
             <button v-if="!editMode && isEditablePayload(selectedApproval)"
               @click="startEdit(selectedApproval)" class="btn-secondary">Edit</button>
-            <button v-if="!editMode" @click="handleApprove(selectedApproval); detailModal = false" class="btn-primary">Approve</button>
+            <button v-if="!editMode" @click="handleApprove(selectedApproval); detailModal = false" class="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 font-medium">Approve</button>
             <button v-if="!editMode" @click="detailModal = false; openReject(selectedApproval)" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Reject</button>
           </template>
           <span v-else class="text-sm text-gray-400 italic">You cannot approve or reject your own request</span>
@@ -107,6 +107,7 @@
       title="Approve Request"
       message="Are you sure you want to approve this request? The LDAP entry will be created immediately."
       confirm-label="Approve"
+      confirm-class="bg-green-600 hover:bg-green-700"
       @confirm="doApprove" />
   </div>
 </template>
@@ -216,9 +217,15 @@ function startEdit(approval) {
 async function savePayload() {
   savingPayload.value = true
   try {
+    // Remove attributes with no value
+    const cleanAttrs = {}
+    for (const [key, vals] of Object.entries(editPayload.attributes)) {
+      const filtered = vals.filter(v => v != null && v !== '')
+      if (filtered.length > 0) cleanAttrs[key] = filtered
+    }
     const newPayload = JSON.stringify({
       dn: editPayload.dn,
-      attributes: editPayload.attributes
+      attributes: cleanAttrs
     })
     const { data } = await updateApprovalPayload(dirId, selectedApproval.value.id, newPayload)
     // Update the local approval data
@@ -272,3 +279,9 @@ async function loadApprovals() {
 
 onMounted(loadApprovals)
 </script>
+
+<style scoped>
+.btn-primary { @apply px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50; }
+.btn-secondary { @apply px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50; }
+.input { @apply border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500; }
+</style>
