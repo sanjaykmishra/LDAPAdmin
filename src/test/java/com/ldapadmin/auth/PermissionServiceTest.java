@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.util.List;
@@ -27,6 +28,8 @@ class PermissionServiceTest {
 
     @Mock private AdminProfileRoleRepository       profileRoleRepo;
     @Mock private AdminFeaturePermissionRepository featurePermissionRepo;
+    @SuppressWarnings("unchecked")
+    @Mock private ObjectProvider<RequestScopedPermissionCache> cacheProvider;
 
     private PermissionService permissionService;
 
@@ -36,7 +39,7 @@ class PermissionServiceTest {
 
     @BeforeEach
     void setUp() {
-        permissionService = new PermissionService(profileRoleRepo, featurePermissionRepo);
+        permissionService = new PermissionService(profileRoleRepo, featurePermissionRepo, cacheProvider);
     }
 
     // ── Superadmin bypass ─────────────────────────────────────────────────────
@@ -103,8 +106,8 @@ class PermissionServiceTest {
         when(profileRoleRepo.existsByAdminAccountIdAndProfileDirectoryId(adminId, dirId)).thenReturn(true);
         when(featurePermissionRepo.findByAdminAccountIdAndFeatureKey(adminId, FeatureKey.USER_CREATE))
                 .thenReturn(Optional.empty());
-        when(profileRoleRepo.findAllByAdminAccountId(adminId))
-                .thenReturn(List.of(roleFor(BaseRole.ADMIN)));
+        when(profileRoleRepo.existsByAdminAccountIdAndBaseRole(adminId, BaseRole.ADMIN))
+                .thenReturn(true);
 
         permissionService.requireFeature(admin(), dirId, FeatureKey.USER_CREATE);
     }
@@ -114,8 +117,8 @@ class PermissionServiceTest {
         when(profileRoleRepo.existsByAdminAccountIdAndProfileDirectoryId(adminId, dirId)).thenReturn(true);
         when(featurePermissionRepo.findByAdminAccountIdAndFeatureKey(adminId, FeatureKey.USER_DELETE))
                 .thenReturn(Optional.empty());
-        when(profileRoleRepo.findAllByAdminAccountId(adminId))
-                .thenReturn(List.of(roleFor(BaseRole.READ_ONLY)));
+        when(profileRoleRepo.existsByAdminAccountIdAndBaseRole(adminId, BaseRole.ADMIN))
+                .thenReturn(false);
 
         assertThatThrownBy(() -> permissionService.requireFeature(admin(), dirId, FeatureKey.USER_DELETE))
                 .isInstanceOf(AccessDeniedException.class);
@@ -126,8 +129,8 @@ class PermissionServiceTest {
         when(profileRoleRepo.existsByAdminAccountIdAndProfileDirectoryId(adminId, dirId)).thenReturn(true);
         when(featurePermissionRepo.findByAdminAccountIdAndFeatureKey(adminId, FeatureKey.BULK_EXPORT))
                 .thenReturn(Optional.empty());
-        when(profileRoleRepo.findAllByAdminAccountId(adminId))
-                .thenReturn(List.of(roleFor(BaseRole.READ_ONLY)));
+        when(profileRoleRepo.existsByAdminAccountIdAndBaseRole(adminId, BaseRole.ADMIN))
+                .thenReturn(false);
 
         permissionService.requireFeature(admin(), dirId, FeatureKey.BULK_EXPORT);
     }
