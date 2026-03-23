@@ -1,9 +1,13 @@
 ================================================================================
-  PLAN: Resolving the Admin Profile-vs-Directory Scope Mismatch
+  PLAN: Permission & Authorization Architecture Audit + Remediation
 ================================================================================
 
 STATUS: Draft — not yet implemented
 DATE:   2026-03-23
+
+================================================================================
+  PART I — PROFILE-VS-DIRECTORY SCOPE MISMATCH
+================================================================================
 
 --------------------------------------------------------------------------------
 1. PROBLEM STATEMENT
@@ -174,7 +178,7 @@ What this means in practice:
        which users they can view or manage."
 
 --------------------------------------------------------------------------------
-4. RECOMMENDATION
+4. RECOMMENDATION (PROFILE SCOPING)
 --------------------------------------------------------------------------------
 
 If the deployment model is "multiple admin teams sharing one directory with
@@ -191,3 +195,278 @@ A hybrid is also viable: add a boolean flag to DirectoryConnection like
 from Option A. When false, profiles are provisioning-only. This lets each
 deployment choose its model, but adds a configuration surface that must be
 documented and tested.
+
+
+================================================================================
+  PART II — BROADER PERMISSION/ACTION AUDIT FINDINGS
+================================================================================
+
+Full architecture audit performed 2026-03-23. Findings are grouped by severity
+and include compounding relationships.
+
+--------------------------------------------------------------------------------
+5. CRITICAL FINDINGS
+--------------------------------------------------------------------------------
+
+C1. Application settings writable by any admin
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   ApplicationSettingsController.java:42
+  Route:  PUT /api/v1/settings
+  Issue:  No @PreAuthorize annotation. Falls through to SecurityConfig catch-all
+          which permits any ADMIN or SUPERADMIN. A regular admin can modify:
+            - SMTP configuration
+            - S3 credentials
+            - OIDC client settings
+            - Session timeout
+            - superadminBypassApproval flag
+  Impact: An admin enables superadminBypassApproval → any superadmin's future
+          operations auto-approve without oversight.
+  Fix:    Add @PreAuthorize("hasRole('SUPERADMIN')") to both get() and upsert()
+          methods in ApplicationSettingsController.
+
+C2. Approval bypass via unprovisioned OUs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Files:  UserController.java:79-96
+          BulkUserController.java:93-106
+          GroupController.java:142-167
+  Issue:  Approval check is conditional on findProfileForDn() returning a match:
+            Optional<ProvisioningProfile> profile =
+                approvalService.findProfileForDn(directoryId, req.dn());
+            if (profile.isPresent() && approvalService.isApprovalRequired(...))
+          If the target DN doesn't match any profile's targetOuDn, the operation
+          executes immediately — no approval, no record of the bypass.
+  Attack: Admin targets ou=temp (no profile configured) → creates users with no
+          approval gate. Bulk import variant can create hundreds of accounts.
+  Fix:    Two options:
+          (a) Deny operations targeting DNs that don't resolve to a profile
+              (strict — may break legitimate use cases for service accounts).
+          (b) Require approval for ALL operations when no profile is resolved,
+              routing to a directory-level default approver.
+          Either way, log when profile resolution fails.
+
+C3. Playbook requireApproval flag is stored but never enforced
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   LifecyclePlaybookService.java:127-189
+  Entity: LifecyclePlaybook.requireApproval (boolean field)
+  Issue:  execute() never checks pb.isRequireApproval(). Any ADMIN can execute
+          a playbook that disables accounts, removes group memberships, or
+          modifies attributes — even when the playbook was explicitly configured
+          to require approval.
+  Fix:    At the top of execute(), check:
+            if (pb.isRequireApproval()) {
+                approvalService.submitForApproval(
+                    directoryId, pb.getProfile().getId(), principal,
+                    ApprovalRequestType.PLAYBOOK_EXECUTION, payload);
+                return pendingResponse;
+            }
+
+--------------------------------------------------------------------------------
+6. HIGH FINDINGS
+--------------------------------------------------------------------------------
+
+H1. Bulk group-member add bypasses single-member approval
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   GroupController.java:180-202
+  Route:  POST /api/v1/directories/{directoryId}/groups/members/bulk
+  Issue:  Single-member endpoint (POST /groups/members) checks approval at the
+          controller level. The bulk variant iterates and calls
+          service.addGroupMember() directly, skipping the approval check.
+  Fix:    Extract the approval-check logic into a shared method. Call it for
+          each member in the bulk loop, or submit the entire batch as one
+          approval request.
+
+H2. Approval payload tampering by approvers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   ApprovalWorkflowService.java:227-249
+  Route:  PUT /api/v1/directories/{directoryId}/approvals/{approvalId}/payload
+  Issue:  Approvers can modify the payload (user attributes, target DN, group
+          memberships) before approving. No validation that the new payload
+          matches the original request. Additionally, the original requester can
+          edit their own pending request — the self-approval guard (line 146-148)
+          only applies to approve(), not updatePayload().
+  Fix:    (a) Validate payload schema matches the original request type.
+          (b) Prevent the original requester from editing their own payload.
+          (c) Record payload diffs in the approval audit trail.
+
+H3. Race condition on concurrent approval
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   ApprovalWorkflowService.java:137-189
+  Issue:  approve() checks status == PENDING, then executes the LDAP operation,
+          then sets status to APPROVED. No pessimistic lock or @Version
+          optimistic check. Two concurrent approve calls can both pass the
+          status check and execute the operation twice.
+  Fix:    Add @Version to PendingApproval entity, or use a pessimistic write
+          lock:
+            @Lock(LockModeType.PESSIMISTIC_WRITE)
+            Optional<PendingApproval> findByIdForUpdate(UUID id);
+
+H4. REPORTS_EXPORT feature key defined but never enforced
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   FeatureKey.java:25 (definition)
+          PermissionService.java:49 (in READONLY_DEFAULT_FEATURES)
+  Issue:  No @RequiresFeature(FeatureKey.REPORTS_EXPORT) annotation exists
+          anywhere. The feature key is dead code — if a report export endpoint
+          exists, it's ungated.
+  Fix:    Either add @RequiresFeature(REPORTS_EXPORT) to the appropriate
+          endpoint, or remove the enum value if no separate export path exists.
+
+H5. generatePassword lacks profile-scope check
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   ProvisioningProfileController.java:123-127
+  Route:  POST /api/v1/profiles/{profileId}/generate-password
+  Issue:  Accepts any profileId with only hasAnyRole('ADMIN', 'SUPERADMIN').
+          No check that the admin has access to that profile. Leaks password
+          policy details (length, character requirements) for profiles outside
+          the admin's scope.
+  Fix:    Add permissionService.requireProfileAccess(principal, profileId)
+          before generating.
+
+--------------------------------------------------------------------------------
+7. MEDIUM FINDINGS
+--------------------------------------------------------------------------------
+
+M1. Audit log not directory-scoped for non-superadmins
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   AuditLogController.java:47
+  Issue:  hasAnyRole('ADMIN', 'SUPERADMIN') with no directory filtering. A
+          regular admin can query audit records for directories they have no
+          profile access to, exposing user DNs, actions, and operational
+          history across the entire deployment.
+  Fix:    For non-superadmins, intersect the query's directoryId filter with
+          the admin's authorized directories (from their profile roles).
+
+M2. Access review listReviewers returns all admins
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   AccessReviewController.java:42-46
+  Route:  GET /api/v1/directories/{directoryId}/access-reviews/reviewers
+  Issue:  Returns all admin accounts regardless of directory. Leaks the full
+          admin roster to any admin with ACCESS_REVIEW_MANAGE feature access.
+  Fix:    Filter to admins who have at least one profile role in the given
+          directoryId.
+
+M3. Campaign creation superadmin check is buried at runtime
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   AccessReviewController.java:60-70
+  Issue:  Checks principal.isSuperadmin() inside the method body instead of
+          declaring @PreAuthorize("hasRole('SUPERADMIN')"). The authorization
+          rule isn't visible at the API contract level and could be bypassed
+          if the service method is called from another code path.
+  Fix:    Replace the runtime check with @PreAuthorize("hasRole('SUPERADMIN')")
+          on the controller method.
+
+M4. No approval coverage for destructive operations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Files:  UserController.java:128-186, GroupController.java:115-123
+  Issue:  Approval workflows only cover: user create, user move, bulk import,
+          group member add, self-registration. These have NO approval path:
+            - User delete, enable/disable, attribute update, password reset
+            - Group delete, member remove
+            - Bulk attribute update
+  Note:   This may be intentional (approval for destructive ops is uncommon
+          in LDAP tooling). Flag for product decision — not necessarily a bug,
+          but should be a conscious choice documented somewhere.
+
+M5. Bulk group import has no approval workflow
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  File:   BulkGroupController.java:63-78
+  Route:  POST /api/v1/directories/{directoryId}/groups/import
+  Issue:  Has @RequiresFeature(BULK_IMPORT) but unlike BulkUserController,
+          does not check for approval. Hundreds of groups can be created
+          without review.
+  Fix:    Add approval check consistent with BulkUserController, or document
+          the intentional difference.
+
+--------------------------------------------------------------------------------
+8. COMPOUNDING RELATIONSHIPS
+--------------------------------------------------------------------------------
+
+These findings interact to create escalation paths:
+
+  C1 + C3: Admin modifies global settings to enable superadminBypassApproval.
+           Superadmin then executes playbooks with requireApproval=true — the
+           flag is ignored anyway (C3), but even if it were enforced, the
+           bypass setting (C1) would auto-approve.
+
+  C2 + H1: Admin targets an OU with no provisioning profile. Approval never
+           triggers for single operations (C2). Bulk group-member add also
+           skips approval (H1). Combined: mass group membership changes with
+           zero oversight.
+
+  H2 + H3: Approver tampers with payload (H2) while a second approver
+           concurrently approves the original (H3). Result: the tampered
+           version executes once AND the original executes once — two LDAP
+           operations, one with modified data.
+
+  C2 + M4: Operations on unprovisioned OUs bypass approval (C2), and
+           destructive operations have no approval path at all (M4). An admin
+           can delete or disable users in unprovisioned OUs with no checks
+           beyond the directory-level feature gate.
+
+  M1 + M2: Non-superadmin can enumerate all admins (M2) and query audit logs
+           across all directories (M1), building a full picture of who did
+           what across the entire deployment.
+
+--------------------------------------------------------------------------------
+9. PRIORITIZED REMEDIATION ORDER
+--------------------------------------------------------------------------------
+
+Priority is based on: exploitability, blast radius, and fix complexity.
+
+  ┌──────┬──────────┬────────────────────────────────────────────────┬──────────┐
+  │ Step │ Finding  │ What to do                                     │ Effort   │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  1   │ C1       │ Add @PreAuthorize("hasRole('SUPERADMIN')")     │ 5 min    │
+  │      │          │ to ApplicationSettingsController get + upsert.  │          │
+  │      │          │ Immediate — blocks the escalation chain.        │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  2   │ H3       │ Add @Version to PendingApproval or use         │ 30 min   │
+  │      │          │ pessimistic lock in approve(). Prevents double  │          │
+  │      │          │ execution.                                      │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  3   │ H2       │ Block requester from editing own payload.       │ 30 min   │
+  │      │          │ Add payload diff logging. Validate schema       │          │
+  │      │          │ matches original request type.                   │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  4   │ C3       │ Enforce requireApproval in playbook execute().  │ 1 hr     │
+  │      │          │ Route to profile approvers or directory-level   │          │
+  │      │          │ fallback. Add PLAYBOOK_EXECUTION request type.  │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  5   │ C2       │ Decide policy: deny if no profile resolved, or │ 2 hr     │
+  │      │          │ route to default approver. Implement in the     │          │
+  │      │          │ shared approval-check path. Add logging.        │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  6   │ H1       │ Extract approval check into shared method.      │ 1 hr     │
+  │      │          │ Call from both single and bulk group-member      │          │
+  │      │          │ endpoints.                                       │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  7   │ H5       │ Add requireProfileAccess() to generate-        │ 10 min   │
+  │      │          │ Password endpoint.                               │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  8   │ H4       │ Add @RequiresFeature(REPORTS_EXPORT) to the    │ 10 min   │
+  │      │          │ export endpoint, or remove dead enum value.      │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  9   │ M3       │ Replace runtime superadmin check with           │ 5 min    │
+  │      │          │ @PreAuthorize in AccessReviewController.create.  │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  10  │ M1       │ Filter audit queries by admin's authorized      │ 1 hr     │
+  │      │          │ directories for non-superadmins.                 │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  11  │ M2       │ Filter listReviewers by directory.              │ 30 min   │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  12  │ M5       │ Add approval workflow to bulk group import, or  │ 1 hr     │
+  │      │          │ document the intentional omission.               │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  13  │ M4       │ Product decision: which destructive operations  │ varies   │
+  │      │          │ need approval gates? Implement accordingly.      │          │
+  ├──────┼──────────┼────────────────────────────────────────────────┼──────────┤
+  │  14  │ Part I   │ Profile-vs-directory scoping (Option A or       │ 2-3 days │
+  │      │          │ Alternative — see sections 2-4 above).           │          │
+  └──────┴──────────┴────────────────────────────────────────────────┴──────────┘
+
+Steps 1-3 should be done immediately — they are low-effort, high-impact fixes
+that close the worst escalation paths. Steps 4-8 form a second batch. Steps
+9-13 are cleanup. Step 14 (profile scoping) is the largest piece and should
+be a deliberate architectural decision.
+
+Total estimated effort (excluding step 14): ~7-8 hours of implementation +
+testing. Step 14 adds 2-3 days depending on which option is chosen.
