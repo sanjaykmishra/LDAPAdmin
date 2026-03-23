@@ -80,7 +80,7 @@
         <button
           v-if="results.length"
           @click="doExportResults"
-          class="text-sm text-blue-600 hover:text-blue-800 font-medium"
+          class="btn-secondary"
         >Export LDIF</button>
       </div>
 
@@ -97,7 +97,7 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-50">
-          <tr v-for="entry in results" :key="entry.dn" class="hover:bg-blue-50 cursor-pointer" @click="goToBrowser(entry.dn)">
+          <tr v-for="entry in results" :key="entry.dn" class="hover:bg-blue-50 cursor-pointer" @click="showEntryDetail(entry)">
             <td class="py-2 px-4 font-mono text-xs text-blue-600 break-all max-w-md">{{ entry.dn }}</td>
             <td v-for="col in resultColumns" :key="col" class="py-2 px-4 font-mono text-xs text-gray-700 break-all">
               {{ (entry.attributes[col] || []).join(', ') }}
@@ -106,29 +106,51 @@
         </tbody>
       </table>
     </div>
+
+    <!-- Entry detail dialog -->
+    <div v-if="selectedEntry" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="selectedEntry = null">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+          <h3 class="text-sm font-semibold text-gray-900 truncate">{{ selectedEntry.dn }}</h3>
+          <button @click="selectedEntry = null" class="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+        </div>
+        <div class="overflow-y-auto p-5">
+          <table class="w-full text-sm">
+            <tbody>
+              <tr v-for="(values, attr) in selectedEntry.attributes" :key="attr" class="border-b border-gray-100">
+                <td class="py-2 pr-4 font-medium text-gray-600 align-top whitespace-nowrap">{{ attr }}</td>
+                <td class="py-2 font-mono text-xs text-gray-800 break-all">
+                  <div v-for="(v, i) in values" :key="i">{{ v }}</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p v-if="!Object.keys(selectedEntry.attributes || {}).length" class="text-sm text-gray-400 text-center py-4">No attributes returned.</p>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { useNotificationStore } from '@/stores/notifications'
 import { listDirectories } from '@/api/directories'
-import { searchEntries, exportLdif } from '@/api/browse'
+import { searchEntries } from '@/api/browse'
 import DnPicker from '@/components/DnPicker.vue'
 
 const HISTORY_KEY = 'ldap-search-history'
 const SAVED_KEY   = 'ldap-saved-searches'
 const MAX_HISTORY = 10
 
-const router = useRouter()
 const notif  = useNotificationStore()
 
 const directories = ref([])
 const loadingDirs = ref(false)
 const searching   = ref(false)
 const hasSearched = ref(false)
-const results     = ref([])
+const results      = ref([])
+const selectedEntry = ref(null)
 
 const form = ref({
   directoryId: '',
@@ -177,26 +199,28 @@ async function doSearch() {
   }
 }
 
-async function doExportResults() {
-  try {
-    const { data } = await exportLdif(
-      form.value.directoryId,
-      form.value.baseDn || '',
-      form.value.scope
-    )
-    const url = URL.createObjectURL(data)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'search-export.ldif'
-    a.click()
-    URL.revokeObjectURL(url)
-  } catch (e) {
-    notif.error(e.response?.data?.detail || e.message)
+function doExportResults() {
+  const lines = []
+  for (const entry of results.value) {
+    lines.push(`dn: ${entry.dn}`)
+    for (const [attr, values] of Object.entries(entry.attributes || {})) {
+      for (const v of values) {
+        lines.push(`${attr}: ${v}`)
+      }
+    }
+    lines.push('')
   }
+  const blob = new Blob([lines.join('\n')], { type: 'application/ldif' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'search-export.ldif'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
-function goToBrowser(dn) {
-  router.push({ path: '/superadmin/browser', query: { dn } })
+function showEntryDetail(entry) {
+  selectedEntry.value = entry
 }
 
 function clearForm() {
@@ -207,8 +231,10 @@ function clearForm() {
 
 function saveToHistory(f) {
   const entry = { directoryId: f.directoryId, baseDn: f.baseDn, scope: f.scope, filter: f.filter, attributes: f.attributes, limit: f.limit }
-  const existing = history.value.filter(h => h.filter !== entry.filter || h.baseDn !== entry.baseDn)
-  history.value = [entry, ...existing].slice(0, MAX_HISTORY)
+  const same = (a, b) => a.directoryId === b.directoryId && a.baseDn === b.baseDn
+      && a.scope === b.scope && a.filter === b.filter && a.attributes === b.attributes && a.limit === b.limit
+  if (history.value.some(h => same(h, entry))) return
+  history.value = [entry, ...history.value].slice(0, MAX_HISTORY)
   try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history.value)) } catch {}
 }
 
