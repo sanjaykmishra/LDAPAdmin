@@ -144,6 +144,18 @@ public class LifecyclePlaybookService {
             return PlaybookExecutionResponse.pending(pb.getName(), pa.getId());
         }
 
+        return executeImmediate(directoryId, playbookId, targetDn, principal);
+    }
+
+    /**
+     * Executes a playbook immediately, bypassing the approval check.
+     * Called directly by {@link ApprovalWorkflowService} when a PLAYBOOK_EXECUTE
+     * approval request is approved.
+     */
+    @Transactional
+    PlaybookExecutionResponse executeImmediate(UUID directoryId, UUID playbookId,
+                                               String targetDn, AuthPrincipal principal) {
+        LifecyclePlaybook pb = requirePlaybook(directoryId, playbookId);
         DirectoryConnection dc = requireDirectory(directoryId);
         List<PlaybookStep> steps = stepRepo.findAllByPlaybookIdOrderByStepOrderAsc(playbookId);
 
