@@ -14,7 +14,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "pending_approvals")
+@Table(name = "workflow_approvals")
 @Getter
 @Setter
 @NoArgsConstructor

@@ -131,6 +131,12 @@ const router = createRouter({
           meta: { requiresSuperadmin: true },
         },
         {
+          path: 'superadmin/audit-log',
+          name: 'superadminAuditLog',
+          component: () => import('@/views/audit/AuditLogView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
+        {
           path: 'superadmin/audit-sources',
           name: 'auditSources',
           component: () => import('@/views/superadmin/AuditSourcesView.vue'),

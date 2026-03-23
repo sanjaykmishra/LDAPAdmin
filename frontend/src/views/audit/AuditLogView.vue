@@ -20,6 +20,9 @@
         <span class="badge-gray">{{ value }}</span>
       </template>
       <template #cell-targetDn="{ value }"><code class="text-xs">{{ value }}</code></template>
+      <template #cell-detail="{ value }">
+        <code v-if="value" class="text-xs whitespace-pre-wrap">{{ formatDetail(value) }}</code>
+      </template>
     </DataTable>
 
     <!-- Pagination -->
@@ -63,11 +66,17 @@ const cols = [
   { key: 'actorUsername', label: 'Actor' },
   { key: 'action',        label: 'Action' },
   { key: 'targetDn',      label: 'Target' },
+  { key: 'detail',        label: 'Detail' },
 ]
 
 function fmtDate(v) {
   if (!v) return '—'
   return new Date(v).toLocaleString()
+}
+
+function formatDetail(detail) {
+  if (!detail || typeof detail !== 'object') return ''
+  return Object.entries(detail).map(([k, v]) => `${k}: ${v}`).join('\n')
 }
 
 function clearFilters() {
