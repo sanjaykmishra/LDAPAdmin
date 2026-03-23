@@ -73,7 +73,8 @@
                   >
                     <FormField
                       :label="attr.customLabel || attr.attributeName"
-                      v-model="local.attributes[attr.attributeName]"
+                      :model-value="attr.computedExpression ? computedAttrValues[attr.attributeName] : local.attributes[attr.attributeName]"
+                      @update:model-value="v => { if (!attr.computedExpression) local.attributes[attr.attributeName] = v }"
                       :type="mapInputType(attr.inputType)"
                       :options="attr.inputType === 'SELECT' ? parseOptions(attr.allowedValues) : undefined"
                       :required="attr.requiredOnCreate"
@@ -393,54 +394,81 @@ function groupIntoSections(attrs) {
 }
 
 /**
- * Evaluate computed expressions like "${givenName}.${sn}@corp.com".
- * Substitutes ${attrName} references with current attribute values.
+ * Parse and evaluate a computed expression by tokenizing into variable
+ * references (${attr}), quoted string literals, concatenation operators (+),
+ * and literal text.  No regex used for the concatenation handling.
  */
-function evaluateComputedExpressions() {
-  if (!props.userTemplateConfig?.attributeConfigs) return
+function evaluateExpression(expr) {
+  const parts = []
+  let i = 0
+  while (i < expr.length) {
+    if (expr[i] === '$' && expr[i + 1] === '{') {
+      // Variable reference: ${attrName}
+      const end = expr.indexOf('}', i + 2)
+      if (end === -1) break
+      const name = expr.substring(i + 2, end)
+      if (name === local.rdnAttribute) {
+        parts.push(local.rdnValue || '')
+      } else {
+        parts.push(local.attributes[name] || '')
+      }
+      i = end + 1
+    } else if (expr[i] === '+') {
+      // Concatenation operator — skip it
+      i++
+    } else if (expr[i] === '"' || expr[i] === "'") {
+      // Quoted string literal
+      const quote = expr[i]
+      const end = expr.indexOf(quote, i + 1)
+      if (end === -1) break
+      parts.push(expr.substring(i + 1, end))
+      i = end + 1
+    } else {
+      // Literal text (e.g. dots, @domain, etc.)
+      let j = i
+      while (j < expr.length && expr[j] !== '$' && expr[j] !== '+' && expr[j] !== '"' && expr[j] !== "'") {
+        j++
+      }
+      parts.push(expr.substring(i, j))
+      i = j
+    }
+  }
+  return parts.join('')
+}
+
+/**
+ * Computed map of all attribute values derived from computed expressions.
+ * Vue tracks which reactive properties are read (e.g. local.attributes.givenName),
+ * so this recomputes only when a referenced source attribute changes —
+ * no manual watcher, no reentrancy flag, no per-keystroke issues.
+ */
+const computedAttrValues = computed(() => {
+  const result = {}
+  if (!props.userTemplateConfig?.attributeConfigs || props.isEdit) return result
   for (const attr of props.userTemplateConfig.attributeConfigs) {
     if (!attr.computedExpression) continue
     try {
-      const expr = String(attr.computedExpression)
-      let resolved = expr.replace(/\$\{(\w+)\}/g, (_, name) => {
-        // Check rdnValue first since it's stored separately
-        if (name === local.rdnAttribute) return local.rdnValue || ''
-        return local.attributes[name] || ''
-      })
-      // Evaluate + concatenation with quoted strings, e.g. +" "+ or +' '+
-      // Handle both-sided case first (+" "+), then single-sided cases
-      resolved = resolved
-        .replace(/\+["']([^"']*)["']\+/g, '$1')
-        .replace(/\+["']([^"']*)["']/g, '$1')
-        .replace(/["']([^"']*)["']\+/g, '$1')
-      // Only set if expression produced a meaningful result (not all placeholders empty)
-      if (resolved !== expr || !expr.includes('${')) {
-        local.attributes[attr.attributeName] = resolved
-        // Also update rdnValue when the computed attribute is the RDN
-        if (attr.attributeName === local.rdnAttribute) {
-          local.rdnValue = resolved
-        }
-      }
+      result[attr.attributeName] = evaluateExpression(String(attr.computedExpression))
     } catch {
-      // Skip failed expression evaluation; continue with remaining attributes
+      // Skip failed expression evaluation
     }
   }
-}
+  return result
+})
 
 let syncing = false
-let computing = false
 watch(local, v => {
   if (syncing) return
-  if (!computing && !props.isEdit) {
-    computing = true
-    try {
-      evaluateComputedExpressions()
-    } finally {
-      // Allow the watcher to re-fire with computed values included
-      nextTick(() => { computing = false })
+  const data = JSON.parse(JSON.stringify(v))
+  // Merge computed attribute values into the emitted data
+  const cv = computedAttrValues.value
+  for (const key in cv) {
+    data.attributes[key] = cv[key]
+    if (key === local.rdnAttribute) {
+      data.rdnValue = cv[key]
     }
   }
-  emit('update', JSON.parse(JSON.stringify(v)))
+  emit('update', data)
 }, { deep: true })
 watch(() => props.data, v => {
   syncing = true
