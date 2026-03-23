@@ -107,15 +107,13 @@ public class LdapBrowseService {
             probe.setSizeLimit(1);
             SearchResult result = conn.search(probe);
             return !result.getSearchEntries().isEmpty();
-        } catch (LDAPSearchException e) {
-            // SIZE_LIMIT_EXCEEDED means at least one entry exists
-            if (e.getResultCode() == ResultCode.SIZE_LIMIT_EXCEEDED
-                    || e.getEntryCount() > 0) {
-                return true;
-            }
-            return false;
         } catch (LDAPException e) {
-            // If we can't probe, assume it might have children
+            // SIZE_LIMIT_EXCEEDED means at least one entry exists;
+            // for any other error, assume it might have children
+            if (e instanceof LDAPSearchException se) {
+                return se.getResultCode() == ResultCode.SIZE_LIMIT_EXCEEDED
+                        || se.getEntryCount() > 0;
+            }
             return true;
         }
     }
