@@ -1,0 +1,193 @@
+================================================================================
+  PLAN: Resolving the Admin Profile-vs-Directory Scope Mismatch
+================================================================================
+
+STATUS: Draft — not yet implemented
+DATE:   2026-03-23
+
+--------------------------------------------------------------------------------
+1. PROBLEM STATEMENT
+--------------------------------------------------------------------------------
+
+Admins are assigned to provisioning profiles via AdminProfileRole, where each
+profile has a targetOuDn (e.g. ou=engineering,dc=example,dc=com). However, most
+operations gate access using PermissionService.requireDirectoryAccess(), which
+only checks whether the admin has a role in ANY profile belonging to that
+directory. Once past that gate, no further DN-level restriction is applied.
+
+Consequence: an admin scoped to profile "Engineering" (ou=engineering) can:
+  - Search/list users in ou=sales
+  - Bulk-import users into ou=sales
+  - Bulk-export the entire directory tree
+  - Execute playbooks against users in any OU
+  - Create/view access review campaigns for any group in the directory
+
+This defeats the purpose of profile-scoped admin assignment.
+
+Affected call sites:
+  - LdapOperationService.searchUsers()           — baseDn from client, unchecked
+  - BulkUserController.importUsers()              — parentDn from client, unchecked
+  - BulkUserController.exportUsers()              — baseDn from client, unchecked
+  - LifecyclePlaybookService.execute()            — targetDn from client, unchecked
+  - LifecyclePlaybookService.preview()            — targetDn from client, unchecked
+  - AccessReviewCampaignService.create()          — groupDn from client, unchecked
+
+--------------------------------------------------------------------------------
+2. OPTION A — ENFORCE DN-LEVEL PROFILE SCOPING (incremental)
+--------------------------------------------------------------------------------
+
+Phase 1: Core infrastructure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+a) Add to PermissionService:
+
+     List<String> getAuthorizedOuDns(AuthPrincipal principal, UUID directoryId)
+       - Returns the set of targetOuDn values from all profiles the admin has
+         access to in this directory.
+       - Superadmins return empty list (meaning "unrestricted").
+
+     void requireDnWithinScope(AuthPrincipal p, UUID dirId, String targetDn)
+       - Calls getAuthorizedOuDns().
+       - If the list is non-empty, asserts that targetDn ends with (is a
+         descendant of) at least one of the authorized OUs.
+       - Throws AccessDeniedException otherwise.
+
+     void requireDnWithinScope(AuthPrincipal p, UUID dirId, List<String> dns)
+       - Batch variant for multi-target operations (playbook batch execute,
+         bulk import).
+
+b) Add to AdminProfileRoleRepository:
+
+     @Query("SELECT DISTINCT p.targetOuDn FROM AdminProfileRole apr "
+          + "JOIN apr.profile p "
+          + "WHERE apr.adminAccount.id = :adminId "
+          + "AND p.directory.id = :directoryId AND p.enabled = true")
+     List<String> findAuthorizedOuDns(@Param("adminId") UUID adminId,
+                                      @Param("directoryId") UUID directoryId);
+
+Phase 2: Wire into high-risk paths (playbooks + bulk import)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+c) LifecyclePlaybookService.execute() — after line 130:
+     permissionService.requireDnWithinScope(principal, directoryId, targetDn);
+
+d) LifecyclePlaybookService.preview() — same treatment.
+
+e) BulkUserController.importUsers() — after line 91:
+     permissionService.requireDnWithinScope(principal, directoryId, request.parentDn());
+
+Phase 3: Wire into read paths
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+f) LdapOperationService.searchUsers() — constrain baseDn:
+     If baseDn is null or equals the directory root, replace it with the union
+     of the admin's authorized OUs. Execute one LDAP search per OU and merge
+     results. If baseDn is explicitly provided, run requireDnWithinScope on it.
+
+g) BulkUserController.exportUsers() — same baseDn constraint as (f).
+
+Phase 4: Wire into access reviews
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+h) AccessReviewCampaignService.create() — for each groupDn in the request,
+     resolve its parent OU and call requireDnWithinScope. This ensures an admin
+     can only create review campaigns for groups within their profile OUs.
+
+i) Consider adding an optional profileId field to AccessReviewCampaign for
+     organizational filtering, but this is not strictly required if DN checks
+     are in place.
+
+Phase 5: Tests
+~~~~~~~~~~~~~~~
+j) Unit tests for PermissionService.requireDnWithinScope:
+     - Admin in profile with targetOuDn=ou=eng → allowed for cn=jdoe,ou=eng
+     - Same admin → denied for cn=jdoe,ou=sales
+     - Admin in two profiles → allowed for either OU
+     - Superadmin → always allowed
+     - Edge: DN case-insensitivity (LDAP DNs are case-insensitive)
+
+k) Integration tests for each wired call site.
+
+Estimated scope: ~150-200 lines of new code, touches 5-6 files.
+
+--------------------------------------------------------------------------------
+3. ALTERNATIVE: ADMINS ARE DIRECTORY-SCOPED; PROFILES ARE PROVISIONING-ONLY
+--------------------------------------------------------------------------------
+
+Instead of tightening profile scoping, we accept the current model and make it
+explicit: an admin granted access to ANY profile in a directory has full
+directory-level visibility and operational access. Profiles become purely a
+provisioning mechanism — they define HOW users are created (which OU, which
+object classes, which groups, which form fields) but not WHO the admin can see
+or act on.
+
+What this means in practice:
+
+  Permissions:
+    - AdminProfileRole still exists, but its semantic is "this admin can
+      provision users using this profile" rather than "this admin can only
+      see users in this profile's OU."
+    - An admin with role on profile "Engineering" can still view, export,
+      and run playbooks on users in ou=sales — because they have directory
+      access.
+    - Profile assignment becomes an operational capability ("you can create
+      engineers") not a visibility boundary.
+
+  What you gain:
+    - Simplicity. No DN-scoping logic to maintain. No per-search OU
+      filtering. No multi-OU query merging. No edge cases around users who
+      live outside any profile's OU (service accounts, legacy entries).
+    - Cross-OU operations just work. An offboarding playbook that moves a
+      user from ou=engineering to ou=disabled doesn't need an exception.
+      Bulk exports for compliance cover the whole directory.
+    - Fewer authorization failures in legitimate workflows. Admins won't be
+      blocked when a manager needs to review a cross-team transfer.
+
+  What you lose:
+    - OU-level isolation between admin teams. If you have HR admins who
+      should only see ou=hr and IT admins who should only see ou=it, this
+      model doesn't support that — both see the full directory.
+    - Least-privilege at the data level. An admin who only needs to provision
+      engineers can browse all users. This may not satisfy audit requirements
+      in regulated environments (SOX, HIPAA, ISO 27001).
+    - Profile becomes a weaker abstraction. It no longer answers "what can
+      this admin do?" — only "what templates can this admin use to create?"
+
+  Where this model works well:
+    - Small-to-medium orgs with a single admin team per directory
+    - Environments where all admins are trusted with directory-wide visibility
+    - Setups where directories already map 1:1 to organizational boundaries
+      (e.g. one AD domain per business unit)
+
+  Where this model breaks down:
+    - Multi-tenant or delegated-admin scenarios within a single directory
+    - Compliance environments requiring demonstrable access segmentation
+    - Large directories where admin teams are organized by OU responsibility
+
+  What you'd want to do if you go this route:
+    1. Rename or document AdminProfileRole to clarify it grants directory
+       access + profile provisioning capability (not OU-scoped visibility).
+    2. Remove the profile_id FK from LifecyclePlaybook — playbooks become
+       directory-level resources, full stop.
+    3. Remove PermissionService.requireProfileAccess() from any path that
+       isn't directly about provisioning (form rendering, template selection).
+    4. Update the admin UI to stop showing profile-based filtering in user
+       lists (since it would be misleading about actual access boundaries).
+    5. Add a clear note in admin documentation: "Profile assignment controls
+       which provisioning templates an admin can use. It does not restrict
+       which users they can view or manage."
+
+--------------------------------------------------------------------------------
+4. RECOMMENDATION
+--------------------------------------------------------------------------------
+
+If the deployment model is "multiple admin teams sharing one directory with
+different OU responsibilities" → go with Option A. The incremental approach
+(phases 1-2 first) gets the highest-risk paths locked down quickly.
+
+If the deployment model is "one trusted admin team per directory, profiles are
+just convenience groupings" → go with the alternative and make the semantics
+explicit. Trying to enforce OU boundaries that nobody actually needs adds
+complexity for no security benefit.
+
+A hybrid is also viable: add a boolean flag to DirectoryConnection like
+`enforceProfileScoping` (default false). When true, activate the DN checks
+from Option A. When false, profiles are provisioning-only. This lets each
+deployment choose its model, but adds a configuration surface that must be
+documented and tested.
