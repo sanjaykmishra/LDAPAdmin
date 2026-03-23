@@ -161,7 +161,7 @@ async function openEdit(p) {
       const required = data.requiredAttributes || data.required || []
       const optional = data.optionalAttributes || data.optional || []
       ocSchemaCache.value[ocName] = { required: [...required], optional: [...optional] }
-      for (const attr of required) schemaRequiredAttrs.value.add(attr)
+      for (const attr of required) schemaRequiredAttrs.value.add(attr.toLowerCase())
     } catch { /* schema lookup optional */ }
   }
 
@@ -327,11 +327,11 @@ async function addObjectClass() {
     const required = data.requiredAttributes || data.required || []
     const optional = data.optionalAttributes || data.optional || []
     // Track schema-required attributes and cache for RDN picker
-    for (const attr of required) schemaRequiredAttrs.value.add(attr)
+    for (const attr of required) schemaRequiredAttrs.value.add(attr.toLowerCase())
     ocSchemaCache.value[ocToAdd.value] = { required: [...required], optional: [...optional] }
     // Auto-add only schema-required attributes; optional ones can be added via the picker
     for (const attr of required) {
-      if (!profile.value.attributeConfigs.find(a => a.attributeName === attr)) {
+      if (!profile.value.attributeConfigs.find(a => a.attributeName.toLowerCase() === attr.toLowerCase())) {
         const isObjClass = attr.toLowerCase() === 'objectclass'
         profile.value.attributeConfigs.push({
           attributeName: attr, customLabel: isObjClass ? '' : guessLabel(attr), inputType: isObjClass ? 'HIDDEN_FIXED' : 'TEXT',
@@ -360,7 +360,7 @@ async function rebuildSchemaRequired() {
   for (const ocName of profile.value.objectClassNames) {
     const cached = ocSchemaCache.value[ocName]
     if (cached) {
-      for (const attr of cached.required) schemaRequiredAttrs.value.add(attr)
+      for (const attr of cached.required) schemaRequiredAttrs.value.add(attr.toLowerCase())
     }
   }
 }
@@ -400,7 +400,7 @@ function isRdnAttribute(attr) {
 
 // Helper: check if an attribute is schema-required
 function isSchemaRequired(attr) {
-  return schemaRequiredAttrs.value.has(attr.attributeName)
+  return schemaRequiredAttrs.value.has(attr.attributeName.toLowerCase())
 }
 
 // Helper: check if an attribute can be removed
@@ -443,7 +443,7 @@ function addSelectedAttributes() {
   for (const name of attrPickerSelection.value) {
     profile.value.attributeConfigs.push({
       attributeName: name, customLabel: guessLabel(name), inputType: 'TEXT',
-      requiredOnCreate: schemaRequiredAttrs.value.has(name), editableOnCreate: true,
+      requiredOnCreate: schemaRequiredAttrs.value.has(name.toLowerCase()), editableOnCreate: true,
       editableOnUpdate: true, selfServiceEdit: false,
       selfRegistrationEdit: false,
       defaultValue: '', computedExpression: '', validationRegex: '',
