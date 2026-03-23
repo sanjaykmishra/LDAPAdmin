@@ -50,11 +50,16 @@ public class ApprovalWorkflowService {
     private final ObjectMapper objectMapper;
 
     // Lazy to break circular dependency: SelfServiceService → ApprovalWorkflowService → SelfServiceService
+    // and LifecyclePlaybookService → ApprovalWorkflowService → LifecyclePlaybookService
     private final ApplicationSettingsService settingsService;
     private final org.springframework.context.ApplicationContext applicationContext;
 
     private SelfServiceService selfServiceService() {
         return applicationContext.getBean(SelfServiceService.class);
+    }
+
+    private LifecyclePlaybookService lifecyclePlaybookService() {
+        return applicationContext.getBean(LifecyclePlaybookService.class);
     }
 
     @Transactional(readOnly = true)
@@ -205,6 +210,8 @@ public class ApprovalWorkflowService {
                 executeGroupMemberAdd(pa, approver);
             } else if (pa.getRequestType() == ApprovalRequestType.SELF_REGISTRATION) {
                 executeSelfRegistration(pa);
+            } else if (pa.getRequestType() == ApprovalRequestType.PLAYBOOK_EXECUTE) {
+                executePlaybook(pa, approver);
             }
         } catch (Exception e) {
             // Provisioning failed — store the error and keep status as PENDING
@@ -381,6 +388,8 @@ public class ApprovalWorkflowService {
             executeGroupMemberAdd(pa, requester);
         } else if (pa.getRequestType() == ApprovalRequestType.SELF_REGISTRATION) {
             executeSelfRegistration(pa);
+        } else if (pa.getRequestType() == ApprovalRequestType.PLAYBOOK_EXECUTE) {
+            executePlaybook(pa, requester);
         }
 
         pa.setStatus(ApprovalStatus.APPROVED);
@@ -470,6 +479,18 @@ public class ApprovalWorkflowService {
         regReq.setStatus(RegistrationStatus.APPROVED);
         registrationRepo.save(regReq);
         log.info("Self-registration approved and provisioned for {}", regReq.getEmail());
+    }
+
+    private void executePlaybook(PendingApproval pa, AuthPrincipal approver) {
+        try {
+            JsonNode payload = objectMapper.readTree(pa.getPayload());
+            UUID playbookId = UUID.fromString(payload.get("playbookId").asText());
+            String targetDn = payload.get("targetDn").asText();
+            lifecyclePlaybookService().executeImmediate(pa.getDirectoryId(), playbookId, targetDn, approver);
+            log.info("Playbook {} executed via approval {}", playbookId, pa.getId());
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Invalid PLAYBOOK_EXECUTE payload for approval " + pa.getId(), e);
+        }
     }
 
     private static final Set<String> PASSWORD_ATTRIBUTES = Set.of(
