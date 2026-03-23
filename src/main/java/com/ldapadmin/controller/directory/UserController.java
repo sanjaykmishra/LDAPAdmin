@@ -53,7 +53,7 @@ public class UserController {
     private final com.ldapadmin.service.ProvisioningProfileService profileService;
     private final com.ldapadmin.service.PasswordPolicyService passwordPolicyService;
     private final com.ldapadmin.service.ApprovalNotificationService notificationService;
-    private final com.ldapadmin.service.PermissionService permissionService;
+    private final com.ldapadmin.auth.PermissionService permissionService;
 
     @GetMapping
     @RequiresFeature(FeatureKey.USER_READ)
