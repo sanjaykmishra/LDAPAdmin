@@ -27,6 +27,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.*;
@@ -89,7 +91,7 @@ public class ApprovalWorkflowService {
         pa = approvalRepo.save(pa);
 
         auditService.record(requester, directoryId, AuditAction.APPROVAL_SUBMITTED,
-                null, Map.of("approvalId", pa.getId().toString(), "requestType", type.name()));
+                null, buildAuditDetail(pa, null));
 
         // Auto-approve if requester is superadmin and bypass setting is enabled
         if (requester.isSuperadmin() && settingsService.getEntity().isSuperadminBypassApproval()) {
@@ -179,7 +181,7 @@ public class ApprovalWorkflowService {
         approvalRepo.save(pa);
 
         auditService.record(approver, pa.getDirectoryId(), AuditAction.APPROVAL_APPROVED,
-                null, Map.of("approvalId", pa.getId().toString()));
+                null, buildAuditDetail(pa, null));
 
         notificationService.notifyRequesterApproved(pa);
 
@@ -215,7 +217,7 @@ public class ApprovalWorkflowService {
         }
 
         auditService.record(approver, pa.getDirectoryId(), AuditAction.APPROVAL_REJECTED,
-                null, Map.of("approvalId", pa.getId().toString(), "reason", reason));
+                null, buildAuditDetail(pa, Map.of("reason", reason)));
 
         notificationService.notifyRequesterRejected(pa);
 
@@ -241,7 +243,7 @@ public class ApprovalWorkflowService {
         approvalRepo.save(pa);
 
         auditService.record(editor, pa.getDirectoryId(), AuditAction.APPROVAL_REQUEST_EDITED,
-                null, Map.of("approvalId", pa.getId().toString()));
+                null, buildAuditDetail(pa, null));
 
         return toResponse(pa);
     }
@@ -276,7 +278,7 @@ public class ApprovalWorkflowService {
         approvalRepo.save(pa);
 
         auditService.record(requester, pa.getDirectoryId(), AuditAction.APPROVAL_AUTO_APPROVED,
-                null, Map.of("approvalId", pa.getId().toString()));
+                null, buildAuditDetail(pa, null));
 
         log.info("Auto-approved request {} for superadmin {}", pa.getId(), requester.id());
     }
@@ -344,6 +346,57 @@ public class ApprovalWorkflowService {
         regReq.setStatus(RegistrationStatus.APPROVED);
         registrationRepo.save(regReq);
         log.info("Self-registration approved and provisioned for {}", regReq.getEmail());
+    }
+
+    private static final Set<String> PASSWORD_ATTRIBUTES = Set.of(
+            "userpassword", "unicodepwd", "password");
+
+    /**
+     * Builds the detail map for approval-related audit events, including the
+     * request type and payload. Password attributes in the payload are
+     * obfuscated before the detail is written.
+     */
+    private Map<String, Object> buildAuditDetail(PendingApproval pa, Map<String, Object> extra) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("approvalId", pa.getId().toString());
+        detail.put("requestType", pa.getRequestType().name());
+        detail.put("payload", obfuscatePasswords(pa.getPayload()));
+        if (extra != null) detail.putAll(extra);
+        return detail;
+    }
+
+    /**
+     * Returns a copy of the JSON payload with any password attribute values
+     * replaced by "********".
+     */
+    private String obfuscatePasswords(String payloadJson) {
+        try {
+            JsonNode root = objectMapper.readTree(payloadJson);
+            obfuscateNode(root);
+            return objectMapper.writeValueAsString(root);
+        } catch (JsonProcessingException e) {
+            return "***unreadable***";
+        }
+    }
+
+    private void obfuscateNode(JsonNode node) {
+        if (node.isObject()) {
+            ObjectNode obj = (ObjectNode) node;
+            Iterator<String> fieldNames = obj.fieldNames();
+            List<String> names = new ArrayList<>();
+            fieldNames.forEachRemaining(names::add);
+            for (String name : names) {
+                if (PASSWORD_ATTRIBUTES.contains(name.toLowerCase())) {
+                    obj.put(name, "********");
+                } else {
+                    obfuscateNode(obj.get(name));
+                }
+            }
+        } else if (node.isArray()) {
+            for (JsonNode child : node) {
+                obfuscateNode(child);
+            }
+        }
     }
 
     private PendingApprovalResponse toResponse(PendingApproval pa) {
