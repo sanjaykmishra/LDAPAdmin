@@ -357,7 +357,12 @@ async function selectProfileAndCreate(p) {
 
 async function openEdit(row) {
   editingDn.value = row.dn
-  const attrs = row._raw?.attributes || {}
+  // Fetch full entry from LDAP to get all attributes (search results may be incomplete)
+  let attrs = row._raw?.attributes || {}
+  try {
+    const { data } = await usersApi.getUser(dirId, row.dn)
+    if (data?.attributes) attrs = data.attributes
+  } catch (e) { console.warn('Failed to fetch full user entry, using search data:', e) }
 
   // Try to resolve a matching profile from the available profiles
   profileConfig.value = null
