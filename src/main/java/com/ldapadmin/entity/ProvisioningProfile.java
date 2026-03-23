@@ -8,8 +8,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.UUID;
 
 /**
@@ -96,6 +95,22 @@ public class ProvisioningProfile {
 
     @Column(name = "email_password_to_user", nullable = false)
     private boolean emailPasswordToUser = false;
+
+    /** When true, this profile's group assignments are auto-included in every other profile in the same directory. */
+    @Column(name = "auto_include_groups", nullable = false)
+    private boolean autoIncludeGroups = false;
+
+    /** When true, this profile opts out of receiving auto-included groups from other profiles. */
+    @Column(name = "exclude_auto_includes", nullable = false)
+    private boolean excludeAutoIncludes = false;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "profile_additional_profiles",
+        joinColumns = @JoinColumn(name = "profile_id"),
+        inverseJoinColumns = @JoinColumn(name = "additional_profile_id")
+    )
+    private Set<ProvisioningProfile> additionalProfiles = new HashSet<>();
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

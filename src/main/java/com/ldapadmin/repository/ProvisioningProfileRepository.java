@@ -20,4 +20,6 @@ public interface ProvisioningProfileRepository extends JpaRepository<Provisionin
     List<ProvisioningProfile> findAllByDirectoryIdAndSelfRegistrationAllowedTrue(UUID directoryId);
 
     boolean existsByDirectoryIdAndName(UUID directoryId, String name);
+
+    List<ProvisioningProfile> findAllByDirectoryIdAndAutoIncludeGroupsTrue(UUID directoryId);
 }

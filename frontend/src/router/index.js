@@ -62,6 +62,13 @@ const router = createRouter({
           component: () => import('@/views/reports/ReportJobsView.vue'),
         },
 
+        // Lifecycle Playbooks
+        {
+          path: 'directories/:dirId/playbooks',
+          name: 'playbooks',
+          component: () => import('@/views/playbooks/PlaybooksView.vue'),
+        },
+
         // Pending Approvals
         {
           path: 'directories/:dirId/approvals',
