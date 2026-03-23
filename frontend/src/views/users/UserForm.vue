@@ -400,15 +400,23 @@ function evaluateComputedExpressions() {
   if (!props.userTemplateConfig?.attributeConfigs) return
   for (const attr of props.userTemplateConfig.attributeConfigs) {
     if (!attr.computedExpression) continue
-    const expr = attr.computedExpression
-    const resolved = expr.replace(/\$\{(\w+)\}/g, (_, name) => {
-      // Check rdnValue first since it's stored separately
-      if (name === local.rdnAttribute) return local.rdnValue || ''
-      return local.attributes[name] || ''
-    })
-    // Only set if expression produced a meaningful result (not all placeholders empty)
-    if (resolved !== expr || !expr.includes('${')) {
-      local.attributes[attr.attributeName] = resolved
+    try {
+      const expr = String(attr.computedExpression)
+      const resolved = expr.replace(/\$\{(\w+)\}/g, (_, name) => {
+        // Check rdnValue first since it's stored separately
+        if (name === local.rdnAttribute) return local.rdnValue || ''
+        return local.attributes[name] || ''
+      })
+      // Only set if expression produced a meaningful result (not all placeholders empty)
+      if (resolved !== expr || !expr.includes('${')) {
+        local.attributes[attr.attributeName] = resolved
+        // Also update rdnValue when the computed attribute is the RDN
+        if (attr.attributeName === local.rdnAttribute) {
+          local.rdnValue = resolved
+        }
+      }
+    } catch {
+      // Skip failed expression evaluation; continue with remaining attributes
     }
   }
 }
@@ -419,9 +427,12 @@ watch(local, v => {
   if (syncing) return
   if (!computing && !props.isEdit) {
     computing = true
-    evaluateComputedExpressions()
-    // Allow the watcher to re-fire with computed values included
-    nextTick(() => { computing = false })
+    try {
+      evaluateComputedExpressions()
+    } finally {
+      // Allow the watcher to re-fire with computed values included
+      nextTick(() => { computing = false })
+    }
   }
   emit('update', JSON.parse(JSON.stringify(v)))
 }, { deep: true })
