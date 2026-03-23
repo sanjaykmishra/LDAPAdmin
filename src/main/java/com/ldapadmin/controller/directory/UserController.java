@@ -56,6 +56,7 @@ public class UserController {
     private final com.ldapadmin.service.PermissionService permissionService;
 
     @GetMapping
+    @RequiresFeature(FeatureKey.USER_READ)
     public List<LdapEntryResponse> search(
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
@@ -118,6 +119,7 @@ public class UserController {
     }
 
     @GetMapping("/entry")
+    @RequiresFeature(FeatureKey.USER_READ)
     public LdapEntryResponse get(
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
@@ -218,6 +220,7 @@ public class UserController {
     }
 
     @GetMapping("/password-status")
+    @RequiresFeature(FeatureKey.USER_READ)
     public Map<String, Object> passwordStatus(
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,

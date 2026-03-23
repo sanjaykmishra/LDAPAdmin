@@ -1,10 +1,14 @@
 package com.ldapadmin.repository;
 
 import com.ldapadmin.entity.AdminProfileRole;
+import com.ldapadmin.entity.enums.BaseRole;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface AdminProfileRoleRepository extends JpaRepository<AdminProfileRole, UUID> {
@@ -22,4 +26,11 @@ public interface AdminProfileRoleRepository extends JpaRepository<AdminProfileRo
     List<AdminProfileRole> findAllByProfileDirectoryId(UUID directoryId);
 
     void deleteByAdminAccountIdAndProfileId(UUID adminAccountId, UUID profileId);
+
+    List<AdminProfileRole> findAllByAdminAccountIdAndProfileDirectoryId(UUID adminAccountId, UUID directoryId);
+
+    boolean existsByAdminAccountIdAndBaseRole(UUID adminAccountId, BaseRole baseRole);
+
+    @Query("SELECT DISTINCT r.profile.directory.id FROM AdminProfileRole r WHERE r.adminAccount.id = :adminId")
+    Set<UUID> findDistinctDirectoryIdsByAdminAccountId(@Param("adminId") UUID adminAccountId);
 }

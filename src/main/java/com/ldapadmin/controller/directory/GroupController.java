@@ -63,6 +63,7 @@ public class GroupController {
     // ── Search ────────────────────────────────────────────────────────────────
 
     @GetMapping
+    @RequiresFeature(FeatureKey.GROUP_READ)
     public List<LdapEntryResponse> search(
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
@@ -91,6 +92,7 @@ public class GroupController {
     // ── Get / Delete by DN ────────────────────────────────────────────────────
 
     @GetMapping("/entry")
+    @RequiresFeature(FeatureKey.GROUP_READ)
     public LdapEntryResponse get(
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
@@ -132,6 +134,7 @@ public class GroupController {
      * @param memberAttribute attribute to read (e.g. {@code member}, {@code memberUid})
      */
     @GetMapping("/members")
+    @RequiresFeature(FeatureKey.GROUP_READ)
     public List<String> getMembers(
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,

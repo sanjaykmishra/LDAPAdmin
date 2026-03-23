@@ -24,7 +24,15 @@ public enum FeatureKey {
     REPORTS_RUN          ("reports.run"),
     REPORTS_SCHEDULE     ("reports.schedule"),
     ACCESS_REVIEW_MANAGE ("access_review.manage"),
-    ACCESS_REVIEW_REVIEW ("access_review.review");
+    ACCESS_REVIEW_REVIEW ("access_review.review"),
+    PLAYBOOK_MANAGE      ("playbook.manage"),
+    PLAYBOOK_EXECUTE     ("playbook.execute"),
+    APPROVAL_MANAGE      ("approval.manage"),
+    CSV_TEMPLATE_MANAGE  ("csv_template.manage"),
+    DIRECTORY_BROWSE     ("directory.browse"),
+    SCHEMA_READ          ("schema.read"),
+    USER_READ            ("user.read"),
+    GROUP_READ           ("group.read");
 
     private final String dbValue;
 

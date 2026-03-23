@@ -2,8 +2,10 @@ package com.ldapadmin.controller.directory;
 
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.auth.DirectoryId;
+import com.ldapadmin.auth.RequiresFeature;
 import com.ldapadmin.dto.approval.ApprovalRejectRequest;
 import com.ldapadmin.dto.approval.PendingApprovalResponse;
+import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.service.ApprovalWorkflowService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ public class ApprovalController {
     private final ApprovalWorkflowService service;
 
     @GetMapping
+    @RequiresFeature(FeatureKey.APPROVAL_MANAGE)
     public List<PendingApprovalResponse> list(
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal) {
@@ -30,6 +33,7 @@ public class ApprovalController {
     }
 
     @GetMapping("/{approvalId}")
+    @RequiresFeature(FeatureKey.APPROVAL_MANAGE)
     public PendingApprovalResponse get(
             @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID approvalId,
@@ -38,6 +42,7 @@ public class ApprovalController {
     }
 
     @PostMapping("/{approvalId}/approve")
+    @RequiresFeature(FeatureKey.APPROVAL_MANAGE)
     public PendingApprovalResponse approve(
             @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID approvalId,
@@ -46,6 +51,7 @@ public class ApprovalController {
     }
 
     @PostMapping("/{approvalId}/reject")
+    @RequiresFeature(FeatureKey.APPROVAL_MANAGE)
     public PendingApprovalResponse reject(
             @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID approvalId,
@@ -55,6 +61,7 @@ public class ApprovalController {
     }
 
     @PutMapping("/{approvalId}/payload")
+    @RequiresFeature(FeatureKey.APPROVAL_MANAGE)
     public PendingApprovalResponse updatePayload(
             @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID approvalId,
@@ -64,6 +71,7 @@ public class ApprovalController {
     }
 
     @GetMapping("/count")
+    @RequiresFeature(FeatureKey.APPROVAL_MANAGE)
     public Map<String, Long> countPending(
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal) {

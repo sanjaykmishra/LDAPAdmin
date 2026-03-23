@@ -1,6 +1,9 @@
 package com.ldapadmin.controller.directory;
 
 import com.ldapadmin.auth.AuthPrincipal;
+import com.ldapadmin.auth.DirectoryId;
+import com.ldapadmin.auth.RequiresFeature;
+import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.ldap.LdapBrowseService.BrowseResult;
 import com.ldapadmin.service.LdapOperationService;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +27,8 @@ public class DirectoryBrowseController {
     private final LdapOperationService service;
 
     @GetMapping
-    public BrowseResult browse(@PathVariable UUID directoryId,
+    @RequiresFeature(FeatureKey.DIRECTORY_BROWSE)
+    public BrowseResult browse(@DirectoryId @PathVariable UUID directoryId,
                                @RequestParam(required = false) String dn,
                                @AuthenticationPrincipal AuthPrincipal principal) {
         return service.browse(directoryId, principal, dn);
