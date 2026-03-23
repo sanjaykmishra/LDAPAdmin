@@ -231,8 +231,10 @@ function clearForm() {
 
 function saveToHistory(f) {
   const entry = { directoryId: f.directoryId, baseDn: f.baseDn, scope: f.scope, filter: f.filter, attributes: f.attributes, limit: f.limit }
-  const existing = history.value.filter(h => h.filter !== entry.filter || h.baseDn !== entry.baseDn)
-  history.value = [entry, ...existing].slice(0, MAX_HISTORY)
+  const same = (a, b) => a.directoryId === b.directoryId && a.baseDn === b.baseDn
+      && a.scope === b.scope && a.filter === b.filter && a.attributes === b.attributes && a.limit === b.limit
+  if (history.value.some(h => same(h, entry))) return
+  history.value = [entry, ...history.value].slice(0, MAX_HISTORY)
   try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history.value)) } catch {}
 }
 
