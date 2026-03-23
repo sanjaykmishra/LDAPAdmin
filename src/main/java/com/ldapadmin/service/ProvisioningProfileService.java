@@ -339,7 +339,9 @@ public class ProvisioningProfileService {
         }
         matcher.appendTail(result);
         // Evaluate + concatenation with quoted strings, e.g. +" "+ or +' '+
+        // Handle both-sided case first (+" "+), then single-sided cases
         return result.toString()
+                .replaceAll("\\+[\"']([^\"']*)[\"']\\+", "$1")
                 .replaceAll("\\+[\"']([^\"']*)[\"']", "$1")
                 .replaceAll("[\"']([^\"']*)[\"']\\+", "$1");
     }
