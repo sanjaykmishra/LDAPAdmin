@@ -443,7 +443,7 @@ function addSelectedAttributes() {
   for (const name of attrPickerSelection.value) {
     profile.value.attributeConfigs.push({
       attributeName: name, customLabel: guessLabel(name), inputType: 'TEXT',
-      requiredOnCreate: false, editableOnCreate: true,
+      requiredOnCreate: schemaRequiredAttrs.value.has(name), editableOnCreate: true,
       editableOnUpdate: true, selfServiceEdit: false,
       selfRegistrationEdit: false,
       defaultValue: '', computedExpression: '', validationRegex: '',
