@@ -59,6 +59,9 @@ function emptyProfile() {
     name: '', description: '', targetOuDn: '',
     objectClassNames: [], rdnAttribute: '',
     showDnField: true, enabled: true, selfRegistrationAllowed: false,
+    passwordLength: 16, passwordUppercase: true, passwordLowercase: true,
+    passwordDigits: true, passwordSpecial: true, passwordSpecialChars: '!@#$%^&*',
+    emailPasswordToUser: false,
     attributeConfigs: [], groupAssignments: []
   }
 }
@@ -130,6 +133,13 @@ async function openEdit(p) {
     objectClassNames: [...p.objectClassNames], rdnAttribute: p.rdnAttribute,
     showDnField: p.showDnField, enabled: p.enabled,
     selfRegistrationAllowed: p.selfRegistrationAllowed,
+    passwordLength: p.passwordLength ?? 16,
+    passwordUppercase: p.passwordUppercase ?? true,
+    passwordLowercase: p.passwordLowercase ?? true,
+    passwordDigits: p.passwordDigits ?? true,
+    passwordSpecial: p.passwordSpecial ?? true,
+    passwordSpecialChars: p.passwordSpecialChars ?? '!@#$%^&*',
+    emailPasswordToUser: p.emailPasswordToUser ?? false,
     attributeConfigs: p.attributeConfigs.map(a => ({
       attributeName: a.attributeName, customLabel: a.customLabel || '',
       inputType: a.inputType, requiredOnCreate: a.requiredOnCreate,
@@ -161,7 +171,7 @@ async function openEdit(p) {
       const required = data.requiredAttributes || data.required || []
       const optional = data.optionalAttributes || data.optional || []
       ocSchemaCache.value[ocName] = { required: [...required], optional: [...optional] }
-      for (const attr of required) schemaRequiredAttrs.value.add(attr)
+      for (const attr of required) schemaRequiredAttrs.value.add(attr.toLowerCase())
     } catch { /* schema lookup optional */ }
   }
 
@@ -327,11 +337,11 @@ async function addObjectClass() {
     const required = data.requiredAttributes || data.required || []
     const optional = data.optionalAttributes || data.optional || []
     // Track schema-required attributes and cache for RDN picker
-    for (const attr of required) schemaRequiredAttrs.value.add(attr)
+    for (const attr of required) schemaRequiredAttrs.value.add(attr.toLowerCase())
     ocSchemaCache.value[ocToAdd.value] = { required: [...required], optional: [...optional] }
     // Auto-add only schema-required attributes; optional ones can be added via the picker
     for (const attr of required) {
-      if (!profile.value.attributeConfigs.find(a => a.attributeName === attr)) {
+      if (!profile.value.attributeConfigs.find(a => a.attributeName.toLowerCase() === attr.toLowerCase())) {
         const isObjClass = attr.toLowerCase() === 'objectclass'
         profile.value.attributeConfigs.push({
           attributeName: attr, customLabel: isObjClass ? '' : guessLabel(attr), inputType: isObjClass ? 'HIDDEN_FIXED' : 'TEXT',
@@ -360,7 +370,7 @@ async function rebuildSchemaRequired() {
   for (const ocName of profile.value.objectClassNames) {
     const cached = ocSchemaCache.value[ocName]
     if (cached) {
-      for (const attr of cached.required) schemaRequiredAttrs.value.add(attr)
+      for (const attr of cached.required) schemaRequiredAttrs.value.add(attr.toLowerCase())
     }
   }
 }
@@ -400,12 +410,12 @@ function isRdnAttribute(attr) {
 
 // Helper: check if an attribute is schema-required
 function isSchemaRequired(attr) {
-  return schemaRequiredAttrs.value.has(attr.attributeName)
+  return schemaRequiredAttrs.value.has(attr.attributeName.toLowerCase())
 }
 
-// Helper: check if an attribute can be removed
+// Helper: check if an attribute can be removed (required attributes cannot be removed)
 function canRemoveAttribute(attr) {
-  return !isRdnAttribute(attr) && !isSchemaRequired(attr)
+  return !isRdnAttribute(attr) && !isSchemaRequired(attr) && !attr.requiredOnCreate
 }
 
 // Available attributes from selected object classes that haven't been added yet
@@ -443,7 +453,7 @@ function addSelectedAttributes() {
   for (const name of attrPickerSelection.value) {
     profile.value.attributeConfigs.push({
       attributeName: name, customLabel: guessLabel(name), inputType: 'TEXT',
-      requiredOnCreate: schemaRequiredAttrs.value.has(name), editableOnCreate: true,
+      requiredOnCreate: schemaRequiredAttrs.value.has(name.toLowerCase()), editableOnCreate: true,
       editableOnUpdate: true, selfServiceEdit: false,
       selfRegistrationEdit: false,
       defaultValue: '', computedExpression: '', validationRegex: '',
@@ -456,6 +466,37 @@ function addSelectedAttributes() {
   attrPickerSelection.value = []
   showAttrPicker.value = false
 }
+
+// When emailPasswordToUser is enabled, ensure 'mail' is present and required
+watch(() => profile.value.emailPasswordToUser, (enabled) => {
+  if (!enabled) return
+  const existing = profile.value.attributeConfigs.find(
+    a => a.attributeName.toLowerCase() === 'mail'
+  )
+  if (existing) {
+    existing.requiredOnCreate = true
+    existing.hidden = false
+  } else {
+    profile.value.attributeConfigs.push({
+      attributeName: 'mail', customLabel: 'Email', inputType: 'TEXT',
+      requiredOnCreate: true, editableOnCreate: true,
+      editableOnUpdate: true, selfServiceEdit: true,
+      selfRegistrationEdit: true,
+      defaultValue: '', computedExpression: '', validationRegex: '',
+      validationMessage: '', allowedValues: '', minLength: null,
+      maxLength: null, sectionName: '', columnSpan: 6, hidden: false,
+      registrationSectionName: null, registrationColumnSpan: null, registrationDisplayOrder: null,
+      selfServiceSectionName: null, selfServiceColumnSpan: null, selfServiceDisplayOrder: null
+    })
+  }
+})
+
+// When requiredOnCreate is set, ensure hidden is cleared
+watch(() => profile.value.attributeConfigs.map(a => a.requiredOnCreate), () => {
+  for (const attr of profile.value.attributeConfigs) {
+    if (attr.requiredOnCreate && attr.hidden) attr.hidden = false
+  }
+})
 
 // Helper: determine which fields to show based on input type
 function showFieldFor(inputType, fieldName) {
@@ -676,6 +717,41 @@ function toggleApprover(accountId) {
               <input type="checkbox" v-model="profile.selfRegistrationAllowed" /> Self-registration
             </label>
           </div>
+
+          <!-- Password Generation Settings -->
+          <fieldset class="border rounded-lg p-3 space-y-3">
+            <legend class="text-sm font-semibold text-gray-800 px-1">Password Generation</legend>
+            <div class="grid grid-cols-6 gap-3">
+              <div class="col-span-2">
+                <label class="block text-xs text-gray-500 mb-1">Length</label>
+                <input type="number" v-model.number="profile.passwordLength" min="8" max="128"
+                  class="input w-full text-sm" />
+              </div>
+              <div class="col-span-4 flex flex-wrap gap-4 items-end pb-1">
+                <label class="flex items-center gap-1 text-sm">
+                  <input type="checkbox" v-model="profile.passwordUppercase" /> A-Z
+                </label>
+                <label class="flex items-center gap-1 text-sm">
+                  <input type="checkbox" v-model="profile.passwordLowercase" /> a-z
+                </label>
+                <label class="flex items-center gap-1 text-sm">
+                  <input type="checkbox" v-model="profile.passwordDigits" /> 0-9
+                </label>
+                <label class="flex items-center gap-1 text-sm">
+                  <input type="checkbox" v-model="profile.passwordSpecial" /> Special
+                </label>
+              </div>
+            </div>
+            <div v-if="profile.passwordSpecial">
+              <label class="block text-xs text-gray-500 mb-1">Special Characters</label>
+              <input v-model="profile.passwordSpecialChars" class="input w-full text-sm font-mono"
+                placeholder="!@#$%^&*" />
+            </div>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" v-model="profile.emailPasswordToUser" />
+              Email generated password to user on creation
+            </label>
+          </fieldset>
         </div>
 
         <!-- Attributes Tab -->
@@ -763,7 +839,10 @@ function toggleApprover(accountId) {
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.editableOnUpdate" /> Editable (update)</label>
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.selfServiceEdit" /> Self-service</label>
               <label v-if="profile.selfRegistrationAllowed" class="flex items-center gap-1"><input type="checkbox" v-model="attr.selfRegistrationEdit" /> Self-registration</label>
-              <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.hidden" /> Hidden</label>
+              <label class="flex items-center gap-1">
+                <input type="checkbox" v-model="attr.hidden"
+                  :disabled="attr.requiredOnCreate || isRdnAttribute(attr) || isSchemaRequired(attr)" /> Hidden
+              </label>
             </div>
           </div>
         </div>

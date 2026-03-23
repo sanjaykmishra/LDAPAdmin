@@ -49,6 +49,9 @@ public class PendingApproval {
     @Column(name = "reject_reason")
     private String rejectReason;
 
+    @Column(name = "provision_error")
+    private String provisionError;
+
     @Column(name = "reviewed_by")
     private UUID reviewedBy;
 

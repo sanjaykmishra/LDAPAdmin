@@ -50,6 +50,7 @@ public class UserController {
     private final LdapOperationService service;
     private final ApprovalWorkflowService approvalService;
     private final com.ldapadmin.service.PasswordPolicyService passwordPolicyService;
+    private final com.ldapadmin.service.ApprovalNotificationService notificationService;
 
     @GetMapping
     public List<LdapEntryResponse> search(
@@ -84,8 +85,23 @@ public class UserController {
                             "approvalId", pa.getId()));
         }
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(service.createUser(directoryId, principal, req));
+        LdapEntryResponse result = service.createUser(directoryId, principal, req);
+
+        // Email password to user if profile is configured for it
+        if (profile.isPresent() && profile.get().isEmailPasswordToUser()) {
+            Map<String, List<String>> attrs = req.attributes();
+            List<String> mailValues = attrs.get("mail");
+            List<String> pwdValues  = attrs.get("userPassword");
+            if (mailValues != null && !mailValues.isEmpty()
+                    && pwdValues != null && !pwdValues.isEmpty()) {
+                String displayName = attrs.containsKey("cn") && !attrs.get("cn").isEmpty()
+                        ? attrs.get("cn").get(0) : "User";
+                notificationService.sendPasswordEmail(
+                        mailValues.get(0), displayName, pwdValues.get(0));
+            }
+        }
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 
     @GetMapping("/entry")

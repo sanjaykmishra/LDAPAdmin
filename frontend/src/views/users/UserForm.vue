@@ -66,9 +66,60 @@
                       disabled
                     />
                   </div>
+                  <!-- Password field with generate/show/copy (create mode only) -->
+                  <div
+                    v-if="!attr.rdn && attr.inputType === 'PASSWORD'"
+                    :style="{ gridColumn: `span ${attr.columnSpan || 6}` }"
+                  >
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                      {{ attr.customLabel || attr.attributeName }}
+                      <span v-if="attr.requiredOnCreate" class="text-red-500">*</span>
+                    </label>
+                    <div class="flex gap-1">
+                      <div class="relative flex-1">
+                        <input
+                          :type="passwordVisible ? 'text' : 'password'"
+                          :value="local.attributes[attr.attributeName]"
+                          @input="local.attributes[attr.attributeName] = $event.target.value"
+                          :required="attr.requiredOnCreate"
+                          :disabled="!attr.editableOnCreate"
+                          class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 pr-8"
+                        />
+                        <button v-if="local.attributes[attr.attributeName]" type="button"
+                          class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          @mousedown.prevent="passwordVisible = true"
+                          @mouseup.prevent="passwordVisible = false"
+                          @mouseleave="passwordVisible = false"
+                          @touchstart.prevent="passwordVisible = true"
+                          @touchend.prevent="passwordVisible = false"
+                          title="Hold to show password">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path v-if="!passwordVisible" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M3 3l18 18" />
+                          </svg>
+                        </button>
+                      </div>
+                      <button v-if="profileId" type="button" @click="doGeneratePassword(attr.attributeName)"
+                        :disabled="generatingPassword"
+                        class="px-2 py-1 text-xs rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap"
+                        title="Generate password">
+                        <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                        </svg>
+                      </button>
+                      <button v-if="local.attributes[attr.attributeName]" type="button"
+                        @click="copyPassword(attr.attributeName)"
+                        class="px-2 py-1 text-xs rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 whitespace-nowrap"
+                        title="Copy to clipboard">
+                        <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                   <!-- Regular field -->
                   <div
-                    v-if="!attr.rdn"
+                    v-else-if="!attr.rdn"
                     :style="{ gridColumn: `span ${attr.columnSpan || 6}` }"
                   >
                     <FormField
@@ -247,12 +298,14 @@ import { reactive, ref, watch, nextTick, computed, onMounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
 import FormField from '@/components/FormField.vue'
 import * as groupsApi from '@/api/groups'
+import { generatePassword } from '@/api/profiles'
 
 const props = defineProps({
   data: { type: Object, required: true },
   isEdit: Boolean,
   userTemplateConfig: { type: Object, default: null },
   dirId: { type: String, default: null },
+  profileId: { type: String, default: null },
 })
 const emit = defineEmits(['update'])
 
@@ -268,6 +321,29 @@ if (!props.isEdit && props.userTemplateConfig?.attributeConfigs) {
       local.attributes[attr.attributeName] = attr.defaultValue
     }
   }
+}
+
+// Password generate / show / copy state
+const passwordVisible = ref(false)
+const generatingPassword = ref(false)
+
+async function doGeneratePassword(attrName) {
+  if (!props.profileId) return
+  generatingPassword.value = true
+  try {
+    const { data } = await generatePassword(props.profileId)
+    local.attributes[attrName] = data.password
+    passwordVisible.value = true
+  } catch {
+    useNotificationStore().error('Failed to generate password')
+  } finally {
+    generatingPassword.value = false
+  }
+}
+
+function copyPassword(attrName) {
+  const val = local.attributes[attrName]
+  if (val) navigator.clipboard.writeText(val)
 }
 
 const activeTab       = ref('attributes')

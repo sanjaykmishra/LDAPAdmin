@@ -11,6 +11,9 @@ export const updateProfile     = (dirId, profileId, data)    => client.put(`${di
 export const deleteProfile     = (dirId, profileId)          => client.delete(`${dirBase(dirId)}/${profileId}`)
 export const cloneProfile      = (dirId, profileId, name)    => client.post(`${dirBase(dirId)}/${profileId}/clone`, { name })
 
+// Password generation
+export const generatePassword = (profileId) => client.post(`/profiles/${profileId}/generate-password`)
+
 // Lifecycle policy
 export const getLifecyclePolicy    = (profileId)       => client.get(`/profiles/${profileId}/lifecycle`)
 export const setLifecyclePolicy    = (profileId, data) => client.put(`/profiles/${profileId}/lifecycle`, data)

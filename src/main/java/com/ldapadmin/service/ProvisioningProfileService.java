@@ -36,6 +36,7 @@ public class ProvisioningProfileService {
     private final DirectoryConnectionRepository      dirRepo;
     private final AccountRepository                  accountRepo;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final PasswordGeneratorService passwordGenerator;
 
     // ── Profile CRUD ──────────────────────────────────────────────────────────
 
@@ -75,7 +76,10 @@ public class ProvisioningProfileService {
         profile.setDirectory(dir);
         applyCommonFields(profile, req.name(), req.description(), req.targetOuDn(),
                 req.objectClassNames(), req.rdnAttribute(), req.showDnField(),
-                req.enabled(), req.selfRegistrationAllowed());
+                req.enabled(), req.selfRegistrationAllowed(),
+                req.passwordLength(), req.passwordUppercase(), req.passwordLowercase(),
+                req.passwordDigits(), req.passwordSpecial(), req.passwordSpecialChars(),
+                req.emailPasswordToUser());
         profile = profileRepo.save(profile);
 
         saveAttributeConfigs(profile, req.attributeConfigs());
@@ -97,7 +101,10 @@ public class ProvisioningProfileService {
 
         applyCommonFields(profile, req.name(), req.description(), req.targetOuDn(),
                 req.objectClassNames(), req.rdnAttribute(), req.showDnField(),
-                req.enabled(), req.selfRegistrationAllowed());
+                req.enabled(), req.selfRegistrationAllowed(),
+                req.passwordLength(), req.passwordUppercase(), req.passwordLowercase(),
+                req.passwordDigits(), req.passwordSpecial(), req.passwordSpecialChars(),
+                req.emailPasswordToUser());
         profile = profileRepo.save(profile);
 
         // Replace attribute configs
@@ -137,6 +144,13 @@ public class ProvisioningProfileService {
         copy.setShowDnField(source.isShowDnField());
         copy.setEnabled(false); // clones start disabled
         copy.setSelfRegistrationAllowed(false);
+        copy.setPasswordLength(source.getPasswordLength());
+        copy.setPasswordUppercase(source.isPasswordUppercase());
+        copy.setPasswordLowercase(source.isPasswordLowercase());
+        copy.setPasswordDigits(source.isPasswordDigits());
+        copy.setPasswordSpecial(source.isPasswordSpecial());
+        copy.setPasswordSpecialChars(source.getPasswordSpecialChars());
+        copy.setEmailPasswordToUser(source.isEmailPasswordToUser());
         copy = profileRepo.save(copy);
 
         // Clone attribute configs
@@ -464,6 +478,17 @@ public class ProvisioningProfileService {
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
+    @Transactional(readOnly = true)
+    public String generatePassword(UUID profileId) {
+        ProvisioningProfile profile = requireProfile(profileId);
+        return passwordGenerator.generate(profile);
+    }
+
+    @Transactional(readOnly = true)
+    public ProvisioningProfile getEntity(UUID profileId) {
+        return requireProfile(profileId);
+    }
+
     private ProfileResponse toResponse(ProvisioningProfile profile) {
         List<ProfileAttributeConfig> configs =
                 attrConfigRepo.findAllByProfileIdOrderByDisplayOrderAsc(profile.getId());
@@ -490,7 +515,11 @@ public class ProvisioningProfileService {
     private void applyCommonFields(ProvisioningProfile profile, String name, String description,
                                     String targetOuDn, List<String> objectClassNames,
                                     String rdnAttribute, boolean showDnField,
-                                    boolean enabled, boolean selfRegistrationAllowed) {
+                                    boolean enabled, boolean selfRegistrationAllowed,
+                                    Integer passwordLength, Boolean passwordUppercase,
+                                    Boolean passwordLowercase, Boolean passwordDigits,
+                                    Boolean passwordSpecial, String passwordSpecialChars,
+                                    Boolean emailPasswordToUser) {
         profile.setName(name);
         profile.setDescription(description);
         profile.setTargetOuDn(targetOuDn);
@@ -499,11 +528,36 @@ public class ProvisioningProfileService {
         profile.setShowDnField(showDnField);
         profile.setEnabled(enabled);
         profile.setSelfRegistrationAllowed(selfRegistrationAllowed);
+        if (passwordLength != null)       profile.setPasswordLength(passwordLength);
+        if (passwordUppercase != null)    profile.setPasswordUppercase(passwordUppercase);
+        if (passwordLowercase != null)    profile.setPasswordLowercase(passwordLowercase);
+        if (passwordDigits != null)       profile.setPasswordDigits(passwordDigits);
+        if (passwordSpecial != null)      profile.setPasswordSpecial(passwordSpecial);
+        if (passwordSpecialChars != null) profile.setPasswordSpecialChars(passwordSpecialChars);
+        if (emailPasswordToUser != null)  profile.setEmailPasswordToUser(emailPasswordToUser);
     }
 
     private void saveAttributeConfigs(ProvisioningProfile profile,
                                        List<AttributeConfigEntry> entries) {
         if (entries == null || entries.isEmpty()) return;
+
+        // Validate: required attributes cannot be hidden
+        for (AttributeConfigEntry e : entries) {
+            if (e.requiredOnCreate() && e.hidden()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Required attribute '" + e.attributeName() + "' cannot be hidden");
+            }
+        }
+
+        // Validate: emailPasswordToUser requires a 'mail' attribute marked as required
+        if (profile.isEmailPasswordToUser()) {
+            boolean hasMailRequired = entries.stream().anyMatch(
+                    e -> e.attributeName().equalsIgnoreCase("mail") && e.requiredOnCreate());
+            if (!hasMailRequired) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Email password to user requires a 'mail' attribute marked as required");
+            }
+        }
 
         for (int i = 0; i < entries.size(); i++) {
             AttributeConfigEntry e = entries.get(i);
