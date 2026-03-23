@@ -1,6 +1,9 @@
 package com.ldapadmin.controller.directory;
 
 import com.ldapadmin.auth.AuthPrincipal;
+import com.ldapadmin.auth.DirectoryId;
+import com.ldapadmin.auth.RequiresFeature;
+import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.ldap.LdapSchemaService.AttributeTypeInfo;
 import com.ldapadmin.ldap.LdapSchemaService.ObjectClassAttributes;
 import com.ldapadmin.ldap.LdapSchemaService.SchemaListItem;
@@ -21,9 +24,6 @@ import java.util.UUID;
  *   GET /api/directories/{directoryId}/schema/attribute-types
  *   GET /api/directories/{directoryId}/schema/attribute-types/{name}
  * </pre>
- *
- * <p>Requires any authenticated principal with directory access (dim 1+2).
- * No specific feature permission is needed for schema discovery.</p>
  */
 @RestController
 @RequestMapping("/api/v1/directories/{directoryId}/schema")
@@ -33,38 +33,43 @@ public class SchemaController {
     private final LdapOperationService service;
 
     @GetMapping("/object-classes")
+    @RequiresFeature(FeatureKey.SCHEMA_READ)
     public List<SchemaListItem> listObjectClasses(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return service.getObjectClassNames(directoryId, principal);
     }
 
     @GetMapping("/object-classes/{name}")
+    @RequiresFeature(FeatureKey.SCHEMA_READ)
     public ObjectClassAttributes getObjectClass(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @PathVariable String name,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return service.getObjectClassAttributes(directoryId, principal, name);
     }
 
     @GetMapping("/object-classes/bulk")
+    @RequiresFeature(FeatureKey.SCHEMA_READ)
     public ObjectClassAttributes getObjectClassesBulk(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @RequestParam List<String> names,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return service.getObjectClassAttributesBulk(directoryId, principal, names);
     }
 
     @GetMapping("/attribute-types")
+    @RequiresFeature(FeatureKey.SCHEMA_READ)
     public List<SchemaListItem> listAttributeTypes(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return service.getAttributeTypeNames(directoryId, principal);
     }
 
     @GetMapping("/attribute-types/{name}")
+    @RequiresFeature(FeatureKey.SCHEMA_READ)
     public AttributeTypeInfo getAttributeType(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @PathVariable String name,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return service.getAttributeTypeInfo(directoryId, principal, name);

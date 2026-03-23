@@ -1,6 +1,7 @@
 package com.ldapadmin.service;
 
 import com.ldapadmin.auth.AuthPrincipal;
+import com.ldapadmin.auth.PermissionService;
 import com.ldapadmin.dto.playbook.*;
 import com.ldapadmin.dto.playbook.CreatePlaybookRequest.StepEntry;
 import com.ldapadmin.entity.*;
@@ -41,6 +42,7 @@ public class LifecyclePlaybookService {
     private final AuditService auditService;
     private final ApprovalNotificationService notificationService;
     private final ApprovalWorkflowService approvalService;
+    private final PermissionService permissionService;
     private final ObjectMapper objectMapper;
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
@@ -156,6 +158,7 @@ public class LifecyclePlaybookService {
     PlaybookExecutionResponse executeImmediate(UUID directoryId, UUID playbookId,
                                                String targetDn, AuthPrincipal principal) {
         LifecyclePlaybook pb = requirePlaybook(directoryId, playbookId);
+        permissionService.requireDnWithinScope(principal, directoryId, targetDn);
         DirectoryConnection dc = requireDirectory(directoryId);
         List<PlaybookStep> steps = stepRepo.findAllByPlaybookIdOrderByStepOrderAsc(playbookId);
 

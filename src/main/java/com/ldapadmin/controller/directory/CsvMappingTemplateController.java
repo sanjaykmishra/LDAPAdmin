@@ -1,8 +1,11 @@
 package com.ldapadmin.controller.directory;
 
 import com.ldapadmin.auth.AuthPrincipal;
+import com.ldapadmin.auth.DirectoryId;
+import com.ldapadmin.auth.RequiresFeature;
 import com.ldapadmin.dto.csv.CreateCsvMappingTemplateRequest;
 import com.ldapadmin.dto.csv.CsvMappingTemplateDto;
+import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.service.CsvMappingTemplateService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -40,15 +43,17 @@ public class CsvMappingTemplateController {
     private final CsvMappingTemplateService service;
 
     @GetMapping
+    @RequiresFeature(FeatureKey.CSV_TEMPLATE_MANAGE)
     public List<CsvMappingTemplateDto> list(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return service.listByDirectory(directoryId, principal);
     }
 
     @PostMapping
+    @RequiresFeature(FeatureKey.CSV_TEMPLATE_MANAGE)
     public ResponseEntity<CsvMappingTemplateDto> create(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody CreateCsvMappingTemplateRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -56,16 +61,18 @@ public class CsvMappingTemplateController {
     }
 
     @GetMapping("/{templateId}")
+    @RequiresFeature(FeatureKey.CSV_TEMPLATE_MANAGE)
     public CsvMappingTemplateDto get(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID templateId,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return service.getById(directoryId, templateId, principal);
     }
 
     @PutMapping("/{templateId}")
+    @RequiresFeature(FeatureKey.CSV_TEMPLATE_MANAGE)
     public CsvMappingTemplateDto update(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID templateId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody CreateCsvMappingTemplateRequest req) {
@@ -73,8 +80,9 @@ public class CsvMappingTemplateController {
     }
 
     @DeleteMapping("/{templateId}")
+    @RequiresFeature(FeatureKey.CSV_TEMPLATE_MANAGE)
     public ResponseEntity<Void> delete(
-            @PathVariable UUID directoryId,
+            @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID templateId,
             @AuthenticationPrincipal AuthPrincipal principal) {
         service.delete(directoryId, templateId, principal);

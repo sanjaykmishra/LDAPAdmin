@@ -80,6 +80,7 @@ public class LdapOperationService {
     public BrowseResult browse(UUID directoryId, AuthPrincipal principal, String dn) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
+        permissionService.requireBaseDnWithinScope(principal, directoryId, dn);
         return browseService.browse(dc, dn);
     }
 
@@ -125,6 +126,7 @@ public class LdapOperationService {
                                                int limit, String[] attributes) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
+        permissionService.requireBaseDnWithinScope(principal, directoryId, baseDn);
         // Default to person entries (covers person, organizationalPerson, inetOrgPerson)
         String effectiveFilter = (filter == null || filter.isBlank())
                 ? "(objectClass=person)" : filter;
@@ -136,6 +138,7 @@ public class LdapOperationService {
                                      String dn, String[] attributes) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
+        permissionService.requireDnWithinScope(principal, directoryId, dn);
 
         return LdapEntryResponse.from(userService.getUser(dc, dn, attributes));
     }
@@ -145,6 +148,7 @@ public class LdapOperationService {
     public LdapEntryResponse createUser(UUID directoryId, AuthPrincipal principal,
                                         CreateEntryRequest req) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
+        permissionService.requireDnWithinScope(principal, directoryId, req.dn());
 
         userService.createUser(dc, req.dn(), req.attributes());
         LdapEntryResponse result = LdapEntryResponse.from(userService.getUser(dc, req.dn()));
@@ -156,6 +160,7 @@ public class LdapOperationService {
     public LdapEntryResponse updateUser(UUID directoryId, AuthPrincipal principal,
                                         String dn, UpdateEntryRequest req) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
+        permissionService.requireDnWithinScope(principal, directoryId, dn);
 
         List<Modification> mods = toModifications(req);
         userService.updateUser(dc, dn, mods);
@@ -169,6 +174,7 @@ public class LdapOperationService {
     public LdapEntryResponse updateGroup(UUID directoryId, AuthPrincipal principal,
                                          String dn, UpdateEntryRequest req) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
+        permissionService.requireDnWithinScope(principal, directoryId, dn);
 
         List<Modification> mods = toModifications(req);
         groupService.updateGroup(dc, dn, mods);
@@ -182,6 +188,7 @@ public class LdapOperationService {
     public BulkAttributeUpdateResult bulkUpdateAttributes(UUID directoryId, AuthPrincipal principal,
                                                            BulkAttributeUpdateRequest req) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
+        req.dns().forEach(dn -> permissionService.requireDnWithinScope(principal, directoryId, dn));
 
         List<Modification> mods = req.modifications().stream()
                 .map(m -> new Modification(
@@ -216,6 +223,7 @@ public class LdapOperationService {
 
     public void deleteUser(UUID directoryId, AuthPrincipal principal, String dn) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
+        permissionService.requireDnWithinScope(principal, directoryId, dn);
 
         userService.deleteUser(dc, dn);
         auditService.record(principal, directoryId, AuditAction.USER_DELETE, dn, null);
@@ -223,6 +231,7 @@ public class LdapOperationService {
 
     public void enableUser(UUID directoryId, AuthPrincipal principal, String dn) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
+        permissionService.requireDnWithinScope(principal, directoryId, dn);
 
         userService.enableUser(dc, dn);
         auditService.record(principal, directoryId, AuditAction.USER_ENABLE, dn, null);
@@ -230,6 +239,7 @@ public class LdapOperationService {
 
     public void disableUser(UUID directoryId, AuthPrincipal principal, String dn) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
+        permissionService.requireDnWithinScope(principal, directoryId, dn);
 
         userService.disableUser(dc, dn);
         auditService.record(principal, directoryId, AuditAction.USER_DISABLE, dn, null);
@@ -238,7 +248,8 @@ public class LdapOperationService {
     public void moveUser(UUID directoryId, AuthPrincipal principal,
                          String dn, MoveUserRequest req) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
-
+        permissionService.requireDnWithinScope(principal, directoryId, dn);
+        permissionService.requireDnWithinScope(principal, directoryId, req.newParentDn());
 
         userService.moveUser(dc, dn, req.newParentDn());
         auditService.record(principal, directoryId, AuditAction.USER_MOVE, dn,
@@ -248,6 +259,7 @@ public class LdapOperationService {
     public void resetPassword(UUID directoryId, AuthPrincipal principal,
                               String dn, String newPassword) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
+        permissionService.requireDnWithinScope(principal, directoryId, dn);
 
         userService.resetPassword(dc, dn, newPassword);
         auditService.record(principal, directoryId, AuditAction.PASSWORD_RESET, dn, null);
@@ -266,6 +278,7 @@ public class LdapOperationService {
                                                 int limit, String[] attributes) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
+        permissionService.requireBaseDnWithinScope(principal, directoryId, baseDn);
 
         // Always intersect with known group objectClasses so non-group entries are excluded.
         String effectiveFilter;
@@ -282,6 +295,7 @@ public class LdapOperationService {
                                       String dn, String[] attributes) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
+        permissionService.requireDnWithinScope(principal, directoryId, dn);
 
         return LdapEntryResponse.from(groupService.getGroup(dc, dn, attributes));
     }
@@ -290,6 +304,7 @@ public class LdapOperationService {
                                         String dn, String memberAttribute) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
+        permissionService.requireDnWithinScope(principal, directoryId, dn);
 
         return groupService.getMembers(dc, dn, memberAttribute);
     }
@@ -299,6 +314,7 @@ public class LdapOperationService {
     public LdapEntryResponse createGroup(UUID directoryId, AuthPrincipal principal,
                                          CreateEntryRequest req) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
+        permissionService.requireDnWithinScope(principal, directoryId, req.dn());
 
         groupService.createGroup(dc, req.dn(), req.attributes());
         LdapEntryResponse result = LdapEntryResponse.from(groupService.getGroup(dc, req.dn()));
@@ -309,6 +325,7 @@ public class LdapOperationService {
 
     public void deleteGroup(UUID directoryId, AuthPrincipal principal, String dn) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
+        permissionService.requireDnWithinScope(principal, directoryId, dn);
 
         groupService.deleteGroup(dc, dn);
         auditService.record(principal, directoryId, AuditAction.GROUP_DELETE, dn, null);
@@ -317,6 +334,7 @@ public class LdapOperationService {
     public void addGroupMember(UUID directoryId, AuthPrincipal principal,
                                String groupDn, String memberAttribute, String memberValue) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
+        permissionService.requireDnWithinScope(principal, directoryId, groupDn);
 
         groupService.addMember(dc, groupDn, memberAttribute, memberValue);
         auditService.record(principal, directoryId, AuditAction.GROUP_MEMBER_ADD, groupDn,
@@ -326,6 +344,7 @@ public class LdapOperationService {
     public void removeGroupMember(UUID directoryId, AuthPrincipal principal,
                                   String groupDn, String memberAttribute, String memberValue) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
+        permissionService.requireDnWithinScope(principal, directoryId, groupDn);
 
         groupService.removeMember(dc, groupDn, memberAttribute, memberValue);
         auditService.record(principal, directoryId, AuditAction.GROUP_MEMBER_REMOVE, groupDn,
@@ -380,6 +399,7 @@ public class LdapOperationService {
                                             BulkImportRequest req) throws IOException {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
+        permissionService.requireDnWithinScope(principal, directoryId, req.parentDn());
 
         // Defaults — may be overridden by template or request fields
         String            targetKeyAttr    = "uid";
@@ -437,6 +457,7 @@ public class LdapOperationService {
                                   List<String> attributes, UUID templateId) throws IOException {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
+        permissionService.requireBaseDnWithinScope(principal, directoryId, baseDn);
 
         List<String> effectiveAttrs = new ArrayList<>(attributes);
         if (effectiveAttrs.isEmpty() && templateId != null) {
@@ -483,6 +504,7 @@ public class LdapOperationService {
                                               String objectClass) throws IOException {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
+        permissionService.requireDnWithinScope(principal, directoryId, req.parentDn());
 
         ConflictHandling  conflictHandling = ConflictHandling.SKIP;
         List<String>      objectClasses    = (objectClass != null && !objectClass.isBlank())
@@ -533,6 +555,7 @@ public class LdapOperationService {
                                     List<String> attributes) throws IOException {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDirectoryAccess(principal, directoryId);
+        permissionService.requireBaseDnWithinScope(principal, directoryId, baseDn);
 
         return bulkGroupService.exportCsv(dc, filter, baseDn, memberAttribute, attributes);
     }
