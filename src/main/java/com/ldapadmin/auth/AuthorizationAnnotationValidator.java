@@ -60,10 +60,13 @@ public class AuthorizationAnnotationValidator {
             String classPrefix = classLevelPath(clazz);
 
             for (Method method : clazz.getDeclaredMethods()) {
+                if (method.isSynthetic() || method.isBridge()) continue;
+
                 String fullPath = classPrefix + methodLevelPath(method);
 
                 if (!fullPath.contains(DIRECTORY_PATH_SEGMENT)) continue;
                 if (isExempt(fullPath)) continue;
+                if (!isHandlerMethod(method)) continue;
 
                 boolean hasAuth = method.isAnnotationPresent(RequiresFeature.class)
                         || method.isAnnotationPresent(PreAuthorize.class);
@@ -111,6 +114,15 @@ public class AuthorizationAnnotationValidator {
                 return "";
             }
         }).orElse("");
+    }
+
+    private boolean isHandlerMethod(Method method) {
+        return method.isAnnotationPresent(org.springframework.web.bind.annotation.GetMapping.class)
+                || method.isAnnotationPresent(org.springframework.web.bind.annotation.PostMapping.class)
+                || method.isAnnotationPresent(org.springframework.web.bind.annotation.PutMapping.class)
+                || method.isAnnotationPresent(org.springframework.web.bind.annotation.DeleteMapping.class)
+                || method.isAnnotationPresent(org.springframework.web.bind.annotation.PatchMapping.class)
+                || method.isAnnotationPresent(org.springframework.web.bind.annotation.RequestMapping.class);
     }
 
     private boolean isExempt(String path) {
