@@ -413,9 +413,9 @@ function isSchemaRequired(attr) {
   return schemaRequiredAttrs.value.has(attr.attributeName.toLowerCase())
 }
 
-// Helper: check if an attribute can be removed
+// Helper: check if an attribute can be removed (required attributes cannot be removed)
 function canRemoveAttribute(attr) {
-  return !isRdnAttribute(attr) && !isSchemaRequired(attr)
+  return !isRdnAttribute(attr) && !isSchemaRequired(attr) && !attr.requiredOnCreate
 }
 
 // Available attributes from selected object classes that haven't been added yet
@@ -466,6 +466,37 @@ function addSelectedAttributes() {
   attrPickerSelection.value = []
   showAttrPicker.value = false
 }
+
+// When emailPasswordToUser is enabled, ensure 'mail' is present and required
+watch(() => profile.value.emailPasswordToUser, (enabled) => {
+  if (!enabled) return
+  const existing = profile.value.attributeConfigs.find(
+    a => a.attributeName.toLowerCase() === 'mail'
+  )
+  if (existing) {
+    existing.requiredOnCreate = true
+    existing.hidden = false
+  } else {
+    profile.value.attributeConfigs.push({
+      attributeName: 'mail', customLabel: 'Email', inputType: 'TEXT',
+      requiredOnCreate: true, editableOnCreate: true,
+      editableOnUpdate: true, selfServiceEdit: true,
+      selfRegistrationEdit: true,
+      defaultValue: '', computedExpression: '', validationRegex: '',
+      validationMessage: '', allowedValues: '', minLength: null,
+      maxLength: null, sectionName: '', columnSpan: 6, hidden: false,
+      registrationSectionName: null, registrationColumnSpan: null, registrationDisplayOrder: null,
+      selfServiceSectionName: null, selfServiceColumnSpan: null, selfServiceDisplayOrder: null
+    })
+  }
+})
+
+// When requiredOnCreate is set, ensure hidden is cleared
+watch(() => profile.value.attributeConfigs.map(a => a.requiredOnCreate), () => {
+  for (const attr of profile.value.attributeConfigs) {
+    if (attr.requiredOnCreate && attr.hidden) attr.hidden = false
+  }
+})
 
 // Helper: determine which fields to show based on input type
 function showFieldFor(inputType, fieldName) {
@@ -808,7 +839,10 @@ function toggleApprover(accountId) {
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.editableOnUpdate" /> Editable (update)</label>
               <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.selfServiceEdit" /> Self-service</label>
               <label v-if="profile.selfRegistrationAllowed" class="flex items-center gap-1"><input type="checkbox" v-model="attr.selfRegistrationEdit" /> Self-registration</label>
-              <label class="flex items-center gap-1"><input type="checkbox" v-model="attr.hidden" /> Hidden</label>
+              <label class="flex items-center gap-1">
+                <input type="checkbox" v-model="attr.hidden"
+                  :disabled="attr.requiredOnCreate || isRdnAttribute(attr) || isSchemaRequired(attr)" /> Hidden
+              </label>
             </div>
           </div>
         </div>

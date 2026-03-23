@@ -541,6 +541,24 @@ public class ProvisioningProfileService {
                                        List<AttributeConfigEntry> entries) {
         if (entries == null || entries.isEmpty()) return;
 
+        // Validate: required attributes cannot be hidden
+        for (AttributeConfigEntry e : entries) {
+            if (e.requiredOnCreate() && e.hidden()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Required attribute '" + e.attributeName() + "' cannot be hidden");
+            }
+        }
+
+        // Validate: emailPasswordToUser requires a 'mail' attribute marked as required
+        if (profile.isEmailPasswordToUser()) {
+            boolean hasMailRequired = entries.stream().anyMatch(
+                    e -> e.attributeName().equalsIgnoreCase("mail") && e.requiredOnCreate());
+            if (!hasMailRequired) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Email password to user requires a 'mail' attribute marked as required");
+            }
+        }
+
         for (int i = 0; i < entries.size(); i++) {
             AttributeConfigEntry e = entries.get(i);
             ProfileAttributeConfig c = new ProfileAttributeConfig();
