@@ -88,6 +88,12 @@ public class ApprovalWorkflowService {
         Optional<ProvisioningProfile> profile = findProfileForDn(directoryId, targetDn);
 
         if (profile.isPresent()) {
+            // Enforce profile-level scope: the requester must have a role in the
+            // matched profile, not just any profile in the directory. Without this,
+            // an admin with access to Profile A could operate on DNs under Profile B
+            // (same directory) whenever Profile B doesn't require approval.
+            permissionService.requireProfileAccess(requester, profile.get().getId());
+
             if (isApprovalRequired(profile.get().getId())) {
                 PendingApproval pa = submitForApproval(
                         directoryId, profile.get().getId(), requester, type, payload);
