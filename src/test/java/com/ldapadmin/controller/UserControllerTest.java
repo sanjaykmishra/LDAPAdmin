@@ -44,6 +44,9 @@ class UserControllerTest extends BaseControllerTest {
 
     @MockBean LdapOperationService ldapService;
     @MockBean ApprovalWorkflowService approvalService;
+    @MockBean com.ldapadmin.service.ProvisioningProfileService provisioningProfileService;
+    @MockBean com.ldapadmin.service.PasswordPolicyService passwordPolicyService;
+    @MockBean com.ldapadmin.service.ApprovalNotificationService approvalNotificationService;
 
     static final UUID DIR_ID    = UUID.fromString("20000000-0000-0000-0000-000000000002");
     static final String BASE_URL = "/api/v1/directories/" + DIR_ID + "/users";
