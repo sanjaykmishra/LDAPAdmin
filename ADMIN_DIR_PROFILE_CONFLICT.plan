@@ -470,3 +470,412 @@ be a deliberate architectural decision.
 
 Total estimated effort (excluding step 14): ~7-8 hours of implementation +
 testing. Step 14 adds 2-3 days depending on which option is chosen.
+
+
+================================================================================
+  PART III — AUTHORIZATION MODEL EVALUATION
+================================================================================
+
+Evaluation of the current permission/authorization architecture for robustness,
+ease of application, and runtime efficiency. Performed 2026-03-23.
+
+--------------------------------------------------------------------------------
+10. ARCHITECTURE OVERVIEW
+--------------------------------------------------------------------------------
+
+The model has four dimensions, layered bottom-to-top:
+
+  Layer 4  │ Feature override    │ AdminFeaturePermission (per-admin, per-feature)
+  Layer 3  │ Base role defaults  │ ADMIN → all features; READ_ONLY → export/reports
+  Layer 2  │ Profile access      │ AdminProfileRole (admin × profile × base role)
+  Layer 1  │ Directory access    │ "has role in ANY profile in this directory"
+  Layer 0  │ Principal type      │ SecurityConfig: SUPERADMIN / ADMIN / SELF_SERVICE
+
+Enforcement is split across three mechanisms:
+  - SecurityConfig  — URL-pattern matching, coarse role check (layer 0)
+  - @PreAuthorize   — Spring Security SpEL on controller methods (layer 0)
+  - @RequiresFeature + AOP aspect — directory + feature check (layers 1-4)
+
+Key files:
+  - auth/AuthPrincipal.java              — immutable JWT-derived principal
+  - auth/PermissionService.java          — 4-dimension permission logic
+  - auth/FeaturePermissionAspect.java    — AOP interceptor for @RequiresFeature
+  - auth/RequiresFeature.java            — annotation definition
+  - auth/DirectoryId.java                — parameter marker for aspect
+  - config/SecurityConfig.java           — global filter chain + URL rules
+  - entity/enums/FeatureKey.java         — 17 feature permission keys
+  - entity/enums/BaseRole.java           — ADMIN, READ_ONLY
+  - entity/AdminProfileRole.java         — admin × profile assignment
+  - entity/AdminFeaturePermission.java   — per-admin feature overrides
+
+--------------------------------------------------------------------------------
+11. ROBUSTNESS
+--------------------------------------------------------------------------------
+
+Strengths:
+
+  a) AuthPrincipal is immutable.
+     A Java record derived from cryptographically-signed JWT claims. No DB hit
+     during authentication. Cannot be tampered with post-issuance. Role, account
+     ID, and username are all embedded in the token.
+
+  b) Feature override model (layer 4) is well-designed.
+     Explicit enable/disable per-admin per-feature, with base-role defaults as
+     fallback. This gives fine-grained control without requiring a row for every
+     admin × feature combination. The READONLY_DEFAULT_FEATURES set
+     (BULK_EXPORT, REPORTS_RUN, REPORTS_EXPORT) is appropriately conservative —
+     all truly read-only operations.
+
+  c) Superadmin controllers are consistently locked down.
+     All 6 controllers under /superadmin/ use class-level
+     @PreAuthorize("hasRole('SUPERADMIN')"). No exceptions, no leaks.
+
+  d) No ad-hoc SecurityContextHolder usage.
+     Only FeaturePermissionAspect and JwtAuthenticationFilter touch the
+     SecurityContext directly. Controllers use @AuthenticationPrincipal
+     injection. No scattered manual principal extraction.
+
+Weaknesses:
+
+  e) Three competing authorization mechanisms with no enforced convention.
+     Of 22 controllers:
+       - 6 use @RequiresFeature (with @DirectoryId)
+       - 8 use @PreAuthorize
+       - 4 use neither (relying on SecurityConfig catch-all)
+       - 4 mix approaches within the same controller
+
+     Within the same URL hierarchy (/api/v1/directories/{id}/...), some
+     endpoints are feature-gated and some aren't. There is no enforced rule
+     for when to use which mechanism. Every new endpoint is a judgment call
+     that can silently go wrong.
+
+  f) The SecurityConfig catch-all is too permissive as a safety net.
+     Line 84: .requestMatchers("/api/v1/**").hasAnyRole("SUPERADMIN", "ADMIN")
+     Any endpoint that forgets to add @PreAuthorize or @RequiresFeature is
+     still reachable by any admin. A deny-by-default posture would be safer:
+     require explicit annotation, reject at startup if missing.
+
+  g) READ endpoints are systematically unprotected.
+     UserController.search(), GroupController.search(), SchemaController.*,
+     DirectoryBrowseController.browse() — none have feature gates. Any admin
+     with access to any profile in a directory can enumerate all users, groups,
+     and schema objects. This is inconsistent with AccessReviewController,
+     which requires ACCESS_REVIEW_MANAGE even for listing campaigns.
+
+  h) Layer 1 (directory access) is a blunt instrument.
+     existsByAdminAccountIdAndProfileDirectoryId() grants access if the admin
+     has a role in ANY profile. This collapses all profile boundaries into a
+     single directory-level gate (covered in detail in Part I).
+
+  i) @PreAuthorize and @RequiresFeature don't compose.
+     They are parallel systems. @PreAuthorize checks role from JWT.
+     @RequiresFeature checks directory access + feature from DB. If an
+     endpoint needs both "must be SUPERADMIN" AND "must have feature X", you
+     must use both annotations or bury one check in service code (as
+     AccessReviewController.create() does). There is no unified annotation.
+
+  j) No compile-time or startup-time enforcement.
+     If a developer adds a new @PostMapping and forgets @RequiresFeature, the
+     code compiles, tests pass (unless there's a specific auth test), and the
+     endpoint silently falls through to the catch-all. No annotation processor,
+     no startup scan, no "every endpoint must have at least one auth
+     annotation" check.
+
+Robustness rating: MODERATE
+  The individual pieces (JWT, feature overrides, superadmin lockdown) are solid.
+  The weakness is structural: three parallel mechanisms with no enforced
+  convention, making it easy to leave gaps when adding new endpoints.
+
+--------------------------------------------------------------------------------
+12. EASE OF APPLICATION
+--------------------------------------------------------------------------------
+
+Strengths:
+
+  a) @RequiresFeature is ergonomic when used.
+     One annotation, one enum value, automatic directoryId extraction via
+     @DirectoryId. A developer adding a new endpoint writes:
+       @RequiresFeature(FeatureKey.USER_CREATE)
+     and gets directory access + feature permission checking for free. The AOP
+     aspect handles everything. This is the model's strongest design point.
+
+  b) FeatureKey enum is self-documenting.
+     17 values with dot-notation DB representation. Adding a new feature is:
+     add an enum value, annotate the endpoint, done. The JPA converter handles
+     serialization transparently.
+
+  c) @DirectoryId fallback to parameter name is a nice ergonomic touch.
+     Existing code without the annotation still works via the "directoryId"
+     parameter name convention in FeaturePermissionAspect.
+
+Weaknesses:
+
+  d) Three different places to check when auditing an endpoint.
+     To understand what's actually enforced on any given endpoint, a reviewer
+     must check:
+       1. SecurityConfig URL patterns (global)
+       2. @PreAuthorize on controller class or method
+       3. @RequiresFeature on method
+     All three can be present, absent, or contradictory. This is error-prone
+     for code review and security audits.
+
+  e) No clear rule for when to use which mechanism.
+     The codebase has no documented convention. Observed heuristics:
+       - Superadmin-only endpoints → @PreAuthorize("hasRole('SUPERADMIN')")
+       - Feature-gated write endpoints → @RequiresFeature
+       - Read endpoints → nothing (catch-all)
+       - Playbooks → @PreAuthorize("hasAnyRole('ADMIN', 'SUPERADMIN')")
+     But these are inconsistently applied and undocumented.
+
+  f) requireProfileAccess() is barely used.
+     It exists in PermissionService but almost nothing calls it. Most code uses
+     requireDirectoryAccess or requireFeature (which internally calls
+     requireDirectoryAccess). If a developer wants to scope an operation to a
+     specific profile, they have to know to call requireProfileAccess()
+     manually — and there is no annotation equivalent like @RequiresProfile.
+
+  g) No feature permission matrix documentation.
+     The mapping of features to endpoints is implicit (scattered across
+     @RequiresFeature annotations). An admin configuring feature overrides
+     must guess which features gate which operations. A superadmin setting up
+     a READ_ONLY admin has no reference for what they'll actually be able to
+     do beyond the three default features.
+
+  h) Mixed authorization in same controller is confusing.
+     AccessReviewController: most methods use @RequiresFeature, but create()
+     adds a manual isSuperadmin() check inside the method body.
+     GroupController: write methods use @RequiresFeature, read methods use
+     nothing. UserController: same pattern. A developer extending these
+     controllers has no consistent template to follow.
+
+Ease of application rating: MIXED
+  @RequiresFeature is well-designed and easy to use. But the lack of a single
+  enforced mechanism, plus undocumented conventions and three places to check,
+  means developers need tribal knowledge to apply authorization correctly.
+
+--------------------------------------------------------------------------------
+13. RUNTIME EFFICIENCY
+--------------------------------------------------------------------------------
+
+Strengths:
+
+  a) JWT validation is zero-cost to the database.
+     JwtTokenService.parse() is pure cryptographic signature verification.
+     Role, account ID, and username are embedded in the token. Authentication
+     never touches the database.
+
+  b) @PreAuthorize is zero-cost to the database.
+     Role checks come from the JWT-derived authority set already in the
+     SecurityContext. No additional query.
+
+  c) AdminFeaturePermissionRepository is well-indexed.
+     Explicit idx_afp_admin on admin_account_id, plus unique constraint on
+     (admin_account_id, feature_key). Feature override lookups are fast.
+
+Weaknesses:
+
+  d) 3 DB queries per @RequiresFeature request, with zero caching.
+     Every request hitting a @RequiresFeature endpoint triggers:
+
+       Query 1: existsByAdminAccountIdAndProfileDirectoryId()
+                → directory access check (join: admin_profile_roles → profiles)
+       Query 2: findByAdminAccountIdAndFeatureKey()
+                → feature override lookup
+       Query 3: findAllByAdminAccountId()
+                → base role fallback (conditional — only if no override found)
+
+     These are small queries, but they execute on every single request. For a
+     tool where admins do rapid user lookups or process bulk operations, this
+     accumulates. An admin browsing a user list triggers 3 DB round-trips
+     before the LDAP query even starts.
+
+  e) No permission caching at any level.
+     No @Cacheable, no CacheManager, no request-scoped cache. An admin's
+     profile roles and feature overrides change rarely (only when a superadmin
+     reconfigures them), yet they are re-queried on every API call.
+
+     A simple request-scoped cache (load once per HTTP request, reuse within
+     that request) would eliminate redundant queries when multiple permission
+     checks occur in the same request. A short-TTL application-level cache
+     (e.g. 60 seconds via Caffeine) would reduce DB load further, at the cost
+     of slightly delayed permission changes.
+
+  f) Missing index on admin_profile_roles.admin_account_id.
+     The existsByAdminAccountIdAndProfileDirectoryId() query (Query 1 — the
+     hottest path) joins admin_profile_roles → provisioning_profiles to check
+     directory_id. The only index is the unique constraint on
+     (admin_account_id, profile_id). For admins with many profiles across
+     directories, this may degrade to a sequential scan on the join.
+
+     Fix: CREATE INDEX idx_apr_admin ON admin_profile_roles(admin_account_id);
+
+  g) findAllByAdminAccountId() in Query 3 is over-fetched.
+     It loads ALL profile roles for the admin across ALL directories just to
+     check if any has BaseRole.ADMIN. A simple exists query would suffice:
+
+       existsByAdminAccountIdAndBaseRole(UUID adminId, BaseRole role)
+
+     This avoids transferring unnecessary rows and simplifies the logic from
+     a stream().anyMatch() to a boolean return.
+
+  h) No batch optimization for multi-operation requests.
+     Playbook execution calls execute() per target DN. Each invocation
+     re-runs the full 3-query permission check. For a playbook targeting 50
+     users, that's 150 permission queries. A batch-aware permission check
+     (validate once, execute many) would reduce this to 3 queries total.
+
+Efficiency rating: ADEQUATE but wasteful
+  Works fine for low-volume admin usage. Would degrade under high-concurrency
+  scenarios (bulk operations, many admins). The fixes are straightforward:
+  add one index, add one cache, fix one over-fetch.
+
+--------------------------------------------------------------------------------
+14. AUTHORIZATION CONSISTENCY ANALYSIS
+--------------------------------------------------------------------------------
+
+Distribution of authorization mechanisms across 22 controllers:
+
+  Mechanism                               │ Controllers │ Count
+  ────────────────────────────────────────┼─────────────┼──────
+  @RequiresFeature only                   │ AccessReview, BulkGroup,     │  6
+                                          │ BulkUser, ScheduledReport,   │
+                                          │ User (writes), Group (writes)│
+  @PreAuthorize only                      │ All 6 superadmin controllers,│  8
+                                          │ LifecyclePlaybook,           │
+                                          │ ProvisioningProfile          │
+  Neither (SecurityConfig catch-all only) │ Approval, CsvMappingTemplate,│  4
+                                          │ DirectoryBrowse, Schema      │
+  Mixed within same controller            │ AccessReview (feature +      │  4
+                                          │ manual superadmin check),    │
+                                          │ User (feature for writes,    │
+                                          │ nothing for reads), Group    │
+                                          │ (same), ProvisioningProfile  │
+                                          │ (mixed superadmin/admin)     │
+
+Anti-patterns observed:
+
+  1. Same URL hierarchy, different auth mechanisms.
+     /api/v1/directories/{id}/users (POST) → @RequiresFeature(USER_CREATE)
+     /api/v1/directories/{id}/users (GET)  → nothing
+     /api/v1/directories/{id}/groups (POST) → @RequiresFeature(GROUP_CREATE_DELETE)
+     /api/v1/directories/{id}/groups (GET)  → nothing
+
+  2. Unvalidated directoryId in @PreAuthorize-only controllers.
+     LifecyclePlaybookController takes @PathVariable UUID directoryId but
+     doesn't use @DirectoryId or @RequiresFeature. Directory-level access
+     is checked only in the service layer. If the service has a bug, the
+     controller provides no safety net.
+
+  3. Controllers with both directoryId and profileId but no scope reconciliation.
+     ProvisioningProfileController routes like:
+       /api/v1/directories/{directoryId}/profiles/{profileId}
+     rely entirely on service-layer validation that profileId belongs to
+     directoryId. No controller-level or aspect-level cross-validation.
+
+  4. Manual ad-hoc authorization in one method of an otherwise annotation-driven
+     controller (AccessReviewController.create — runtime isSuperadmin() check
+     alongside @RequiresFeature on every other method).
+
+  5. ApprovalController has ZERO authorization annotations on any of its 6
+     endpoints, despite performing state-changing operations (approve, reject,
+     updatePayload). All authorization is implicit via SecurityConfig catch-all
+     + service-layer checks.
+
+--------------------------------------------------------------------------------
+15. RECOMMENDED STRUCTURAL IMPROVEMENT
+--------------------------------------------------------------------------------
+
+If one structural change were made, it should be:
+
+  Standardize on @RequiresFeature as the SINGLE authorization mechanism for
+  all directory-scoped endpoints.
+
+What this entails:
+
+  a) Add feature keys for read operations.
+     New keys: USER_VIEW, GROUP_VIEW (or a single DIRECTORY_BROWSE).
+     Apply @RequiresFeature to search(), get(), browse() endpoints.
+     This closes the "unprotected reads" gap and makes the READ_ONLY role
+     meaningful at the feature level.
+
+  b) Add feature keys for currently ungated operations.
+     New keys: APPROVAL_MANAGE, PLAYBOOK_EXECUTE, PLAYBOOK_MANAGE.
+     Apply to ApprovalController, LifecyclePlaybookController.
+     Replace @PreAuthorize on playbook endpoints with @RequiresFeature.
+
+  c) Add a startup-time scan that rejects unannotated endpoints.
+     A Spring ApplicationListener<ContextRefreshedEvent> that introspects all
+     @RequestMapping methods under /api/v1/directories/** and fails startup if
+     any lack @RequiresFeature. This makes the "forget to annotate" failure
+     mode impossible.
+
+       @Component
+       public class AuthAnnotationValidator implements
+               ApplicationListener<ContextRefreshedEvent> {
+           @Override
+           public void onApplicationEvent(ContextRefreshedEvent event) {
+               // Scan all @RequestMapping methods in directory controllers
+               // Throw if any lacks @RequiresFeature
+           }
+       }
+
+  d) Add a request-scoped permission cache.
+     On the first @RequiresFeature check in a request, load the admin's
+     profile roles and feature overrides into a request-scoped bean. Reuse
+     on subsequent checks in the same request. This collapses 3N queries
+     (where N = permission checks per request) down to 3.
+
+       @RequestScope
+       @Component
+       public class PermissionContext {
+           private List<AdminProfileRole> profileRoles;
+           private List<AdminFeaturePermission> featureOverrides;
+           // Lazy-loaded, cached for request duration
+       }
+
+  e) Add the missing index.
+     Migration V_next:
+       CREATE INDEX idx_apr_admin ON admin_profile_roles(admin_account_id);
+
+  f) Replace over-fetched query.
+     Change findAllByAdminAccountId() call in requireFeature() to:
+       existsByAdminAccountIdAndBaseRole(adminId, BaseRole.ADMIN)
+
+  g) Document the feature permission matrix.
+     Generate from @RequiresFeature annotations at build time (annotation
+     processor or test that outputs a markdown table). This gives superadmins
+     a reference for what each feature key actually gates.
+
+Result: a single authorization mechanism, enforced at startup, cached per
+request, with a documented permission matrix. The three-mechanism ambiguity
+disappears. New endpoints get a compiler-like check. Performance improves.
+Security audits become a matter of reviewing one enum and one annotation.
+
+Estimated effort: 2-3 days (can be done alongside or after the remediation
+steps in section 9).
+
+--------------------------------------------------------------------------------
+16. EVALUATION SUMMARY
+--------------------------------------------------------------------------------
+
+  ┌─────────────────────┬───────────┬────────────────────────────────────────────┐
+  │ Dimension           │ Rating    │ Key issue                                  │
+  ├─────────────────────┼───────────┼────────────────────────────────────────────┤
+  │ Robustness          │ Moderate  │ Three competing auth mechanisms with no    │
+  │                     │           │ enforced convention; catch-all too         │
+  │                     │           │ permissive; READs unprotected             │
+  ├─────────────────────┼───────────┼────────────────────────────────────────────┤
+  │ Ease of application │ Mixed     │ @RequiresFeature is ergonomic; everything │
+  │                     │           │ else requires tribal knowledge of which    │
+  │                     │           │ mechanism to use where                     │
+  ├─────────────────────┼───────────┼────────────────────────────────────────────┤
+  │ Efficiency          │ Adequate  │ 3 uncached DB queries per request; missing │
+  │                     │           │ index on hottest path; over-fetch in       │
+  │                     │           │ base-role fallback                         │
+  └─────────────────────┴───────────┴────────────────────────────────────────────┘
+
+The authorization model's strongest asset is the @RequiresFeature + FeatureKey
+pattern. Its weakest aspect is that this pattern isn't the only one — two other
+mechanisms coexist without clear boundaries, making the system harder to audit,
+extend, and trust. The recommended path forward is to promote @RequiresFeature
+to the single standard, enforce it at startup, and cache it per request.
