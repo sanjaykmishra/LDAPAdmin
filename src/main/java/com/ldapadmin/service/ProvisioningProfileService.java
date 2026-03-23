@@ -18,8 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Core CRUD and provisioning logic for provisioning profiles.
@@ -38,8 +36,6 @@ public class ProvisioningProfileService {
     private final DirectoryConnectionRepository      dirRepo;
     private final AccountRepository                  accountRepo;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
-
-    private static final Pattern EXPRESSION_VAR = Pattern.compile("\\$\\{(\\w+)}");
 
     // ── Profile CRUD ──────────────────────────────────────────────────────────
 
@@ -324,26 +320,48 @@ public class ProvisioningProfileService {
     // ── Provisioning helpers ──────────────────────────────────────────────────
 
     /**
-     * Evaluates computed expressions by interpolating ${attributeName} references.
+     * Evaluates computed expressions by tokenizing into variable references
+     * ({@code ${attr}}), quoted string literals, concatenation operators (+),
+     * and literal text.  No regex used for the concatenation handling.
      */
     public String evaluateExpression(String expression, Map<String, List<String>> attributes) {
         if (expression == null || expression.isBlank()) return null;
 
-        Matcher matcher = EXPRESSION_VAR.matcher(expression);
         StringBuilder result = new StringBuilder();
-        while (matcher.find()) {
-            String attrName = matcher.group(1);
-            List<String> values = attributes.get(attrName);
-            String replacement = (values != null && !values.isEmpty()) ? values.get(0) : "";
-            matcher.appendReplacement(result, Matcher.quoteReplacement(replacement));
+        int i = 0;
+        int len = expression.length();
+        while (i < len) {
+            char c = expression.charAt(i);
+            if (c == '$' && i + 1 < len && expression.charAt(i + 1) == '{') {
+                // Variable reference: ${attrName}
+                int end = expression.indexOf('}', i + 2);
+                if (end == -1) break;
+                String attrName = expression.substring(i + 2, end);
+                List<String> values = attributes.get(attrName);
+                result.append((values != null && !values.isEmpty()) ? values.get(0) : "");
+                i = end + 1;
+            } else if (c == '+') {
+                // Concatenation operator — skip it
+                i++;
+            } else if (c == '"' || c == '\'') {
+                // Quoted string literal
+                int end = expression.indexOf(c, i + 1);
+                if (end == -1) break;
+                result.append(expression, i + 1, end);
+                i = end + 1;
+            } else {
+                // Literal text (dots, @domain, etc.)
+                int j = i;
+                while (j < len) {
+                    char ch = expression.charAt(j);
+                    if (ch == '$' || ch == '+' || ch == '"' || ch == '\'') break;
+                    j++;
+                }
+                result.append(expression, i, j);
+                i = j;
+            }
         }
-        matcher.appendTail(result);
-        // Evaluate + concatenation with quoted strings, e.g. +" "+ or +' '+
-        // Handle both-sided case first (+" "+), then single-sided cases
-        return result.toString()
-                .replaceAll("\\+[\"']([^\"']*)[\"']\\+", "$1")
-                .replaceAll("\\+[\"']([^\"']*)[\"']", "$1")
-                .replaceAll("[\"']([^\"']*)[\"']\\+", "$1");
+        return result.toString();
     }
 
     /**
