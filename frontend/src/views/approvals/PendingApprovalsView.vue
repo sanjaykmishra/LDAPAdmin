@@ -115,6 +115,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationStore } from '@/stores/notifications'
 import { useApi } from '@/composables/useApi'
 import { listPendingApprovals, approveRequest, rejectRequest, updateApprovalPayload } from '@/api/approvals'
 import DataTable from '@/components/DataTable.vue'
@@ -125,6 +126,7 @@ import RelativeTime from '@/components/RelativeTime.vue'
 const route = useRoute()
 const auth = useAuthStore()
 const { loading, call } = useApi()
+const notif = useNotificationStore()
 const dirId = route.params.dirId
 
 const approvals = ref([])
@@ -244,12 +246,17 @@ function handleApprove(approval) {
 
 async function doApprove() {
   confirmApprove.value = false
-  try {
-    await call(() => approveRequest(dirId, approvalToAction.value.id), { successMsg: 'Request approved' })
-  } catch {
-    // Provisioning may have failed — reload to show the error
+  const res = await call(() => approveRequest(dirId, approvalToAction.value.id))
+  if (res?.data?.provisionError) {
+    // Provisioning failed — reload list and open detail to show the error
+    await loadApprovals()
+    const updated = approvals.value.find(a => a.id === res.data.id)
+    if (updated) openDetail(updated)
+    notif.error('Provisioning failed: ' + res.data.provisionError)
+  } else {
+    notif.success('Request approved')
+    await loadApprovals()
   }
-  await loadApprovals()
 }
 
 async function handleReject() {

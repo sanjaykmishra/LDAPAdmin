@@ -168,9 +168,7 @@ public class ApprovalWorkflowService {
             pa.setProvisionError(msg);
             approvalRepo.save(pa);
             log.error("Provisioning failed for approval {}: {}", pa.getId(), msg);
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY,
-                    "Provisioning failed: " + msg);
+            return toResponse(pa);
         }
 
         pa.setProvisionError(null); // clear any previous error on success
