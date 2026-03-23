@@ -151,7 +151,7 @@ public class PermissionService {
     public Set<String> getAuthorizedOuDns(AuthPrincipal principal, UUID directoryId) {
         if (principal.isSuperadmin()) return Set.of();
         return profileRoleRepo
-                .findAllByAdminAccountIdAndProfileDirectoryId(principal.id(), directoryId)
+                .findAllByAdminAccountIdAndProfileDirectoryIdWithProfile(principal.id(), directoryId)
                 .stream()
                 .map(r -> r.getProfile().getTargetOuDn())
                 .collect(Collectors.toSet());

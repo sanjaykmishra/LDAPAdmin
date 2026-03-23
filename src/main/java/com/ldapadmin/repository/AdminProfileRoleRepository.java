@@ -29,6 +29,9 @@ public interface AdminProfileRoleRepository extends JpaRepository<AdminProfileRo
 
     List<AdminProfileRole> findAllByAdminAccountIdAndProfileDirectoryId(UUID adminAccountId, UUID directoryId);
 
+    @Query("SELECT r FROM AdminProfileRole r JOIN FETCH r.profile WHERE r.adminAccount.id = :adminId AND r.profile.directory.id = :dirId")
+    List<AdminProfileRole> findAllByAdminAccountIdAndProfileDirectoryIdWithProfile(@Param("adminId") UUID adminAccountId, @Param("dirId") UUID directoryId);
+
     boolean existsByAdminAccountIdAndBaseRole(UUID adminAccountId, BaseRole baseRole);
 
     @Query("SELECT DISTINCT r.profile.directory.id FROM AdminProfileRole r WHERE r.adminAccount.id = :adminId")
