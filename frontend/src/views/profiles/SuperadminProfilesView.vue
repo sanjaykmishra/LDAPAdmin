@@ -4,7 +4,8 @@ import { useNotificationStore } from '@/stores/notifications'
 import {
   listAllProfiles, createProfile, updateProfile, deleteProfile, cloneProfile,
   getLifecyclePolicy, setLifecyclePolicy, deleteLifecyclePolicy,
-  getApprovalConfig, setApprovalConfig, getApprovers, setApprovers
+  getApprovalConfig, setApprovalConfig, getApprovers, setApprovers,
+  evaluateGroupChanges, applyGroupChanges
 } from '@/api/profiles'
 import { listDirectories } from '@/api/directories'
 import { listObjectClasses, getObjectClass } from '@/api/schema'
@@ -50,6 +51,11 @@ const profile = ref(emptyProfile())
 // Lifecycle form
 const lifecycle = ref(emptyLifecycle())
 
+// Group change preview dialog
+const showGroupChangeDialog = ref(false)
+const groupChangePreview = ref(null)
+const applyingGroupChanges = ref(false)
+
 // Approval form
 const approval = ref(emptyApproval())
 const profileApprovers = ref([])
@@ -62,6 +68,8 @@ function emptyProfile() {
     passwordLength: 16, passwordUppercase: true, passwordLowercase: true,
     passwordDigits: true, passwordSpecial: true, passwordSpecialChars: '!@#$%^&*',
     emailPasswordToUser: false,
+    autoIncludeGroups: false, excludeAutoIncludes: false,
+    additionalProfileIds: [],
     attributeConfigs: [], groupAssignments: []
   }
 }
@@ -140,6 +148,9 @@ async function openEdit(p) {
     passwordSpecial: p.passwordSpecial ?? true,
     passwordSpecialChars: p.passwordSpecialChars ?? '!@#$%^&*',
     emailPasswordToUser: p.emailPasswordToUser ?? false,
+    autoIncludeGroups: p.autoIncludeGroups ?? false,
+    excludeAutoIncludes: p.excludeAutoIncludes ?? false,
+    additionalProfileIds: (p.additionalProfiles || []).map(ap => ap.id),
     attributeConfigs: p.attributeConfigs.map(a => ({
       attributeName: a.attributeName, customLabel: a.customLabel || '',
       inputType: a.inputType, requiredOnCreate: a.requiredOnCreate,
@@ -219,6 +230,14 @@ async function save() {
       await setApprovalConfig(editing.value, approval.value)
       await setApprovers(editing.value, { accountIds: profileApprovers.value })
       notif.success('Profile updated')
+      // Check if group membership changes are needed for existing users
+      const savedProfileId = editing.value
+      showModal.value = false
+      await reload()
+      // Use saved ID since editing.value gets cleared
+      editing.value = savedProfileId
+      await handleGroupChangePreview()
+      editing.value = null
     } else {
       const { data } = await createProfile(selectedDirId.value, profile.value)
       // Save lifecycle if configured
@@ -231,9 +250,18 @@ async function save() {
         await setApprovers(data.id, { accountIds: profileApprovers.value })
       }
       notif.success('Profile created')
+      // If this new profile is auto-include, check impact on other profiles
+      if (profile.value.autoIncludeGroups && profile.value.groupAssignments.length > 0) {
+        showModal.value = false
+        await reload()
+        editing.value = data.id
+        await handleGroupChangePreview()
+        editing.value = null
+      } else {
+        showModal.value = false
+        await reload()
+      }
     }
-    showModal.value = false
-    await reload()
   } catch (e) {
     notif.error(e.response?.data?.detail || e.response?.data?.message || e.message)
   } finally {
@@ -280,6 +308,69 @@ function addGroupAssignment() {
 }
 function removeGroupAssignment(index) {
   profile.value.groupAssignments.splice(index, 1)
+}
+
+// Additional profiles: profiles from the same directory that can be stacked
+const availableAdditionalProfiles = computed(() => {
+  if (!selectedDirId.value) return []
+  return profiles.value
+    .filter(p => p.directoryId === selectedDirId.value
+      && p.id !== editing.value
+      && !p.autoIncludeGroups) // auto-include profiles are implicit, not selectable
+    .map(p => ({ id: p.id, name: p.name }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+})
+
+// Auto-included profiles (read-only display)
+const autoIncludedProfiles = computed(() => {
+  if (!selectedDirId.value) return []
+  return profiles.value
+    .filter(p => p.directoryId === selectedDirId.value
+      && p.id !== editing.value
+      && p.autoIncludeGroups)
+    .map(p => ({ id: p.id, name: p.name }))
+})
+
+// Effective groups shown in the response
+const effectiveGroups = computed(() => {
+  // Find the current profile in the profiles list
+  const current = profiles.value.find(p => p.id === editing.value)
+  return current?.effectiveGroupAssignments || []
+})
+
+function toggleAdditionalProfile(profileId) {
+  const ids = profile.value.additionalProfileIds
+  const idx = ids.indexOf(profileId)
+  if (idx >= 0) ids.splice(idx, 1)
+  else ids.push(profileId)
+}
+
+async function handleGroupChangePreview() {
+  if (!editing.value) return
+  try {
+    const { data } = await evaluateGroupChanges(selectedDirId.value, editing.value)
+    if (data.changes && data.changes.length > 0) {
+      groupChangePreview.value = data
+      showGroupChangeDialog.value = true
+    }
+  } catch (e) {
+    // Non-critical — just means we can't preview
+    console.warn('Group change evaluation failed:', e)
+  }
+}
+
+async function confirmApplyGroupChanges() {
+  applyingGroupChanges.value = true
+  try {
+    await applyGroupChanges(selectedDirId.value, editing.value)
+    notif.success('Group memberships updated')
+    showGroupChangeDialog.value = false
+    groupChangePreview.value = null
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.response?.data?.message || e.message)
+  } finally {
+    applyingGroupChanges.value = false
+  }
 }
 
 // Object class management
@@ -752,6 +843,21 @@ function toggleApprover(accountId) {
               Email generated password to user on creation
             </label>
           </fieldset>
+
+          <!-- Group inclusion settings -->
+          <fieldset class="border rounded-lg p-4 space-y-2">
+            <legend class="text-sm font-semibold text-gray-700 px-1">Group Inclusion</legend>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" v-model="profile.autoIncludeGroups" />
+              Automatically include with other profiles
+              <span class="text-gray-400 text-xs">(this profile's groups will be added to users provisioned by any other profile in this directory)</span>
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" v-model="profile.excludeAutoIncludes" />
+              Exclude auto-included groups
+              <span class="text-gray-400 text-xs">(users provisioned by this profile will not receive groups from auto-included profiles)</span>
+            </label>
+          </fieldset>
         </div>
 
         <!-- Attributes Tab -->
@@ -900,24 +1006,69 @@ function toggleApprover(accountId) {
         </div>
 
         <!-- Groups Tab -->
-        <div v-if="modalTab === 'groups'" class="space-y-3">
-          <p class="text-sm text-gray-600">Groups users will be automatically added to on creation.</p>
-          <div v-for="(g, i) in profile.groupAssignments" :key="i" class="flex gap-2 items-end">
-            <div class="flex-1">
-              <label class="block text-xs text-gray-500">Group DN</label>
-              <GroupDnPicker v-model="g.groupDn" :directory-id="selectedDirId" />
+        <div v-if="modalTab === 'groups'" class="space-y-5">
+          <!-- Own group assignments -->
+          <fieldset class="border rounded-lg p-4 space-y-3">
+            <legend class="text-sm font-semibold text-gray-700 px-1">Own Group Assignments</legend>
+            <p class="text-sm text-gray-600">Groups users will be automatically added to on creation.</p>
+            <div v-for="(g, i) in profile.groupAssignments" :key="i" class="flex gap-2 items-end">
+              <div class="flex-1">
+                <label class="block text-xs text-gray-500">Group DN</label>
+                <GroupDnPicker v-model="g.groupDn" :directory-id="selectedDirId" />
+              </div>
+              <div class="w-40">
+                <label class="block text-xs text-gray-500">Member Attribute</label>
+                <select v-model="g.memberAttribute" class="input w-full text-sm">
+                  <option>member</option>
+                  <option>uniqueMember</option>
+                  <option>memberUid</option>
+                </select>
+              </div>
+              <button class="text-red-500 hover:underline text-sm pb-1" @click="removeGroupAssignment(i)">Remove</button>
             </div>
-            <div class="w-40">
-              <label class="block text-xs text-gray-500">Member Attribute</label>
-              <select v-model="g.memberAttribute" class="input w-full text-sm">
-                <option>member</option>
-                <option>uniqueMember</option>
-                <option>memberUid</option>
-              </select>
+            <button class="btn-secondary text-sm" @click="addGroupAssignment">Add Group</button>
+          </fieldset>
+
+          <!-- Additional profiles -->
+          <fieldset class="border rounded-lg p-4 space-y-3">
+            <legend class="text-sm font-semibold text-gray-700 px-1">Additional Profiles</legend>
+            <p class="text-sm text-gray-600">Select other profiles whose group assignments should also be applied to users provisioned with this profile.</p>
+            <div v-if="availableAdditionalProfiles.length === 0" class="text-sm text-gray-400 italic">
+              No other profiles available in this directory.
             </div>
-            <button class="text-red-500 hover:underline text-sm pb-1" @click="removeGroupAssignment(i)">Remove</button>
-          </div>
-          <button class="btn-secondary text-sm" @click="addGroupAssignment">Add Group</button>
+            <div v-else class="flex flex-wrap gap-2">
+              <label v-for="ap in availableAdditionalProfiles" :key="ap.id"
+                class="flex items-center gap-1.5 text-sm border rounded px-3 py-1.5 cursor-pointer"
+                :class="profile.additionalProfileIds.includes(ap.id) ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200 hover:border-gray-300'">
+                <input type="checkbox" :checked="profile.additionalProfileIds.includes(ap.id)"
+                  @change="toggleAdditionalProfile(ap.id)" class="accent-blue-600" />
+                {{ ap.name }}
+              </label>
+            </div>
+          </fieldset>
+
+          <!-- Auto-included profiles (read-only) -->
+          <fieldset v-if="autoIncludedProfiles.length > 0 && !profile.excludeAutoIncludes" class="border rounded-lg p-4 space-y-2">
+            <legend class="text-sm font-semibold text-gray-700 px-1">Auto-included Profiles</legend>
+            <p class="text-sm text-gray-500">These profiles have "Automatically include with other profiles" enabled and their groups are included automatically.</p>
+            <div class="flex flex-wrap gap-2">
+              <span v-for="ap in autoIncludedProfiles" :key="ap.id"
+                class="inline-flex items-center text-sm bg-green-50 border border-green-200 rounded px-3 py-1">
+                {{ ap.name }}
+              </span>
+            </div>
+          </fieldset>
+
+          <!-- Effective groups summary -->
+          <fieldset v-if="editing && effectiveGroups.length > 0" class="border rounded-lg p-4 space-y-2">
+            <legend class="text-sm font-semibold text-gray-700 px-1">Effective Group Set</legend>
+            <p class="text-sm text-gray-500">The combined set of groups that will be assigned on provisioning (own + additional + auto-included).</p>
+            <div class="space-y-1">
+              <div v-for="g in effectiveGroups" :key="g.groupDn" class="text-sm font-mono text-gray-700 bg-gray-50 px-2 py-1 rounded">
+                {{ g.groupDn }} <span class="text-gray-400">({{ g.memberAttribute }})</span>
+              </div>
+            </div>
+          </fieldset>
         </div>
 
         <!-- Lifecycle Tab -->
@@ -1011,6 +1162,33 @@ function toggleApprover(accountId) {
     <ConfirmDialog v-model="showDeleteConfirm"
       :message="`Delete profile '${deleteTarget?.name}'? This cannot be undone.`"
       confirmLabel="Delete" :danger="true" @confirm="doDelete" />
+
+    <!-- Group change preview dialog -->
+    <AppModal v-model="showGroupChangeDialog" title="Group Membership Changes" size="lg">
+      <template v-if="groupChangePreview">
+        <p class="text-sm text-gray-600 mb-3">
+          The following group membership changes are needed for <strong>{{ groupChangePreview.totalUsersAffected }}</strong> existing user(s):
+        </p>
+        <div class="max-h-80 overflow-y-auto space-y-3">
+          <div v-for="change in groupChangePreview.changes" :key="change.userDn"
+            class="border rounded-lg p-3 text-sm">
+            <div class="font-mono text-gray-800 mb-1">{{ change.userDn }}</div>
+            <div v-for="g in change.groupsToAdd" :key="g.groupDn" class="text-green-700 ml-4">
+              + Add to {{ g.groupDn }}
+            </div>
+            <div v-for="g in change.groupsToRemove" :key="g.groupDn" class="text-red-700 ml-4">
+              - Remove from {{ g.groupDn }}
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 mt-4">
+          <button class="btn-secondary" @click="showGroupChangeDialog = false; groupChangePreview = null">Skip</button>
+          <button class="btn-primary" :disabled="applyingGroupChanges" @click="confirmApplyGroupChanges">
+            {{ applyingGroupChanges ? 'Applying...' : 'Apply Changes' }}
+          </button>
+        </div>
+      </template>
+    </AppModal>
   </div>
 </template>
 

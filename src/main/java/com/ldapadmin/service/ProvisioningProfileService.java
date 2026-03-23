@@ -1,14 +1,19 @@
 package com.ldapadmin.service;
 
+import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.dto.profile.*;
 import com.ldapadmin.dto.profile.CreateProfileRequest.AttributeConfigEntry;
 import com.ldapadmin.dto.profile.CreateProfileRequest.GroupAssignmentEntry;
 import com.ldapadmin.entity.*;
 import com.ldapadmin.entity.enums.ApproverMode;
+import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.entity.enums.ExpiryAction;
 import com.ldapadmin.entity.enums.InputType;
 import com.ldapadmin.exception.ConflictException;
 import com.ldapadmin.exception.ResourceNotFoundException;
+import com.ldapadmin.ldap.LdapGroupService;
+import com.ldapadmin.ldap.LdapUserService;
+import com.ldapadmin.ldap.model.LdapUser;
 import com.ldapadmin.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Core CRUD and provisioning logic for provisioning profiles.
@@ -37,6 +43,9 @@ public class ProvisioningProfileService {
     private final AccountRepository                  accountRepo;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final PasswordGeneratorService passwordGenerator;
+    private final LdapUserService ldapUserService;
+    private final LdapGroupService ldapGroupService;
+    private final AuditService auditService;
 
     // ── Profile CRUD ──────────────────────────────────────────────────────────
 
@@ -80,8 +89,11 @@ public class ProvisioningProfileService {
                 req.passwordLength(), req.passwordUppercase(), req.passwordLowercase(),
                 req.passwordDigits(), req.passwordSpecial(), req.passwordSpecialChars(),
                 req.emailPasswordToUser());
+        profile.setAutoIncludeGroups(req.autoIncludeGroups());
+        profile.setExcludeAutoIncludes(req.excludeAutoIncludes());
         profile = profileRepo.save(profile);
 
+        saveAdditionalProfiles(profile, req.additionalProfileIds());
         saveAttributeConfigs(profile, req.attributeConfigs());
         saveGroupAssignments(profile, req.groupAssignments());
 
@@ -105,7 +117,12 @@ public class ProvisioningProfileService {
                 req.passwordLength(), req.passwordUppercase(), req.passwordLowercase(),
                 req.passwordDigits(), req.passwordSpecial(), req.passwordSpecialChars(),
                 req.emailPasswordToUser());
+        profile.setAutoIncludeGroups(req.autoIncludeGroups());
+        profile.setExcludeAutoIncludes(req.excludeAutoIncludes());
         profile = profileRepo.save(profile);
+
+        // Replace additional profiles
+        saveAdditionalProfiles(profile, req.additionalProfileIds());
 
         // Replace attribute configs
         attrConfigRepo.deleteAllByProfileId(profileId);
@@ -151,6 +168,12 @@ public class ProvisioningProfileService {
         copy.setPasswordSpecial(source.isPasswordSpecial());
         copy.setPasswordSpecialChars(source.getPasswordSpecialChars());
         copy.setEmailPasswordToUser(source.isEmailPasswordToUser());
+        copy.setAutoIncludeGroups(false); // clones don't auto-include
+        copy.setExcludeAutoIncludes(source.isExcludeAutoIncludes());
+        copy = profileRepo.save(copy);
+
+        // Clone additional profiles
+        copy.setAdditionalProfiles(new HashSet<>(source.getAdditionalProfiles()));
         copy = profileRepo.save(copy);
 
         // Clone attribute configs
@@ -494,7 +517,18 @@ public class ProvisioningProfileService {
                 attrConfigRepo.findAllByProfileIdOrderByDisplayOrderAsc(profile.getId());
         List<ProfileGroupAssignment> groups =
                 groupAssignmentRepo.findAllByProfileIdOrderByDisplayOrderAsc(profile.getId());
-        return ProfileResponse.from(profile, configs, groups);
+
+        // Additional profiles
+        List<ProfileResponse.AdditionalProfileEntry> additionalEntries = profile.getAdditionalProfiles()
+                .stream()
+                .map(p -> new ProfileResponse.AdditionalProfileEntry(p.getId(), p.getName()))
+                .sorted(Comparator.comparing(ProfileResponse.AdditionalProfileEntry::name))
+                .toList();
+
+        // Effective group set: own + additional + auto-include (unless excluded)
+        List<ProfileResponse.GroupAssignmentEntry> effectiveGroups = computeEffectiveGroups(profile, groups);
+
+        return ProfileResponse.from(profile, configs, groups, additionalEntries, effectiveGroups);
     }
 
     private ProvisioningProfile requireProfile(UUID profileId) {
@@ -606,5 +640,169 @@ public class ProvisioningProfileService {
             g.setDisplayOrder(i);
             groupAssignmentRepo.save(g);
         }
+    }
+
+    private void saveAdditionalProfiles(ProvisioningProfile profile, List<UUID> additionalProfileIds) {
+        Set<ProvisioningProfile> additionals = new HashSet<>();
+        if (additionalProfileIds != null) {
+            for (UUID apId : additionalProfileIds) {
+                if (apId.equals(profile.getId())) continue; // skip self-reference
+                ProvisioningProfile ap = profileRepo.findById(apId)
+                        .orElseThrow(() -> new ResourceNotFoundException("ProvisioningProfile", apId));
+                additionals.add(ap);
+            }
+        }
+        profile.setAdditionalProfiles(additionals);
+        profileRepo.save(profile);
+    }
+
+    // ── Effective group computation ──────────────────────────────────────────
+
+    /**
+     * Computes the effective group set for a profile: own groups + additional
+     * profiles' groups + auto-include profiles' groups (unless excluded).
+     */
+    private List<ProfileResponse.GroupAssignmentEntry> computeEffectiveGroups(
+            ProvisioningProfile profile,
+            List<ProfileGroupAssignment> ownGroups) {
+
+        // Use groupDn as dedup key, preserving first occurrence
+        Map<String, ProfileResponse.GroupAssignmentEntry> seen = new LinkedHashMap<>();
+
+        // 1. Own groups
+        for (ProfileGroupAssignment g : ownGroups) {
+            seen.putIfAbsent(g.getGroupDn(),
+                    ProfileResponse.GroupAssignmentEntry.from(g));
+        }
+
+        // 2. Explicit additional profiles
+        for (ProvisioningProfile ap : profile.getAdditionalProfiles()) {
+            for (ProfileGroupAssignment g :
+                    groupAssignmentRepo.findAllByProfileIdOrderByDisplayOrderAsc(ap.getId())) {
+                seen.putIfAbsent(g.getGroupDn(),
+                        ProfileResponse.GroupAssignmentEntry.from(g));
+            }
+        }
+
+        // 3. Auto-include profiles (unless this profile opts out)
+        if (!profile.isExcludeAutoIncludes()) {
+            List<ProvisioningProfile> autoIncludes =
+                    profileRepo.findAllByDirectoryIdAndAutoIncludeGroupsTrue(
+                            profile.getDirectory().getId());
+            for (ProvisioningProfile ai : autoIncludes) {
+                if (ai.getId().equals(profile.getId())) continue; // skip self
+                for (ProfileGroupAssignment g :
+                        groupAssignmentRepo.findAllByProfileIdOrderByDisplayOrderAsc(ai.getId())) {
+                    seen.putIfAbsent(g.getGroupDn(),
+                            ProfileResponse.GroupAssignmentEntry.from(g));
+                }
+            }
+        }
+
+        return List.copyOf(seen.values());
+    }
+
+    // ── Group change evaluation and application ──────────────────────────────
+
+    /**
+     * Evaluates group membership changes for all users provisioned under this
+     * profile by comparing their current group memberships against the
+     * effective group set.
+     */
+    @Transactional(readOnly = true)
+    public GroupChangePreview evaluateGroupChanges(UUID directoryId, UUID profileId) {
+        ProvisioningProfile profile = requireProfileInDirectory(directoryId, profileId);
+        DirectoryConnection dc = requireDirectory(directoryId);
+
+        List<ProfileGroupAssignment> ownGroups =
+                groupAssignmentRepo.findAllByProfileIdOrderByDisplayOrderAsc(profileId);
+        List<ProfileResponse.GroupAssignmentEntry> effective =
+                computeEffectiveGroups(profile, ownGroups);
+
+        // Build a map of groupDn -> memberAttribute for the effective set
+        Map<String, String> effectiveMap = new LinkedHashMap<>();
+        for (ProfileResponse.GroupAssignmentEntry g : effective) {
+            effectiveMap.put(g.groupDn(), g.memberAttribute());
+        }
+
+        // Search LDAP for users under the profile's target OU
+        List<LdapUser> users = ldapUserService.searchUsers(
+                dc, "(objectClass=*)", profile.getTargetOuDn(), "dn");
+
+        List<GroupChangePreview.UserGroupChange> changes = new ArrayList<>();
+
+        for (LdapUser user : users) {
+            String userDn = user.getDn();
+            List<String> currentMemberships = user.getMemberOf();
+            Set<String> currentSet = currentMemberships.stream()
+                    .map(String::toLowerCase)
+                    .collect(Collectors.toSet());
+
+            List<GroupChangePreview.GroupChange> toAdd = new ArrayList<>();
+            List<GroupChangePreview.GroupChange> toRemove = new ArrayList<>();
+
+            // Groups to add: in effective set but user is not a member
+            for (var entry : effectiveMap.entrySet()) {
+                if (!currentSet.contains(entry.getKey().toLowerCase())) {
+                    toAdd.add(new GroupChangePreview.GroupChange(
+                            entry.getKey(), entry.getValue()));
+                }
+            }
+
+            // We only add groups, never remove — removing would require tracking
+            // which groups were originally assigned by profiles vs manually added.
+            // Future enhancement: track profile-managed group memberships.
+
+            if (!toAdd.isEmpty()) {
+                changes.add(new GroupChangePreview.UserGroupChange(
+                        userDn, toAdd, toRemove));
+            }
+        }
+
+        return new GroupChangePreview(changes, changes.size());
+    }
+
+    /**
+     * Applies the group membership changes previewed by
+     * {@link #evaluateGroupChanges(UUID, UUID)}.
+     */
+    @Transactional
+    public GroupChangePreview applyGroupChanges(UUID directoryId, UUID profileId,
+                                                 AuthPrincipal principal) {
+        GroupChangePreview preview = evaluateGroupChanges(directoryId, profileId);
+        DirectoryConnection dc = requireDirectory(directoryId);
+
+        for (GroupChangePreview.UserGroupChange change : preview.changes()) {
+            for (GroupChangePreview.GroupChange add : change.groupsToAdd()) {
+                try {
+                    ldapGroupService.addMember(dc, add.groupDn(),
+                            add.memberAttribute(), change.userDn());
+                    auditService.record(principal, directoryId,
+                            AuditAction.GROUP_MEMBER_ADD, add.groupDn(),
+                            Map.of("attribute", add.memberAttribute(),
+                                    "member", change.userDn(),
+                                    "source", "additional_profiles"));
+                } catch (Exception e) {
+                    log.warn("Failed to add {} to group {}: {}",
+                            change.userDn(), add.groupDn(), e.getMessage());
+                }
+            }
+            for (GroupChangePreview.GroupChange remove : change.groupsToRemove()) {
+                try {
+                    ldapGroupService.removeMember(dc, remove.groupDn(),
+                            remove.memberAttribute(), change.userDn());
+                    auditService.record(principal, directoryId,
+                            AuditAction.GROUP_MEMBER_REMOVE, remove.groupDn(),
+                            Map.of("attribute", remove.memberAttribute(),
+                                    "member", change.userDn(),
+                                    "source", "additional_profiles"));
+                } catch (Exception e) {
+                    log.warn("Failed to remove {} from group {}: {}",
+                            change.userDn(), remove.groupDn(), e.getMessage());
+                }
+            }
+        }
+
+        return preview;
     }
 }

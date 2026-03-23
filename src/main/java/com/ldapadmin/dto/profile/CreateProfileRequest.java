@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
+import java.util.UUID;
 
 public record CreateProfileRequest(
         @NotBlank @Size(max = 255) String name,
@@ -23,6 +24,9 @@ public record CreateProfileRequest(
         Boolean passwordSpecial,
         @Size(max = 50) String passwordSpecialChars,
         Boolean emailPasswordToUser,
+        boolean autoIncludeGroups,
+        boolean excludeAutoIncludes,
+        List<UUID> additionalProfileIds,
         List<@Valid AttributeConfigEntry> attributeConfigs,
         List<@Valid GroupAssignmentEntry> groupAssignments) {
 

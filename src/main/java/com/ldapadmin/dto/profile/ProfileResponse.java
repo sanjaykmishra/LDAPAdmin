@@ -27,10 +27,17 @@ public record ProfileResponse(
         boolean passwordSpecial,
         String passwordSpecialChars,
         boolean emailPasswordToUser,
+        boolean autoIncludeGroups,
+        boolean excludeAutoIncludes,
+        List<AdditionalProfileEntry> additionalProfiles,
         List<AttributeConfigEntry> attributeConfigs,
         List<GroupAssignmentEntry> groupAssignments,
+        List<GroupAssignmentEntry> effectiveGroupAssignments,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
+
+    public record AdditionalProfileEntry(UUID id, String name) {}
+
 
     public record AttributeConfigEntry(
             UUID id,
@@ -108,7 +115,9 @@ public record ProfileResponse(
 
     public static ProfileResponse from(ProvisioningProfile p,
                                         List<ProfileAttributeConfig> configs,
-                                        List<ProfileGroupAssignment> groups) {
+                                        List<ProfileGroupAssignment> groups,
+                                        List<AdditionalProfileEntry> additionalProfiles,
+                                        List<GroupAssignmentEntry> effectiveGroupAssignments) {
         return new ProfileResponse(
                 p.getId(),
                 p.getDirectory().getId(),
@@ -128,8 +137,12 @@ public record ProfileResponse(
                 p.isPasswordSpecial(),
                 p.getPasswordSpecialChars(),
                 p.isEmailPasswordToUser(),
+                p.isAutoIncludeGroups(),
+                p.isExcludeAutoIncludes(),
+                additionalProfiles,
                 configs.stream().map(AttributeConfigEntry::from).toList(),
                 groups.stream().map(GroupAssignmentEntry::from).toList(),
+                effectiveGroupAssignments,
                 p.getCreatedAt(),
                 p.getUpdatedAt());
     }
