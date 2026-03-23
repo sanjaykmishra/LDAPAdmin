@@ -1,6 +1,7 @@
 package com.ldapadmin.service;
 
 import com.ldapadmin.auth.AuthPrincipal;
+import com.ldapadmin.auth.PermissionService;
 import com.ldapadmin.dto.approval.PendingApprovalResponse;
 import com.ldapadmin.dto.csv.BulkImportRequest;
 import com.ldapadmin.dto.ldap.CreateEntryRequest;
@@ -41,6 +42,7 @@ public class ApprovalWorkflowService {
     private final PendingApprovalRepository approvalRepo;
     private final AccountRepository accountRepo;
     private final RegistrationRequestRepository registrationRepo;
+    private final PermissionService permissionService;
     private final ProvisioningProfileService profileService;
     private final LdapOperationService ldapOperationService;
     private final AuditService auditService;
@@ -86,6 +88,12 @@ public class ApprovalWorkflowService {
         Optional<ProvisioningProfile> profile = findProfileForDn(directoryId, targetDn);
 
         if (profile.isPresent()) {
+            // Enforce profile-level scope: the requester must have a role in the
+            // matched profile, not just any profile in the directory. Without this,
+            // an admin with access to Profile A could operate on DNs under Profile B
+            // (same directory) whenever Profile B doesn't require approval.
+            permissionService.requireProfileAccess(requester, profile.get().getId());
+
             if (isApprovalRequired(profile.get().getId())) {
                 PendingApproval pa = submitForApproval(
                         directoryId, profile.get().getId(), requester, type, payload);
@@ -149,8 +157,7 @@ public class ApprovalWorkflowService {
             visible = all;
         } else {
             visible = all.stream()
-                    .filter(pa -> pa.getProfileId() != null
-                            && profileService.isApprover(pa.getProfileId(), principal.id()))
+                    .filter(pa -> canViewApproval(pa, principal))
                     .toList();
         }
 
@@ -162,9 +169,8 @@ public class ApprovalWorkflowService {
         PendingApproval pa = approvalRepo.findById(approvalId)
                 .orElseThrow(() -> new ResourceNotFoundException("PendingApproval", approvalId));
 
-        if (!principal.isSuperadmin() && pa.getProfileId() != null
-                && !profileService.isApprover(pa.getProfileId(), principal.id())) {
-            throw new AccessDeniedException("Not an approver for this profile");
+        if (!principal.isSuperadmin() && !canViewApproval(pa, principal)) {
+            throw new AccessDeniedException("Not an approver for this request");
         }
 
         return toResponse(pa);
@@ -183,9 +189,8 @@ public class ApprovalWorkflowService {
             throw new AccessDeniedException("Cannot approve your own request");
         }
 
-        if (!approver.isSuperadmin() && pa.getProfileId() != null
-                && !profileService.isApprover(pa.getProfileId(), approver.id())) {
-            throw new AccessDeniedException("Not an approver for this profile");
+        if (!approver.isSuperadmin() && !canViewApproval(pa, approver)) {
+            throw new AccessDeniedException("Not an approver for this request");
         }
 
         // Execute the actual LDAP operation — on failure, store error and keep PENDING
@@ -233,9 +238,8 @@ public class ApprovalWorkflowService {
             throw new IllegalStateException("Approval is not in PENDING status");
         }
 
-        if (!approver.isSuperadmin() && pa.getProfileId() != null
-                && !profileService.isApprover(pa.getProfileId(), approver.id())) {
-            throw new AccessDeniedException("Not an approver for this profile");
+        if (!approver.isSuperadmin() && !canViewApproval(pa, approver)) {
+            throw new AccessDeniedException("Not an approver for this request");
         }
 
         pa.setStatus(ApprovalStatus.REJECTED);
@@ -274,9 +278,8 @@ public class ApprovalWorkflowService {
             throw new AccessDeniedException("Cannot edit your own approval request");
         }
 
-        if (!editor.isSuperadmin() && pa.getProfileId() != null
-                && !profileService.isApprover(pa.getProfileId(), editor.id())) {
-            throw new AccessDeniedException("Not an approver for this profile");
+        if (!editor.isSuperadmin() && !canViewApproval(pa, editor)) {
+            throw new AccessDeniedException("Not an approver for this request");
         }
 
         // Validate the new payload matches the original request type's schema
@@ -295,6 +298,21 @@ public class ApprovalWorkflowService {
                 null, buildAuditDetail(pa, diffDetail));
 
         return toResponse(pa);
+    }
+
+    /**
+     * Determines whether a non-superadmin principal can view/act on a pending approval.
+     * For profile-scoped approvals, checks if the principal is a designated approver.
+     * For directory-level approvals (null profileId, e.g. bulk imports targeting
+     * unprovisioned OUs), falls back to checking directory access.
+     */
+    private boolean canViewApproval(PendingApproval pa, AuthPrincipal principal) {
+        if (pa.getProfileId() != null) {
+            return profileService.isApprover(pa.getProfileId(), principal.id());
+        }
+        // Directory-level approval — any admin with access to this directory can review
+        return permissionService.getAuthorizedDirectoryIds(principal)
+                .contains(pa.getDirectoryId());
     }
 
     /**
@@ -379,6 +397,10 @@ public class ApprovalWorkflowService {
     private void executeUserCreate(PendingApproval pa, AuthPrincipal approver) {
         try {
             CreateEntryRequest req = objectMapper.readValue(pa.getPayload(), CreateEntryRequest.class);
+            // Enforce that the approver has access to the target profile
+            if (pa.getProfileId() != null) {
+                permissionService.requireProfileAccess(approver, pa.getProfileId());
+            }
             // Re-apply computed/default/fixed attributes in case the payload was edited
             if (pa.getProfileId() != null) {
                 Map<String, List<String>> attrs = new LinkedHashMap<>(req.attributes());
@@ -392,6 +414,9 @@ public class ApprovalWorkflowService {
     }
 
     private void executeBulkImport(PendingApproval pa, AuthPrincipal approver) {
+        if (pa.getProfileId() != null) {
+            permissionService.requireProfileAccess(approver, pa.getProfileId());
+        }
         try {
             JsonNode root = objectMapper.readTree(pa.getPayload());
             BulkImportRequest req = objectMapper.treeToValue(root.get("request"), BulkImportRequest.class);
@@ -408,6 +433,9 @@ public class ApprovalWorkflowService {
     }
 
     private void executeUserMove(PendingApproval pa, AuthPrincipal approver) {
+        if (pa.getProfileId() != null) {
+            permissionService.requireProfileAccess(approver, pa.getProfileId());
+        }
         try {
             JsonNode root = objectMapper.readTree(pa.getPayload());
             String dn = root.get("dn").asText();
@@ -419,6 +447,9 @@ public class ApprovalWorkflowService {
     }
 
     private void executeGroupMemberAdd(PendingApproval pa, AuthPrincipal approver) {
+        if (pa.getProfileId() != null) {
+            permissionService.requireProfileAccess(approver, pa.getProfileId());
+        }
         try {
             JsonNode root = objectMapper.readTree(pa.getPayload());
             String groupDn = root.get("groupDn").asText();
