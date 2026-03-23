@@ -356,7 +356,7 @@ const pendingGroups   = ref([])
 
 const showExtraAttrs = ref(false)
 
-const HIDDEN_EDIT_ATTRS = new Set(['objectclass', 'objectClass'])
+const HIDDEN_EDIT_ATTRS = new Set(['objectclass', 'objectClass', 'userpassword', 'userPassword', 'unicodePwd', 'unicodepwd'])
 
 /** Attributes to show in edit mode (excludes objectClass). */
 const editableAttributes = computed(() => {
@@ -369,12 +369,12 @@ const editableAttributes = computed(() => {
   return result
 })
 
-/** Attributes from the form config to show in edit mode (excludes objectClass and hidden, includes RDN). */
+/** Attributes from the form config to show in edit mode (excludes objectClass, password, and hidden; includes RDN). */
 const editFormAttributes = computed(() => {
   if (!props.userTemplateConfig?.attributeConfigs) return []
   const rdnName = props.userTemplateConfig.rdnAttribute
   return props.userTemplateConfig.attributeConfigs
-    .filter(a => !a.hidden && a.attributeName.toLowerCase() !== 'objectclass')
+    .filter(a => !a.hidden && !HIDDEN_EDIT_ATTRS.has(a.attributeName) && !HIDDEN_EDIT_ATTRS.has(a.attributeName.toLowerCase()))
     .map(a => ({ ...a, rdn: a.attributeName === rdnName }))
 })
 
