@@ -13,7 +13,7 @@
             @click="confirm"
             :class="[
               'px-4 py-2 text-sm rounded-lg text-white font-medium',
-              danger ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
+              confirmClass || (danger ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700')
             ]"
           >{{ confirmLabel }}</button>
         </div>
@@ -28,6 +28,7 @@ defineProps({
   title: { type: String, default: 'Confirm' },
   message: { type: String, default: 'Are you sure?' },
   confirmLabel: { type: String, default: 'Confirm' },
+  confirmClass: { type: String, default: '' },
   danger: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue', 'confirm'])
