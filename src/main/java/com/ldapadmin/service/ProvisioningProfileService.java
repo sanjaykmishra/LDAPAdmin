@@ -541,11 +541,12 @@ public class ProvisioningProfileService {
                                        List<AttributeConfigEntry> entries) {
         if (entries == null || entries.isEmpty()) return;
 
-        // Validate: required attributes cannot be hidden
+        // Validate: required attributes cannot be hidden (unless they have a computed expression)
         for (AttributeConfigEntry e : entries) {
-            if (e.requiredOnCreate() && e.hidden()) {
+            if (e.requiredOnCreate() && e.hidden()
+                    && (e.computedExpression() == null || e.computedExpression().isBlank())) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Required attribute '" + e.attributeName() + "' cannot be hidden");
+                        "Required attribute '" + e.attributeName() + "' cannot be hidden unless it has a computed expression");
             }
         }
 

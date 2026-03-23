@@ -491,10 +491,10 @@ watch(() => profile.value.emailPasswordToUser, (enabled) => {
   }
 })
 
-// When requiredOnCreate is set, ensure hidden is cleared
+// When requiredOnCreate is set, ensure hidden is cleared (unless attribute has a computed expression)
 watch(() => profile.value.attributeConfigs.map(a => a.requiredOnCreate), () => {
   for (const attr of profile.value.attributeConfigs) {
-    if (attr.requiredOnCreate && attr.hidden) attr.hidden = false
+    if (attr.requiredOnCreate && attr.hidden && !attr.computedExpression) attr.hidden = false
   }
 })
 
@@ -841,7 +841,7 @@ function toggleApprover(accountId) {
               <label v-if="profile.selfRegistrationAllowed" class="flex items-center gap-1"><input type="checkbox" v-model="attr.selfRegistrationEdit" /> Self-registration</label>
               <label class="flex items-center gap-1">
                 <input type="checkbox" v-model="attr.hidden"
-                  :disabled="attr.requiredOnCreate || isRdnAttribute(attr) || isSchemaRequired(attr)" /> Hidden
+                  :disabled="(attr.requiredOnCreate && !attr.computedExpression) || isRdnAttribute(attr) || isSchemaRequired(attr)" /> Hidden
               </label>
             </div>
           </div>
