@@ -74,6 +74,29 @@ public class ProvisioningProfile {
     @Column(name = "self_registration_allowed", nullable = false)
     private boolean selfRegistrationAllowed = false;
 
+    // ── Password generation settings ────────────────────────────────────────
+
+    @Column(name = "password_length", nullable = false)
+    private int passwordLength = 16;
+
+    @Column(name = "password_uppercase", nullable = false)
+    private boolean passwordUppercase = true;
+
+    @Column(name = "password_lowercase", nullable = false)
+    private boolean passwordLowercase = true;
+
+    @Column(name = "password_digits", nullable = false)
+    private boolean passwordDigits = true;
+
+    @Column(name = "password_special", nullable = false)
+    private boolean passwordSpecial = true;
+
+    @Column(name = "password_special_chars", nullable = false, length = 50)
+    private String passwordSpecialChars = "!@#$%^&*";
+
+    @Column(name = "email_password_to_user", nullable = false)
+    private boolean emailPasswordToUser = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

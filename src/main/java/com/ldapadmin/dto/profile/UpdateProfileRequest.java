@@ -18,6 +18,13 @@ public record UpdateProfileRequest(
         boolean showDnField,
         boolean enabled,
         boolean selfRegistrationAllowed,
+        Integer passwordLength,
+        Boolean passwordUppercase,
+        Boolean passwordLowercase,
+        Boolean passwordDigits,
+        Boolean passwordSpecial,
+        @Size(max = 50) String passwordSpecialChars,
+        Boolean emailPasswordToUser,
         List<@Valid AttributeConfigEntry> attributeConfigs,
         List<@Valid GroupAssignmentEntry> groupAssignments) {
 }

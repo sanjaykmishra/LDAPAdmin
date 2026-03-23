@@ -59,6 +59,9 @@ function emptyProfile() {
     name: '', description: '', targetOuDn: '',
     objectClassNames: [], rdnAttribute: '',
     showDnField: true, enabled: true, selfRegistrationAllowed: false,
+    passwordLength: 16, passwordUppercase: true, passwordLowercase: true,
+    passwordDigits: true, passwordSpecial: true, passwordSpecialChars: '!@#$%^&*',
+    emailPasswordToUser: false,
     attributeConfigs: [], groupAssignments: []
   }
 }
@@ -130,6 +133,13 @@ async function openEdit(p) {
     objectClassNames: [...p.objectClassNames], rdnAttribute: p.rdnAttribute,
     showDnField: p.showDnField, enabled: p.enabled,
     selfRegistrationAllowed: p.selfRegistrationAllowed,
+    passwordLength: p.passwordLength ?? 16,
+    passwordUppercase: p.passwordUppercase ?? true,
+    passwordLowercase: p.passwordLowercase ?? true,
+    passwordDigits: p.passwordDigits ?? true,
+    passwordSpecial: p.passwordSpecial ?? true,
+    passwordSpecialChars: p.passwordSpecialChars ?? '!@#$%^&*',
+    emailPasswordToUser: p.emailPasswordToUser ?? false,
     attributeConfigs: p.attributeConfigs.map(a => ({
       attributeName: a.attributeName, customLabel: a.customLabel || '',
       inputType: a.inputType, requiredOnCreate: a.requiredOnCreate,
@@ -676,6 +686,41 @@ function toggleApprover(accountId) {
               <input type="checkbox" v-model="profile.selfRegistrationAllowed" /> Self-registration
             </label>
           </div>
+
+          <!-- Password Generation Settings -->
+          <fieldset class="border rounded-lg p-3 space-y-3">
+            <legend class="text-sm font-semibold text-gray-800 px-1">Password Generation</legend>
+            <div class="grid grid-cols-6 gap-3">
+              <div class="col-span-2">
+                <label class="block text-xs text-gray-500 mb-1">Length</label>
+                <input type="number" v-model.number="profile.passwordLength" min="8" max="128"
+                  class="input w-full text-sm" />
+              </div>
+              <div class="col-span-4 flex flex-wrap gap-4 items-end pb-1">
+                <label class="flex items-center gap-1 text-sm">
+                  <input type="checkbox" v-model="profile.passwordUppercase" /> A-Z
+                </label>
+                <label class="flex items-center gap-1 text-sm">
+                  <input type="checkbox" v-model="profile.passwordLowercase" /> a-z
+                </label>
+                <label class="flex items-center gap-1 text-sm">
+                  <input type="checkbox" v-model="profile.passwordDigits" /> 0-9
+                </label>
+                <label class="flex items-center gap-1 text-sm">
+                  <input type="checkbox" v-model="profile.passwordSpecial" /> Special
+                </label>
+              </div>
+            </div>
+            <div v-if="profile.passwordSpecial">
+              <label class="block text-xs text-gray-500 mb-1">Special Characters</label>
+              <input v-model="profile.passwordSpecialChars" class="input w-full text-sm font-mono"
+                placeholder="!@#$%^&*" />
+            </div>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" v-model="profile.emailPasswordToUser" />
+              Email generated password to user on creation
+            </label>
+          </fieldset>
         </div>
 
         <!-- Attributes Tab -->
