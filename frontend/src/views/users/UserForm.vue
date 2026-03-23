@@ -408,7 +408,11 @@ function evaluateComputedExpressions() {
         return local.attributes[name] || ''
       })
       // Evaluate + concatenation with quoted strings, e.g. +" "+ or +' '+
-      resolved = resolved.replace(/\+["']([^"']*)["']/g, '$1').replace(/["']([^"']*)["']\+/g, '$1')
+      // Handle both-sided case first (+" "+), then single-sided cases
+      resolved = resolved
+        .replace(/\+["']([^"']*)["']\+/g, '$1')
+        .replace(/\+["']([^"']*)["']/g, '$1')
+        .replace(/["']([^"']*)["']\+/g, '$1')
       // Only set if expression produced a meaningful result (not all placeholders empty)
       if (resolved !== expr || !expr.includes('${')) {
         local.attributes[attr.attributeName] = resolved
