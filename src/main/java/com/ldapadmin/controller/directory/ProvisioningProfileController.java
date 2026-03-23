@@ -1,5 +1,6 @@
 package com.ldapadmin.controller.directory;
 
+import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.dto.profile.*;
 import com.ldapadmin.service.PasswordGeneratorService;
 import com.ldapadmin.service.ProvisioningProfileService;
@@ -9,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,7 +26,9 @@ import java.util.UUID;
  *   GET    /api/v1/directories/{dirId}/profiles/{profileId}              — get
  *   PUT    /api/v1/directories/{dirId}/profiles/{profileId}              — update
  *   DELETE /api/v1/directories/{dirId}/profiles/{profileId}              — delete
- *   POST   /api/v1/directories/{dirId}/profiles/{profileId}/clone        — clone
+ *   POST   /api/v1/directories/{dirId}/profiles/{profileId}/clone                    — clone
+ *   POST   /api/v1/directories/{dirId}/profiles/{profileId}/evaluate-group-changes   — preview group changes
+ *   POST   /api/v1/directories/{dirId}/profiles/{profileId}/apply-group-changes      — apply group changes
  *
  *   GET    /api/v1/profiles/{profileId}/lifecycle                         — get lifecycle policy
  *   PUT    /api/v1/profiles/{profileId}/lifecycle                         — set lifecycle policy
@@ -95,6 +99,23 @@ public class ProvisioningProfileController {
         }
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(service.clone(directoryId, profileId, newName));
+    }
+
+    // ── Group Change Evaluation ─────────────────────────────────────────────
+
+    @PostMapping("/api/v1/directories/{directoryId}/profiles/{profileId}/evaluate-group-changes")
+    @PreAuthorize("hasRole('SUPERADMIN')")
+    public GroupChangePreview evaluateGroupChanges(@PathVariable UUID directoryId,
+                                                    @PathVariable UUID profileId) {
+        return service.evaluateGroupChanges(directoryId, profileId);
+    }
+
+    @PostMapping("/api/v1/directories/{directoryId}/profiles/{profileId}/apply-group-changes")
+    @PreAuthorize("hasRole('SUPERADMIN')")
+    public GroupChangePreview applyGroupChanges(@PathVariable UUID directoryId,
+                                                @PathVariable UUID profileId,
+                                                @AuthenticationPrincipal AuthPrincipal principal) {
+        return service.applyGroupChanges(directoryId, profileId, principal);
     }
 
     // ── Password Generation ──────────────────────────────────────────────────

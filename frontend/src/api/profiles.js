@@ -26,3 +26,7 @@ export const setApprovalConfig  = (profileId, data) => client.put(`/profiles/${p
 // Approvers
 export const getApprovers  = (profileId)       => client.get(`/profiles/${profileId}/approvers`)
 export const setApprovers  = (profileId, data) => client.put(`/profiles/${profileId}/approvers`, data)
+
+// Group change evaluation
+export const evaluateGroupChanges = (dirId, profileId) => client.post(`${dirBase(dirId)}/${profileId}/evaluate-group-changes`)
+export const applyGroupChanges    = (dirId, profileId) => client.post(`${dirBase(dirId)}/${profileId}/apply-group-changes`)

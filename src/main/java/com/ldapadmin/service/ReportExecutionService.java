@@ -1,12 +1,15 @@
 package com.ldapadmin.service;
 
+import com.ldapadmin.dto.profile.GroupChangePreview;
 import com.ldapadmin.entity.DirectoryConnection;
+import com.ldapadmin.entity.ProvisioningProfile;
 import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.entity.enums.OutputFormat;
 import com.ldapadmin.entity.enums.ReportType;
 import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.ldap.model.LdapUser;
 import com.ldapadmin.repository.AuditEventRepository;
+import com.ldapadmin.repository.ProvisioningProfileRepository;
 import com.ldapadmin.util.CsvUtils;
 import com.unboundid.ldap.sdk.Filter;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +46,10 @@ import java.util.UUID;
  *       returns dn + actorUsername + occurredAt columns.</li>
  *   <li><b>DISABLED_ACCOUNTS</b>  — {@code (|(pwdAccountLockedTime=*)(loginDisabled=TRUE))},
  *       base = directory base DN; no params.</li>
+ *   <li><b>MISSING_PROFILE_GROUPS</b> — for each provisioning profile in the directory,
+ *       compares users' actual group memberships against the profile's effective group
+ *       set (own + additional + auto-include). Returns userDn, profileName,
+ *       missingGroupDn, memberAttribute columns; no params.</li>
  * </ul>
  *
  * <p>{@link OutputFormat#PDF} is not currently supported and will throw
@@ -56,8 +63,10 @@ public class ReportExecutionService {
     private static final DateTimeFormatter LDAP_TIMESTAMP_FMT =
             DateTimeFormatter.ofPattern("yyyyMMddHHmmss'Z'");
 
-    private final LdapUserService      userService;
-    private final AuditEventRepository auditEventRepo;
+    private final LdapUserService                userService;
+    private final AuditEventRepository           auditEventRepo;
+    private final ProvisioningProfileRepository  profileRepo;
+    private final ProvisioningProfileService     profileService;
 
     /**
      * Runs the report and returns the result as UTF-8 CSV bytes.
@@ -93,6 +102,7 @@ public class ReportExecutionService {
             case RECENTLY_DELETED    -> runDeletedReport(directoryId, safeParams);
             case DISABLED_ACCOUNTS   -> runLdapReport(dc,
                                                        "(|(pwdAccountLockedTime=*)(loginDisabled=TRUE))", null);
+            case MISSING_PROFILE_GROUPS -> runMissingProfileGroupsReport(dc, directoryId);
         };
     }
 
@@ -160,6 +170,43 @@ public class ReportExecutionService {
                 })
                 .toList();
 
+        return CsvUtils.write(columns, rows);
+    }
+
+    /**
+     * For each enabled profile in the directory, evaluates the group membership
+     * diff and collects missing groups into a flat CSV report.
+     */
+    private byte[] runMissingProfileGroupsReport(DirectoryConnection dc,
+                                                   UUID directoryId) throws IOException {
+        List<ProvisioningProfile> profiles =
+                profileRepo.findAllByDirectoryIdAndEnabledTrue(directoryId);
+
+        List<String> columns = List.of("userDn", "profileName", "missingGroupDn", "memberAttribute");
+        List<Map<String, String>> rows = new ArrayList<>();
+
+        for (ProvisioningProfile profile : profiles) {
+            try {
+                GroupChangePreview preview =
+                        profileService.evaluateGroupChanges(directoryId, profile.getId());
+                for (GroupChangePreview.UserGroupChange change : preview.changes()) {
+                    for (GroupChangePreview.GroupChange add : change.groupsToAdd()) {
+                        Map<String, String> row = new LinkedHashMap<>();
+                        row.put("userDn", change.userDn());
+                        row.put("profileName", profile.getName());
+                        row.put("missingGroupDn", add.groupDn());
+                        row.put("memberAttribute", add.memberAttribute());
+                        rows.add(row);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to evaluate group changes for profile {}: {}",
+                        profile.getName(), e.getMessage());
+            }
+        }
+
+        log.debug("Missing profile groups report → {} rows across {} profiles",
+                rows.size(), profiles.size());
         return CsvUtils.write(columns, rows);
     }
 

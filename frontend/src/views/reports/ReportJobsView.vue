@@ -168,6 +168,7 @@ const reportTypes = [
   { value: 'RECENTLY_MODIFIED',    label: 'Recently Modified',      param: null },
   { value: 'RECENTLY_DELETED',     label: 'Recently Deleted',       param: null },
   { value: 'DISABLED_ACCOUNTS',    label: 'Disabled Accounts',      param: null },
+  { value: 'MISSING_PROFILE_GROUPS', label: 'Missing Profile Groups', param: null },
 ]
 
 function labelFor(type) {
