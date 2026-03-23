@@ -40,6 +40,7 @@ public enum AuditAction {
     APPROVAL_APPROVED    ("approval.approved"),
     APPROVAL_AUTO_APPROVED("approval.auto_approved"),
     APPROVAL_REJECTED    ("approval.rejected"),
+    APPROVAL_REQUEST_EDITED("approval.request_edited"),
 
     // ── Access review campaigns ─────────────────────────────────────────────
     CAMPAIGN_CREATED     ("campaign.created"),

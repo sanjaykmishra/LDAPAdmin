@@ -149,19 +149,31 @@ public class ApprovalWorkflowService {
             throw new AccessDeniedException("Not an approver for this profile");
         }
 
-        // Execute the actual LDAP operation
-        if (pa.getRequestType() == ApprovalRequestType.USER_CREATE) {
-            executeUserCreate(pa, approver);
-        } else if (pa.getRequestType() == ApprovalRequestType.BULK_IMPORT) {
-            executeBulkImport(pa, approver);
-        } else if (pa.getRequestType() == ApprovalRequestType.USER_MOVE) {
-            executeUserMove(pa, approver);
-        } else if (pa.getRequestType() == ApprovalRequestType.GROUP_MEMBER_ADD) {
-            executeGroupMemberAdd(pa, approver);
-        } else if (pa.getRequestType() == ApprovalRequestType.SELF_REGISTRATION) {
-            executeSelfRegistration(pa);
+        // Execute the actual LDAP operation — on failure, store error and keep PENDING
+        try {
+            if (pa.getRequestType() == ApprovalRequestType.USER_CREATE) {
+                executeUserCreate(pa, approver);
+            } else if (pa.getRequestType() == ApprovalRequestType.BULK_IMPORT) {
+                executeBulkImport(pa, approver);
+            } else if (pa.getRequestType() == ApprovalRequestType.USER_MOVE) {
+                executeUserMove(pa, approver);
+            } else if (pa.getRequestType() == ApprovalRequestType.GROUP_MEMBER_ADD) {
+                executeGroupMemberAdd(pa, approver);
+            } else if (pa.getRequestType() == ApprovalRequestType.SELF_REGISTRATION) {
+                executeSelfRegistration(pa);
+            }
+        } catch (Exception e) {
+            // Provisioning failed — store the error and keep status as PENDING
+            String msg = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
+            pa.setProvisionError(msg);
+            approvalRepo.save(pa);
+            log.error("Provisioning failed for approval {}: {}", pa.getId(), msg);
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Provisioning failed: " + msg);
         }
 
+        pa.setProvisionError(null); // clear any previous error on success
         pa.setStatus(ApprovalStatus.APPROVED);
         pa.setReviewedBy(approver.id());
         pa.setReviewedAt(OffsetDateTime.now());
@@ -207,6 +219,30 @@ public class ApprovalWorkflowService {
                 null, Map.of("approvalId", pa.getId().toString(), "reason", reason));
 
         notificationService.notifyRequesterRejected(pa);
+
+        return toResponse(pa);
+    }
+
+    @Transactional
+    public PendingApprovalResponse updatePayload(UUID approvalId, AuthPrincipal editor, String newPayload) {
+        PendingApproval pa = approvalRepo.findById(approvalId)
+                .orElseThrow(() -> new ResourceNotFoundException("PendingApproval", approvalId));
+
+        if (pa.getStatus() != ApprovalStatus.PENDING) {
+            throw new IllegalStateException("Can only edit requests in PENDING status");
+        }
+
+        if (!editor.isSuperadmin() && pa.getProfileId() != null
+                && !profileService.isApprover(pa.getProfileId(), editor.id())) {
+            throw new AccessDeniedException("Not an approver for this profile");
+        }
+
+        pa.setPayload(newPayload);
+        pa.setProvisionError(null); // clear error after edit
+        approvalRepo.save(pa);
+
+        auditService.record(editor, pa.getDirectoryId(), AuditAction.APPROVAL_REQUEST_EDITED,
+                null, Map.of("approvalId", pa.getId().toString()));
 
         return toResponse(pa);
     }
