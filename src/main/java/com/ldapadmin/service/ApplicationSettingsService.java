@@ -129,6 +129,16 @@ public class ApplicationSettingsService {
         s.setOidcScopes(req.oidcScopes());
         s.setOidcUsernameClaim(req.oidcUsernameClaim());
         applyPassword(req.oidcClientSecret(), s::getOidcClientSecretEnc, s::setOidcClientSecretEnc);
+
+        // SIEM / syslog export
+        if (req.siemEnabled() != null) s.setSiemEnabled(req.siemEnabled());
+        s.setSiemProtocol(req.siemProtocol());
+        s.setSiemHost(req.siemHost());
+        s.setSiemPort(req.siemPort());
+        s.setSiemFormat(req.siemFormat());
+        s.setWebhookUrl(req.webhookUrl());
+        applyPassword(req.siemAuthToken(), s::getSiemAuthTokenEnc, s::setSiemAuthTokenEnc);
+        applyPassword(req.webhookAuthHeader(), s::getWebhookAuthHeaderEnc, s::setWebhookAuthHeaderEnc);
     }
 
     /**
@@ -190,6 +200,15 @@ public class ApplicationSettingsService {
                 s.getOidcClientSecretEnc() != null,
                 s.getOidcScopes(),
                 s.getOidcUsernameClaim(),
+                // SIEM
+                s.isSiemEnabled(),
+                s.getSiemProtocol(),
+                s.getSiemHost(),
+                s.getSiemPort(),
+                s.getSiemFormat(),
+                s.getSiemAuthTokenEnc() != null,
+                s.getWebhookUrl(),
+                s.getWebhookAuthHeaderEnc() != null,
                 s.getCreatedAt(),
                 s.getUpdatedAt());
     }
@@ -208,6 +227,8 @@ public class ApplicationSettingsService {
                 null, null, null, false, null, null, false, null, null,
                 // OIDC auth provider
                 null, null, false, "openid profile email", "preferred_username",
+                // SIEM
+                false, null, null, null, null, false, null, false,
                 null, null);
     }
 }
