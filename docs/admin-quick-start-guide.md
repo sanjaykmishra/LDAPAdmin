@@ -40,7 +40,7 @@ BOOTSTRAP_SUPERADMIN_PASSWORD=<your-initial-password>
 docker compose up -d
 ```
 
-The app starts at **http://localhost:8080**. PostgreSQL runs on port 5432. Database schema is created automatically on first startup.
+The UI starts at **http://localhost:8080**. The API is available at **http://localhost:5173**. PostgreSQL runs on port 5432. Database schema is created automatically on first startup.
 
 ---
 
