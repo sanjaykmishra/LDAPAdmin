@@ -947,7 +947,7 @@ function toggleApprover(accountId) {
               <label v-if="profile.selfRegistrationAllowed" class="flex items-center gap-1"><input type="checkbox" v-model="attr.selfRegistrationEdit" /> Self-registration</label>
               <label class="flex items-center gap-1">
                 <input type="checkbox" v-model="attr.hidden"
-                  :disabled="(attr.requiredOnCreate && !attr.computedExpression) || isRdnAttribute(attr) || isSchemaRequired(attr)" /> Hidden
+                  :disabled="((attr.requiredOnCreate || isSchemaRequired(attr)) && !attr.computedExpression) || isRdnAttribute(attr)" /> Hidden
               </label>
             </div>
           </div>
