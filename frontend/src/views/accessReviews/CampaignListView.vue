@@ -2,9 +2,14 @@
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Access Reviews</h1>
-      <button v-if="isSuperadmin" @click="$router.push({ name: 'accessReviewCreate', params: { dirId } })" class="btn-primary">
-        New Campaign
-      </button>
+      <div class="flex gap-2">
+        <button @click="$router.push({ name: 'crossCampaignReport', params: { dirId } })" class="btn-secondary">
+          Cross-Campaign Report
+        </button>
+        <button v-if="isSuperadmin" @click="$router.push({ name: 'accessReviewCreate', params: { dirId } })" class="btn-primary">
+          New Campaign
+        </button>
+      </div>
     </div>
 
     <!-- Status filter tabs -->
