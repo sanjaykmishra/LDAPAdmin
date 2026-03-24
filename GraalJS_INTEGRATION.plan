@@ -1,0 +1,310 @@
+# GraalJS Script Integration Plan
+# Adds generic JavaScript scripting capability via GraalVM's GraalJS engine.
+# Two initial integration points: computed attribute values + playbook script steps.
+# Designed as a shared service so future callers (approval rules, etc.) can reuse it.
+
+## Overview
+
+Add an embedded JavaScript engine (GraalJS) that runs sandboxed scripts in-process.
+Scripts receive a context object with domain-specific data and return a result.
+The engine is exposed as a generic `ScriptEvaluationService` consumed by multiple features.
+
+---
+
+## Phase 1: Core Engine — ScriptEvaluationService
+
+### 1.1 Add GraalJS dependency
+
+File: pom.xml
+
+Add to <dependencies>:
+  - org.graalvm.polyglot:polyglot (latest 24.x)
+  - org.graalvm.polyglot:js (latest 24.x, runtime scope)
+
+These are standalone JARs — no full GraalVM JDK required.
+
+### 1.2 Create ScriptEvaluationService
+
+File: src/main/java/com/ldapadmin/script/ScriptEvaluationService.java
+
+@Service class with:
+
+  - Shared GraalVM `Engine` instance (thread-safe, expensive to create, reuse it).
+    Created in @PostConstruct, closed in @PreDestroy.
+
+  - Primary method:
+      Object evaluate(String script, Map<String, Object> bindings, Duration timeout)
+    Steps:
+      1. Create a sandboxed Context per invocation:
+         Context.newBuilder("js")
+           .engine(sharedEngine)
+           .allowIO(IOAccess.NONE)
+           .allowNativeAccess(false)
+           .allowCreateThread(false)
+           .allowHostAccess(HostAccess.NONE)       // no calling back into Java
+           .allowEnvironmentAccess(EnvironmentAccess.NONE)
+           .option("js.ecmascript-version", "2022")
+           .build()
+      2. Bind each entry from `bindings` map into the JS global scope as read-only.
+         For Map values, convert to JS-friendly proxy via Value.asValue().
+      3. Execute the script string within the context.
+      4. Extract and return the result (auto-convert Value to String/Boolean/Map/List).
+      5. Close the Context in a finally block.
+
+  - Timeout enforcement:
+      Use Context.close(true) from a scheduled thread if execution exceeds `timeout`.
+      Default timeout from config: app.script.timeout-ms (default 5000).
+
+  - Convenience overloads:
+      String evaluateToString(script, bindings)  — calls evaluate(), toString() on result.
+      Map<String,Object> evaluateToMap(script, bindings) — for structured results.
+
+  - Error handling:
+      Catch PolyglotException. Wrap in a ScriptExecutionException (new custom exception)
+      that includes: script source (truncated), error message, line number.
+      The GlobalExceptionHandler maps ScriptExecutionException → 422 Unprocessable Entity.
+
+### 1.3 Configuration properties
+
+File: src/main/java/com/ldapadmin/config/AppProperties.java
+
+Add nested class:
+  @Getter @Setter
+  public static class Script {
+      private int timeoutMs = 5000;       // max execution time per script
+      private int maxOutputLength = 10000; // truncate results beyond this
+  }
+
+Add field to AppProperties:
+  @Valid private Script script = new Script();
+
+No mandatory config — sensible defaults work out of the box.
+
+### 1.4 Custom exception
+
+File: src/main/java/com/ldapadmin/exception/ScriptExecutionException.java
+
+public class ScriptExecutionException extends RuntimeException
+  - Fields: scriptSnippet (String, first 200 chars), lineNumber (int)
+  - Extends RuntimeException
+
+Add handler in GlobalExceptionHandler:
+  @ExceptionHandler(ScriptExecutionException.class) → 422
+
+### 1.5 Unit tests
+
+File: src/test/java/com/ldapadmin/script/ScriptEvaluationServiceTest.java
+
+Test cases:
+  - Simple string return: "ctx.firstName + '.' + ctx.lastName" → "john.doe"
+  - Conditional logic: ternary returning different values
+  - Timeout enforcement: infinite loop → ScriptExecutionException
+  - Sandbox: attempting Java.type() or file access → exception
+  - Null/missing bindings handled gracefully
+  - Map result extraction works
+
+---
+
+## Phase 2: Computed Attribute Integration
+
+### 2.1 Add expressionType to ProfileAttributeConfig
+
+File: src/main/java/com/ldapadmin/entity/ProfileAttributeConfig.java
+
+Add field:
+  @Enumerated(EnumType.STRING)
+  @Column(name = "expression_type", length = 10)
+  private ExpressionType expressionType = ExpressionType.TEMPLATE;
+
+### 2.2 Create ExpressionType enum
+
+File: src/main/java/com/ldapadmin/entity/enums/ExpressionType.java
+
+public enum ExpressionType {
+    TEMPLATE,   // existing ${attr} interpolation (default, backward compatible)
+    SCRIPT      // GraalJS evaluation
+}
+
+### 2.3 Flyway migration
+
+File: src/main/resources/db/migration/V<next>__add_expression_type.sql
+
+ALTER TABLE profile_attribute_configs
+    ADD COLUMN expression_type VARCHAR(10) NOT NULL DEFAULT 'TEMPLATE';
+
+No data migration needed — all existing rows get TEMPLATE default.
+
+### 2.4 Update ProvisioningProfileService.applyDefaults()
+
+File: src/main/java/com/ldapadmin/service/ProvisioningProfileService.java
+
+In the computed expression block (~line 486-493), branch on expressionType:
+
+  if (config.getExpressionType() == ExpressionType.SCRIPT) {
+      // Build bindings: flatten attributes map (first values) into a "ctx" object
+      Map<String, Object> ctx = new LinkedHashMap<>();
+      attributes.forEach((k, v) -> ctx.put(k, (v != null && !v.isEmpty()) ? v.get(0) : ""));
+      Map<String, Object> bindings = Map.of("ctx", ctx);
+      String computed = scriptService.evaluateToString(config.getComputedExpression(), bindings);
+      if (computed != null && !computed.isBlank()) {
+          attributes.put(config.getAttributeName(), List.of(computed));
+          continue;
+      }
+  } else {
+      // existing evaluateExpression() call — unchanged
+  }
+
+Inject ScriptEvaluationService into ProvisioningProfileService.
+
+### 2.5 Update DTOs
+
+Files:
+  - src/main/java/com/ldapadmin/dto/profile/CreateProfileRequest.java
+  - src/main/java/com/ldapadmin/dto/profile/ProfileResponse.java
+
+Add `expressionType` field (String) to AttributeConfigEntry records in both.
+Default to "TEMPLATE" when null/absent for backward compatibility.
+
+### 2.6 Update profile save logic
+
+File: src/main/java/com/ldapadmin/service/ProvisioningProfileService.java
+
+In the method that maps DTO → entity (where AttributeConfigEntry is persisted),
+set config.setExpressionType() from the DTO value. Parse string to enum, default TEMPLATE.
+
+---
+
+## Phase 3: Playbook Script Step
+
+### 3.1 Add SCRIPT action to PlaybookStepAction enum
+
+File: src/main/java/com/ldapadmin/entity/enums/PlaybookStepAction.java
+
+Add:  SCRIPT
+
+### 3.2 Implement SCRIPT case in executeStep()
+
+File: src/main/java/com/ldapadmin/service/LifecyclePlaybookService.java
+
+In the switch statement in executeStep() (~line 290), add:
+
+  case SCRIPT -> {
+      String scriptBody = params.path("script").asText();
+
+      // Build rich context for the script
+      LdapUser user = ldapUserService.getUser(dc, targetDn);
+      Map<String, Object> ctx = new LinkedHashMap<>();
+      ctx.put("dn", targetDn);
+      ctx.put("directoryId", dc.getId().toString());
+      ctx.put("attributes", user.getAttributes());  // Map<String, List<String>>
+
+      Map<String, Object> bindings = Map.of("ctx", ctx, "result", new LinkedHashMap<>());
+      Map<String, Object> result = scriptService.evaluateToMap(scriptBody, bindings);
+
+      // Interpret result actions
+      applyScriptResult(dc, targetDn, result);
+  }
+
+Inject ScriptEvaluationService into LifecyclePlaybookService.
+
+### 3.3 Create applyScriptResult() helper
+
+File: src/main/java/com/ldapadmin/service/LifecyclePlaybookService.java
+
+Private method that reads the result map and dispatches actions:
+
+  private void applyScriptResult(DirectoryConnection dc, String targetDn, Map<String, Object> result) {
+      // result.action — optional: "DISABLE", "ENABLE", "DELETE", "MOVE_OU"
+      // result.targetDn — for MOVE_OU
+      // result.setAttributes — Map<String, String> of attributes to set
+      // result.removeAttributes — List<String> of attributes to remove
+      // result.addGroups — List<String> of group DNs to add to
+      // result.removeGroups — List<String> of group DNs to remove from
+  }
+
+Each key is optional. If result is empty/null, the step is a no-op (useful for
+scripts that only compute values for subsequent steps or log decisions).
+
+### 3.4 Rollback for SCRIPT steps
+
+In the rollback switch statement (~line 225-272), SCRIPT steps are treated as
+non-reversible (same as DELETE/NOTIFY):
+
+  case SCRIPT -> log.warn("Cannot auto-rollback SCRIPT step {} for {}", step, targetDn);
+
+This is the safe default. Scripts that only set attributes will have their
+previous state captured by capturePreviousState(), but the composite nature
+of script results makes automatic rollback unreliable.
+
+### 3.5 Preview for SCRIPT steps
+
+In the preview logic, SCRIPT steps show:
+  description: "Run script"  (or first line/comment of script body)
+  reversible: false
+
+### 3.6 Update DTOs
+
+No DTO changes needed — the existing `parameters` JSON field carries the script:
+  { "script": "if (ctx.attributes.department[0] === ...) { ... }" }
+
+---
+
+## Phase 4: Security Hardening
+
+### 4.1 Script size limit
+
+In ScriptEvaluationService.evaluate(), reject scripts exceeding a configurable
+max length (default 50_000 chars). Prevents memory abuse.
+
+### 4.2 Feature-gate script creation
+
+Only SUPERADMIN can create/edit attributes with expressionType=SCRIPT or
+playbook steps with action=SCRIPT. Enforce in:
+  - ProvisioningProfileService (profile save validation)
+  - LifecyclePlaybookService (playbook create/update validation)
+
+This prevents regular admins from injecting arbitrary code.
+
+### 4.3 Audit logging
+
+Log all script executions to the audit trail:
+  - AuditAction.SCRIPT_EXECUTED
+  - Include: script hash (not full source), execution time, success/failure, caller context
+
+### 4.4 Resource limits
+
+Configure in the GraalJS Context:
+  - option("engine.MaximumStackDepth", "100")  — prevent stack overflow
+  - Statement limit via ResourceLimits (if available in version)
+  - Already sandboxed: no I/O, no threads, no native access, no host access
+
+---
+
+## File Summary
+
+New files:
+  - src/main/java/com/ldapadmin/script/ScriptEvaluationService.java
+  - src/main/java/com/ldapadmin/entity/enums/ExpressionType.java
+  - src/main/java/com/ldapadmin/exception/ScriptExecutionException.java
+  - src/main/resources/db/migration/V<next>__add_expression_type.sql
+  - src/test/java/com/ldapadmin/script/ScriptEvaluationServiceTest.java
+
+Modified files:
+  - pom.xml (GraalJS dependencies)
+  - src/main/java/com/ldapadmin/config/AppProperties.java (Script config)
+  - src/main/java/com/ldapadmin/entity/ProfileAttributeConfig.java (expressionType field)
+  - src/main/java/com/ldapadmin/entity/enums/PlaybookStepAction.java (SCRIPT value)
+  - src/main/java/com/ldapadmin/service/ProvisioningProfileService.java (script branch in applyDefaults)
+  - src/main/java/com/ldapadmin/service/LifecyclePlaybookService.java (SCRIPT step execution)
+  - src/main/java/com/ldapadmin/dto/profile/CreateProfileRequest.java (expressionType)
+  - src/main/java/com/ldapadmin/dto/profile/ProfileResponse.java (expressionType)
+  - src/main/java/com/ldapadmin/exception/GlobalExceptionHandler.java (ScriptExecutionException handler)
+
+---
+
+## Implementation Order
+
+1. Phase 1 first — get the core engine working with tests.
+2. Phase 2 — computed attributes (smaller integration surface, lower risk).
+3. Phase 3 — playbook steps (richer context, more complex result handling).
+4. Phase 4 — hardening (can be done incrementally alongside 2 and 3).

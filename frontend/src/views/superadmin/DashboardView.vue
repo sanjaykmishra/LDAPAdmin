@@ -20,14 +20,30 @@ const ACTION_LABELS = {
   'GROUP_DELETE': 'Group deleted',
   'GROUP_MEMBER_ADD': 'Member added',
   'GROUP_MEMBER_REMOVE': 'Member removed',
+  'GROUP_BULK_IMPORT': 'Group bulk import',
   'ENTRY_CREATE': 'Entry created',
   'ENTRY_UPDATE': 'Entry updated',
   'ENTRY_DELETE': 'Entry deleted',
   'ENTRY_MOVE': 'Entry moved',
   'ENTRY_RENAME': 'Entry renamed',
+  'LDIF_IMPORT': 'LDIF imported',
+  'INTEGRITY_CHECK': 'Integrity check',
+  'BULK_ATTRIBUTE_UPDATE': 'Bulk attribute update',
   'APPROVAL_SUBMITTED': 'Approval submitted',
   'APPROVAL_APPROVED': 'Request approved',
+  'APPROVAL_AUTO_APPROVED': 'Request auto-approved',
   'APPROVAL_REJECTED': 'Request rejected',
+  'APPROVAL_REQUEST_EDITED': 'Request edited',
+  'CAMPAIGN_CREATED': 'Campaign created',
+  'CAMPAIGN_ACTIVATED': 'Campaign activated',
+  'CAMPAIGN_CLOSED': 'Campaign closed',
+  'CAMPAIGN_CANCELLED': 'Campaign cancelled',
+  'CAMPAIGN_EXPIRED': 'Campaign expired',
+  'REVIEW_CONFIRMED': 'Review confirmed',
+  'REVIEW_REVOKED': 'Review revoked',
+  'REVIEW_AUTO_REVOKED': 'Review auto-revoked',
+  'PLAYBOOK_EXECUTED': 'Playbook executed',
+  'PLAYBOOK_ROLLED_BACK': 'Playbook rolled back',
   'LDAP_CHANGE': 'LDAP change',
 }
 
@@ -36,10 +52,12 @@ function actionLabel(action) {
 }
 
 function actionColor(action) {
-  if (action?.startsWith('USER_DELETE') || action?.startsWith('GROUP_DELETE') || action?.startsWith('ENTRY_DELETE'))
+  if (action?.includes('DELETE') || action?.includes('REVOKED') || action?.includes('ROLLED_BACK'))
     return 'text-red-600 bg-red-50'
-  if (action?.includes('CREATE')) return 'text-green-600 bg-green-50'
-  if (action?.includes('DISABLE') || action?.includes('REJECTED')) return 'text-amber-600 bg-amber-50'
+  if (action?.includes('CREATE') || action?.includes('APPROVED') || action?.includes('CONFIRMED'))
+    return 'text-green-600 bg-green-50'
+  if (action?.includes('DISABLE') || action?.includes('REJECTED') || action?.includes('CANCELLED') || action?.includes('EXPIRED'))
+    return 'text-amber-600 bg-amber-50'
   return 'text-blue-600 bg-blue-50'
 }
 

@@ -482,8 +482,9 @@ public class ProvisioningProfileService {
                 continue;
             }
 
-            // Apply computed expressions
-            if (!hasValue && config.getComputedExpression() != null
+            // Apply computed expressions (always re-evaluate to ensure correctness,
+            // since computed values are read-only on the frontend)
+            if (config.getComputedExpression() != null
                     && !config.getComputedExpression().isBlank()) {
                 String computed = evaluateExpression(config.getComputedExpression(), attributes);
                 if (computed != null && !computed.isBlank()) {
