@@ -54,15 +54,34 @@
           </div>
         </div>
 
-        <div class="flex gap-6">
+        <div class="space-y-3">
           <label class="flex items-center gap-2 text-sm">
             <input v-model="form.autoRevoke" type="checkbox" class="rounded border-gray-300" />
             Auto-revoke on decision
           </label>
-          <label class="flex items-center gap-2 text-sm">
-            <input v-model="form.autoRevokeOnExpiry" type="checkbox" class="rounded border-gray-300" />
-            Auto-revoke on expiry
-          </label>
+          <div>
+            <label class="flex items-center gap-2 text-sm">
+              <input v-model="form.autoRevokeOnExpiry" type="checkbox" class="rounded border-gray-300" />
+              Auto-revoke on expiry
+            </label>
+            <p v-if="form.autoRevokeOnExpiry" class="ml-6 mt-1 text-xs text-orange-600 bg-orange-50 rounded p-2">
+              Warning: When the campaign deadline passes, all undecided memberships will be automatically revoked.
+              This requires the global auto-revoke kill switch to be enabled on the server.
+            </p>
+          </div>
+        </div>
+
+        <!-- Escalation settings -->
+        <div v-if="form.recurrenceMonths || form.deadlineDays" class="border-t pt-4 mt-4">
+          <h3 class="text-sm font-medium text-gray-700 mb-2">Escalation &amp; Reminders</h3>
+          <p class="text-xs text-gray-500 mb-2">
+            Reminders are sent automatically when the deadline approaches (default: 3 days before).
+            If a reviewer has not responded after 14 days, the campaign creator will receive an escalation notification.
+            These thresholds are configured server-side.
+          </p>
+          <p v-if="form.recurrenceMonths && form.deadlineDays" class="text-xs text-blue-600">
+            Next scheduled run: approximately {{ nextScheduledRun }}
+          </p>
         </div>
       </div>
 
@@ -117,7 +136,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '@/composables/useApi'
 import { createCampaign, listReviewers } from '@/api/accessReviews'
@@ -141,6 +160,13 @@ const form = reactive({
   autoRevoke: false,
   autoRevokeOnExpiry: false,
   groups: [{ groupDn: '', memberAttribute: 'member', reviewerAccountId: '' }],
+})
+
+const nextScheduledRun = computed(() => {
+  if (!form.recurrenceMonths || !form.deadlineDays) return ''
+  const d = new Date()
+  d.setMonth(d.getMonth() + form.recurrenceMonths)
+  return d.toLocaleDateString()
 })
 
 function addGroup() {

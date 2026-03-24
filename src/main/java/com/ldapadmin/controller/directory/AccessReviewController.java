@@ -168,6 +168,15 @@ public class AccessReviewController {
         return new ResponseEntity<>(data, headers, HttpStatus.OK);
     }
 
+    @GetMapping("/{campaignId}/reminders")
+    @RequiresFeature(FeatureKey.ACCESS_REVIEW_MANAGE)
+    public List<CampaignReminderDto> listReminders(
+            @DirectoryId @PathVariable UUID directoryId,
+            @PathVariable UUID campaignId,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        return campaignService.listReminders(campaignId);
+    }
+
     @GetMapping("/{campaignId}/history")
     @RequiresFeature(FeatureKey.ACCESS_REVIEW_MANAGE)
     public List<CampaignHistoryDto> getHistory(
