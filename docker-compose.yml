@@ -41,6 +41,17 @@ services:
       LOG_LEVEL:     ${LOG_LEVEL:-INFO}
       APP_LOG_LEVEL: ${APP_LOG_LEVEL:-INFO}
     ports:
+      - "5173:8080"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ldap-admin-frontend
+    depends_on:
+      - app
+    ports:
       - "8080:8080"
     restart: unless-stopped
 
