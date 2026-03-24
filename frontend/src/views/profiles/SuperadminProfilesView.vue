@@ -696,7 +696,7 @@ const modalHeight = computed(() => {
 const modalTabs = [
   { id: 'general', label: 'General' },
   { id: 'attributes', label: 'Attributes' },
-  { id: 'layout', label: 'Layout' },
+  { id: 'layout', label: 'Forms' },
   { id: 'groups', label: 'Groups' },
   { id: 'policy', label: 'Policy' },
   { id: 'lifecycle', label: 'Lifecycle' },
