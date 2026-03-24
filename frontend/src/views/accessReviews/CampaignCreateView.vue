@@ -63,9 +63,7 @@
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Group DN *</label>
-            <input v-model="g.groupDn" type="text" required
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="cn=admins,ou=groups,dc=example,dc=com" />
+            <GroupDnPicker v-model="g.groupDn" :directory-id="dirId" />
           </div>
 
           <div class="grid grid-cols-2 gap-4">
@@ -107,6 +105,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '@/composables/useApi'
 import { createCampaign, listReviewers } from '@/api/accessReviews'
+import GroupDnPicker from '@/components/GroupDnPicker.vue'
 
 const route = useRoute()
 const router = useRouter()
