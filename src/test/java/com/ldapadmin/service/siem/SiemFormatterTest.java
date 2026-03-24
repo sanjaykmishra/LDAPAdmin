@@ -102,7 +102,7 @@ class SiemFormatterTest {
         String result = formatter.format(testEvent(), SiemFormat.CEF);
 
         assertThat(result).contains("suser=alice");
-        assertThat(result).contains("cs1=uid=alice,ou=users,dc=corp");
+        assertThat(result).contains("cs1=uid\\=alice,ou\\=users,dc\\=corp");
         assertThat(result).contains("cs1Label=targetDn");
         assertThat(result).contains("cs2=corp-ldap");
         assertThat(result).contains("cs2Label=directoryName");
