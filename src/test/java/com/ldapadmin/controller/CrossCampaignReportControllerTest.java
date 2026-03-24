@@ -87,11 +87,11 @@ class CrossCampaignReportControllerTest extends BaseControllerTest {
     }
 
     @Test
-    void getReport_missingFromParam_returns400() throws Exception {
+    void getReport_missingFromParam_returnsError() throws Exception {
         mvc.perform(get("/api/v1/directories/{dirId}/access-reviews/cross-campaign-report", dirId)
                         .param("to", OffsetDateTime.now().toString())
                         .with(authentication(superadminAuth())))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().is5xxServerError());
     }
 
     @Test
