@@ -14,8 +14,8 @@
       <template #cell-actions="{ row }">
         <div class="flex gap-2" v-if="row.status === 'PENDING'">
           <button @click="openDetail(row)" class="btn-secondary text-xs">View</button>
-          <button v-if="!isOwnRequest(row)" @click="handleApprove(row)" class="text-xs px-3 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700 font-medium">Approve</button>
-          <button v-if="!isOwnRequest(row)" @click="openReject(row)" class="text-xs px-3 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700">Reject</button>
+          <button v-if="!isOwnRequest(row)" @click="handleApprove(row)" class="text-xs px-3 py-1 rounded-lg text-green-600 bg-green-50 hover:bg-green-100 font-medium">Approve</button>
+          <button v-if="!isOwnRequest(row)" @click="openReject(row)" class="text-xs px-3 py-1 rounded-lg text-red-600 bg-red-50 hover:bg-red-100 font-medium">Reject</button>
           <span v-if="isOwnRequest(row)" class="text-xs text-gray-400 italic self-center">Own request</span>
         </div>
         <div v-else>
@@ -76,8 +76,8 @@
           <template v-if="!isOwnRequest(selectedApproval)">
             <button v-if="!editMode && isEditablePayload(selectedApproval)"
               @click="startEdit(selectedApproval)" class="btn-secondary">Edit</button>
-            <button v-if="!editMode" @click="handleApprove(selectedApproval); detailModal = false" class="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 font-medium">Approve</button>
-            <button v-if="!editMode" @click="detailModal = false; openReject(selectedApproval)" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Reject</button>
+            <button v-if="!editMode" @click="handleApprove(selectedApproval); detailModal = false" class="px-4 py-2 rounded-lg text-green-600 bg-green-50 hover:bg-green-100 font-medium">Approve</button>
+            <button v-if="!editMode" @click="detailModal = false; openReject(selectedApproval)" class="px-4 py-2 rounded-lg text-red-600 bg-red-50 hover:bg-red-100 font-medium">Reject</button>
           </template>
           <span v-else class="text-sm text-gray-400 italic">You cannot approve or reject your own request</span>
         </div>
@@ -94,7 +94,7 @@
         <div class="flex gap-2 justify-end">
           <button @click="rejectModal = false" class="btn-secondary">Cancel</button>
           <button @click="handleReject" :disabled="!rejectReason.trim()"
-            class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+            class="px-4 py-2 rounded-lg text-red-600 bg-red-50 hover:bg-red-100 font-medium disabled:opacity-50">
             Reject
           </button>
         </div>
