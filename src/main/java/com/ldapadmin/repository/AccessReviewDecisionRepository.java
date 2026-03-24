@@ -34,4 +34,7 @@ public interface AccessReviewDecisionRepository extends JpaRepository<AccessRevi
            "AND d.decidedAt IS NOT NULL AND d.decidedAt >= :since")
     long countDistinctReviewedUsersSince(@Param("directoryId") UUID directoryId,
                                          @Param("since") java.time.OffsetDateTime since);
+
+    @Query("SELECT d FROM AccessReviewDecision d WHERE d.reviewGroup.campaign.id IN :campaignIds AND d.decision IS NOT NULL")
+    List<AccessReviewDecision> findDecidedByCampaignIds(@Param("campaignIds") List<UUID> campaignIds);
 }
