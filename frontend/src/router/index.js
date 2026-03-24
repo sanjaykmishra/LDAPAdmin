@@ -139,6 +139,11 @@ const router = createRouter({
           component: () => import('@/views/accessReviews/CampaignListView.vue'),
         },
         {
+          path: 'directories/:dirId/access-reviews/cross-campaign-report',
+          name: 'crossCampaignReport',
+          component: () => import('@/views/accessReviews/CrossCampaignReportView.vue'),
+        },
+        {
           path: 'directories/:dirId/access-reviews/new',
           name: 'accessReviewCreate',
           component: () => import('@/views/accessReviews/CampaignCreateView.vue'),
