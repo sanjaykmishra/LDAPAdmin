@@ -25,6 +25,7 @@
           <button v-if="campaign.status === 'ACTIVE'" @click="handleClose(false)" :disabled="loading" class="btn-primary text-sm">Close</button>
           <button v-if="campaign.status === 'ACTIVE'" @click="handleClose(true)" :disabled="loading" class="text-sm px-3 py-1.5 rounded-lg bg-orange-600 text-white hover:bg-orange-700">Force Close</button>
           <button v-if="campaign.status === 'UPCOMING' || campaign.status === 'ACTIVE'" @click="handleCancel" :disabled="loading" class="text-sm px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700">Cancel</button>
+          <button @click="handleSaveAsTemplate" :disabled="loading" class="btn-secondary text-sm">Save as Template</button>
           <button @click="handleExport" class="btn-secondary text-sm">Export CSV</button>
         </div>
       </div>
@@ -114,6 +115,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApi, downloadBlob } from '@/composables/useApi'
 import { getCampaign, activateCampaign, closeCampaign, cancelCampaign, exportCampaign } from '@/api/accessReviews'
+import { saveAsTemplate } from '@/api/campaignTemplates'
 import DataTable from '@/components/DataTable.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import RelativeTime from '@/components/RelativeTime.vue'
@@ -181,6 +183,12 @@ async function doCancel() {
   try {
     await call(() => cancelCampaign(dirId, campaignId), { successMsg: 'Campaign cancelled' })
     await loadCampaign()
+  } catch { /* handled */ }
+}
+
+async function handleSaveAsTemplate() {
+  try {
+    await call(() => saveAsTemplate(dirId, campaignId), { successMsg: 'Saved as template' })
   } catch { /* handled */ }
 }
 

@@ -3,6 +3,22 @@
     <h1 class="text-2xl font-bold text-gray-900 mb-6">New Access Review Campaign</h1>
 
     <form @submit.prevent="handleSubmit" class="space-y-6">
+      <!-- Start from template -->
+      <div v-if="templates.length" class="bg-blue-50 rounded-lg border border-blue-200 p-4">
+        <label class="block text-sm font-medium text-blue-800 mb-2">Start from template</label>
+        <div class="flex gap-3">
+          <select v-model="selectedTemplateId"
+            class="flex-1 border border-blue-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
+            <option value="">-- blank campaign --</option>
+            <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
+          </select>
+          <button type="button" @click="applyTemplate" :disabled="!selectedTemplateId"
+            class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+            Apply
+          </button>
+        </div>
+      </div>
+
       <!-- Campaign details -->
       <div class="bg-white rounded-lg border p-5 space-y-4">
         <h2 class="text-lg font-semibold text-gray-800">Campaign Details</h2>
@@ -105,6 +121,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '@/composables/useApi'
 import { createCampaign, listReviewers } from '@/api/accessReviews'
+import { listTemplates } from '@/api/campaignTemplates'
 import GroupDnPicker from '@/components/GroupDnPicker.vue'
 
 const route = useRoute()
@@ -113,6 +130,8 @@ const { loading, call } = useApi()
 const dirId = route.params.dirId
 
 const admins = ref([])
+const templates = ref([])
+const selectedTemplateId = ref('')
 
 const form = reactive({
   name: '',
@@ -126,6 +145,22 @@ const form = reactive({
 
 function addGroup() {
   form.groups.push({ groupDn: '', memberAttribute: 'member', reviewerAccountId: '' })
+}
+
+function applyTemplate() {
+  const t = templates.value.find(t => t.id === selectedTemplateId.value)
+  if (!t) return
+  form.name = ''
+  form.description = t.description || ''
+  form.deadlineDays = t.config.deadlineDays
+  form.recurrenceMonths = t.config.recurrenceMonths
+  form.autoRevoke = t.config.autoRevoke
+  form.autoRevokeOnExpiry = t.config.autoRevokeOnExpiry
+  form.groups = t.config.groups.map(g => ({
+    groupDn: g.groupDn,
+    memberAttribute: g.memberAttribute || 'member',
+    reviewerAccountId: g.reviewerAccountId,
+  }))
 }
 
 async function handleSubmit() {
@@ -155,6 +190,12 @@ onMounted(async () => {
     admins.value = res.data
   } catch (e) {
     console.warn('Failed to load reviewers:', e)
+  }
+  try {
+    const res = await listTemplates(dirId)
+    templates.value = res.data
+  } catch (e) {
+    console.warn('Failed to load templates:', e)
   }
 })
 </script>
