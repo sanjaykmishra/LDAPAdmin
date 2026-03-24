@@ -1,56 +1,38 @@
 <template>
   <div class="p-6 max-w-3xl">
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">New Access Review Campaign</h1>
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">{{ isEdit ? 'Edit' : 'New' }} Campaign Template</h1>
 
     <form @submit.prevent="handleSubmit" class="space-y-6">
-      <!-- Start from template -->
-      <div v-if="templates.length" class="bg-blue-50 rounded-lg border border-blue-200 p-4">
-        <label class="block text-sm font-medium text-blue-800 mb-2">Start from template</label>
-        <div class="flex gap-3">
-          <select v-model="selectedTemplateId"
-            class="flex-1 border border-blue-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
-            <option value="">-- blank campaign --</option>
-            <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
-          </select>
-          <button type="button" @click="applyTemplate" :disabled="!selectedTemplateId"
-            class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-            Apply
-          </button>
-        </div>
-      </div>
-
-      <!-- Campaign details -->
+      <!-- Template details -->
       <div class="bg-white rounded-lg border p-5 space-y-4">
-        <h2 class="text-lg font-semibold text-gray-800">Campaign Details</h2>
+        <h2 class="text-lg font-semibold text-gray-800">Template Details</h2>
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
           <input v-model="form.name" type="text" required
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Q1 2026 Access Review" />
+            placeholder="Quarterly Review Template" />
         </div>
 
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
           <textarea v-model="form.description" rows="2"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Quarterly access recertification..."></textarea>
+            placeholder="Template for quarterly access recertification..."></textarea>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Deadline (days from start) *</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Deadline (days) *</label>
             <input v-model.number="form.deadlineDays" type="number" min="1" required
               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="30" />
-            <p class="text-xs text-gray-400 mt-1">Number of days reviewers have to complete the review</p>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Repeat every (months)</label>
             <input v-model.number="form.recurrenceMonths" type="number" min="1"
               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g. 3 for quarterly" />
-            <p class="text-xs text-gray-400 mt-1">Leave empty for one-time campaigns</p>
           </div>
         </div>
 
@@ -108,7 +90,7 @@
 
       <div class="flex gap-3">
         <button type="submit" :disabled="loading" class="btn-primary">
-          {{ loading ? 'Creating...' : 'Create Campaign' }}
+          {{ loading ? 'Saving...' : (isEdit ? 'Update Template' : 'Create Template') }}
         </button>
         <button type="button" @click="$router.back()" class="btn-secondary">Cancel</button>
       </div>
@@ -117,21 +99,21 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '@/composables/useApi'
-import { createCampaign, listReviewers } from '@/api/accessReviews'
-import { listTemplates } from '@/api/campaignTemplates'
+import { createTemplate, getTemplate, updateTemplate } from '@/api/campaignTemplates'
+import { listReviewers } from '@/api/accessReviews'
 import GroupDnPicker from '@/components/GroupDnPicker.vue'
 
 const route = useRoute()
 const router = useRouter()
 const { loading, call } = useApi()
 const dirId = route.params.dirId
+const templateId = route.params.templateId
+const isEdit = computed(() => !!templateId)
 
 const admins = ref([])
-const templates = ref([])
-const selectedTemplateId = ref('')
 
 const form = reactive({
   name: '',
@@ -145,22 +127,6 @@ const form = reactive({
 
 function addGroup() {
   form.groups.push({ groupDn: '', memberAttribute: 'member', reviewerAccountId: '' })
-}
-
-function applyTemplate() {
-  const t = templates.value.find(t => t.id === selectedTemplateId.value)
-  if (!t) return
-  form.name = ''
-  form.description = t.description || ''
-  form.deadlineDays = t.config.deadlineDays
-  form.recurrenceMonths = t.config.recurrenceMonths
-  form.autoRevoke = t.config.autoRevoke
-  form.autoRevokeOnExpiry = t.config.autoRevokeOnExpiry
-  form.groups = t.config.groups.map(g => ({
-    groupDn: g.groupDn,
-    memberAttribute: g.memberAttribute || 'member',
-    reviewerAccountId: g.reviewerAccountId,
-  }))
 }
 
 async function handleSubmit() {
@@ -179,8 +145,12 @@ async function handleSubmit() {
   }
 
   try {
-    const res = await call(() => createCampaign(dirId, payload), { successMsg: 'Campaign created' })
-    router.push({ name: 'accessReviewDetail', params: { dirId, campaignId: res.data.id } })
+    if (isEdit.value) {
+      await call(() => updateTemplate(dirId, templateId, payload), { successMsg: 'Template updated' })
+    } else {
+      await call(() => createTemplate(dirId, payload), { successMsg: 'Template created' })
+    }
+    router.push({ name: 'campaignTemplates', params: { dirId } })
   } catch { /* handled by useApi */ }
 }
 
@@ -191,11 +161,23 @@ onMounted(async () => {
   } catch (e) {
     console.warn('Failed to load reviewers:', e)
   }
-  try {
-    const res = await listTemplates(dirId)
-    templates.value = res.data
-  } catch (e) {
-    console.warn('Failed to load templates:', e)
+
+  if (isEdit.value) {
+    try {
+      const res = await call(() => getTemplate(dirId, templateId))
+      const t = res.data
+      form.name = t.name
+      form.description = t.description || ''
+      form.deadlineDays = t.config.deadlineDays
+      form.recurrenceMonths = t.config.recurrenceMonths
+      form.autoRevoke = t.config.autoRevoke
+      form.autoRevokeOnExpiry = t.config.autoRevokeOnExpiry
+      form.groups = t.config.groups.map(g => ({
+        groupDn: g.groupDn,
+        memberAttribute: g.memberAttribute || 'member',
+        reviewerAccountId: g.reviewerAccountId,
+      }))
+    } catch { /* handled */ }
   }
 })
 </script>
