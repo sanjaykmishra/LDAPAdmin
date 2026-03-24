@@ -40,13 +40,23 @@ BOOTSTRAP_SUPERADMIN_PASSWORD=<your-initial-password>
 docker compose up -d
 ```
 
-The app starts at **http://localhost:8080**. PostgreSQL runs on port 5432. Database schema is created automatically on first startup.
+The API starts at **http://localhost:8080**. PostgreSQL runs on port 5432. Database schema is created automatically on first startup.
+
+To start the frontend dev server:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The UI is available at **http://localhost:5173**. It proxies API requests to the backend on port 8080 automatically.
 
 ---
 
 ## 2. First Login & Setup Wizard
 
-1. Go to **http://localhost:8080/login**
+1. Go to **http://localhost:5173/login**
 2. Log in with your bootstrap superadmin credentials
 3. The **Setup Wizard** starts automatically on first login
 
