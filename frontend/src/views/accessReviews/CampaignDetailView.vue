@@ -81,6 +81,46 @@
         </DataTable>
       </div>
 
+      <!-- Reviewer progress -->
+      <div v-if="campaign.reviewGroups && campaign.reviewGroups.length" class="bg-white rounded-lg border p-5 mb-6">
+        <h2 class="text-sm font-semibold text-gray-700 mb-3">Per-Reviewer Progress</h2>
+        <div class="space-y-3">
+          <div v-for="g in campaign.reviewGroups" :key="g.id" class="flex items-center gap-4">
+            <div class="w-32 text-sm font-medium text-gray-800 truncate" :title="g.reviewerUsername">
+              {{ g.reviewerUsername }}
+              <span v-if="isEscalated(g.reviewerId)" class="ml-1 text-xs text-red-600 font-bold" title="Escalated">ESCALATED</span>
+            </div>
+            <div class="flex-1">
+              <div class="w-full bg-gray-200 rounded-full h-2">
+                <div class="bg-blue-600 h-2 rounded-full transition-all"
+                  :style="{ width: (g.total > 0 ? ((g.confirmed + g.revoked) / g.total * 100) : 0) + '%' }"></div>
+              </div>
+            </div>
+            <span class="text-xs text-gray-500 w-16 text-right">{{ g.confirmed + g.revoked }}/{{ g.total }}</span>
+            <span class="text-xs w-16 text-right" :class="g.pending > 0 ? 'text-yellow-600 font-medium' : 'text-green-600'">
+              {{ g.pending > 0 ? g.pending + ' pending' : 'Done' }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reminder / Escalation history -->
+      <details v-if="reminders.length" class="bg-white rounded-lg border p-5 mb-6">
+        <summary class="text-sm font-semibold text-gray-700 cursor-pointer">
+          Reminder &amp; Escalation History ({{ reminders.length }})
+        </summary>
+        <div class="mt-3 space-y-2">
+          <div v-for="r in reminders" :key="r.id" class="flex items-center gap-3 text-sm">
+            <span :class="r.reminderType === 'ESCALATION' ? 'bg-red-500' : 'bg-yellow-500'" class="w-2 h-2 rounded-full shrink-0"></span>
+            <span class="font-medium" :class="r.reminderType === 'ESCALATION' ? 'text-red-700' : 'text-yellow-700'">
+              {{ r.reminderType }}
+            </span>
+            <span class="text-gray-600">{{ r.reviewerUsername }}</span>
+            <span class="text-gray-400 ml-auto"><RelativeTime :value="r.sentAt" /></span>
+          </div>
+        </div>
+      </details>
+
       <!-- Status history -->
       <details class="bg-white rounded-lg border p-5">
         <summary class="text-sm font-semibold text-gray-700 cursor-pointer">Status History</summary>
@@ -114,7 +154,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApi, downloadBlob } from '@/composables/useApi'
-import { getCampaign, activateCampaign, closeCampaign, cancelCampaign, exportCampaign } from '@/api/accessReviews'
+import { getCampaign, activateCampaign, closeCampaign, cancelCampaign, exportCampaign, listCampaignReminders } from '@/api/accessReviews'
 import { saveAsTemplate } from '@/api/campaignTemplates'
 import DataTable from '@/components/DataTable.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -127,6 +167,7 @@ const dirId = route.params.dirId
 const campaignId = route.params.campaignId
 
 const campaign = ref(null)
+const reminders = ref([])
 const confirmActivate = ref(false)
 const confirmCancel = ref(false)
 
@@ -158,6 +199,10 @@ function fmtDate(val) {
 function fmtDateTime(val) {
   if (!val) return ''
   return new Date(val).toLocaleString()
+}
+
+function isEscalated(reviewerId) {
+  return reminders.value.some(r => r.reminderType === 'ESCALATION' && r.reviewerAccountId === reviewerId)
 }
 
 function handleActivate() { confirmActivate.value = true }
@@ -206,7 +251,17 @@ async function loadCampaign() {
   } catch { /* handled */ }
 }
 
-onMounted(loadCampaign)
+async function loadReminders() {
+  try {
+    const res = await listCampaignReminders(dirId, campaignId)
+    reminders.value = res.data
+  } catch { /* non-critical */ }
+}
+
+onMounted(() => {
+  loadCampaign()
+  loadReminders()
+})
 </script>
 
 <style scoped>
