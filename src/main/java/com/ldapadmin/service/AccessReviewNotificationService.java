@@ -96,6 +96,26 @@ public class AccessReviewNotificationService {
     }
 
     @Async
+    public void notifyEscalation(AccessReviewCampaign campaign, Account reviewer, long pendingCount) {
+        Account creator = campaign.getCreatedBy();
+        if (creator.getEmail() == null || creator.getEmail().isBlank()) {
+            log.info("Campaign creator has no email — escalation logged: campaign={}, reviewer={}",
+                    campaign.getName(), reviewer.getUsername());
+            return;
+        }
+
+        sendEmail(creator.getEmail(),
+                "[LDAPAdmin] ESCALATION — Reviewer has not responded for " + campaign.getName(),
+                String.format(
+                        "ESCALATION NOTICE\n\n"
+                        + "Reviewer '%s' has not completed their access review for campaign '%s'.\n\n"
+                        + "Pending decisions: %d\n"
+                        + "Campaign deadline: %s\n\n"
+                        + "Please follow up with the reviewer or take action in LDAPAdmin.",
+                        reviewer.getUsername(), campaign.getName(), pendingCount, campaign.getDeadline()));
+    }
+
+    @Async
     public void notifyCampaignExpired(AccessReviewCampaign campaign) {
         Account creator = campaign.getCreatedBy();
         if (creator.getEmail() != null && !creator.getEmail().isBlank()) {

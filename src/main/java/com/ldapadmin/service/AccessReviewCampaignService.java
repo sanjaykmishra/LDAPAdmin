@@ -10,6 +10,7 @@ import com.ldapadmin.ldap.LdapGroupService;
 import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.ldap.model.LdapUser;
 import com.ldapadmin.repository.*;
+import com.ldapadmin.entity.CampaignReminder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -38,6 +39,7 @@ public class AccessReviewCampaignService {
     private final AccountRepository accountRepo;
     private final AuditService auditService;
     private final AccessReviewNotificationService notificationService;
+    private final CampaignReminderRepository reminderRepo;
 
     @Transactional
     public AccessReviewCampaign create(UUID directoryId, CreateCampaignRequest req, AuthPrincipal principal) {
@@ -266,6 +268,20 @@ public class AccessReviewCampaignService {
             }
         }
         return csv.toString().getBytes();
+    }
+
+    // ── Reminder history ────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<CampaignReminderDto> listReminders(UUID campaignId) {
+        return reminderRepo.findByCampaignIdOrderBySentAtDesc(campaignId).stream()
+                .map(r -> new CampaignReminderDto(
+                        r.getId(),
+                        r.getReminderType(),
+                        r.getReviewerAccount().getUsername(),
+                        r.getReviewerAccount().getId(),
+                        r.getSentAt()))
+                .toList();
     }
 
     // ── Expiry support (called by scheduler) ────────────────────────────────

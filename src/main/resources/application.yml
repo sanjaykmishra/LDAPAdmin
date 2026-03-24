@@ -67,6 +67,14 @@ app:
     # Set to false only in local development (plain HTTP).  Always true in production.
     secure: ${COOKIE_SECURE:true}
 
+# ── Access review scheduler ────────────────────────────────────────────────────
+ldapadmin:
+  access-review:
+    reminder-days:       ${ACCESS_REVIEW_REMINDER_DAYS:3}
+    escalation-days:     ${ACCESS_REVIEW_ESCALATION_DAYS:14}
+    auto-revoke-enabled: ${ACCESS_REVIEW_AUTO_REVOKE_ENABLED:false}
+    expiry-cron:         ${ACCESS_REVIEW_EXPIRY_CRON:0 0 2 * * ?}
+
 # ── Logging ───────────────────────────────────────────────────────────────────
 # JSON format is configured in logback-spring.xml.
 # Log level is controlled via environment variable only.
