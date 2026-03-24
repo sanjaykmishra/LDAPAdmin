@@ -5,6 +5,8 @@ import com.ldapadmin.entity.enums.CampaignStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.OffsetDateTime;
@@ -19,4 +21,11 @@ public interface AccessReviewCampaignRepository extends JpaRepository<AccessRevi
     List<AccessReviewCampaign> findByDirectoryIdAndStatus(UUID directoryId, CampaignStatus status);
 
     List<AccessReviewCampaign> findByStatusAndDeadlineBefore(CampaignStatus status, OffsetDateTime deadline);
+
+    @Query("SELECT c FROM AccessReviewCampaign c WHERE c.directory.id = :directoryId "
+            + "AND c.createdAt >= :from AND c.createdAt <= :to ORDER BY c.createdAt DESC")
+    List<AccessReviewCampaign> findByDirectoryIdAndCreatedAtBetween(
+            @Param("directoryId") UUID directoryId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to);
 }
