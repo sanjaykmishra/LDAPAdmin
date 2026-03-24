@@ -76,6 +76,15 @@ public class AuthController {
     private final DirectoryConnectionRepository dirRepo;
     private final LdapConnectionFactory         ldapConnectionFactory;
     private final LdapUserService               ldapUserService;
+    private final com.ldapadmin.service.ApplicationSettingsService applicationSettingsService;
+
+    /**
+     * Public endpoint — returns whether the first-run setup wizard has been completed.
+     */
+    @GetMapping("/setup-status")
+    public Map<String, Boolean> setupStatus() {
+        return Map.of("setupCompleted", applicationSettingsService.getEntity().isSetupCompleted());
+    }
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(

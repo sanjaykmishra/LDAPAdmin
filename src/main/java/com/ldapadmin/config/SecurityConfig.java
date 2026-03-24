@@ -70,6 +70,7 @@ public class SecurityConfig {
                 // ── Public ────────────────────────────────────────────────────
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/logout").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/self-service/login").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/auth/setup-status").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/oidc/authorize").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/oidc/callback").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/settings/branding").permitAll()

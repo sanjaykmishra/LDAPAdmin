@@ -48,6 +48,8 @@ class ApplicationSettingsControllerTest extends BaseControllerTest {
                 null, null, false, null, null,
                 // SIEM
                 false, null, null, null, null, false, null, false,
+                // Setup wizard
+                false,
                 OffsetDateTime.now(), OffsetDateTime.now());
     }
 
@@ -66,7 +68,9 @@ class ApplicationSettingsControllerTest extends BaseControllerTest {
                 null, null, null, null, null, null, null, null, null,
                 null, null, null, null, null,
                 // SIEM
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null,
+                // Setup wizard
+                null);
     }
 
     // ── GET /api/v1/settings ─────────────────────────────────────────────────
@@ -101,6 +105,8 @@ class ApplicationSettingsControllerTest extends BaseControllerTest {
                 true, com.ldapadmin.entity.enums.SiemProtocol.SYSLOG_UDP,
                 "siem.corp.com", 514, com.ldapadmin.entity.enums.SiemFormat.CEF,
                 true, null, false,
+                // Setup wizard
+                false,
                 OffsetDateTime.now(), OffsetDateTime.now());
 
         given(settingsService.get()).willReturn(withSiem);

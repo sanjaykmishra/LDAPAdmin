@@ -2,10 +2,12 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { login as apiLogin, logout as apiLogout, me } from '@/api/auth'
 import { selfServiceLogin as apiSelfServiceLogin } from '@/api/selfservice'
+import { getSetupStatus } from '@/api/setup'
 
 export const useAuthStore = defineStore('auth', () => {
   const principal   = ref(null)
   const initialized = ref(false)
+  const setupPending = ref(false)
 
   const isLoggedIn    = computed(() => !!principal.value)
   const isSuperadmin  = computed(() => principal.value?.accountType === 'SUPERADMIN')
@@ -28,9 +30,20 @@ export const useAuthStore = defineStore('auth', () => {
         dn:          data.dn || null,
         directoryId: data.directoryId || null,
       }
+      // Check if first-run setup wizard is needed for superadmins
+      if (data.accountType === 'SUPERADMIN') {
+        try {
+          const { data: status } = await getSetupStatus()
+          setupPending.value = !status.setupCompleted
+        } catch { /* treat as completed */ }
+      }
     } catch {
       principal.value = null
     }
+  }
+
+  function markSetupComplete() {
+    setupPending.value = false
   }
 
   async function login(username, password) {
@@ -63,5 +76,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { principal, isLoggedIn, isSuperadmin, isSelfService, username, init, login, selfServiceLogin, logout }
+  return { principal, isLoggedIn, isSuperadmin, isSelfService, username, setupPending, init, login, selfServiceLogin, logout, markSetupComplete }
 })

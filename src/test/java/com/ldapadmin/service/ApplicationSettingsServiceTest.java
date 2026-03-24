@@ -256,6 +256,64 @@ class ApplicationSettingsServiceTest {
         verify(encryptionService, never()).encrypt(any());
     }
 
+    // ── Setup wizard flag ──────────────────────────────────────────────────────
+
+    @Test
+    void get_defaultSettings_setupCompletedIsFalse() {
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.empty());
+        ApplicationSettingsDto dto = service.get();
+        assertThat(dto.setupCompleted()).isFalse();
+    }
+
+    @Test
+    void get_existingSettings_returnsSetupCompleted() {
+        ApplicationSettings settings = existingSettings();
+        settings.setSetupCompleted(true);
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.of(settings));
+
+        ApplicationSettingsDto dto = service.get();
+        assertThat(dto.setupCompleted()).isTrue();
+    }
+
+    @Test
+    void upsert_setupCompletedTrue_setsFlag() {
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.empty());
+        when(settingsRepo.save(any(ApplicationSettings.class)))
+                .thenAnswer(inv -> {
+                    ApplicationSettings s = inv.getArgument(0);
+                    s.setId(UUID.randomUUID());
+                    return s;
+                });
+
+        UpdateApplicationSettingsRequest req = requestBuilder()
+                .setupCompleted(true)
+                .build();
+
+        service.upsert(req);
+
+        ArgumentCaptor<ApplicationSettings> captor =
+                ArgumentCaptor.forClass(ApplicationSettings.class);
+        verify(settingsRepo).save(captor.capture());
+        assertThat(captor.getValue().isSetupCompleted()).isTrue();
+    }
+
+    @Test
+    void upsert_nullSetupCompleted_preservesExisting() {
+        ApplicationSettings existing = existingSettings();
+        existing.setSetupCompleted(false);
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.of(existing));
+        when(settingsRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // null setupCompleted → preserve
+        UpdateApplicationSettingsRequest req = requestBuilder().build();
+        service.upsert(req);
+
+        ArgumentCaptor<ApplicationSettings> captor =
+                ArgumentCaptor.forClass(ApplicationSettings.class);
+        verify(settingsRepo).save(captor.capture());
+        assertThat(captor.getValue().isSetupCompleted()).isFalse();
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private ApplicationSettings existingSettings() {
@@ -296,6 +354,7 @@ class ApplicationSettingsServiceTest {
         String siemAuthToken = null;
         String webhookUrl = null;
         String webhookAuthHeader = null;
+        Boolean setupCompleted = null;
 
         RequestBuilder appName(String v) { this.appName = v; return this; }
         RequestBuilder sessionTimeoutMinutes(int v) { this.sessionTimeoutMinutes = v; return this; }
@@ -309,6 +368,7 @@ class ApplicationSettingsServiceTest {
         RequestBuilder siemAuthToken(String v) { this.siemAuthToken = v; return this; }
         RequestBuilder webhookUrl(String v) { this.webhookUrl = v; return this; }
         RequestBuilder webhookAuthHeader(String v) { this.webhookAuthHeader = v; return this; }
+        RequestBuilder setupCompleted(Boolean v) { this.setupCompleted = v; return this; }
 
         UpdateApplicationSettingsRequest build() {
             return new UpdateApplicationSettingsRequest(
@@ -321,7 +381,8 @@ class ApplicationSettingsServiceTest {
                     null, null, null, null, null, null, null, null, null,
                     null, null, null, null, null,
                     siemEnabled, siemProtocol, siemHost, siemPort, siemFormat,
-                    siemAuthToken, webhookUrl, webhookAuthHeader);
+                    siemAuthToken, webhookUrl, webhookAuthHeader,
+                    setupCompleted);
         }
     }
 }
