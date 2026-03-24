@@ -81,4 +81,8 @@ public record UpdateApplicationSettingsRequest(
         String siemAuthToken,
         String webhookUrl,
         /** null = keep existing; empty string = clear */
-        String webhookAuthHeader) {}
+        String webhookAuthHeader,
+
+        // Setup wizard
+        /** null = don't change; true/false = set explicitly */
+        Boolean setupCompleted) {}

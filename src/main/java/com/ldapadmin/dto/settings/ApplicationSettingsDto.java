@@ -76,5 +76,8 @@ public record ApplicationSettingsDto(
         String webhookUrl,
         boolean webhookAuthHeaderConfigured,
 
+        // Setup wizard
+        boolean setupCompleted,
+
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {}

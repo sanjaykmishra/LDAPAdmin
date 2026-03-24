@@ -8,11 +8,13 @@ import com.ldapadmin.auth.OidcAuthenticationService;
 import com.ldapadmin.auth.PrincipalType;
 import com.ldapadmin.auth.dto.LoginRequest;
 import com.ldapadmin.auth.dto.LoginResponse;
+import com.ldapadmin.entity.ApplicationSettings;
 import com.ldapadmin.ldap.LdapConnectionFactory;
 import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.repository.AdminProfileRoleRepository;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.repository.ProvisioningProfileRepository;
+import com.ldapadmin.service.ApplicationSettingsService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -48,6 +50,7 @@ class AuthControllerTest extends BaseControllerTest {
     @MockBean DirectoryConnectionRepository directoryConnectionRepository;
     @MockBean LdapConnectionFactory ldapConnectionFactory;
     @MockBean LdapUserService ldapUserService;
+    @MockBean ApplicationSettingsService applicationSettingsService;
 
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
@@ -93,5 +96,27 @@ class AuthControllerTest extends BaseControllerTest {
     void me_unauthenticated_returns401() throws Exception {
         mockMvc.perform(get("/api/v1/auth/me"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void setupStatus_unauthenticated_returnsFalseByDefault() throws Exception {
+        ApplicationSettings settings = new ApplicationSettings();
+        settings.setSetupCompleted(false);
+        given(applicationSettingsService.getEntity()).willReturn(settings);
+
+        mockMvc.perform(get("/api/v1/auth/setup-status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.setupCompleted").value(false));
+    }
+
+    @Test
+    void setupStatus_afterSetup_returnsTrue() throws Exception {
+        ApplicationSettings settings = new ApplicationSettings();
+        settings.setSetupCompleted(true);
+        given(applicationSettingsService.getEntity()).willReturn(settings);
+
+        mockMvc.perform(get("/api/v1/auth/setup-status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.setupCompleted").value(true));
     }
 }
