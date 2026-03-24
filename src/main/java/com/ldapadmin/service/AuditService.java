@@ -7,6 +7,7 @@ import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.entity.enums.AuditSource;
 import com.ldapadmin.repository.AuditEventRepository;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
+import com.ldapadmin.service.siem.SiemExportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -33,6 +34,7 @@ public class AuditService {
 
     private final AuditEventRepository         auditRepo;
     private final DirectoryConnectionRepository dirRepo;
+    private final SiemExportService             siemExportService;
 
     // ── Internal-event recording ──────────────────────────────────────────────
 
@@ -70,6 +72,7 @@ public class AuditService {
                     .build();
 
             auditRepo.save(event);
+            siemExportService.export(event);
         } catch (Exception ex) {
             // Never let audit failures bubble up to callers.
             log.error("Failed to record audit event [action={}, dn={}, actor={}]: {}",
@@ -114,6 +117,7 @@ public class AuditService {
                     .build();
 
             auditRepo.save(event);
+            siemExportService.export(event);
         } catch (Exception ex) {
             log.error("Failed to record changelog event [changeNumber={}, dn={}]: {}",
                     changeNumber, targetDn, ex.getMessage(), ex);

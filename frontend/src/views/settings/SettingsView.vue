@@ -180,6 +180,76 @@
         </div>
       </section>
 
+      <!-- SIEM / Syslog Export -->
+      <section class="bg-white border border-gray-200 rounded-xl p-6">
+        <h2 class="text-base font-semibold text-gray-900 mb-3">SIEM / Syslog Export</h2>
+        <p class="text-xs text-gray-500 mb-4">Forward audit events in real-time to a SIEM, syslog collector, or webhook endpoint.</p>
+
+        <div class="flex items-center gap-2 mb-4">
+          <input type="checkbox" id="siemEnabled" v-model="form.siemEnabled" class="rounded" />
+          <label for="siemEnabled" class="text-sm text-gray-700">Enable SIEM export</label>
+        </div>
+
+        <div v-if="form.siemEnabled" class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Protocol</label>
+              <select v-model="form.siemProtocol"
+                class="input w-full">
+                <option value="">-- select --</option>
+                <option value="SYSLOG_UDP">Syslog (UDP)</option>
+                <option value="SYSLOG_TCP">Syslog (TCP)</option>
+                <option value="WEBHOOK">Webhook (HTTPS)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Format</label>
+              <select v-model="form.siemFormat"
+                class="input w-full">
+                <option value="">-- select --</option>
+                <option value="RFC5424">RFC 5424 (Syslog)</option>
+                <option value="CEF">CEF (Common Event Format)</option>
+                <option value="JSON">JSON</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Syslog host/port (shown for SYSLOG_UDP and SYSLOG_TCP) -->
+          <div v-if="form.siemProtocol === 'SYSLOG_UDP' || form.siemProtocol === 'SYSLOG_TCP'"
+            class="grid grid-cols-2 gap-3">
+            <FormField label="Host" v-model="form.siemHost" placeholder="siem.example.com" />
+            <FormField label="Port" v-model.number="form.siemPort" type="number" placeholder="514" />
+            <div>
+              <FormField label="Auth Token" v-model="form.siemAuthToken" type="password"
+                :placeholder="settings?.siemAuthTokenConfigured ? '●●●●●●●● (leave blank to keep)' : 'Optional'" />
+              <p class="text-xs text-gray-400 mt-1">Optional bearer token for authenticated syslog. Leave blank to keep existing.</p>
+            </div>
+          </div>
+
+          <!-- Webhook URL (shown for WEBHOOK) -->
+          <div v-if="form.siemProtocol === 'WEBHOOK'" class="grid grid-cols-2 gap-3">
+            <div class="col-span-2">
+              <FormField label="Webhook URL" v-model="form.webhookUrl" placeholder="https://hooks.example.com/audit" />
+            </div>
+            <div class="col-span-2">
+              <FormField label="Authorization Header" v-model="form.webhookAuthHeader" type="password"
+                :placeholder="settings?.webhookAuthHeaderConfigured ? '●●●●●●●● (leave blank to keep)' : 'e.g. Bearer your-token'" />
+              <p class="text-xs text-gray-400 mt-1">Sent as the Authorization header on each webhook request.</p>
+            </div>
+          </div>
+
+          <!-- Test button -->
+          <div class="flex items-center gap-3 pt-2">
+            <button type="button" @click="doTestSiem" :disabled="testingSiem" class="btn-secondary text-sm">
+              {{ testingSiem ? 'Testing…' : 'Test Connection' }}
+            </button>
+            <span v-if="siemTestResult" class="text-sm" :class="siemTestResult.ok ? 'text-green-600' : 'text-red-600'">
+              {{ siemTestResult.message }}
+            </span>
+          </div>
+        </div>
+      </section>
+
       <div class="flex justify-end">
         <button type="submit" :disabled="saving" class="btn-primary">
           {{ saving ? 'Saving…' : 'Save Settings' }}
@@ -194,7 +264,7 @@ import { ref, onMounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
 import { useSettingsStore } from '@/stores/settings'
 import { useTheme } from '@/composables/useTheme'
-import { getSettings, updateSettings } from '@/api/settings'
+import { getSettings, updateSettings, testSiem } from '@/api/settings'
 import FormField from '@/components/FormField.vue'
 
 const { theme, setTheme } = useTheme()
@@ -209,6 +279,8 @@ const settingsStore = useSettingsStore()
 const loading = ref(false)
 const saving  = ref(false)
 const settings = ref(null)
+const testingSiem = ref(false)
+const siemTestResult = ref(null)
 
 const form = ref({
   appName: 'LDAP Portal',
@@ -247,6 +319,15 @@ const form = ref({
   oidcClientSecret: null,
   oidcScopes: 'openid profile email',
   oidcUsernameClaim: 'preferred_username',
+  // SIEM
+  siemEnabled: false,
+  siemProtocol: '',
+  siemHost: '',
+  siemPort: null,
+  siemFormat: '',
+  siemAuthToken: null,
+  webhookUrl: '',
+  webhookAuthHeader: null,
 })
 
 async function loadSettings() {
@@ -291,6 +372,15 @@ async function loadSettings() {
       oidcClientSecret:       null,
       oidcScopes:             data.oidcScopes ?? 'openid profile email',
       oidcUsernameClaim:      data.oidcUsernameClaim ?? 'preferred_username',
+      // SIEM
+      siemEnabled:            data.siemEnabled ?? false,
+      siemProtocol:           data.siemProtocol ?? '',
+      siemHost:               data.siemHost ?? '',
+      siemPort:               data.siemPort ?? null,
+      siemFormat:             data.siemFormat ?? '',
+      siemAuthToken:          null,
+      webhookUrl:             data.webhookUrl ?? '',
+      webhookAuthHeader:      null,
     })
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
@@ -344,6 +434,15 @@ async function doSave() {
       oidcClientSecret:      form.value.oidcClientSecret,
       oidcScopes:            form.value.oidcScopes      || null,
       oidcUsernameClaim:     form.value.oidcUsernameClaim || null,
+      // SIEM
+      siemEnabled:           form.value.siemEnabled,
+      siemProtocol:          form.value.siemProtocol || null,
+      siemHost:              form.value.siemHost     || null,
+      siemPort:              form.value.siemPort     || null,
+      siemFormat:            form.value.siemFormat   || null,
+      siemAuthToken:         form.value.siemAuthToken,
+      webhookUrl:            form.value.webhookUrl   || null,
+      webhookAuthHeader:     form.value.webhookAuthHeader,
     })
     notif.success('Settings saved')
     // Sync branding store so sidebar + page title update immediately
@@ -353,6 +452,22 @@ async function doSave() {
     notif.error(e.response?.data?.detail || e.message)
   } finally {
     saving.value = false
+  }
+}
+
+async function doTestSiem() {
+  testingSiem.value = true
+  siemTestResult.value = null
+  try {
+    const { data } = await testSiem()
+    siemTestResult.value = {
+      ok: !data.delivery?.includes('failed') && !data.delivery?.includes('not enabled'),
+      message: data.delivery,
+    }
+  } catch (e) {
+    siemTestResult.value = { ok: false, message: e.response?.data?.detail || e.message }
+  } finally {
+    testingSiem.value = false
   }
 }
 

@@ -1,6 +1,8 @@
 package com.ldapadmin.entity;
 
 import com.ldapadmin.entity.enums.AccountType;
+import com.ldapadmin.entity.enums.SiemFormat;
+import com.ldapadmin.entity.enums.SiemProtocol;
 import com.ldapadmin.entity.enums.SslMode;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -167,6 +169,36 @@ public class ApplicationSettings {
     /** Claim from the ID token used to match against Account.username. */
     @Column(name = "oidc_username_claim", length = 100)
     private String oidcUsernameClaim = "preferred_username";
+
+    // ── SIEM / syslog export ────────────────────────────────────────────────
+
+    @Column(name = "siem_enabled", nullable = false)
+    private boolean siemEnabled = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "siem_protocol", length = 20)
+    private SiemProtocol siemProtocol;
+
+    @Column(name = "siem_host", length = 500)
+    private String siemHost;
+
+    @Column(name = "siem_port")
+    private Integer siemPort;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "siem_format", length = 20)
+    private SiemFormat siemFormat;
+
+    /** AES-256 encrypted bearer token for syslog TLS auth. */
+    @Column(name = "siem_auth_token_enc", columnDefinition = "TEXT")
+    private String siemAuthTokenEnc;
+
+    @Column(name = "webhook_url", length = 2000)
+    private String webhookUrl;
+
+    /** AES-256 encrypted Authorization header value for webhook. */
+    @Column(name = "webhook_auth_header_enc", columnDefinition = "TEXT")
+    private String webhookAuthHeaderEnc;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

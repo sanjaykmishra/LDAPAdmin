@@ -5,6 +5,7 @@ import com.ldapadmin.dto.settings.ApplicationSettingsDto;
 import com.ldapadmin.dto.settings.BrandingDto;
 import com.ldapadmin.dto.settings.UpdateApplicationSettingsRequest;
 import com.ldapadmin.service.ApplicationSettingsService;
+import com.ldapadmin.service.siem.SiemExportService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -19,8 +20,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -31,6 +31,7 @@ class ApplicationSettingsControllerTest extends BaseControllerTest {
     @Autowired ObjectMapper objectMapper;
 
     @MockBean ApplicationSettingsService settingsService;
+    @MockBean SiemExportService          siemExportService;
 
     static final String BASE_URL = "/api/v1/settings";
 
@@ -45,6 +46,8 @@ class ApplicationSettingsControllerTest extends BaseControllerTest {
                 null,
                 null, null, null, false, null, null, false, null, null,
                 null, null, false, null, null,
+                // SIEM
+                false, null, null, null, null, false, null, false,
                 OffsetDateTime.now(), OffsetDateTime.now());
     }
 
@@ -61,7 +64,9 @@ class ApplicationSettingsControllerTest extends BaseControllerTest {
                 null, null, null, null, null, 1,
                 null,
                 null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null);
+                null, null, null, null, null,
+                // SIEM
+                null, null, null, null, null, null, null, null);
     }
 
     // ── GET /api/v1/settings ─────────────────────────────────────────────────
@@ -79,6 +84,34 @@ class ApplicationSettingsControllerTest extends BaseControllerTest {
     void getSettings_unauthenticated_returns401() throws Exception {
         mockMvc.perform(get(BASE_URL))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getSettings_returnsSiemFields() throws Exception {
+        ApplicationSettingsDto withSiem = new ApplicationSettingsDto(
+                UUID.randomUUID(),
+                "LDAPAdmin", null, null, null,
+                false, 30,
+                null, null, null, null, false, false,
+                null, null, null, false, null, 24,
+                null,
+                null, null, null, false, null, null, false, null, null,
+                null, null, false, null, null,
+                // SIEM
+                true, com.ldapadmin.entity.enums.SiemProtocol.SYSLOG_UDP,
+                "siem.corp.com", 514, com.ldapadmin.entity.enums.SiemFormat.CEF,
+                true, null, false,
+                OffsetDateTime.now(), OffsetDateTime.now());
+
+        given(settingsService.get()).willReturn(withSiem);
+
+        mockMvc.perform(get(BASE_URL).with(authentication(superadminAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.siemEnabled").value(true))
+                .andExpect(jsonPath("$.siemProtocol").value("SYSLOG_UDP"))
+                .andExpect(jsonPath("$.siemHost").value("siem.corp.com"))
+                .andExpect(jsonPath("$.siemFormat").value("CEF"))
+                .andExpect(jsonPath("$.siemAuthTokenConfigured").value(true));
     }
 
     // ── GET /api/v1/settings/branding ────────────────────────────────────────
@@ -104,5 +137,25 @@ class ApplicationSettingsControllerTest extends BaseControllerTest {
                         .content(objectMapper.writeValueAsString(sampleUpdateRequest())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.appName").value("LDAPAdmin"));
+    }
+
+    // ── POST /api/v1/settings/siem/test ──────────────────────────────────────
+
+    @Test
+    void testSiem_authenticated_returns200() throws Exception {
+        given(siemExportService.testConnectivity()).willReturn("TCP: Connected");
+        given(siemExportService.sendTestEvent()).willReturn("Test event sent successfully.");
+
+        mockMvc.perform(post(BASE_URL + "/siem/test")
+                        .with(authentication(superadminAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.connectivity").value("TCP: Connected"))
+                .andExpect(jsonPath("$.delivery").value("Test event sent successfully."));
+    }
+
+    @Test
+    void testSiem_unauthenticated_returns401() throws Exception {
+        mockMvc.perform(post(BASE_URL + "/siem/test"))
+                .andExpect(status().isUnauthorized());
     }
 }

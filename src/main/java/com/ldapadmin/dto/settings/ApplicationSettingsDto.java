@@ -1,6 +1,8 @@
 package com.ldapadmin.dto.settings;
 
 import com.ldapadmin.entity.enums.AccountType;
+import com.ldapadmin.entity.enums.SiemFormat;
+import com.ldapadmin.entity.enums.SiemProtocol;
 import com.ldapadmin.entity.enums.SslMode;
 
 import java.time.OffsetDateTime;
@@ -63,6 +65,16 @@ public record ApplicationSettingsDto(
         boolean oidcClientSecretConfigured,
         String oidcScopes,
         String oidcUsernameClaim,
+
+        // SIEM / syslog export
+        boolean siemEnabled,
+        SiemProtocol siemProtocol,
+        String siemHost,
+        Integer siemPort,
+        SiemFormat siemFormat,
+        boolean siemAuthTokenConfigured,
+        String webhookUrl,
+        boolean webhookAuthHeaderConfigured,
 
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {}

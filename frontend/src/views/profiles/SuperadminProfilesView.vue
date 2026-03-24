@@ -310,6 +310,14 @@ function removeGroupAssignment(index) {
   profile.value.groupAssignments.splice(index, 1)
 }
 
+// When auto-include is toggled on, clear additional profiles and exclude flag
+function onAutoIncludeToggle() {
+  if (profile.value.autoIncludeGroups) {
+    profile.value.additionalProfileIds = []
+    profile.value.excludeAutoIncludes = false
+  }
+}
+
 // Additional profiles: profiles from the same directory that can be stacked
 const availableAdditionalProfiles = computed(() => {
   if (!selectedDirId.value) return []
@@ -963,11 +971,11 @@ function toggleApprover(accountId) {
           <fieldset class="border rounded-lg p-4 space-y-2">
             <legend class="text-sm font-semibold text-gray-700 px-1">Group Inclusion</legend>
             <label class="flex items-center gap-2 text-sm">
-              <input type="checkbox" v-model="profile.autoIncludeGroups" />
+              <input type="checkbox" v-model="profile.autoIncludeGroups" @change="onAutoIncludeToggle" />
               Automatically include with other profiles
               <span class="text-gray-400 text-xs">(this profile's groups will be added to users provisioned by any other profile in this directory)</span>
             </label>
-            <label class="flex items-center gap-2 text-sm">
+            <label v-if="!profile.autoIncludeGroups" class="flex items-center gap-2 text-sm">
               <input type="checkbox" v-model="profile.excludeAutoIncludes" />
               Exclude auto-included groups
               <span class="text-gray-400 text-xs">(users provisioned by this profile will not receive groups from auto-included profiles)</span>
@@ -996,8 +1004,8 @@ function toggleApprover(accountId) {
             <button class="btn-secondary text-sm" @click="addGroupAssignment">Add Group</button>
           </fieldset>
 
-          <!-- Additional profiles -->
-          <fieldset class="border rounded-lg p-4 space-y-3">
+          <!-- Additional profiles (hidden for auto-include profiles to prevent cascading) -->
+          <fieldset v-if="!profile.autoIncludeGroups" class="border rounded-lg p-4 space-y-3">
             <legend class="text-sm font-semibold text-gray-700 px-1">Additional Profiles</legend>
             <p class="text-sm text-gray-600">Select other profiles whose group assignments should also be applied to users provisioned with this profile.</p>
             <div v-if="availableAdditionalProfiles.length === 0" class="text-sm text-gray-400 italic">

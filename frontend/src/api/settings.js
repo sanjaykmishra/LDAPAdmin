@@ -9,3 +9,6 @@ export const updateSettings = (data) =>
 /** Public (no auth required) — returns only branding fields. */
 export const getBranding = () =>
   client.get('/settings/branding')
+
+export const testSiem = () =>
+  client.post('/settings/siem/test')

@@ -1,6 +1,8 @@
 package com.ldapadmin.dto.settings;
 
 import com.ldapadmin.entity.enums.AccountType;
+import com.ldapadmin.entity.enums.SiemFormat;
+import com.ldapadmin.entity.enums.SiemProtocol;
 import com.ldapadmin.entity.enums.SslMode;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -67,4 +69,16 @@ public record UpdateApplicationSettingsRequest(
         /** null = keep existing; empty string = clear */
         String oidcClientSecret,
         String oidcScopes,
-        String oidcUsernameClaim) {}
+        String oidcUsernameClaim,
+
+        // SIEM / syslog export
+        Boolean siemEnabled,
+        SiemProtocol siemProtocol,
+        String siemHost,
+        Integer siemPort,
+        SiemFormat siemFormat,
+        /** null = keep existing; empty string = clear */
+        String siemAuthToken,
+        String webhookUrl,
+        /** null = keep existing; empty string = clear */
+        String webhookAuthHeader) {}
