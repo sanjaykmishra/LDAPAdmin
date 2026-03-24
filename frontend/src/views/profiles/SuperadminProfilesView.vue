@@ -698,6 +698,7 @@ const modalTabs = [
   { id: 'attributes', label: 'Attributes' },
   { id: 'layout', label: 'Layout' },
   { id: 'groups', label: 'Groups' },
+  { id: 'policy', label: 'Policy' },
   { id: 'lifecycle', label: 'Lifecycle' },
 ]
 
@@ -809,55 +810,6 @@ function toggleApprover(accountId) {
             </label>
           </div>
 
-          <!-- Password Generation Settings -->
-          <fieldset class="border rounded-lg p-3 space-y-3">
-            <legend class="text-sm font-semibold text-gray-800 px-1">Password Generation</legend>
-            <div class="grid grid-cols-6 gap-3">
-              <div class="col-span-2">
-                <label class="block text-xs text-gray-500 mb-1">Length</label>
-                <input type="number" v-model.number="profile.passwordLength" min="8" max="128"
-                  class="input w-full text-sm" />
-              </div>
-              <div class="col-span-4 flex flex-wrap gap-4 items-end pb-1">
-                <label class="flex items-center gap-1 text-sm">
-                  <input type="checkbox" v-model="profile.passwordUppercase" /> A-Z
-                </label>
-                <label class="flex items-center gap-1 text-sm">
-                  <input type="checkbox" v-model="profile.passwordLowercase" /> a-z
-                </label>
-                <label class="flex items-center gap-1 text-sm">
-                  <input type="checkbox" v-model="profile.passwordDigits" /> 0-9
-                </label>
-                <label class="flex items-center gap-1 text-sm">
-                  <input type="checkbox" v-model="profile.passwordSpecial" /> Special
-                </label>
-              </div>
-            </div>
-            <div v-if="profile.passwordSpecial">
-              <label class="block text-xs text-gray-500 mb-1">Special Characters</label>
-              <input v-model="profile.passwordSpecialChars" class="input w-full text-sm font-mono"
-                placeholder="!@#$%^&*" />
-            </div>
-            <label class="flex items-center gap-2 text-sm">
-              <input type="checkbox" v-model="profile.emailPasswordToUser" />
-              Email generated password to user on creation
-            </label>
-          </fieldset>
-
-          <!-- Group inclusion settings -->
-          <fieldset class="border rounded-lg p-4 space-y-2">
-            <legend class="text-sm font-semibold text-gray-700 px-1">Group Inclusion</legend>
-            <label class="flex items-center gap-2 text-sm">
-              <input type="checkbox" v-model="profile.autoIncludeGroups" />
-              Automatically include with other profiles
-              <span class="text-gray-400 text-xs">(this profile's groups will be added to users provisioned by any other profile in this directory)</span>
-            </label>
-            <label class="flex items-center gap-2 text-sm">
-              <input type="checkbox" v-model="profile.excludeAutoIncludes" />
-              Exclude auto-included groups
-              <span class="text-gray-400 text-xs">(users provisioned by this profile will not receive groups from auto-included profiles)</span>
-            </label>
-          </fieldset>
         </div>
 
         <!-- Attributes Tab -->
@@ -1007,6 +959,21 @@ function toggleApprover(accountId) {
 
         <!-- Groups Tab -->
         <div v-if="modalTab === 'groups'" class="space-y-5">
+          <!-- Group inclusion settings -->
+          <fieldset class="border rounded-lg p-4 space-y-2">
+            <legend class="text-sm font-semibold text-gray-700 px-1">Group Inclusion</legend>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" v-model="profile.autoIncludeGroups" />
+              Automatically include with other profiles
+              <span class="text-gray-400 text-xs">(this profile's groups will be added to users provisioned by any other profile in this directory)</span>
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" v-model="profile.excludeAutoIncludes" />
+              Exclude auto-included groups
+              <span class="text-gray-400 text-xs">(users provisioned by this profile will not receive groups from auto-included profiles)</span>
+            </label>
+          </fieldset>
+
           <!-- Own group assignments -->
           <fieldset class="border rounded-lg p-4 space-y-3">
             <legend class="text-sm font-semibold text-gray-700 px-1">Own Group Assignments</legend>
@@ -1068,6 +1035,44 @@ function toggleApprover(accountId) {
                 {{ g.groupDn }} <span class="text-gray-400">({{ g.memberAttribute }})</span>
               </div>
             </div>
+          </fieldset>
+        </div>
+
+        <!-- Policy Tab -->
+        <div v-if="modalTab === 'policy'" class="space-y-4">
+          <!-- Password Generation Settings -->
+          <fieldset class="border rounded-lg p-3 space-y-3">
+            <legend class="text-sm font-semibold text-gray-800 px-1">Password Generation</legend>
+            <div class="grid grid-cols-6 gap-3">
+              <div class="col-span-2">
+                <label class="block text-xs text-gray-500 mb-1">Length</label>
+                <input type="number" v-model.number="profile.passwordLength" min="8" max="128"
+                  class="input w-full text-sm" />
+              </div>
+              <div class="col-span-4 flex flex-wrap gap-4 items-end pb-1">
+                <label class="flex items-center gap-1 text-sm">
+                  <input type="checkbox" v-model="profile.passwordUppercase" /> A-Z
+                </label>
+                <label class="flex items-center gap-1 text-sm">
+                  <input type="checkbox" v-model="profile.passwordLowercase" /> a-z
+                </label>
+                <label class="flex items-center gap-1 text-sm">
+                  <input type="checkbox" v-model="profile.passwordDigits" /> 0-9
+                </label>
+                <label class="flex items-center gap-1 text-sm">
+                  <input type="checkbox" v-model="profile.passwordSpecial" /> Special
+                </label>
+              </div>
+            </div>
+            <div v-if="profile.passwordSpecial">
+              <label class="block text-xs text-gray-500 mb-1">Special Characters</label>
+              <input v-model="profile.passwordSpecialChars" class="input w-full text-sm font-mono"
+                placeholder="!@#$%^&*" />
+            </div>
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" v-model="profile.emailPasswordToUser" />
+              Email generated password to user on creation
+            </label>
           </fieldset>
         </div>
 
