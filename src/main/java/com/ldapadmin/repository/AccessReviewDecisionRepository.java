@@ -28,7 +28,4 @@ public interface AccessReviewDecisionRepository extends JpaRepository<AccessRevi
 
     @Query("SELECT d FROM AccessReviewDecision d WHERE d.reviewGroup.campaign.id = :campaignId AND d.decision = :decision")
     List<AccessReviewDecision> findByCampaignIdAndDecision(@Param("campaignId") UUID campaignId, @Param("decision") ReviewDecision decision);
-
-    @Query("SELECT d FROM AccessReviewDecision d WHERE d.reviewGroup.campaign.id IN :campaignIds AND d.decision IS NOT NULL")
-    List<AccessReviewDecision> findDecidedByCampaignIds(@Param("campaignIds") List<UUID> campaignIds);
 }
