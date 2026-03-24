@@ -139,6 +139,9 @@ public class ApplicationSettingsService {
         s.setWebhookUrl(req.webhookUrl());
         applyPassword(req.siemAuthToken(), s::getSiemAuthTokenEnc, s::setSiemAuthTokenEnc);
         applyPassword(req.webhookAuthHeader(), s::getWebhookAuthHeaderEnc, s::setWebhookAuthHeaderEnc);
+
+        // Setup wizard
+        if (req.setupCompleted() != null) s.setSetupCompleted(req.setupCompleted());
     }
 
     /**
@@ -209,6 +212,8 @@ public class ApplicationSettingsService {
                 s.getSiemAuthTokenEnc() != null,
                 s.getWebhookUrl(),
                 s.getWebhookAuthHeaderEnc() != null,
+                // Setup wizard
+                s.isSetupCompleted(),
                 s.getCreatedAt(),
                 s.getUpdatedAt());
     }
@@ -229,6 +234,8 @@ public class ApplicationSettingsService {
                 null, null, false, "openid profile email", "preferred_username",
                 // SIEM
                 false, null, null, null, null, false, null, false,
+                // Setup wizard
+                false,
                 null, null);
     }
 }

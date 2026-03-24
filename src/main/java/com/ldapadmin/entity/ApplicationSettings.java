@@ -200,6 +200,11 @@ public class ApplicationSettings {
     @Column(name = "webhook_auth_header_enc", columnDefinition = "TEXT")
     private String webhookAuthHeaderEnc;
 
+    // ── Setup wizard ──────────────────────────────────────────────────────
+
+    @Column(name = "setup_completed", nullable = false)
+    private boolean setupCompleted = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

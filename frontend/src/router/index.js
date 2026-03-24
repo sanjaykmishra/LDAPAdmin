@@ -19,6 +19,13 @@ const router = createRouter({
       meta: { public: true },
     },
 
+    // ── Setup Wizard (own layout, outside AppLayout) ──────────────────────
+    {
+      path: '/setup',
+      name: 'setup',
+      component: () => import('@/views/SetupWizardView.vue'),
+    },
+
     // ── App shell ───────────────────────────────────────────────────────────
     {
       path: '/',
@@ -289,6 +296,10 @@ router.beforeEach(async (to) => {
   }
   if (to.meta.requiresSuperadmin && !auth.isSuperadmin) {
     return { path: await resolveHomePath(auth) }
+  }
+  // Redirect superadmin to setup wizard if first-run setup is pending
+  if (auth.isSuperadmin && auth.setupPending && to.name !== 'setup') {
+    return { name: 'setup' }
   }
 })
 
