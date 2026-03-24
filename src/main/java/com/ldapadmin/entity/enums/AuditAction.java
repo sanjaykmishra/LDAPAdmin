@@ -52,6 +52,15 @@ public enum AuditAction {
     REVIEW_REVOKED       ("review.revoked"),
     REVIEW_AUTO_REVOKED  ("review.auto_revoked"),
 
+    // ── SoD policy engine ──────────────────────────────────────────────────
+    SOD_POLICY_CREATED   ("sod.policy_created"),
+    SOD_POLICY_UPDATED   ("sod.policy_updated"),
+    SOD_POLICY_DELETED   ("sod.policy_deleted"),
+    SOD_SCAN_EXECUTED    ("sod.scan_executed"),
+    SOD_VIOLATION_DETECTED("sod.violation_detected"),
+    SOD_VIOLATION_EXEMPTED("sod.violation_exempted"),
+    SOD_VIOLATION_BLOCKED ("sod.violation_blocked"),
+
     // ── Lifecycle playbooks ─────────────────────────────────────────────────
     PLAYBOOK_EXECUTED    ("playbook.executed"),
     PLAYBOOK_ROLLED_BACK ("playbook.rolled_back"),

@@ -22,4 +22,8 @@ public interface PendingApprovalRepository extends JpaRepository<PendingApproval
     long countByProfileIdAndStatus(UUID profileId, ApprovalStatus status);
 
     long countByDirectoryIdAndStatus(UUID directoryId, ApprovalStatus status);
+
+    List<PendingApproval> findAllByStatus(ApprovalStatus status);
+
+    long countByStatus(ApprovalStatus status);
 }
