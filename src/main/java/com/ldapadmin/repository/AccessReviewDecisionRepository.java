@@ -28,4 +28,10 @@ public interface AccessReviewDecisionRepository extends JpaRepository<AccessRevi
 
     @Query("SELECT d FROM AccessReviewDecision d WHERE d.reviewGroup.campaign.id = :campaignId AND d.decision = :decision")
     List<AccessReviewDecision> findByCampaignIdAndDecision(@Param("campaignId") UUID campaignId, @Param("decision") ReviewDecision decision);
+
+    @Query("SELECT COUNT(DISTINCT d.memberDn) FROM AccessReviewDecision d " +
+           "WHERE d.reviewGroup.campaign.directory.id = :directoryId " +
+           "AND d.decidedAt IS NOT NULL AND d.decidedAt >= :since")
+    long countDistinctReviewedUsersSince(@Param("directoryId") UUID directoryId,
+                                         @Param("since") java.time.OffsetDateTime since);
 }

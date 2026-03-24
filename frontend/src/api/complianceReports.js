@@ -15,3 +15,9 @@ export const downloadPrivilegedAccountInventory = () =>
   client.get('/compliance-reports/privileged-accounts', {
     responseType: 'blob',
   })
+
+export const generateEvidencePackage = (dirId, body) =>
+  client.post(`/directories/${dirId}/evidence-package`, body, {
+    responseType: 'blob',
+    timeout: 120000,
+  })

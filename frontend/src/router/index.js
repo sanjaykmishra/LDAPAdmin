@@ -90,6 +90,28 @@ const router = createRouter({
           component: () => import('@/views/approvals/PendingApprovalsView.vue'),
         },
 
+        // SoD Policies
+        {
+          path: 'directories/:dirId/sod-policies',
+          name: 'sodPolicies',
+          component: () => import('@/views/sodPolicies/SodPoliciesView.vue'),
+        },
+        {
+          path: 'directories/:dirId/sod-policies/new',
+          name: 'sodPolicyCreate',
+          component: () => import('@/views/sodPolicies/SodPolicyFormView.vue'),
+        },
+        {
+          path: 'directories/:dirId/sod-policies/:policyId/edit',
+          name: 'sodPolicyEdit',
+          component: () => import('@/views/sodPolicies/SodPolicyFormView.vue'),
+        },
+        {
+          path: 'directories/:dirId/sod-violations',
+          name: 'sodViolations',
+          component: () => import('@/views/sodPolicies/SodViolationsView.vue'),
+        },
+
         // Campaign Templates
         {
           path: 'directories/:dirId/campaign-templates',

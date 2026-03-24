@@ -32,7 +32,9 @@ public enum FeatureKey {
     DIRECTORY_BROWSE     ("directory.browse"),
     SCHEMA_READ          ("schema.read"),
     USER_READ            ("user.read"),
-    GROUP_READ           ("group.read");
+    GROUP_READ           ("group.read"),
+    SOD_MANAGE           ("sod.manage"),
+    SOD_VIEW             ("sod.view");
 
     private final String dbValue;
 
