@@ -74,6 +74,7 @@ public class LdapOperationService {
     private final BulkUserService               bulkUserService;
     private final BulkGroupService              bulkGroupService;
     private final CsvMappingTemplateService     csvTemplateService;
+    private final SodPolicyService              sodPolicyService;
 
     // ── Browse ────────────────────────────────────────────────────────────────
 
@@ -335,6 +336,9 @@ public class LdapOperationService {
                                String groupDn, String memberAttribute, String memberValue) {
         DirectoryConnection dc = loadDirectory(directoryId, principal);
         permissionService.requireDnWithinScope(principal, directoryId, groupDn);
+
+        // SoD check — may throw SodViolationException (409) if BLOCK policy is violated
+        sodPolicyService.checkMembership(directoryId, memberValue, groupDn, principal);
 
         groupService.addMember(dc, groupDn, memberAttribute, memberValue);
         auditService.record(principal, directoryId, AuditAction.GROUP_MEMBER_ADD, groupDn,
