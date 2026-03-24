@@ -90,7 +90,8 @@ public class ProvisioningProfileService {
                 req.passwordDigits(), req.passwordSpecial(), req.passwordSpecialChars(),
                 req.emailPasswordToUser());
         profile.setAutoIncludeGroups(req.autoIncludeGroups());
-        profile.setExcludeAutoIncludes(req.excludeAutoIncludes());
+        // Auto-include profiles should not also exclude auto-includes (nonsensical)
+        profile.setExcludeAutoIncludes(req.autoIncludeGroups() ? false : req.excludeAutoIncludes());
         profile = profileRepo.save(profile);
 
         saveAdditionalProfiles(profile, req.additionalProfileIds());
@@ -118,7 +119,8 @@ public class ProvisioningProfileService {
                 req.passwordDigits(), req.passwordSpecial(), req.passwordSpecialChars(),
                 req.emailPasswordToUser());
         profile.setAutoIncludeGroups(req.autoIncludeGroups());
-        profile.setExcludeAutoIncludes(req.excludeAutoIncludes());
+        // Auto-include profiles should not also exclude auto-includes (nonsensical)
+        profile.setExcludeAutoIncludes(req.autoIncludeGroups() ? false : req.excludeAutoIncludes());
         profile = profileRepo.save(profile);
 
         // Replace additional profiles
@@ -645,7 +647,8 @@ public class ProvisioningProfileService {
 
     private void saveAdditionalProfiles(ProvisioningProfile profile, List<UUID> additionalProfileIds) {
         Set<ProvisioningProfile> additionals = new HashSet<>();
-        if (additionalProfileIds != null) {
+        // Auto-include profiles must not have additional profiles to prevent cascading group membership
+        if (additionalProfileIds != null && !profile.isAutoIncludeGroups()) {
             for (UUID apId : additionalProfileIds) {
                 if (apId.equals(profile.getId())) continue; // skip self-reference
                 ProvisioningProfile ap = profileRepo.findById(apId)
