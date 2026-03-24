@@ -3,6 +3,8 @@ package com.ldapadmin.service;
 import com.ldapadmin.dto.settings.ApplicationSettingsDto;
 import com.ldapadmin.dto.settings.UpdateApplicationSettingsRequest;
 import com.ldapadmin.entity.ApplicationSettings;
+import com.ldapadmin.entity.enums.SiemFormat;
+import com.ldapadmin.entity.enums.SiemProtocol;
 import com.ldapadmin.repository.ApplicationSettingsRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,6 +58,33 @@ class ApplicationSettingsServiceTest {
         assertThat(dto.appName()).isEqualTo("LDAP Portal");
         assertThat(dto.sessionTimeoutMinutes()).isEqualTo(60);
         assertThat(dto.smtpPasswordConfigured()).isFalse();
+        // SIEM defaults
+        assertThat(dto.siemEnabled()).isFalse();
+        assertThat(dto.siemProtocol()).isNull();
+        assertThat(dto.siemAuthTokenConfigured()).isFalse();
+        assertThat(dto.webhookAuthHeaderConfigured()).isFalse();
+    }
+
+    @Test
+    void get_existingSettings_returnsSiemFields() {
+        ApplicationSettings settings = existingSettings();
+        settings.setSiemEnabled(true);
+        settings.setSiemProtocol(SiemProtocol.SYSLOG_UDP);
+        settings.setSiemHost("siem.corp.com");
+        settings.setSiemPort(514);
+        settings.setSiemFormat(SiemFormat.CEF);
+        settings.setSiemAuthTokenEnc("enc-token");
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.of(settings));
+
+        ApplicationSettingsDto dto = service.get();
+
+        assertThat(dto.siemEnabled()).isTrue();
+        assertThat(dto.siemProtocol()).isEqualTo(SiemProtocol.SYSLOG_UDP);
+        assertThat(dto.siemHost()).isEqualTo("siem.corp.com");
+        assertThat(dto.siemPort()).isEqualTo(514);
+        assertThat(dto.siemFormat()).isEqualTo(SiemFormat.CEF);
+        assertThat(dto.siemAuthTokenConfigured()).isTrue();
+        assertThat(dto.webhookAuthHeaderConfigured()).isFalse();
     }
 
     // ── upsert (create) ───────────────────────────────────────────────────────
@@ -71,12 +100,10 @@ class ApplicationSettingsServiceTest {
                     return s;
                 });
 
-        UpdateApplicationSettingsRequest req = new UpdateApplicationSettingsRequest(
-                "New App", null, null, null, false, 45,
-                "smtp.test.com", 587, null, null, "secret123", false,
-                null, null, null, null, null, 24,
-                null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null);
+        UpdateApplicationSettingsRequest req = requestBuilder()
+                .appName("New App").sessionTimeoutMinutes(45)
+                .smtpHost("smtp.test.com").smtpPassword("secret123")
+                .build();
 
         ApplicationSettingsDto dto = service.upsert(req);
 
@@ -113,12 +140,9 @@ class ApplicationSettingsServiceTest {
         when(settingsRepo.findFirstBy()).thenReturn(Optional.of(existing));
         when(settingsRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateApplicationSettingsRequest req = new UpdateApplicationSettingsRequest(
-                "My App", null, null, null, false, 30,
-                null, 587, null, null, "", false,  // empty string → clear
-                null, null, null, null, null, 24,
-                null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null);
+        UpdateApplicationSettingsRequest req = requestBuilder()
+                .smtpPassword("") // empty string → clear
+                .build();
 
         service.upsert(req);
 
@@ -135,12 +159,9 @@ class ApplicationSettingsServiceTest {
         when(encryptionService.encrypt("newpass")).thenReturn("enc-newpass");
         when(settingsRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateApplicationSettingsRequest req = new UpdateApplicationSettingsRequest(
-                "My App", null, null, null, false, 30,
-                null, 587, null, null, "newpass", false,
-                null, null, null, null, null, 24,
-                null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null);
+        UpdateApplicationSettingsRequest req = requestBuilder()
+                .smtpPassword("newpass")
+                .build();
 
         service.upsert(req);
 
@@ -148,6 +169,91 @@ class ApplicationSettingsServiceTest {
                 ArgumentCaptor.forClass(ApplicationSettings.class);
         verify(settingsRepo).save(captor.capture());
         assertThat(captor.getValue().getSmtpPasswordEncrypted()).isEqualTo("enc-newpass");
+    }
+
+    // ── SIEM settings ─────────────────────────────────────────────────────────
+
+    @Test
+    void upsert_siemEnabled_storesConfiguration() {
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.empty());
+        when(encryptionService.encrypt("my-token")).thenReturn("enc-token");
+        when(settingsRepo.save(any(ApplicationSettings.class)))
+                .thenAnswer(inv -> {
+                    ApplicationSettings s = inv.getArgument(0);
+                    s.setId(UUID.randomUUID());
+                    return s;
+                });
+
+        UpdateApplicationSettingsRequest req = requestBuilder()
+                .siemEnabled(true)
+                .siemProtocol(SiemProtocol.SYSLOG_TCP)
+                .siemHost("siem.corp.com")
+                .siemPort(6514)
+                .siemFormat(SiemFormat.RFC5424)
+                .siemAuthToken("my-token")
+                .build();
+
+        ApplicationSettingsDto dto = service.upsert(req);
+
+        ArgumentCaptor<ApplicationSettings> captor =
+                ArgumentCaptor.forClass(ApplicationSettings.class);
+        verify(settingsRepo).save(captor.capture());
+        ApplicationSettings saved = captor.getValue();
+        assertThat(saved.isSiemEnabled()).isTrue();
+        assertThat(saved.getSiemProtocol()).isEqualTo(SiemProtocol.SYSLOG_TCP);
+        assertThat(saved.getSiemHost()).isEqualTo("siem.corp.com");
+        assertThat(saved.getSiemPort()).isEqualTo(6514);
+        assertThat(saved.getSiemFormat()).isEqualTo(SiemFormat.RFC5424);
+        assertThat(saved.getSiemAuthTokenEnc()).isEqualTo("enc-token");
+    }
+
+    @Test
+    void upsert_siemWebhook_storesWebhookConfig() {
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.empty());
+        when(encryptionService.encrypt("Bearer abc123")).thenReturn("enc-bearer");
+        when(settingsRepo.save(any(ApplicationSettings.class)))
+                .thenAnswer(inv -> {
+                    ApplicationSettings s = inv.getArgument(0);
+                    s.setId(UUID.randomUUID());
+                    return s;
+                });
+
+        UpdateApplicationSettingsRequest req = requestBuilder()
+                .siemEnabled(true)
+                .siemProtocol(SiemProtocol.WEBHOOK)
+                .siemFormat(SiemFormat.JSON)
+                .webhookUrl("https://hooks.example.com/audit")
+                .webhookAuthHeader("Bearer abc123")
+                .build();
+
+        service.upsert(req);
+
+        ArgumentCaptor<ApplicationSettings> captor =
+                ArgumentCaptor.forClass(ApplicationSettings.class);
+        verify(settingsRepo).save(captor.capture());
+        ApplicationSettings saved = captor.getValue();
+        assertThat(saved.getSiemProtocol()).isEqualTo(SiemProtocol.WEBHOOK);
+        assertThat(saved.getWebhookUrl()).isEqualTo("https://hooks.example.com/audit");
+        assertThat(saved.getWebhookAuthHeaderEnc()).isEqualTo("enc-bearer");
+    }
+
+    @Test
+    void upsert_nullSiemAuthToken_preservesExisting() {
+        ApplicationSettings existing = existingSettings();
+        existing.setSiemAuthTokenEnc("old-enc-token");
+        when(settingsRepo.findFirstBy()).thenReturn(Optional.of(existing));
+        when(settingsRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // null siemAuthToken → preserve
+        UpdateApplicationSettingsRequest req = requestBuilder().build();
+
+        service.upsert(req);
+
+        ArgumentCaptor<ApplicationSettings> captor =
+                ArgumentCaptor.forClass(ApplicationSettings.class);
+        verify(settingsRepo).save(captor.capture());
+        assertThat(captor.getValue().getSiemAuthTokenEnc()).isEqualTo("old-enc-token");
+        verify(encryptionService, never()).encrypt(any());
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -164,15 +270,58 @@ class ApplicationSettingsServiceTest {
     }
 
     private UpdateApplicationSettingsRequest basicRequest() {
-        return new UpdateApplicationSettingsRequest(
-                "My App", null, "#fff", null,
-                false,
-                30,
-                "smtp.example.com", 587, "noreply@example.com", "user",
-                null,  // keep existing password
-                true,
-                null, null, null, null, null, 24,
-                null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null);
+        return requestBuilder().build();
+    }
+
+    /**
+     * Builder helper to avoid huge constructor calls in every test.
+     */
+    private static RequestBuilder requestBuilder() {
+        return new RequestBuilder();
+    }
+
+    private static class RequestBuilder {
+        String appName = "My App";
+        int sessionTimeoutMinutes = 30;
+        String smtpHost = "smtp.example.com";
+        Integer smtpPort = 587;
+        String smtpSenderAddress = "noreply@example.com";
+        String smtpUsername = "user";
+        String smtpPassword = null;
+        Boolean siemEnabled = null;
+        SiemProtocol siemProtocol = null;
+        String siemHost = null;
+        Integer siemPort = null;
+        SiemFormat siemFormat = null;
+        String siemAuthToken = null;
+        String webhookUrl = null;
+        String webhookAuthHeader = null;
+
+        RequestBuilder appName(String v) { this.appName = v; return this; }
+        RequestBuilder sessionTimeoutMinutes(int v) { this.sessionTimeoutMinutes = v; return this; }
+        RequestBuilder smtpHost(String v) { this.smtpHost = v; return this; }
+        RequestBuilder smtpPassword(String v) { this.smtpPassword = v; return this; }
+        RequestBuilder siemEnabled(boolean v) { this.siemEnabled = v; return this; }
+        RequestBuilder siemProtocol(SiemProtocol v) { this.siemProtocol = v; return this; }
+        RequestBuilder siemHost(String v) { this.siemHost = v; return this; }
+        RequestBuilder siemPort(int v) { this.siemPort = v; return this; }
+        RequestBuilder siemFormat(SiemFormat v) { this.siemFormat = v; return this; }
+        RequestBuilder siemAuthToken(String v) { this.siemAuthToken = v; return this; }
+        RequestBuilder webhookUrl(String v) { this.webhookUrl = v; return this; }
+        RequestBuilder webhookAuthHeader(String v) { this.webhookAuthHeader = v; return this; }
+
+        UpdateApplicationSettingsRequest build() {
+            return new UpdateApplicationSettingsRequest(
+                    appName, null, "#fff", null,
+                    false,
+                    sessionTimeoutMinutes,
+                    smtpHost, smtpPort, smtpSenderAddress, smtpUsername, smtpPassword, true,
+                    null, null, null, null, null, 24,
+                    null,
+                    null, null, null, null, null, null, null, null, null,
+                    null, null, null, null, null,
+                    siemEnabled, siemProtocol, siemHost, siemPort, siemFormat,
+                    siemAuthToken, webhookUrl, webhookAuthHeader);
+        }
     }
 }

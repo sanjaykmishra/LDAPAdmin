@@ -8,6 +8,7 @@ import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.entity.enums.AuditSource;
 import com.ldapadmin.repository.AuditEventRepository;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
+import com.ldapadmin.service.siem.SiemExportService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +29,7 @@ class AuditServiceTest {
 
     @Mock private AuditEventRepository         auditRepo;
     @Mock private DirectoryConnectionRepository dirRepo;
+    @Mock private SiemExportService             siemExportService;
 
     private AuditService auditService;
 
@@ -36,7 +38,7 @@ class AuditServiceTest {
 
     @BeforeEach
     void setUp() {
-        auditService = new AuditService(auditRepo, dirRepo);
+        auditService = new AuditService(auditRepo, dirRepo, siemExportService);
     }
 
     // ── Internal event recording ──────────────────────────────────────────────
@@ -69,6 +71,19 @@ class AuditServiceTest {
     }
 
     @Test
+    void record_exportsSavedEventToSiem() {
+        AuthPrincipal principal = new AuthPrincipal(PrincipalType.ADMIN, adminId, "alice");
+        when(dirRepo.findById(directoryId)).thenReturn(Optional.of(mockDirectory("corp")));
+
+        auditService.record(principal, directoryId, AuditAction.USER_CREATE,
+                "uid=alice,dc=corp", null);
+
+        ArgumentCaptor<AuditEvent> captor = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(siemExportService).export(captor.capture());
+        assertThat(captor.getValue().getAction()).isEqualTo(AuditAction.USER_CREATE);
+    }
+
+    @Test
     void record_doesNotThrow_whenDirLookupFails() {
         AuthPrincipal principal = new AuthPrincipal(PrincipalType.ADMIN, adminId, "bob");
         when(dirRepo.findById(directoryId)).thenReturn(Optional.empty());
@@ -90,6 +105,9 @@ class AuditServiceTest {
         // Must not throw — audit failures are swallowed
         auditService.record(principal, directoryId, AuditAction.USER_ENABLE,
                 "uid=carol,dc=corp", null);
+
+        // SIEM export should NOT be called if save failed
+        verify(siemExportService, never()).export(any());
     }
 
     // ── Changelog event recording ─────────────────────────────────────────────
@@ -116,6 +134,21 @@ class AuditServiceTest {
     }
 
     @Test
+    void recordChangelogEvent_exportsSavedEventToSiem() {
+        String changeNumber = "12346";
+        when(auditRepo.existsByDirectoryIdAndChangelogChangeNumber(directoryId, changeNumber))
+                .thenReturn(false);
+
+        auditService.recordChangelogEvent(
+                directoryId, "corp-ldap",
+                "uid=dave,dc=corp", changeNumber,
+                Map.of("changeType", "modify"),
+                OffsetDateTime.now());
+
+        verify(siemExportService).export(any(AuditEvent.class));
+    }
+
+    @Test
     void recordChangelogEvent_skips_whenAlreadyRecorded() {
         String changeNumber = "99999";
         when(auditRepo.existsByDirectoryIdAndChangelogChangeNumber(directoryId, changeNumber))
@@ -128,6 +161,7 @@ class AuditServiceTest {
                 OffsetDateTime.now());
 
         verify(auditRepo, never()).save(any());
+        verify(siemExportService, never()).export(any());
     }
 
     // ── isChangelogEventRecorded ──────────────────────────────────────────────
