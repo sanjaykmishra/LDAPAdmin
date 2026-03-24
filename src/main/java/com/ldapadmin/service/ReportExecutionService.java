@@ -11,12 +11,23 @@ import com.ldapadmin.ldap.model.LdapUser;
 import com.ldapadmin.repository.AuditEventRepository;
 import com.ldapadmin.repository.ProvisioningProfileRepository;
 import com.ldapadmin.util.CsvUtils;
+import com.lowagie.text.Document;
+import com.lowagie.text.DocumentException;
+import com.lowagie.text.Font;
+import com.lowagie.text.PageSize;
+import com.lowagie.text.Paragraph;
+import com.lowagie.text.Phrase;
+import com.lowagie.text.pdf.PdfPCell;
+import com.lowagie.text.pdf.PdfPTable;
+import com.lowagie.text.pdf.PdfWriter;
 import com.unboundid.ldap.sdk.Filter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.awt.Color;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -83,40 +94,43 @@ public class ReportExecutionService {
                       OutputFormat format,
                       UUID directoryId) throws IOException {
 
-        if (format == OutputFormat.PDF) {
-            throw new UnsupportedOperationException("PDF output is not yet supported");
-        }
-
         Map<String, Object> safeParams = params != null ? params : Map.of();
 
-        return switch (reportType) {
-            case USERS_IN_GROUP      -> runLdapReport(dc, buildGroupFilter(safeParams), null);
-            case USERS_IN_BRANCH     -> runLdapReport(dc, "(objectClass=inetOrgPerson)",
+        // Gather CSV-style row data (shared by both CSV and PDF output)
+        ReportData data = switch (reportType) {
+            case USERS_IN_GROUP      -> runLdapReportData(dc, buildGroupFilter(safeParams), null);
+            case USERS_IN_BRANCH     -> runLdapReportData(dc, "(objectClass=inetOrgPerson)",
                                                        requireString(safeParams, "branchDn"));
-            case USERS_WITH_NO_GROUP -> runLdapReport(dc,
+            case USERS_WITH_NO_GROUP -> runLdapReportData(dc,
                                                        "(&(objectClass=inetOrgPerson)(!(memberOf=*)))", null);
-            case RECENTLY_ADDED      -> runLdapReport(dc,
+            case RECENTLY_ADDED      -> runLdapReportData(dc,
                                                        "(createTimestamp>=" + lookbackTimestamp(safeParams) + ")", null);
-            case RECENTLY_MODIFIED   -> runLdapReport(dc,
+            case RECENTLY_MODIFIED   -> runLdapReportData(dc,
                                                        "(modifyTimestamp>=" + lookbackTimestamp(safeParams) + ")", null);
-            case RECENTLY_DELETED    -> runDeletedReport(directoryId, safeParams);
-            case DISABLED_ACCOUNTS   -> runLdapReport(dc,
+            case RECENTLY_DELETED    -> runDeletedReportData(directoryId, safeParams);
+            case DISABLED_ACCOUNTS   -> runLdapReportData(dc,
                                                        "(|(pwdAccountLockedTime=*)(loginDisabled=TRUE))", null);
-            case MISSING_PROFILE_GROUPS -> runMissingProfileGroupsReport(dc, directoryId);
+            case MISSING_PROFILE_GROUPS -> runMissingProfileGroupsReportData(dc, directoryId);
         };
+
+        if (format == OutputFormat.PDF) {
+            return renderPdf(reportType.name(), data);
+        }
+        return CsvUtils.write(data.columns, data.rows);
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
+    /** Intermediate report data container (columns + rows). */
+    record ReportData(List<String> columns, List<Map<String, String>> rows) {}
+
     /**
-     * Queries LDAP and serialises the result as CSV.
-     * Returns {@code dn} + all attributes found across the result set.
+     * Queries LDAP and returns structured report data.
      */
-    private byte[] runLdapReport(DirectoryConnection dc, String filter,
-                                   String baseDn) throws IOException {
+    private ReportData runLdapReportData(DirectoryConnection dc, String filter,
+                                         String baseDn) {
         List<LdapUser> users = userService.searchUsers(dc, filter, baseDn);
 
-        // Derive column set: dn first, then all unique attribute names
         List<String> columns = new ArrayList<>();
         columns.add("dn");
         users.stream()
@@ -129,10 +143,10 @@ public class ReportExecutionService {
                 .toList();
 
         log.debug("Report query [filter={}, base={}] → {} entries", filter, baseDn, rows.size());
-        return CsvUtils.write(columns, rows);
+        return new ReportData(columns, rows);
     }
 
-    /** Builds a CSV row from a single LDAP entry; multi-values are pipe-joined. */
+    /** Builds a row from a single LDAP entry; multi-values are pipe-joined. */
     private Map<String, String> buildRow(LdapUser user, List<String> columns) {
         Map<String, String> row = new LinkedHashMap<>();
         for (String col : columns) {
@@ -147,10 +161,9 @@ public class ReportExecutionService {
 
     /**
      * Queries the internal audit events table for USER_DELETE actions.
-     * Returns a CSV with columns: {@code dn}, {@code deletedBy}, {@code deletedAt}.
      */
-    private byte[] runDeletedReport(UUID directoryId,
-                                     Map<String, Object> params) throws IOException {
+    private ReportData runDeletedReportData(UUID directoryId,
+                                            Map<String, Object> params) {
         int lookbackDays = lookbackDays(params);
         OffsetDateTime from = OffsetDateTime.now().minusDays(lookbackDays);
 
@@ -170,15 +183,15 @@ public class ReportExecutionService {
                 })
                 .toList();
 
-        return CsvUtils.write(columns, rows);
+        return new ReportData(columns, rows);
     }
 
     /**
      * For each enabled profile in the directory, evaluates the group membership
-     * diff and collects missing groups into a flat CSV report.
+     * diff and collects missing groups into a flat report.
      */
-    private byte[] runMissingProfileGroupsReport(DirectoryConnection dc,
-                                                   UUID directoryId) throws IOException {
+    private ReportData runMissingProfileGroupsReportData(DirectoryConnection dc,
+                                                         UUID directoryId) {
         List<ProvisioningProfile> profiles =
                 profileRepo.findAllByDirectoryIdAndEnabledTrue(directoryId);
 
@@ -207,7 +220,65 @@ public class ReportExecutionService {
 
         log.debug("Missing profile groups report → {} rows across {} profiles",
                 rows.size(), profiles.size());
-        return CsvUtils.write(columns, rows);
+        return new ReportData(columns, rows);
+    }
+
+    /**
+     * Renders report data as a styled PDF document.
+     */
+    private byte[] renderPdf(String reportTitle, ReportData data) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        Document document = new Document(PageSize.A4.rotate(), 36, 36, 36, 36);
+
+        Font titleFont  = new Font(Font.HELVETICA, 16, Font.BOLD, new Color(33, 37, 41));
+        Font headerFont = new Font(Font.HELVETICA, 9, Font.BOLD, Color.WHITE);
+        Font cellFont   = new Font(Font.HELVETICA, 8, Font.NORMAL, new Color(33, 37, 41));
+        Color headerBg  = new Color(52, 58, 64);
+        Color altRowBg  = new Color(248, 249, 250);
+
+        try {
+            PdfWriter.getInstance(document, baos);
+            document.open();
+
+            Paragraph title = new Paragraph(reportTitle.replace('_', ' '), titleFont);
+            title.setSpacingAfter(12);
+            document.add(title);
+
+            if (data.columns.isEmpty()) {
+                document.add(new Paragraph("No data available.", cellFont));
+            } else {
+                PdfPTable table = new PdfPTable(data.columns.size());
+                table.setWidthPercentage(100);
+
+                for (String col : data.columns) {
+                    PdfPCell cell = new PdfPCell(new Phrase(col, headerFont));
+                    cell.setBackgroundColor(headerBg);
+                    cell.setPadding(6);
+                    table.addCell(cell);
+                }
+
+                int rowIdx = 0;
+                for (Map<String, String> row : data.rows) {
+                    Color bg = (rowIdx % 2 == 1) ? altRowBg : Color.WHITE;
+                    for (String col : data.columns) {
+                        String value = row.getOrDefault(col, "");
+                        PdfPCell cell = new PdfPCell(new Phrase(value, cellFont));
+                        cell.setBackgroundColor(bg);
+                        cell.setPadding(5);
+                        table.addCell(cell);
+                    }
+                    rowIdx++;
+                }
+
+                document.add(table);
+            }
+
+            document.close();
+        } catch (DocumentException e) {
+            throw new IOException("Failed to generate PDF: " + e.getMessage(), e);
+        }
+
+        return baos.toByteArray();
     }
 
     private String buildGroupFilter(Map<String, Object> params) {

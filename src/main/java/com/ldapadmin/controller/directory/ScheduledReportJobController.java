@@ -141,9 +141,11 @@ public class ScheduledReportJobController {
 
         byte[] data = executionService.run(dc, req.reportType(), req.reportParams(), format, directoryId);
 
-        String filename = req.reportType().name().toLowerCase() + ".csv";
+        boolean isPdf = format == OutputFormat.PDF;
+        String ext = isPdf ? ".pdf" : ".csv";
+        String filename = req.reportType().name().toLowerCase() + ext;
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.parseMediaType("text/csv"));
+        headers.setContentType(isPdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType("text/csv"));
         headers.setContentDisposition(
                 ContentDisposition.attachment().filename(filename).build());
 

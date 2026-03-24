@@ -65,6 +65,10 @@
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V10M10 16V4M15 16v-4"/></svg>
               Reports
             </RouterLink>
+            <RouterLink :to="{ path: `/directories/${currentDirId}/compliance-reports` }" class="nav-item">
+              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M8 7h4M8 10h4M8 13h2"/><path d="M13 2v3h3"/></svg>
+              Compliance Reports
+            </RouterLink>
             <RouterLink :to="{ path: `/directories/${currentDirId}/playbooks` }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12M4 8h12M4 12h8M4 16h6"/><path d="M15 12l2 2-2 2"/></svg>
               Playbooks
@@ -227,7 +231,7 @@ watch(() => route.params.dirId, (dirId) => {
 })
 
 // Navigate when user picks a different profile
-const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'approvals', 'accessReviews']
+const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'complianceReports', 'approvals', 'accessReviews']
 watch(currentDirId, (newDirId) => {
   if (!newDirId || newDirId === route.params.dirId) return
   const section = dirSections.includes(route.name) ? route.name : 'users'
