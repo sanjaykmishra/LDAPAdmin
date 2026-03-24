@@ -92,6 +92,11 @@
             </table>
           </template>
         </div>
+        <button v-if="parentObjectClass && activeTab === 'attributeTypes' && detail"
+          @click="navigateBackToObjectClass()"
+          class="mt-3 text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
+          &larr; Back to {{ parentObjectClass }}
+        </button>
       </div>
     </div>
   </div>
@@ -121,6 +126,7 @@ const listLoading = ref(false)
 const selected    = ref(null)
 const detail      = ref(null)
 const detailLoading = ref(false)
+const parentObjectClass = ref(null)
 
 const filteredList = computed(() => {
   const q = search.value.toLowerCase()
@@ -181,11 +187,22 @@ async function loadDetail(name) {
 function switchTab(tab) {
   activeTab.value = tab
   search.value = ''
+  parentObjectClass.value = null
   if (selectedDirId.value) loadList()
 }
 
 async function navigateToAttribute(name) {
+  parentObjectClass.value = selected.value
   activeTab.value = 'attributeTypes'
+  search.value = ''
+  await loadList()
+  loadDetail(name)
+}
+
+async function navigateBackToObjectClass() {
+  const name = parentObjectClass.value
+  parentObjectClass.value = null
+  activeTab.value = 'objectClasses'
   search.value = ''
   await loadList()
   loadDetail(name)
