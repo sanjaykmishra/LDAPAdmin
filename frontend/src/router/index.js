@@ -90,6 +90,26 @@ const router = createRouter({
           component: () => import('@/views/approvals/PendingApprovalsView.vue'),
         },
 
+        // Campaign Templates
+        {
+          path: 'directories/:dirId/campaign-templates',
+          name: 'campaignTemplates',
+          component: () => import('@/views/accessReviews/CampaignTemplatesView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
+        {
+          path: 'directories/:dirId/campaign-templates/new',
+          name: 'campaignTemplateCreate',
+          component: () => import('@/views/accessReviews/CampaignTemplateFormView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
+        {
+          path: 'directories/:dirId/campaign-templates/:templateId/edit',
+          name: 'campaignTemplateEdit',
+          component: () => import('@/views/accessReviews/CampaignTemplateFormView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
+
         // Access Reviews
         {
           path: 'directories/:dirId/access-reviews',
