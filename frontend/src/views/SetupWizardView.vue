@@ -152,7 +152,7 @@
             </div>
             <div>
               <label class="label">Target OU *</label>
-              <input v-model="profile.targetOuDn" type="text" class="input" />
+              <DnPicker v-model="profile.targetOuDn" :directory-id="directoryId" />
             </div>
             <div>
               <label class="label">Object Classes *</label>
@@ -273,6 +273,7 @@ import { createProfile } from '@/api/profiles'
 import { listObjectClasses } from '@/api/schema'
 import { createCampaign } from '@/api/accessReviews'
 import { completeSetup as apiCompleteSetup } from '@/api/settings'
+import DnPicker from '@/components/DnPicker.vue'
 import GroupDnPicker from '@/components/GroupDnPicker.vue'
 
 const router = useRouter()

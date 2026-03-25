@@ -71,8 +71,7 @@
     <!-- Members drawer -->
     <AppModal v-model="showMembers" :title="`Members — ${selectedGroup?.cn || ''}`" size="lg">
       <div class="mb-3 flex gap-2">
-        <input v-model="newMemberDn" placeholder="member DN to add" @keyup.enter="addMember"
-          class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <DnPicker v-model="newMemberDn" :directory-id="dirId" class="flex-1" />
         <button @click="addMember" class="btn-primary">Add</button>
         <button @click="showBulkAdd = !showBulkAdd" class="btn-secondary">Bulk Add</button>
       </div>
@@ -116,6 +115,7 @@ import DataTable from '@/components/DataTable.vue'
 import AppModal from '@/components/AppModal.vue'
 import FormField from '@/components/FormField.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import DnPicker from '@/components/DnPicker.vue'
 import CopyButton from '@/components/CopyButton.vue'
 
 const route = useRoute()

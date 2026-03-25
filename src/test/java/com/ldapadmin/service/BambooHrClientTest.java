@@ -15,7 +15,7 @@ class BambooHrClientTest {
 
     @BeforeEach
     void setUp() {
-        client = new BambooHrClient();
+        client = new BambooHrClient(new com.fasterxml.jackson.databind.ObjectMapper());
     }
 
     @Test
