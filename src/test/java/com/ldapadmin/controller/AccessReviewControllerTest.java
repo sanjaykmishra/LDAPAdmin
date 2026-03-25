@@ -77,7 +77,7 @@ class AccessReviewControllerTest extends BaseControllerTest {
         var campaign = new AccessReviewCampaign();
         campaign.setId(campaignId);
         when(campaignService.create(eq(dirId), any(), any())).thenReturn(campaign);
-        when(campaignService.get(campaignId)).thenReturn(
+        when(campaignService.get(dirId, campaignId)).thenReturn(
                 new CampaignDetailDto(campaignId, "Q1 Review", "Test", CampaignStatus.UPCOMING,
                         null, OffsetDateTime.now().plusDays(30), 30, null, false, false,
                         OffsetDateTime.now(), null, "admin",
@@ -124,7 +124,7 @@ class AccessReviewControllerTest extends BaseControllerTest {
         var campaign = new AccessReviewCampaign();
         campaign.setId(campaignId);
         when(campaignService.create(eq(dirId), any(), any())).thenReturn(campaign);
-        when(campaignService.get(campaignId)).thenReturn(
+        when(campaignService.get(dirId, campaignId)).thenReturn(
                 new CampaignDetailDto(campaignId, "Quarterly Review", null, CampaignStatus.UPCOMING,
                         null, OffsetDateTime.now().plusDays(30), 30, 3, false, false,
                         OffsetDateTime.now(), null, "admin",
@@ -152,7 +152,7 @@ class AccessReviewControllerTest extends BaseControllerTest {
 
     @Test
     void getCampaign_returns200() throws Exception {
-        when(campaignService.get(campaignId)).thenReturn(
+        when(campaignService.get(dirId, campaignId)).thenReturn(
                 new CampaignDetailDto(campaignId, "Q1 Review", null, CampaignStatus.ACTIVE,
                         null, OffsetDateTime.now().plusDays(30), 30, null, false, false,
                         OffsetDateTime.now(), null, "admin",
@@ -199,7 +199,7 @@ class AccessReviewControllerTest extends BaseControllerTest {
 
     @Test
     void exportCsv_returns200WithCsvContentType() throws Exception {
-        when(campaignService.exportCsv(campaignId)).thenReturn("header\nrow1\n".getBytes());
+        when(campaignService.exportCsv(dirId, campaignId)).thenReturn("header\nrow1\n".getBytes());
 
         mvc.perform(get("/api/v1/directories/{dirId}/access-reviews/{campaignId}/export", dirId, campaignId)
                         .with(authentication(superadminAuth())))

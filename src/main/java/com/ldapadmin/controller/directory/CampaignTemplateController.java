@@ -84,7 +84,7 @@ public class CampaignTemplateController {
             @RequestParam(required = false) String description) {
         CreateCampaignRequest req = templateService.toCampaignRequest(directoryId, templateId, name, description);
         var campaign = campaignService.create(directoryId, req, principal);
-        return ResponseEntity.status(HttpStatus.CREATED).body(campaignService.get(campaign.getId()));
+        return ResponseEntity.status(HttpStatus.CREATED).body(campaignService.get(directoryId, campaign.getId()));
     }
 
     @PostMapping("/from-campaign/{campaignId}")

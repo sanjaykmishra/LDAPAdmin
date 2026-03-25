@@ -10,7 +10,6 @@ import com.ldapadmin.repository.CampaignReminderRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -57,11 +56,12 @@ class AccessReviewSchedulerTest {
     @Test
     void processDeadlines_expiresOverdueCampaigns() {
         AccessReviewCampaign overdue = buildCampaign(CampaignStatus.ACTIVE, OffsetDateTime.now().minusDays(1));
+        when(campaignRepo.findByStatusAndStartsAtBefore(eq(CampaignStatus.UPCOMING), any()))
+                .thenReturn(List.of());
         when(campaignRepo.findByStatusAndDeadlineBefore(eq(CampaignStatus.ACTIVE), any()))
                 .thenReturn(List.of(overdue))
-                .thenReturn(List.of()) // reminders
-                .thenReturn(List.of()); // escalation
-        when(accountRepo.findAllByRoleAndActiveTrue(AccountRole.SUPERADMIN)).thenReturn(List.of(superadmin));
+                .thenReturn(List.of());
+        when(campaignRepo.findByStatus(CampaignStatus.ACTIVE)).thenReturn(List.of());
 
         scheduler.processDeadlines();
 
@@ -73,11 +73,12 @@ class AccessReviewSchedulerTest {
         AccessReviewCampaign overdue = buildCampaign(CampaignStatus.ACTIVE, OffsetDateTime.now().minusDays(1));
         overdue.setRecurrenceMonths(3);
         overdue.setDeadlineDays(30);
+        when(campaignRepo.findByStatusAndStartsAtBefore(eq(CampaignStatus.UPCOMING), any()))
+                .thenReturn(List.of());
         when(campaignRepo.findByStatusAndDeadlineBefore(eq(CampaignStatus.ACTIVE), any()))
                 .thenReturn(List.of(overdue))
-                .thenReturn(List.of())
                 .thenReturn(List.of());
-        when(accountRepo.findAllByRoleAndActiveTrue(AccountRole.SUPERADMIN)).thenReturn(List.of(superadmin));
+        when(campaignRepo.findByStatus(CampaignStatus.ACTIVE)).thenReturn(List.of());
 
         scheduler.processDeadlines();
 
@@ -90,51 +91,72 @@ class AccessReviewSchedulerTest {
         AccessReviewCampaign approaching = buildCampaignWithReviewers(
                 CampaignStatus.ACTIVE, OffsetDateTime.now().plusDays(2));
 
+        when(campaignRepo.findByStatusAndStartsAtBefore(eq(CampaignStatus.UPCOMING), any()))
+                .thenReturn(List.of());
         when(campaignRepo.findByStatusAndDeadlineBefore(eq(CampaignStatus.ACTIVE), any()))
                 .thenReturn(List.of())   // overdue check
-                .thenReturn(List.of(approaching)) // reminder check
-                .thenReturn(List.of());  // escalation check
-        when(accountRepo.findAllByRoleAndActiveTrue(AccountRole.SUPERADMIN)).thenReturn(List.of(superadmin));
+                .thenReturn(List.of(approaching)); // reminder check
+        when(campaignRepo.findByStatus(CampaignStatus.ACTIVE)).thenReturn(List.of());
         when(decisionRepo.countByReviewGroupIdAndDecisionIsNull(any())).thenReturn(5L);
-        when(reminderRepo.existsByCampaignIdAndReviewerAccountIdAndReminderType(any(), any(), eq(ReminderType.DEADLINE)))
-                .thenReturn(false);
+        when(reminderRepo.existsByCampaignIdAndReviewerAccountIdAndReminderTypeAndSentAtAfter(
+                any(), any(), eq(ReminderType.DEADLINE), any())).thenReturn(false);
 
         scheduler.processDeadlines();
 
-        verify(notificationService).notifyDeadlineApproaching(any());
+        verify(notificationService).notifyDeadlineApproaching(any(), any());
         verify(reminderRepo).save(any(CampaignReminder.class));
     }
 
     @Test
-    void processDeadlines_doesNotSendDuplicateReminders() {
+    void processDeadlines_doesNotSendRecentDuplicateReminders() {
         AccessReviewCampaign approaching = buildCampaignWithReviewers(
                 CampaignStatus.ACTIVE, OffsetDateTime.now().plusDays(2));
 
+        when(campaignRepo.findByStatusAndStartsAtBefore(eq(CampaignStatus.UPCOMING), any()))
+                .thenReturn(List.of());
         when(campaignRepo.findByStatusAndDeadlineBefore(eq(CampaignStatus.ACTIVE), any()))
                 .thenReturn(List.of())
-                .thenReturn(List.of(approaching))
-                .thenReturn(List.of());
-        when(accountRepo.findAllByRoleAndActiveTrue(AccountRole.SUPERADMIN)).thenReturn(List.of(superadmin));
+                .thenReturn(List.of(approaching));
+        when(campaignRepo.findByStatus(CampaignStatus.ACTIVE)).thenReturn(List.of());
         when(decisionRepo.countByReviewGroupIdAndDecisionIsNull(any())).thenReturn(5L);
-        // Already sent
-        when(reminderRepo.existsByCampaignIdAndReviewerAccountIdAndReminderType(any(), any(), eq(ReminderType.DEADLINE)))
-                .thenReturn(true);
+        // Sent within last 24 hours
+        when(reminderRepo.existsByCampaignIdAndReviewerAccountIdAndReminderTypeAndSentAtAfter(
+                any(), any(), eq(ReminderType.DEADLINE), any())).thenReturn(true);
 
         scheduler.processDeadlines();
 
-        verify(notificationService, never()).notifyDeadlineApproaching(any());
+        verify(notificationService, never()).notifyDeadlineApproaching(any(), any());
         verify(reminderRepo, never()).save(any());
     }
 
     @Test
     void processDeadlines_noOverdueCampaigns_doesNothing() {
+        when(campaignRepo.findByStatusAndStartsAtBefore(eq(CampaignStatus.UPCOMING), any()))
+                .thenReturn(List.of());
         when(campaignRepo.findByStatusAndDeadlineBefore(eq(CampaignStatus.ACTIVE), any()))
                 .thenReturn(List.of());
-        when(accountRepo.findAllByRoleAndActiveTrue(AccountRole.SUPERADMIN)).thenReturn(List.of(superadmin));
+        when(campaignRepo.findByStatus(CampaignStatus.ACTIVE)).thenReturn(List.of());
 
         scheduler.processDeadlines();
 
         verify(campaignService, never()).expireCampaign(any(), any());
+    }
+
+    @Test
+    void processDeadlines_autoActivatesScheduledCampaigns() {
+        AccessReviewCampaign scheduled = buildCampaign(CampaignStatus.UPCOMING, OffsetDateTime.now().plusDays(30));
+        scheduled.setStartsAt(OffsetDateTime.now().minusHours(1)); // startsAt has passed
+
+        when(campaignRepo.findByStatusAndStartsAtBefore(eq(CampaignStatus.UPCOMING), any()))
+                .thenReturn(List.of(scheduled));
+        when(campaignRepo.findByStatusAndDeadlineBefore(eq(CampaignStatus.ACTIVE), any()))
+                .thenReturn(List.of());
+        when(campaignRepo.findByStatus(CampaignStatus.ACTIVE)).thenReturn(List.of());
+
+        scheduler.processDeadlines();
+
+        verify(campaignService).activate(
+                eq(scheduled.getDirectory().getId()), eq(scheduled.getId()), any());
     }
 
     // ── Escalation tests ──────────────────────────────────────────────────
@@ -197,6 +219,20 @@ class AccessReviewSchedulerTest {
         verify(notificationService, never()).notifyEscalation(any(), any(), anyLong());
     }
 
+    @Test
+    void processEscalations_usesStartsAtWhenSet() {
+        AccessReviewCampaign campaign = buildCampaignWithReviewers(
+                CampaignStatus.ACTIVE, OffsetDateTime.now().plusDays(5));
+        // startsAt is 5 days ago (below threshold), createdAt is 20 days ago (above)
+        campaign.setStartsAt(OffsetDateTime.now().minusDays(5));
+        campaign.setCreatedAt(OffsetDateTime.now().minusDays(20));
+
+        scheduler.processEscalations(campaign);
+
+        // Should use startsAt (5 days), not createdAt (20 days) — below 14-day threshold
+        verify(notificationService, never()).notifyEscalation(any(), any(), anyLong());
+    }
+
     // ── Auto-revoke on expiry tests ───────────────────────────────────────
 
     @Test
@@ -218,12 +254,8 @@ class AccessReviewSchedulerTest {
         alreadyDecided.setReviewGroup(campaign.getReviewGroups().get(0));
 
         when(decisionRepo.findByReviewGroupId(any())).thenReturn(List.of(undecided, alreadyDecided));
-        when(accountRepo.findById(any())).thenReturn(Optional.of(superadmin));
 
-        var systemPrincipal = new com.ldapadmin.auth.AuthPrincipal(
-                com.ldapadmin.auth.PrincipalType.SUPERADMIN, superadmin.getId(), superadmin.getUsername());
-
-        scheduler.executeAutoRevokeOnExpiry(campaign, systemPrincipal);
+        scheduler.executeAutoRevokeOnExpiry(campaign);
 
         // Only the undecided one should be revoked
         verify(ldapGroupService, times(1)).removeMember(
@@ -253,16 +285,12 @@ class AccessReviewSchedulerTest {
         d2.setReviewGroup(campaign.getReviewGroups().get(0));
 
         when(decisionRepo.findByReviewGroupId(any())).thenReturn(List.of(d1, d2));
-        when(accountRepo.findById(any())).thenReturn(Optional.of(superadmin));
         // First call throws, second succeeds
         doThrow(new RuntimeException("LDAP error"))
                 .doNothing()
                 .when(ldapGroupService).removeMember(any(), any(), any(), any());
 
-        var systemPrincipal = new com.ldapadmin.auth.AuthPrincipal(
-                com.ldapadmin.auth.PrincipalType.SUPERADMIN, superadmin.getId(), superadmin.getUsername());
-
-        scheduler.executeAutoRevokeOnExpiry(campaign, systemPrincipal);
+        scheduler.executeAutoRevokeOnExpiry(campaign);
 
         // Both attempted
         verify(ldapGroupService, times(2)).removeMember(any(), any(), any(), any());

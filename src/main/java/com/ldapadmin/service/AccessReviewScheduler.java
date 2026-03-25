@@ -7,7 +7,6 @@ import com.ldapadmin.entity.AccessReviewDecision;
 import com.ldapadmin.entity.AccessReviewGroup;
 import com.ldapadmin.entity.Account;
 import com.ldapadmin.entity.CampaignReminder;
-import com.ldapadmin.entity.enums.AccountRole;
 import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.entity.enums.CampaignStatus;
 import com.ldapadmin.entity.enums.ReminderType;
@@ -53,31 +52,37 @@ public class AccessReviewScheduler {
     @Value("${ldapadmin.access-review.auto-revoke-enabled:false}")
     private boolean autoRevokeEnabled;
 
+    private static final AuthPrincipal SYSTEM_PRINCIPAL =
+            new AuthPrincipal(PrincipalType.SUPERADMIN, new UUID(0, 0), "system");
+
     @Scheduled(cron = "${ldapadmin.access-review.expiry-cron:0 0 2 * * ?}")
     public void processDeadlines() {
         log.info("Running access review deadline processor");
 
-        AuthPrincipal systemPrincipal = resolveSystemPrincipal();
+        // 0. Auto-activate UPCOMING campaigns whose startsAt has arrived
+        activateScheduledCampaigns();
 
         // 1. Expire overdue campaigns
         List<AccessReviewCampaign> overdue = campaignRepo.findByStatusAndDeadlineBefore(
                 CampaignStatus.ACTIVE, OffsetDateTime.now());
+        Set<UUID> overdueIds = new HashSet<>();
 
         for (AccessReviewCampaign campaign : overdue) {
+            overdueIds.add(campaign.getId());
             try {
                 log.info("Expiring campaign '{}' (id={})", campaign.getName(), campaign.getId());
 
                 // Auto-revoke undecided memberships on expiry if configured
                 if (campaign.isAutoRevokeOnExpiry() && autoRevokeEnabled) {
-                    executeAutoRevokeOnExpiry(campaign, systemPrincipal);
+                    executeAutoRevokeOnExpiry(campaign);
                 }
 
-                campaignService.expireCampaign(campaign, systemPrincipal);
+                campaignService.expireCampaign(campaign, SYSTEM_PRINCIPAL);
 
                 // Create recurring follow-up if configured
                 if (campaign.getRecurrenceMonths() != null) {
                     try {
-                        campaignService.createRecurringFollowUp(campaign, systemPrincipal);
+                        campaignService.createRecurringFollowUp(campaign, SYSTEM_PRINCIPAL);
                     } catch (Exception e) {
                         log.error("Failed to create recurring follow-up for campaign {}: {}",
                                 campaign.getId(), e.getMessage(), e);
@@ -94,7 +99,7 @@ public class AccessReviewScheduler {
                 campaignRepo.findByStatusAndDeadlineBefore(CampaignStatus.ACTIVE, reminderThreshold));
 
         // Filter out already expired ones (they were just processed above)
-        approaching.removeAll(overdue);
+        approaching.removeIf(c -> overdueIds.contains(c.getId()));
 
         for (AccessReviewCampaign campaign : approaching) {
             try {
@@ -105,10 +110,10 @@ public class AccessReviewScheduler {
             }
         }
 
-        // 3. Process escalations for all active campaigns
-        List<AccessReviewCampaign> allActive = campaignRepo.findByStatusAndDeadlineBefore(
-                CampaignStatus.ACTIVE, OffsetDateTime.now().plusYears(10));
+        // 3. Process escalations for all active campaigns (excluding just-expired ones)
+        List<AccessReviewCampaign> allActive = campaignRepo.findByStatus(CampaignStatus.ACTIVE);
         for (AccessReviewCampaign campaign : allActive) {
+            if (overdueIds.contains(campaign.getId())) continue;
             try {
                 processEscalations(campaign);
             } catch (Exception e) {
@@ -118,28 +123,47 @@ public class AccessReviewScheduler {
     }
 
     /**
+     * Auto-activate UPCOMING campaigns whose scheduled start time has arrived.
+     */
+    private void activateScheduledCampaigns() {
+        List<AccessReviewCampaign> ready = campaignRepo.findByStatusAndStartsAtBefore(
+                CampaignStatus.UPCOMING, OffsetDateTime.now());
+
+        for (AccessReviewCampaign campaign : ready) {
+            try {
+                log.info("Auto-activating scheduled campaign '{}' (id={})", campaign.getName(), campaign.getId());
+                campaignService.activate(campaign.getDirectory().getId(), campaign.getId(), SYSTEM_PRINCIPAL);
+            } catch (Exception e) {
+                log.error("Failed to auto-activate campaign {}: {}", campaign.getId(), e.getMessage(), e);
+            }
+        }
+    }
+
+    /**
      * Sends deadline reminders only to reviewers who have pending decisions
-     * and haven't already received a DEADLINE reminder for this campaign.
+     * and haven't received a DEADLINE reminder within the last 24 hours.
      */
     private void sendDeadlineRemindersWithTracking(AccessReviewCampaign campaign) {
-        Set<Account> notified = new HashSet<>();
+        OffsetDateTime oneDayAgo = OffsetDateTime.now().minusHours(24);
+        Set<Account> toNotify = new HashSet<>();
+
         for (AccessReviewGroup group : campaign.getReviewGroups()) {
             Account reviewer = group.getReviewer();
-            if (notified.contains(reviewer)) continue;
+            if (toNotify.contains(reviewer)) continue;
 
             long pending = decisionRepo.countByReviewGroupIdAndDecisionIsNull(group.getId());
             if (pending == 0) continue;
 
-            boolean alreadySent = reminderRepo.existsByCampaignIdAndReviewerAccountIdAndReminderType(
-                    campaign.getId(), reviewer.getId(), ReminderType.DEADLINE);
-            if (alreadySent) continue;
+            boolean recentlySent = reminderRepo.existsByCampaignIdAndReviewerAccountIdAndReminderTypeAndSentAtAfter(
+                    campaign.getId(), reviewer.getId(), ReminderType.DEADLINE, oneDayAgo);
+            if (recentlySent) continue;
 
-            notified.add(reviewer);
+            toNotify.add(reviewer);
             reminderRepo.save(new CampaignReminder(campaign, reviewer, ReminderType.DEADLINE));
         }
-        // Delegate actual email sending to the existing method
-        if (!notified.isEmpty()) {
-            notificationService.notifyDeadlineApproaching(campaign);
+
+        if (!toNotify.isEmpty()) {
+            notificationService.notifyDeadlineApproaching(campaign, toNotify);
         }
     }
 
@@ -149,11 +173,11 @@ public class AccessReviewScheduler {
      * the campaign creator.
      */
     void processEscalations(AccessReviewCampaign campaign) {
-        if (campaign.getStartsAt() == null && campaign.getCreatedAt() == null) return;
+        OffsetDateTime activeSince = campaign.getStartsAt() != null
+                ? campaign.getStartsAt() : campaign.getCreatedAt();
+        if (activeSince == null) return;
 
-        OffsetDateTime activeSince = campaign.getStartsAt() != null ? campaign.getStartsAt() : campaign.getCreatedAt();
         OffsetDateTime escalationThreshold = activeSince.plusDays(escalationDays);
-
         if (OffsetDateTime.now().isBefore(escalationThreshold)) return;
 
         for (AccessReviewGroup group : campaign.getReviewGroups()) {
@@ -179,10 +203,8 @@ public class AccessReviewScheduler {
      * Creates REVOKE decisions with SYSTEM actor and removes LDAP members.
      * Guarded by the global auto-revoke-enabled kill switch.
      */
-    void executeAutoRevokeOnExpiry(AccessReviewCampaign campaign, AuthPrincipal systemPrincipal) {
+    void executeAutoRevokeOnExpiry(AccessReviewCampaign campaign) {
         log.info("Executing auto-revoke on expiry for campaign '{}' (id={})", campaign.getName(), campaign.getId());
-
-        Account systemAccount = accountRepo.findById(systemPrincipal.id()).orElse(null);
 
         for (AccessReviewGroup group : campaign.getReviewGroups()) {
             List<AccessReviewDecision> undecided = decisionRepo.findByReviewGroupId(group.getId()).stream()
@@ -192,7 +214,6 @@ public class AccessReviewScheduler {
             for (AccessReviewDecision decision : undecided) {
                 try {
                     decision.setDecision(ReviewDecision.REVOKE);
-                    decision.setDecidedBy(systemAccount);
                     decision.setDecidedAt(OffsetDateTime.now());
                     decision.setComment("Auto-revoked on campaign expiry");
 
@@ -205,7 +226,7 @@ public class AccessReviewScheduler {
                     decision.setRevokedAt(OffsetDateTime.now());
                     decisionRepo.save(decision);
 
-                    auditService.record(systemPrincipal, campaign.getDirectory().getId(),
+                    auditService.record(SYSTEM_PRINCIPAL, campaign.getDirectory().getId(),
                             AuditAction.REVIEW_AUTO_REVOKED,
                             decision.getMemberDn(),
                             Map.of("groupDn", group.getGroupDn(),
@@ -220,17 +241,5 @@ public class AccessReviewScheduler {
                 }
             }
         }
-    }
-
-    private AuthPrincipal resolveSystemPrincipal() {
-        // Use the first active superadmin as the system principal for audit records
-        List<Account> superadmins = accountRepo.findAllByRoleAndActiveTrue(AccountRole.SUPERADMIN);
-        if (!superadmins.isEmpty()) {
-            Account sa = superadmins.get(0);
-            return new AuthPrincipal(PrincipalType.SUPERADMIN, sa.getId(), sa.getUsername());
-        }
-        // Fallback — should not happen in a properly configured system
-        log.warn("No active superadmin found for system audit principal");
-        return new AuthPrincipal(PrincipalType.SUPERADMIN, UUID.randomUUID(), "system");
     }
 }

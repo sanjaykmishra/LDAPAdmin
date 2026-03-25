@@ -60,6 +60,7 @@ public enum AuditAction {
     SOD_VIOLATION_DETECTED("sod.violation_detected"),
     SOD_VIOLATION_EXEMPTED("sod.violation_exempted"),
     SOD_VIOLATION_BLOCKED ("sod.violation_blocked"),
+    SOD_VIOLATION_RESOLVED("sod.violation_resolved"),
 
     // ── Lifecycle playbooks ─────────────────────────────────────────────────
     PLAYBOOK_EXECUTED    ("playbook.executed"),

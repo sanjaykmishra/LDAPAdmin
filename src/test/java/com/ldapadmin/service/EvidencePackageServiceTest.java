@@ -101,7 +101,7 @@ class EvidencePackageServiceTest {
         when(pdfReportService.generatePrivilegedAccountInventory()).thenReturn(new byte[0]);
         when(campaignRepo.findById(campaignId)).thenReturn(Optional.of(campaign));
         when(pdfReportService.generateAccessReviewSummary(campaignId)).thenReturn("summary-pdf".getBytes());
-        when(campaignService.exportCsv(campaignId)).thenReturn("csv-data".getBytes());
+        when(campaignService.exportCsv(directoryId, campaignId)).thenReturn("csv-data".getBytes());
         when(historyRepo.findByCampaignIdOrderByChangedAtAsc(campaignId)).thenReturn(List.of());
         when(approvalRepo.findAllByDirectoryIdOrderByCreatedAtDesc(directoryId)).thenReturn(List.of());
 

@@ -38,4 +38,5 @@ public class SodViolation {
     private Account exemptedBy;
 
     private String exemptionReason;
+    private OffsetDateTime exemptionExpiresAt;
 }
