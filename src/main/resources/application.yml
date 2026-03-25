@@ -74,6 +74,10 @@ ldapadmin:
     escalation-days:     ${ACCESS_REVIEW_ESCALATION_DAYS:14}
     auto-revoke-enabled: ${ACCESS_REVIEW_AUTO_REVOKE_ENABLED:false}
     expiry-cron:         ${ACCESS_REVIEW_EXPIRY_CRON:0 0 2 * * ?}
+  hr:
+    poll-interval-ms:       ${HR_POLL_INTERVAL_MS:60000}
+    sync-timeout-minutes:   ${HR_SYNC_TIMEOUT_MINUTES:30}
+    max-employees-per-sync: ${HR_MAX_EMPLOYEES:50000}
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 # JSON format is configured in logback-spring.xml.

@@ -34,7 +34,9 @@ public enum FeatureKey {
     USER_READ            ("user.read"),
     GROUP_READ           ("group.read"),
     SOD_MANAGE           ("sod.manage"),
-    SOD_VIEW             ("sod.view");
+    SOD_VIEW             ("sod.view"),
+    HR_MANAGE            ("hr.manage"),
+    HR_VIEW              ("hr.view");
 
     private final String dbValue;
 

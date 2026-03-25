@@ -162,6 +162,32 @@ if [ -n "$wrapperSha256Sum" ]; then
   fi
 fi
 
+# Determine the Java command to use to start the JVM.
+if [ -n "$JAVA_HOME" ] ; then
+    if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
+        # IBM's JDK on AIX uses strange locations for the executables
+        JAVACMD="$JAVA_HOME/jre/sh/java"
+    else
+        JAVACMD="$JAVA_HOME/bin/java"
+    fi
+    if [ ! -x "$JAVACMD" ] ; then
+        echo "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME"
+        echo ""
+        echo "Please set the JAVA_HOME variable in your environment to match the"
+        echo "location of your Java installation." >&2
+        exit 1
+    fi
+else
+    JAVACMD="$(\unset -f command 2>/dev/null; \command -v java)" || :
+    if [ ! -x "$JAVACMD" ] ; then
+        echo "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH."
+        echo ""
+        echo "Please set the JAVA_HOME variable in your environment to match the"
+        echo "location of your Java installation." >&2
+        exit 1
+    fi
+fi
+
 MAVEN_OPTS="$(concat_lines "$MAVEN_PROJECTBASEDIR/.mvn/jvm.config") $MAVEN_OPTS"
 
 # shellcheck disable=SC2086 # safe args

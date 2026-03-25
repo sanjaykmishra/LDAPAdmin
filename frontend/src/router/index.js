@@ -132,6 +132,18 @@ const router = createRouter({
           meta: { requiresSuperadmin: true },
         },
 
+        // HR Integration
+        {
+          path: 'directories/:dirId/hr',
+          name: 'hrConnection',
+          component: () => import('@/views/hr/HrConnectionView.vue'),
+        },
+        {
+          path: 'directories/:dirId/hr/employees',
+          name: 'hrEmployees',
+          component: () => import('@/views/hr/HrEmployeesView.vue'),
+        },
+
         // Access Reviews
         {
           path: 'directories/:dirId/access-reviews',
