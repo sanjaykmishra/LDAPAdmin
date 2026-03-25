@@ -50,6 +50,13 @@ public class ApplicationSettingsController {
         return service.upsert(req);
     }
 
+    /** Marks first-run setup as complete. Called by the setup wizard on the final step. */
+    @PostMapping("/complete-setup")
+    @PreAuthorize("hasRole('SUPERADMIN')")
+    public ApplicationSettingsDto completeSetup() {
+        return service.markSetupComplete();
+    }
+
     /** Tests SIEM connectivity by sending a synthetic audit event. */
     @PostMapping("/siem/test")
     @PreAuthorize("hasRole('SUPERADMIN')")

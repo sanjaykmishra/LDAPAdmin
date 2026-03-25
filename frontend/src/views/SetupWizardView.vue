@@ -121,7 +121,11 @@
                 <p class="text-xs text-gray-600">Groups found</p>
               </div>
             </div>
-            <div v-if="verifyData.userCount === 0 && verifyData.groupCount === 0"
+            <div v-if="verifyError"
+                 class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+              Failed to query directory: {{ verifyError }}
+            </div>
+            <div v-else-if="verifyData.userCount === 0 && verifyData.groupCount === 0"
                  class="bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-lg px-4 py-3 text-sm">
               No entries found. Check your base DN and try again.
             </div>
@@ -210,7 +214,7 @@
             <button @click="step = 4" class="btn-secondary">Back</button>
             <div class="flex gap-3">
               <button @click="step = 6" class="btn-secondary">Skip</button>
-              <button @click="createReview" :disabled="!campaign.groupDn || saving" class="btn-primary">
+              <button @click="createReview" :disabled="!campaign.groupDn || campaign.deadlineDays < 1 || saving" class="btn-primary">
                 {{ saving ? 'Creating...' : 'Create Campaign & Continue' }}
               </button>
             </div>
@@ -264,11 +268,11 @@ import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSettingsStore } from '@/stores/settings'
-import { testDirectory, createDirectory } from '@/api/directories'
+import { testDirectory, createDirectory, updateDirectory } from '@/api/directories'
 import { createProfile } from '@/api/profiles'
 import { listObjectClasses } from '@/api/schema'
 import { createCampaign } from '@/api/accessReviews'
-import { getSettings, updateSettings } from '@/api/settings'
+import { completeSetup as apiCompleteSetup } from '@/api/settings'
 import GroupDnPicker from '@/components/GroupDnPicker.vue'
 
 const router = useRouter()
@@ -297,7 +301,8 @@ const dir = ref({
 const directoryId = ref(null)
 
 const canTest = computed(() =>
-  dir.value.host && dir.value.bindDn && dir.value.bindPassword && dir.value.baseDn
+  dir.value.displayName && dir.value.host && dir.value.bindDn && dir.value.bindPassword && dir.value.baseDn
+    && dir.value.port > 0 && dir.value.port <= 65535
 )
 
 async function testConnection() {
@@ -315,7 +320,7 @@ async function testConnection() {
     })
     testResult.value = { ok: data.success, message: data.success ? `Connected successfully (${data.responseTimeMs}ms)` : data.error }
   } catch (e) {
-    testResult.value = { ok: false, message: e.response?.data?.message || e.message }
+    testResult.value = { ok: false, message: e.response?.data?.detail || e.response?.data?.message || e.message }
   } finally {
     testing.value = false
   }
@@ -325,7 +330,7 @@ async function saveDirectory() {
   saving.value = true
   error.value = ''
   try {
-    const { data } = await createDirectory({
+    const payload = {
       displayName: dir.value.displayName,
       host: dir.value.host,
       port: dir.value.port,
@@ -346,11 +351,19 @@ async function saveDirectory() {
       disableValue: null,
       auditDataSourceId: null,
       enabled: true,
-    })
-    directoryId.value = data.id
+    }
+    if (directoryId.value) {
+      // Update existing directory if user went back and changed settings
+      await updateDirectory(directoryId.value, payload)
+    } else {
+      const { data } = await createDirectory(payload)
+      directoryId.value = data.id
+    }
+    // Reset verification data so Step 3 re-queries with updated config
+    verifyData.value = { userCount: 0, groupCount: 0, sampleUsers: [] }
     step.value = 3
   } catch (e) {
-    error.value = e.response?.data?.message || e.message
+    error.value = e.response?.data?.detail || e.response?.data?.message || e.message
   } finally {
     saving.value = false
   }
@@ -358,25 +371,30 @@ async function saveDirectory() {
 
 // ── Step 3: Verify ─────────────────────────────────────────────────────
 const verifying = ref(false)
-const verifyData = ref({ userCount: 0, groupCount: 0, sampleUsers: [] })
+const verifyError = ref('')
+const verifyData = ref({ userCount: 0, groupCount: 0, sampleUsers: [], capped: false })
 
 watch(step, async (s) => {
   if (s !== 3) return
+  // Skip re-verification if already successfully loaded
+  if (verifyData.value.userCount > 0 || verifyData.value.groupCount > 0) return
   verifying.value = true
+  verifyError.value = ''
   try {
+    const fetchLimit = 201 // fetch 201 to detect "more than 200"
     const [usersRes, groupsRes] = await Promise.all([
-      import('@/api/users').then(m => m.searchUsers(directoryId.value, { maxResults: 5 })),
-      import('@/api/groups').then(m => m.searchGroups(directoryId.value, { maxResults: 5 })),
+      import('@/api/users').then(m => m.searchUsers(directoryId.value, { limit: fetchLimit })),
+      import('@/api/groups').then(m => m.searchGroups(directoryId.value, { limit: fetchLimit })),
     ])
     const users = Array.isArray(usersRes.data) ? usersRes.data : []
     const groups = Array.isArray(groupsRes.data) ? groupsRes.data : []
     verifyData.value = {
-      userCount: users.length,
-      groupCount: groups.length,
+      userCount: users.length >= fetchLimit ? '200+' : users.length,
+      groupCount: groups.length >= fetchLimit ? '200+' : groups.length,
       sampleUsers: users.slice(0, 5).map(u => u.dn || u.attributes?.dn || 'unknown'),
     }
   } catch (e) {
-    console.warn('Verify failed:', e)
+    verifyError.value = e.response?.data?.detail || e.response?.data?.message || e.message
   } finally {
     verifying.value = false
   }
@@ -420,11 +438,18 @@ watch(step, async (s) => {
   }
 })
 
+const profileId = ref(null)
+
 async function saveProfile() {
+  if (profileId.value) {
+    // Profile already created — skip to next step
+    step.value = 5
+    return
+  }
   saving.value = true
   error.value = ''
   try {
-    await createProfile(directoryId.value, {
+    const { data } = await createProfile(directoryId.value, {
       name: profile.value.name,
       targetOuDn: profile.value.targetOuDn,
       objectClassNames: profile.value.objectClasses,
@@ -437,9 +462,10 @@ async function saveProfile() {
       attributeConfigs: [],
       groupAssignments: [],
     })
+    profileId.value = data.id
     step.value = 5
   } catch (e) {
-    error.value = e.response?.data?.message || e.message
+    error.value = e.response?.data?.detail || e.response?.data?.message || e.message
   } finally {
     saving.value = false
   }
@@ -471,7 +497,7 @@ async function createReview() {
     campaignId.value = data.id
     step.value = 6
   } catch (e) {
-    error.value = e.response?.data?.message || e.message
+    error.value = e.response?.data?.detail || e.response?.data?.message || e.message
   } finally {
     saving.value = false
   }
@@ -482,56 +508,11 @@ async function completeSetup() {
   saving.value = true
   error.value = ''
   try {
-    // Read current settings, merge setupCompleted, then write back
-    const { data: current } = await getSettings()
-    await updateSettings({
-      appName: current.appName || 'LDAP Portal',
-      logoUrl: current.logoUrl,
-      primaryColour: current.primaryColour,
-      secondaryColour: current.secondaryColour,
-      superadminBypassApproval: current.superadminBypassApproval || false,
-      sessionTimeoutMinutes: current.sessionTimeoutMinutes || 60,
-      smtpHost: current.smtpHost,
-      smtpPort: current.smtpPort,
-      smtpSenderAddress: current.smtpSenderAddress,
-      smtpUsername: current.smtpUsername,
-      smtpPassword: null, // preserve
-      smtpUseTls: current.smtpUseTls ?? true,
-      s3EndpointUrl: current.s3EndpointUrl,
-      s3BucketName: current.s3BucketName,
-      s3AccessKey: current.s3AccessKey,
-      s3SecretKey: null, // preserve
-      s3Region: current.s3Region,
-      s3PresignedUrlTtlHours: current.s3PresignedUrlTtlHours || 24,
-      enabledAuthTypes: current.enabledAuthTypes,
-      ldapAuthHost: current.ldapAuthHost,
-      ldapAuthPort: current.ldapAuthPort,
-      ldapAuthSslMode: current.ldapAuthSslMode,
-      ldapAuthTrustAllCerts: current.ldapAuthTrustAllCerts,
-      ldapAuthTrustedCertPem: current.ldapAuthTrustedCertPem,
-      ldapAuthBindDn: current.ldapAuthBindDn,
-      ldapAuthBindPassword: null, // preserve
-      ldapAuthUserSearchBase: current.ldapAuthUserSearchBase,
-      ldapAuthBindDnPattern: current.ldapAuthBindDnPattern,
-      oidcIssuerUrl: current.oidcIssuerUrl,
-      oidcClientId: current.oidcClientId,
-      oidcClientSecret: null, // preserve
-      oidcScopes: current.oidcScopes,
-      oidcUsernameClaim: current.oidcUsernameClaim,
-      siemEnabled: current.siemEnabled,
-      siemProtocol: current.siemProtocol,
-      siemHost: current.siemHost,
-      siemPort: current.siemPort,
-      siemFormat: current.siemFormat,
-      siemAuthToken: null, // preserve
-      webhookUrl: current.webhookUrl,
-      webhookAuthHeader: null, // preserve
-      setupCompleted: true,
-    })
+    await apiCompleteSetup()
     auth.markSetupComplete()
     router.push('/superadmin/dashboard')
   } catch (e) {
-    error.value = e.response?.data?.message || e.message
+    error.value = e.response?.data?.detail || e.response?.data?.message || e.message
   } finally {
     saving.value = false
   }
