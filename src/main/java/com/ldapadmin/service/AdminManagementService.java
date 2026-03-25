@@ -52,6 +52,7 @@ public class AdminManagementService {
     /**
      * Lists admins who have at least one profile role in the given directory.
      */
+    @Transactional(readOnly = true)
     public List<AdminAccountResponse> listAdminsByDirectory(UUID directoryId) {
         return profileRoleRepo.findAllByProfileDirectoryId(directoryId).stream()
                 .map(apr -> apr.getAdminAccount())

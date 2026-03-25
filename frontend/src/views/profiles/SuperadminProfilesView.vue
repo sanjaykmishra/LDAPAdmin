@@ -851,7 +851,7 @@ function toggleApprover(accountId) {
             Add object classes in the General tab to populate attributes.
           </div>
           <div v-for="(attr, i) in profile.attributeConfigs" :key="i"
-            class="border rounded-lg p-3 space-y-2">
+            class="border border-gray-300 rounded-lg p-3 space-y-2">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
                 <span class="font-medium text-sm">{{ attr.attributeName }}</span>
@@ -968,7 +968,7 @@ function toggleApprover(accountId) {
         <!-- Groups Tab -->
         <div v-if="modalTab === 'groups'" class="space-y-5">
           <!-- Group inclusion settings -->
-          <fieldset class="border rounded-lg p-4 space-y-2">
+          <fieldset class="border border-gray-300 rounded-lg p-4 space-y-2">
             <legend class="text-sm font-semibold text-gray-700 px-1">Group Inclusion</legend>
             <label class="flex items-center gap-2 text-sm">
               <input type="checkbox" v-model="profile.autoIncludeGroups" @change="onAutoIncludeToggle" />
@@ -983,7 +983,7 @@ function toggleApprover(accountId) {
           </fieldset>
 
           <!-- Own group assignments -->
-          <fieldset class="border rounded-lg p-4 space-y-3">
+          <fieldset class="border border-gray-300 rounded-lg p-4 space-y-3">
             <legend class="text-sm font-semibold text-gray-700 px-1">Own Group Assignments</legend>
             <p class="text-sm text-gray-600">Groups users will be automatically added to on creation.</p>
             <div v-for="(g, i) in profile.groupAssignments" :key="i" class="flex gap-2 items-end">
@@ -1005,7 +1005,7 @@ function toggleApprover(accountId) {
           </fieldset>
 
           <!-- Additional profiles (hidden for auto-include profiles to prevent cascading) -->
-          <fieldset v-if="!profile.autoIncludeGroups" class="border rounded-lg p-4 space-y-3">
+          <fieldset v-if="!profile.autoIncludeGroups" class="border border-gray-300 rounded-lg p-4 space-y-3">
             <legend class="text-sm font-semibold text-gray-700 px-1">Additional Profiles</legend>
             <p class="text-sm text-gray-600">Select other profiles whose group assignments should also be applied to users provisioned with this profile.</p>
             <div v-if="availableAdditionalProfiles.length === 0" class="text-sm text-gray-400 italic">
@@ -1023,7 +1023,7 @@ function toggleApprover(accountId) {
           </fieldset>
 
           <!-- Auto-included profiles (read-only) -->
-          <fieldset v-if="autoIncludedProfiles.length > 0 && !profile.excludeAutoIncludes" class="border rounded-lg p-4 space-y-2">
+          <fieldset v-if="autoIncludedProfiles.length > 0 && !profile.excludeAutoIncludes" class="border border-gray-300 rounded-lg p-4 space-y-2">
             <legend class="text-sm font-semibold text-gray-700 px-1">Auto-included Profiles</legend>
             <p class="text-sm text-gray-500">These profiles have "Automatically include with other profiles" enabled and their groups are included automatically.</p>
             <div class="flex flex-wrap gap-2">
@@ -1035,7 +1035,7 @@ function toggleApprover(accountId) {
           </fieldset>
 
           <!-- Effective groups summary -->
-          <fieldset v-if="editing && effectiveGroups.length > 0" class="border rounded-lg p-4 space-y-2">
+          <fieldset v-if="editing && effectiveGroups.length > 0" class="border border-gray-300 rounded-lg p-4 space-y-2">
             <legend class="text-sm font-semibold text-gray-700 px-1">Effective Group Set</legend>
             <p class="text-sm text-gray-500">The combined set of groups that will be assigned on provisioning (own + additional + auto-included).</p>
             <div class="space-y-1">
@@ -1049,7 +1049,7 @@ function toggleApprover(accountId) {
         <!-- Policy Tab -->
         <div v-if="modalTab === 'policy'" class="space-y-4">
           <!-- Password Generation Settings -->
-          <fieldset class="border rounded-lg p-3 space-y-3">
+          <fieldset class="border border-gray-300 rounded-lg p-3 space-y-3">
             <legend class="text-sm font-semibold text-gray-800 px-1">Password Generation</legend>
             <div class="grid grid-cols-6 gap-3">
               <div class="col-span-2">
@@ -1184,7 +1184,7 @@ function toggleApprover(accountId) {
         </p>
         <div class="max-h-80 overflow-y-auto space-y-3">
           <div v-for="change in groupChangePreview.changes" :key="change.userDn"
-            class="border rounded-lg p-3 text-sm">
+            class="border border-gray-300 rounded-lg p-3 text-sm">
             <div class="font-mono text-gray-800 mb-1">{{ change.userDn }}</div>
             <div v-for="g in change.groupsToAdd" :key="g.groupDn" class="text-green-700 ml-4">
               + Add to {{ g.groupDn }}
