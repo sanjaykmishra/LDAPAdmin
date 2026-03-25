@@ -64,7 +64,7 @@ public class AccessReviewController {
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody CreateCampaignRequest req) {
         var campaign = campaignService.create(directoryId, req, principal);
-        return ResponseEntity.status(HttpStatus.CREATED).body(campaignService.get(campaign.getId()));
+        return ResponseEntity.status(HttpStatus.CREATED).body(campaignService.get(directoryId, campaign.getId()));
     }
 
     @GetMapping("/{campaignId}")
@@ -73,7 +73,7 @@ public class AccessReviewController {
             @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID campaignId,
             @AuthenticationPrincipal AuthPrincipal principal) {
-        return campaignService.get(campaignId);
+        return campaignService.get(directoryId, campaignId);
     }
 
     @PostMapping("/{campaignId}/activate")
@@ -82,8 +82,8 @@ public class AccessReviewController {
             @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID campaignId,
             @AuthenticationPrincipal AuthPrincipal principal) {
-        campaignService.activate(campaignId, principal);
-        return campaignService.get(campaignId);
+        campaignService.activate(directoryId, campaignId, principal);
+        return campaignService.get(directoryId, campaignId);
     }
 
     @PostMapping("/{campaignId}/close")
@@ -93,8 +93,8 @@ public class AccessReviewController {
             @PathVariable UUID campaignId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam(defaultValue = "false") boolean force) {
-        campaignService.close(campaignId, force, principal);
-        return campaignService.get(campaignId);
+        campaignService.close(directoryId, campaignId, force, principal);
+        return campaignService.get(directoryId, campaignId);
     }
 
     @PostMapping("/{campaignId}/cancel")
@@ -103,8 +103,8 @@ public class AccessReviewController {
             @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID campaignId,
             @AuthenticationPrincipal AuthPrincipal principal) {
-        campaignService.cancel(campaignId, principal);
-        return campaignService.get(campaignId);
+        campaignService.cancel(directoryId, campaignId, principal);
+        return campaignService.get(directoryId, campaignId);
     }
 
     // ── Review groups & decisions ────────────────────────────────────────────
@@ -115,7 +115,7 @@ public class AccessReviewController {
             @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID campaignId,
             @AuthenticationPrincipal AuthPrincipal principal) {
-        return campaignService.listReviewGroups(campaignId, principal);
+        return campaignService.listReviewGroups(directoryId, campaignId, principal);
     }
 
     @GetMapping("/{campaignId}/groups/{groupId}/decisions")
@@ -160,7 +160,7 @@ public class AccessReviewController {
             @PathVariable UUID campaignId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam(defaultValue = "csv") String format) {
-        byte[] data = campaignService.exportCsv(campaignId);
+        byte[] data = campaignService.exportCsv(directoryId, campaignId);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType("text/csv"));
         headers.setContentDisposition(
@@ -174,7 +174,7 @@ public class AccessReviewController {
             @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID campaignId,
             @AuthenticationPrincipal AuthPrincipal principal) {
-        return campaignService.listReminders(campaignId);
+        return campaignService.listReminders(directoryId, campaignId);
     }
 
     @GetMapping("/{campaignId}/history")
@@ -183,6 +183,6 @@ public class AccessReviewController {
             @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID campaignId,
             @AuthenticationPrincipal AuthPrincipal principal) {
-        return campaignService.getHistory(campaignId);
+        return campaignService.getHistory(directoryId, campaignId);
     }
 }

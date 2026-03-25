@@ -84,7 +84,7 @@ public class EvidencePackageService {
         addPdfReports(files, directoryId);
 
         // ── Campaign-specific data ──────────────────────────────────────────
-        addCampaignData(files, campaignIds);
+        addCampaignData(files, directoryId, campaignIds);
 
         // ── SoD data (optional) ─────────────────────────────────────────────
         if (includeSod) {
@@ -128,7 +128,7 @@ public class EvidencePackageService {
 
     // ── Campaign data ─────────────────────────────────────────────────────────
 
-    private void addCampaignData(Map<String, byte[]> files, List<UUID> campaignIds) {
+    private void addCampaignData(Map<String, byte[]> files, UUID directoryId, List<UUID> campaignIds) {
         for (UUID campaignId : campaignIds) {
             Optional<AccessReviewCampaign> opt = campaignRepo.findById(campaignId);
             if (opt.isEmpty()) {
@@ -151,7 +151,7 @@ public class EvidencePackageService {
 
             // Decisions CSV
             try {
-                byte[] csv = campaignService.exportCsv(campaignId);
+                byte[] csv = campaignService.exportCsv(directoryId, campaignId);
                 files.put(prefix + "decisions.csv", csv);
             } catch (Exception e) {
                 log.warn("Failed to export CSV for campaign {}: {}", campaignId, e.getMessage());

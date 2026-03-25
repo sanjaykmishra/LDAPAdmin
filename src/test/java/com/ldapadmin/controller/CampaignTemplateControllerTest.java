@@ -193,7 +193,7 @@ class CampaignTemplateControllerTest extends BaseControllerTest {
         var campaign = new AccessReviewCampaign();
         campaign.setId(campaignId);
         when(campaignService.create(eq(dirId), any(), any())).thenReturn(campaign);
-        when(campaignService.get(campaignId)).thenReturn(
+        when(campaignService.get(dirId, campaignId)).thenReturn(
                 new CampaignDetailDto(campaignId, "Test Template", "desc", CampaignStatus.UPCOMING,
                         null, OffsetDateTime.now().plusDays(30), 30, null, false, false,
                         OffsetDateTime.now(), null, "admin",
@@ -216,7 +216,7 @@ class CampaignTemplateControllerTest extends BaseControllerTest {
         var campaign = new AccessReviewCampaign();
         campaign.setId(campaignId);
         when(campaignService.create(eq(dirId), any(), any())).thenReturn(campaign);
-        when(campaignService.get(campaignId)).thenReturn(
+        when(campaignService.get(dirId, campaignId)).thenReturn(
                 new CampaignDetailDto(campaignId, "Custom Name", "Custom Desc", CampaignStatus.UPCOMING,
                         null, OffsetDateTime.now().plusDays(30), 30, null, false, false,
                         OffsetDateTime.now(), null, "admin",
