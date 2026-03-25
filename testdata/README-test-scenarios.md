@@ -8,8 +8,33 @@ ldapadd -x -D "cn=admin,dc=acmecorp,dc=com" -w <password> \
   -f testdata/acmecorp-5000-users.ldif
 
 # 2. Load the test scenarios (adds groups, modifies memberships, adds test users)
-#    This file contains both new entries (ldapadd) and modifications (ldapmodify).
-#    Use ldapmodify which handles both:
+ldapmodify -x -D "cn=admin,dc=acmecorp,dc=com" -w <password> \
+  -a -f testdata/acmecorp-test-scenarios.ldif
+
+# 3. (Optional) Create orphaned entries for integrity check:
+#    Delete the temporary parent OUs — their children become orphaned.
+#    NOTE: Requires the LDAP server to support deleting non-leaf entries,
+#    or use the tree-delete control. If this fails, skip the orphaned-entry test.
+ldapdelete -x -D "cn=admin,dc=acmecorp,dc=com" -w <password> \
+  "ou=Contractors,ou=People,dc=acmecorp,dc=com"
+ldapdelete -x -D "cn=admin,dc=acmecorp,dc=com" -w <password> \
+  "ou=Vendors,ou=People,dc=acmecorp,dc=com"
+```
+
+### Re-importing (cleanup first)
+
+If you need to re-import after a previous load:
+
+```bash
+# 1. Remove members added to existing groups
+ldapmodify -x -D "cn=admin,dc=acmecorp,dc=com" -w <password> \
+  -f testdata/acmecorp-test-cleanup.ldif
+
+# 2. Delete test entries (users, new groups, OUs)
+bash testdata/acmecorp-test-cleanup-delete.sh \
+  "cn=admin,dc=acmecorp,dc=com" <password>
+
+# 3. Re-import
 ldapmodify -x -D "cn=admin,dc=acmecorp,dc=com" -w <password> \
   -a -f testdata/acmecorp-test-scenarios.ldif
 ```
@@ -159,7 +184,7 @@ This simulates an incomplete onboarding process where the employee was created i
 
 ## Test 6: Disabled Accounts in Sensitive Groups
 
-These 4 terminated accounts have `nsAccountLock: TRUE` and `employeeType: Terminated` but remain in sensitive groups:
+These 4 terminated accounts have `employeeType: Terminated` and `loginShell: /sbin/nologin` but remain in sensitive groups:
 
 | User | Former Role | Sensitive Groups Still In |
 |---|---|---|
@@ -172,7 +197,7 @@ These 4 terminated accounts have `nsAccountLock: TRUE` and `employeeType: Termin
 
 1. **Access Drift** will flag these users as anomalies in their peer group (their terminated status makes them outliers).
 2. **User Access Report** will show them with active group memberships despite being disabled.
-3. **Search** for `nsAccountLock=TRUE` in the LDAP Search page to list all disabled accounts, then cross-reference with group memberships.
+3. **Search** for `(employeeType=Terminated)` in the LDAP Search page to list all disabled accounts, then cross-reference with group memberships.
 
 ---
 
@@ -185,4 +210,4 @@ These 4 terminated accounts have `nsAccountLock: TRUE` and `employeeType: Termin
 | **Integrity Check** | Superadmin > Integrity Check | Directory, Base DN: `dc=acmecorp,dc=com`, Checks: all 3 |
 | **User Access Report** | Superadmin > Compliance Reports | No group filter (shows all users including ungrouped) |
 | **Group Membership Report** | Superadmin > Reports > Run Report Now | Type: GROUP_MEMBERSHIP, Param: specific group DN |
-| **LDAP Search (disabled accts)** | Superadmin > LDAP Search | Base DN: `dc=acmecorp,dc=com`, Filter: `(nsAccountLock=TRUE)` |
+| **LDAP Search (disabled accts)** | Superadmin > LDAP Search | Base DN: `dc=acmecorp,dc=com`, Filter: `(employeeType=Terminated)` |
