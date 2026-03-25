@@ -12,6 +12,11 @@ import java.util.Map;
 
 /**
  * Converts {@link AuditEvent} instances into SIEM-consumable string formats.
+ *
+ * <p><b>Thread safety note:</b> This component accesses only eagerly-loaded fields
+ * of {@code AuditEvent} (all fields are set via the builder before persistence).
+ * It must NOT access any lazy-loaded JPA relationships, as events may be passed
+ * from async contexts where the persistence context is closed.</p>
  */
 @Component
 public class SiemFormatter {
@@ -20,6 +25,8 @@ public class SiemFormatter {
     private static final String DEVICE_VENDOR = "LDAPAdmin";
     private static final String DEVICE_PRODUCT = "LDAPAdmin";
     private static final String DEVICE_VERSION = "1.0";
+
+    private static final String LEEF_VERSION = "2.0";
 
     private final ObjectMapper objectMapper;
 
@@ -34,6 +41,7 @@ public class SiemFormatter {
         return switch (fmt) {
             case RFC5424 -> toRfc5424(event);
             case CEF -> toCef(event);
+            case LEEF -> toLeef(event);
             case JSON -> toJson(event);
         };
     }
@@ -53,9 +61,9 @@ public class SiemFormatter {
         String procId = "-";
         String msgId = event.getAction().name();
 
-        // Structured data
+        // Structured data — using enterprise number 32473 (experimental/documentation per RFC 5424 §7.2.2)
         StringBuilder sd = new StringBuilder();
-        sd.append("[event@0 ");
+        sd.append("[event@32473 ");
         sd.append("id=\"").append(event.getId()).append("\" ");
         sd.append("action=\"").append(event.getAction().name()).append("\" ");
         sd.append("source=\"").append(event.getSource().name()).append("\"");
@@ -94,21 +102,21 @@ public class SiemFormatter {
      * {@code CEF:0|vendor|product|version|signatureId|name|severity|extension}
      */
     private String toCef(AuditEvent event) {
-        String signatureId = event.getAction().name();
-        String name = event.getAction().name();
+        String signatureId = escapeCefHeader(event.getAction().name());
+        String name = escapeCefHeader(event.getAction().name());
         int severity = cefSeverity(event);
 
         StringBuilder ext = new StringBuilder();
         ext.append("rt=").append(event.getOccurredAt().toInstant().toEpochMilli());
         if (event.getActorUsername() != null) {
-            ext.append(" suser=").append(escapeCef(event.getActorUsername()));
+            ext.append(" suser=").append(escapeCefExt(event.getActorUsername()));
         }
         if (event.getTargetDn() != null) {
-            ext.append(" cs1=").append(escapeCef(event.getTargetDn()));
+            ext.append(" cs1=").append(escapeCefExt(event.getTargetDn()));
             ext.append(" cs1Label=targetDn");
         }
         if (event.getDirectoryName() != null) {
-            ext.append(" cs2=").append(escapeCef(event.getDirectoryName()));
+            ext.append(" cs2=").append(escapeCefExt(event.getDirectoryName()));
             ext.append(" cs2Label=directoryName");
         }
         if (event.getSource() != null) {
@@ -122,19 +130,73 @@ public class SiemFormatter {
     }
 
     private int cefSeverity(AuditEvent event) {
-        return switch (event.getAction().name()) {
-            case String s when s.contains("DELETE") || s.contains("REVOKE") -> 7;
-            case String s when s.contains("CREATE") || s.contains("UPDATE") -> 3;
-            default -> 5;
-        };
+        String action = event.getAction().name();
+        // High severity: destructive actions, security blocks, access revocation
+        if (action.contains("DELETE") || action.contains("REVOKE")
+                || action.contains("BLOCKED") || action.contains("EXPIRED")) {
+            return 7;
+        }
+        // Medium-high: security-relevant status changes
+        if (action.contains("REJECTED") || action.contains("FAILED")
+                || action.contains("VIOLATION") || action.contains("ESCALATION")
+                || action.contains("ORPHAN")) {
+            return 6;
+        }
+        // Low: creation and modification
+        if (action.contains("CREATE") || action.contains("UPDATE")
+                || action.contains("SUBMITTED") || action.contains("ACTIVATED")) {
+            return 3;
+        }
+        return 5;
+    }
+
+    /** Escape CEF header fields: pipe characters must be escaped. */
+    private String escapeCefHeader(String value) {
+        return value.replace("\\", "\\\\").replace("|", "\\|");
     }
 
     /** Escape CEF extension values: backslash, equals, newlines. */
-    private String escapeCef(String value) {
+    private String escapeCefExt(String value) {
         return value.replace("\\", "\\\\")
                     .replace("=", "\\=")
                     .replace("\n", "\\n")
                     .replace("\r", "\\r");
+    }
+
+    // ── LEEF (Log Event Extended Format — IBM QRadar) ────────────────────────
+
+    /**
+     * LEEF format:
+     * {@code LEEF:2.0|Vendor|Product|Version|EventID|\tkey=value\tkey=value}
+     */
+    private String toLeef(AuditEvent event) {
+        String eventId = event.getAction().name();
+
+        StringBuilder attrs = new StringBuilder();
+        attrs.append("devTime=").append(event.getOccurredAt().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+        if (event.getActorUsername() != null) {
+            attrs.append("\tusrName=").append(event.getActorUsername());
+        }
+        if (event.getTargetDn() != null) {
+            attrs.append("\tidentSrc=").append(event.getTargetDn());
+        }
+        if (event.getDirectoryName() != null) {
+            attrs.append("\tresource=").append(event.getDirectoryName());
+        }
+        if (event.getSource() != null) {
+            attrs.append("\tpolicy=").append(event.getSource().name());
+        }
+        if (event.getId() != null) {
+            attrs.append("\tdevTimeFormat=ISO8601\tsev=").append(leefSeverity(event));
+        }
+
+        return String.format("LEEF:%s|%s|%s|%s|%s|%s",
+                LEEF_VERSION, DEVICE_VENDOR, DEVICE_PRODUCT, DEVICE_VERSION,
+                eventId, attrs);
+    }
+
+    private int leefSeverity(AuditEvent event) {
+        return cefSeverity(event); // same logic, 0-10 scale
     }
 
     // ── JSON ────────────────────────────────────────────────────────────────
@@ -145,18 +207,24 @@ public class SiemFormatter {
         map.put("timestamp", event.getOccurredAt().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
         map.put("source", event.getSource().name());
         map.put("action", event.getAction().name());
-        map.put("actorId", event.getActorId());
-        map.put("actorUsername", event.getActorUsername());
-        map.put("actorType", event.getActorType());
-        map.put("directoryId", event.getDirectoryId());
-        map.put("directoryName", event.getDirectoryName());
-        map.put("targetDn", event.getTargetDn());
-        map.put("detail", event.getDetail());
+        putIfNotNull(map, "actorId", event.getActorId());
+        putIfNotNull(map, "actorUsername", event.getActorUsername());
+        putIfNotNull(map, "actorType", event.getActorType());
+        putIfNotNull(map, "directoryId", event.getDirectoryId());
+        putIfNotNull(map, "directoryName", event.getDirectoryName());
+        putIfNotNull(map, "targetDn", event.getTargetDn());
+        putIfNotNull(map, "detail", event.getDetail());
         try {
             return objectMapper.writeValueAsString(map);
         } catch (JsonProcessingException e) {
             // Fallback: minimal JSON
             return "{\"id\":\"" + event.getId() + "\",\"action\":\"" + event.getAction().name() + "\"}";
+        }
+    }
+
+    private void putIfNotNull(Map<String, Object> map, String key, Object value) {
+        if (value != null) {
+            map.put(key, value);
         }
     }
 }

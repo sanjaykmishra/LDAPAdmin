@@ -83,6 +83,18 @@ class SiemClientTest {
         assertThat(result).contains("Connection test failed");
     }
 
+    @Test
+    void testConnectivity_tls_unreachableHost_returnsError() {
+        ApplicationSettings settings = new ApplicationSettings();
+        settings.setSiemProtocol(SiemProtocol.SYSLOG_TLS);
+        settings.setSiemHost("192.0.2.1");
+        settings.setSiemPort(6514);
+
+        String result = client.testConnectivity(settings);
+
+        assertThat(result).contains("Connection test failed");
+    }
+
     // ── send ────────────────────────────────────────────────────────────────
 
     @Test

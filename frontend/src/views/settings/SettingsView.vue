@@ -199,6 +199,7 @@
                 <option value="">-- select --</option>
                 <option value="SYSLOG_UDP">Syslog (UDP)</option>
                 <option value="SYSLOG_TCP">Syslog (TCP)</option>
+                <option value="SYSLOG_TLS">Syslog (TLS / RFC 5425)</option>
                 <option value="WEBHOOK">Webhook (HTTPS)</option>
               </select>
             </div>
@@ -209,21 +210,21 @@
                 <option value="">-- select --</option>
                 <option value="RFC5424">RFC 5424 (Syslog)</option>
                 <option value="CEF">CEF (Common Event Format)</option>
+                <option value="LEEF">LEEF (IBM QRadar)</option>
                 <option value="JSON">JSON</option>
               </select>
             </div>
           </div>
 
-          <!-- Syslog host/port (shown for SYSLOG_UDP and SYSLOG_TCP) -->
-          <div v-if="form.siemProtocol === 'SYSLOG_UDP' || form.siemProtocol === 'SYSLOG_TCP'"
+          <!-- Syslog host/port (shown for SYSLOG_UDP, SYSLOG_TCP, SYSLOG_TLS) -->
+          <div v-if="form.siemProtocol === 'SYSLOG_UDP' || form.siemProtocol === 'SYSLOG_TCP' || form.siemProtocol === 'SYSLOG_TLS'"
             class="grid grid-cols-2 gap-3">
             <FormField label="Host" v-model="form.siemHost" placeholder="siem.example.com" />
-            <FormField label="Port" v-model.number="form.siemPort" type="number" placeholder="514" />
-            <div>
-              <FormField label="Auth Token" v-model="form.siemAuthToken" type="password"
-                :placeholder="settings?.siemAuthTokenConfigured ? '●●●●●●●● (leave blank to keep)' : 'Optional'" />
-              <p class="text-xs text-gray-400 mt-1">Optional bearer token for authenticated syslog. Leave blank to keep existing.</p>
-            </div>
+            <FormField label="Port" v-model.number="form.siemPort" type="number"
+              :placeholder="form.siemProtocol === 'SYSLOG_TLS' ? '6514' : '514'" />
+            <p v-if="form.siemProtocol === 'SYSLOG_TLS'" class="col-span-2 text-xs text-gray-400">
+              TLS syslog (RFC 5425) uses the JVM's default trust store. To trust custom CAs, add them to the JVM cacerts.
+            </p>
           </div>
 
           <!-- Webhook URL (shown for WEBHOOK) -->
