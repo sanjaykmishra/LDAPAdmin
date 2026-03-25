@@ -29,17 +29,30 @@
           <div class="text-xs text-gray-500 truncate">
             Policy: <strong>{{ v.policyName }}</strong> &mdash; {{ v.userDn }}
           </div>
+          <div class="text-xs text-gray-500">
+            Conflicting groups:
+            <strong>{{ v.groupAName || v.groupADn }}</strong> &amp;
+            <strong>{{ v.groupBName || v.groupBDn }}</strong>
+          </div>
           <div class="text-xs text-gray-400">
             Detected: {{ fmtDate(v.detectedAt) }}
             <template v-if="v.resolvedAt"> &mdash; Resolved: {{ fmtDate(v.resolvedAt) }}</template>
           </div>
           <div v-if="v.exemptionReason" class="text-xs text-gray-500 mt-1">
             Exempted by {{ v.exemptedByUsername }}: {{ v.exemptionReason }}
+            <template v-if="v.exemptionExpiresAt">
+              (expires {{ fmtDate(v.exemptionExpiresAt) }})
+            </template>
           </div>
         </div>
-        <button v-if="v.status === 'OPEN'" @click="openExempt(v)" class="btn-secondary text-xs shrink-0">
-          Exempt
-        </button>
+        <div class="flex gap-2 shrink-0">
+          <button v-if="v.status === 'OPEN'" @click="openExempt(v)" class="btn-secondary text-xs">
+            Exempt
+          </button>
+          <button v-if="v.status === 'OPEN'" @click="handleResolve(v)" class="btn-secondary text-xs">
+            Resolve
+          </button>
+        </div>
       </div>
     </div>
 
@@ -57,6 +70,12 @@
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder="Business justification for this exemption..."></textarea>
         </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Expires At (optional)</label>
+          <input v-model="exemptExpiresAt" type="datetime-local"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+          <p class="text-xs text-gray-400 mt-1">Leave empty for a permanent exemption.</p>
+        </div>
         <div class="flex gap-2 justify-end">
           <button @click="exemptDialog = null" class="btn-secondary text-sm">Cancel</button>
           <button @click="submitExempt" :disabled="!exemptReason.trim() || loading" class="btn-primary text-sm">
@@ -72,7 +91,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useApi } from '@/composables/useApi'
-import { listViolations, exemptViolation } from '@/api/sodPolicies'
+import { listViolations, exemptViolation, resolveViolation } from '@/api/sodPolicies'
 
 const route = useRoute()
 const { loading, call } = useApi()
@@ -82,6 +101,7 @@ const violations = ref([])
 const statusFilter = ref('OPEN')
 const exemptDialog = ref(null)
 const exemptReason = ref('')
+const exemptExpiresAt = ref('')
 
 function statusBadge(s) {
   const base = 'px-2 py-0.5 rounded-full text-xs font-medium shrink-0'
@@ -101,13 +121,26 @@ function fmtDate(val) {
 function openExempt(v) {
   exemptDialog.value = v
   exemptReason.value = ''
+  exemptExpiresAt.value = ''
 }
 
 async function submitExempt() {
   try {
-    await call(() => exemptViolation(dirId, exemptDialog.value.id, { reason: exemptReason.value }),
+    const data = { reason: exemptReason.value }
+    if (exemptExpiresAt.value) {
+      data.expiresAt = new Date(exemptExpiresAt.value).toISOString()
+    }
+    await call(() => exemptViolation(dirId, exemptDialog.value.id, data),
       { successMsg: 'Violation exempted' })
     exemptDialog.value = null
+    await loadViolations()
+  } catch { /* handled */ }
+}
+
+async function handleResolve(v) {
+  if (!confirm('Mark this violation as resolved?')) return
+  try {
+    await call(() => resolveViolation(dirId, v.id), { successMsg: 'Violation resolved' })
     await loadViolations()
   } catch { /* handled */ }
 }

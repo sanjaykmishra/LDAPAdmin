@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,4 +31,12 @@ public interface SodViolationRepository extends JpaRepository<SodViolation, UUID
     long countByPolicyIdAndStatus(UUID policyId, SodViolationStatus status);
 
     Optional<SodViolation> findByPolicyIdAndUserDnAndStatus(UUID policyId, String userDn, SodViolationStatus status);
+
+    @Query("SELECT COUNT(v) FROM SodViolation v WHERE v.policy.directory.id = :directoryId AND v.status = :status")
+    long countByDirectoryIdAndStatus(@Param("directoryId") UUID directoryId,
+                                     @Param("status") SodViolationStatus status);
+
+    @Query("SELECT v FROM SodViolation v WHERE v.status = :status AND v.exemptionExpiresAt IS NOT NULL AND v.exemptionExpiresAt < :now")
+    List<SodViolation> findExpiredExemptions(@Param("status") SodViolationStatus status,
+                                             @Param("now") OffsetDateTime now);
 }

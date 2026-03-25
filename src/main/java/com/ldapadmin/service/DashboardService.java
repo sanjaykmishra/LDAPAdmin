@@ -71,7 +71,7 @@ public class DashboardService {
 
             long pending = approvalRepo.countByDirectoryIdAndStatus(dc.getId(), ApprovalStatus.PENDING);
             long activeCampaigns = campaignRepo.findByDirectoryIdAndStatus(dc.getId(), CampaignStatus.ACTIVE).size();
-            long dirSodViolations = sodViolationRepo.findByDirectoryIdAndStatus(dc.getId(), SodViolationStatus.OPEN).size();
+            long dirSodViolations = sodViolationRepo.countByDirectoryIdAndStatus(dc.getId(), SodViolationStatus.OPEN);
 
             if (userCount >= 0) totalUsers += userCount;
             if (groupCount >= 0) totalGroups += groupCount;

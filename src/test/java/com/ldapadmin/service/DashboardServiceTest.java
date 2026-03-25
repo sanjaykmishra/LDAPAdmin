@@ -77,7 +77,7 @@ class DashboardServiceTest {
         when(campaignRepo.countByStatusAndDeadlineBefore(eq(CampaignStatus.ACTIVE), any())).thenReturn(0L);
 
         // SoD
-        when(sodViolationRepo.findByDirectoryIdAndStatus(directoryId, SodViolationStatus.OPEN)).thenReturn(List.of());
+        when(sodViolationRepo.countByDirectoryIdAndStatus(directoryId, SodViolationStatus.OPEN)).thenReturn(0L);
         when(sodViolationRepo.countByStatus(SodViolationStatus.OPEN)).thenReturn(2L);
 
         // Reviewed users
@@ -105,7 +105,7 @@ class DashboardServiceTest {
                 .thenReturn(List.of());
         when(approvalRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
         when(approvalRepo.findAllByStatus(any())).thenReturn(List.of());
-        when(sodViolationRepo.findByDirectoryIdAndStatus(any(), any())).thenReturn(List.of());
+        when(sodViolationRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
         when(sodViolationRepo.countByStatus(any())).thenReturn(0L);
         when(decisionRepo.countDistinctReviewedUsersSince(any(), any())).thenReturn(0L);
         when(auditQueryService.query(any(), any(), any(), any(), any(), anyInt(), anyInt()))
@@ -141,7 +141,7 @@ class DashboardServiceTest {
                 .thenReturn(List.of());
         when(approvalRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
         when(approvalRepo.findAllByStatus(any())).thenReturn(List.of());
-        when(sodViolationRepo.findByDirectoryIdAndStatus(any(), any())).thenReturn(List.of());
+        when(sodViolationRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
         when(sodViolationRepo.countByStatus(any())).thenReturn(0L);
         when(decisionRepo.countDistinctReviewedUsersSince(any(), any())).thenReturn(0L);
         when(auditQueryService.query(any(), any(), any(), any(), any(), anyInt(), anyInt()))
@@ -174,7 +174,7 @@ class DashboardServiceTest {
         when(groupService.searchGroups(eq(directory), anyString(), any(), anyInt(), anyString()))
                 .thenReturn(List.of());
         when(approvalRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(4L);
-        when(sodViolationRepo.findByDirectoryIdAndStatus(any(), any())).thenReturn(List.of());
+        when(sodViolationRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
         when(sodViolationRepo.countByStatus(any())).thenReturn(0L);
         when(campaignRepo.findByDirectoryIdAndStatus(any(), any())).thenReturn(List.of());
         when(campaignRepo.findByStatus(any())).thenReturn(List.of());
@@ -213,7 +213,7 @@ class DashboardServiceTest {
                 .thenReturn(List.of());
         when(approvalRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
         when(approvalRepo.findAllByStatus(any())).thenReturn(List.of());
-        when(sodViolationRepo.findByDirectoryIdAndStatus(any(), any())).thenReturn(List.of());
+        when(sodViolationRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
         when(sodViolationRepo.countByStatus(any())).thenReturn(0L);
         when(campaignRepo.findByDirectoryIdAndStatus(any(), any())).thenReturn(List.of());
         when(campaignRepo.findByStatus(any())).thenReturn(List.of());
@@ -238,7 +238,7 @@ class DashboardServiceTest {
                 .thenReturn(List.of());
         when(approvalRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
         when(approvalRepo.findAllByStatus(any())).thenReturn(List.of());
-        when(sodViolationRepo.findByDirectoryIdAndStatus(any(), any())).thenReturn(List.of());
+        when(sodViolationRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
         when(sodViolationRepo.countByStatus(any())).thenReturn(0L);
         when(campaignRepo.findByDirectoryIdAndStatus(any(), any())).thenReturn(List.of());
         when(campaignRepo.findByStatus(any())).thenReturn(List.of());
@@ -259,7 +259,7 @@ class DashboardServiceTest {
         when(dirRepo.findAll()).thenReturn(List.of(directory));
         when(approvalRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
         when(approvalRepo.findAllByStatus(any())).thenReturn(List.of());
-        when(sodViolationRepo.findByDirectoryIdAndStatus(any(), any())).thenReturn(List.of());
+        when(sodViolationRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
         when(sodViolationRepo.countByStatus(any())).thenReturn(0L);
         when(campaignRepo.findByDirectoryIdAndStatus(any(), any())).thenReturn(List.of());
         when(campaignRepo.findByStatus(any())).thenReturn(List.of());
@@ -291,8 +291,8 @@ class DashboardServiceTest {
                 .thenReturn(new PageImpl<>(List.of()));
 
         // 3 open SoD violations for this directory
-        when(sodViolationRepo.findByDirectoryIdAndStatus(directoryId, SodViolationStatus.OPEN))
-                .thenReturn(List.of(new com.ldapadmin.entity.SodViolation(), new com.ldapadmin.entity.SodViolation(), new com.ldapadmin.entity.SodViolation()));
+        when(sodViolationRepo.countByDirectoryIdAndStatus(directoryId, SodViolationStatus.OPEN))
+                .thenReturn(3L);
         when(sodViolationRepo.countByStatus(SodViolationStatus.OPEN)).thenReturn(3L);
 
         ComplianceDashboardDto result = service.getDashboard();

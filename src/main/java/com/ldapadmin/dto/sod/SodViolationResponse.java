@@ -15,5 +15,10 @@ public record SodViolationResponse(
         OffsetDateTime detectedAt,
         OffsetDateTime resolvedAt,
         String exemptedByUsername,
-        String exemptionReason
+        String exemptionReason,
+        OffsetDateTime exemptionExpiresAt,
+        String groupADn,
+        String groupBDn,
+        String groupAName,
+        String groupBName
 ) {}

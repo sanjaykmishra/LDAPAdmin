@@ -98,6 +98,15 @@ public class SodPolicyController {
             @PathVariable UUID violationId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody ExemptViolationRequest req) {
-        return sodPolicyService.exemptViolation(violationId, req.reason(), principal);
+        return sodPolicyService.exemptViolation(violationId, req, principal);
+    }
+
+    @PostMapping("/violations/{violationId}/resolve")
+    @RequiresFeature(FeatureKey.SOD_MANAGE)
+    public SodViolationResponse resolve(
+            @DirectoryId @PathVariable UUID directoryId,
+            @PathVariable UUID violationId,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        return sodPolicyService.resolveViolation(violationId, principal);
     }
 }
