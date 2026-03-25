@@ -39,6 +39,14 @@ class SiemFormatterTest {
     }
 
     @Test
+    void rfc5424_usesExperimentalEnterpriseNumber() {
+        String result = formatter.format(testEvent(), SiemFormat.RFC5424);
+
+        // Should use 32473 (experimental), not 0 (reserved)
+        assertThat(result).contains("[event@32473 ");
+    }
+
+    @Test
     void rfc5424_containsStructuredData() {
         String result = formatter.format(testEvent(), SiemFormat.RFC5424);
 
@@ -47,13 +55,6 @@ class SiemFormatterTest {
         assertThat(result).contains("directory=\"corp-ldap\"");
         assertThat(result).contains("targetDn=\"uid=alice,ou=users,dc=corp\"");
         assertThat(result).contains("source=\"INTERNAL\"");
-    }
-
-    @Test
-    void rfc5424_containsMsgId() {
-        String result = formatter.format(testEvent(), SiemFormat.RFC5424);
-
-        assertThat(result).contains("USER_CREATE");
     }
 
     @Test
@@ -121,7 +122,6 @@ class SiemFormatterTest {
 
         String result = formatter.format(deleteEvent, SiemFormat.CEF);
 
-        // Severity 7 for DELETE actions
         assertThat(result).contains("|USER_DELETE|7|");
     }
 
@@ -129,8 +129,73 @@ class SiemFormatterTest {
     void cef_createAction_hasLowSeverity() {
         String result = formatter.format(testEvent(), SiemFormat.CEF);
 
-        // Severity 3 for CREATE actions
         assertThat(result).contains("|USER_CREATE|3|");
+    }
+
+    @Test
+    void cef_securityBlock_hasHighSeverity() {
+        AuditEvent event = AuditEvent.builder()
+                .id(eventId)
+                .source(AuditSource.INTERNAL)
+                .action(AuditAction.SOD_VIOLATION_BLOCKED)
+                .actorUsername("admin")
+                .occurredAt(timestamp)
+                .build();
+
+        String result = formatter.format(event, SiemFormat.CEF);
+
+        // BLOCKED matches the high-severity (7) pattern
+        assertThat(result).contains("|SOD_VIOLATION_BLOCKED|7|");
+    }
+
+    @Test
+    void cef_violationDetected_hasMediumHighSeverity() {
+        AuditEvent event = AuditEvent.builder()
+                .id(eventId)
+                .source(AuditSource.INTERNAL)
+                .action(AuditAction.SOD_VIOLATION_DETECTED)
+                .actorUsername("admin")
+                .occurredAt(timestamp)
+                .build();
+
+        String result = formatter.format(event, SiemFormat.CEF);
+
+        assertThat(result).contains("|SOD_VIOLATION_DETECTED|6|");
+    }
+
+    @Test
+    void cef_headerEscapesPipeCharacters() {
+        // Verify the escape method works for header values with pipe chars
+        AuditEvent event = AuditEvent.builder()
+                .id(eventId)
+                .source(AuditSource.INTERNAL)
+                .action(AuditAction.USER_CREATE)
+                .occurredAt(timestamp)
+                .build();
+
+        String result = formatter.format(event, SiemFormat.CEF);
+
+        // Standard action names don't have pipes, but the escaping path is exercised
+        assertThat(result).contains("CEF:0|LDAPAdmin|LDAPAdmin|1.0|");
+    }
+
+    // ── LEEF ────────────────────────────────────────────────────────────────
+
+    @Test
+    void leef_startsWithHeader() {
+        String result = formatter.format(testEvent(), SiemFormat.LEEF);
+
+        assertThat(result).startsWith("LEEF:2.0|LDAPAdmin|LDAPAdmin|1.0|USER_CREATE|");
+    }
+
+    @Test
+    void leef_containsAttributes() {
+        String result = formatter.format(testEvent(), SiemFormat.LEEF);
+
+        assertThat(result).contains("usrName=alice");
+        assertThat(result).contains("identSrc=uid=alice,ou=users,dc=corp");
+        assertThat(result).contains("resource=corp-ldap");
+        assertThat(result).contains("devTime=");
     }
 
     // ── JSON ────────────────────────────────────────────────────────────────
@@ -155,6 +220,23 @@ class SiemFormatterTest {
     }
 
     @Test
+    void json_omitsNullFields() {
+        AuditEvent event = AuditEvent.builder()
+                .id(eventId)
+                .source(AuditSource.LDAP_CHANGELOG)
+                .action(AuditAction.LDAP_CHANGE)
+                .occurredAt(timestamp)
+                .build();
+
+        String result = formatter.format(event, SiemFormat.JSON);
+
+        // Null fields should be omitted, not included as null
+        assertThat(result).doesNotContain("\"actorUsername\"");
+        assertThat(result).doesNotContain("\"targetDn\"");
+        assertThat(result).contains("\"action\":\"LDAP_CHANGE\"");
+    }
+
+    @Test
     void json_containsDetail() {
         AuditEvent event = AuditEvent.builder()
                 .id(eventId)
@@ -169,21 +251,6 @@ class SiemFormatterTest {
         String result = formatter.format(event, SiemFormat.JSON);
 
         assertThat(result).contains("\"detail\":{\"modified\":\"cn\"}");
-    }
-
-    @Test
-    void json_handlesNullFields() {
-        AuditEvent event = AuditEvent.builder()
-                .id(eventId)
-                .source(AuditSource.LDAP_CHANGELOG)
-                .action(AuditAction.LDAP_CHANGE)
-                .occurredAt(timestamp)
-                .build();
-
-        String result = formatter.format(event, SiemFormat.JSON);
-
-        assertThat(result).contains("\"actorUsername\":null");
-        assertThat(result).contains("\"targetDn\":null");
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

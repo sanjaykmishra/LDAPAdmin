@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -51,13 +50,10 @@ public class EvidencePackageController {
         }
 
         try {
-            List<UUID> campaignIds = request.campaignIds().stream()
-                    .map(UUID::fromString)
-                    .toList();
-
             byte[] zip = evidencePackageService.generateEvidencePackage(
-                    directoryId, campaignIds,
+                    directoryId, request.campaignIds(),
                     request.includeSod(), request.includeEntitlements(),
+                    request.includeAuditEvents(),
                     principal.username());
 
             String filename = "evidence-package-"

@@ -7,6 +7,7 @@ import com.ldapadmin.entity.*;
 import com.ldapadmin.entity.enums.CampaignStatus;
 import com.ldapadmin.entity.enums.ReviewDecision;
 import com.ldapadmin.exception.LdapAdminException;
+import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.ldap.LdapGroupService;
 import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.ldap.model.LdapGroup;
@@ -15,7 +16,6 @@ import com.ldapadmin.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -46,6 +46,7 @@ class AccessReviewCampaignServiceTest {
     private AccessReviewCampaignService service;
 
     private final UUID directoryId = UUID.randomUUID();
+    private final UUID otherDirectoryId = UUID.randomUUID();
     private final UUID adminId = UUID.randomUUID();
     private final UUID reviewerId = UUID.randomUUID();
     private final AuthPrincipal principal = new AuthPrincipal(PrincipalType.SUPERADMIN, adminId, "admin");
@@ -127,21 +128,24 @@ class AccessReviewCampaignServiceTest {
     }
 
     @Test
-    void create_invalidDeadlineDays_throwsException() {
+    void create_invalidDeadlineDays_rejectedByValidation() {
+        // deadlineDays < 1 is rejected by @Min(1) on the DTO before reaching the service.
+        // The service trusts DTO validation for deadlineDays.
+        // This test verifies the recurrenceMonths validation in the service.
         when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
 
         var groups = List.of(new CreateCampaignRequest.GroupAssignment(
                 "cn=admins,dc=test", "member", reviewerId));
         var req = new CreateCampaignRequest("Q1 Review", null,
-                0, null, false, false, groups);
+                30, 0, false, false, groups);
 
         assertThatThrownBy(() -> service.create(directoryId, req, principal))
                 .isInstanceOf(LdapAdminException.class)
-                .hasMessageContaining("at least 1 day");
+                .hasMessageContaining("at least 1 month");
     }
 
     @Test
-    void activate_draftCampaign_snapshotsMembersAndNotifies() {
+    void activate_draftCampaign_snapshotsMembersAndSetsStartsAt() {
         AccessReviewCampaign campaign = buildDraftCampaign();
         when(campaignRepo.findById(campaign.getId())).thenReturn(Optional.of(campaign));
         when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount));
@@ -151,9 +155,10 @@ class AccessReviewCampaignServiceTest {
                 .thenReturn(new LdapUser("uid=user1,dc=test", Map.of("cn", List.of("User One"))));
         when(campaignRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        AccessReviewCampaign result = service.activate(campaign.getId(), principal);
+        AccessReviewCampaign result = service.activate(directoryId, campaign.getId(), principal);
 
         assertThat(result.getStatus()).isEqualTo(CampaignStatus.ACTIVE);
+        assertThat(result.getStartsAt()).isNotNull();
         assertThat(result.getReviewGroups().get(0).getDecisions()).hasSize(2);
         verify(notificationService).notifyReviewersAssigned(campaign);
     }
@@ -164,9 +169,18 @@ class AccessReviewCampaignServiceTest {
         campaign.setStatus(CampaignStatus.ACTIVE);
         when(campaignRepo.findById(campaign.getId())).thenReturn(Optional.of(campaign));
 
-        assertThatThrownBy(() -> service.activate(campaign.getId(), principal))
+        assertThatThrownBy(() -> service.activate(directoryId, campaign.getId(), principal))
                 .isInstanceOf(LdapAdminException.class)
                 .hasMessageContaining("UPCOMING");
+    }
+
+    @Test
+    void activate_wrongDirectory_throws() {
+        AccessReviewCampaign campaign = buildDraftCampaign();
+        when(campaignRepo.findById(campaign.getId())).thenReturn(Optional.of(campaign));
+
+        assertThatThrownBy(() -> service.activate(otherDirectoryId, campaign.getId(), principal))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
@@ -175,7 +189,7 @@ class AccessReviewCampaignServiceTest {
         when(campaignRepo.findById(campaign.getId())).thenReturn(Optional.of(campaign));
         when(decisionRepo.countPendingByCampaignId(campaign.getId())).thenReturn(5L);
 
-        assertThatThrownBy(() -> service.close(campaign.getId(), false, principal))
+        assertThatThrownBy(() -> service.close(directoryId, campaign.getId(), false, principal))
                 .isInstanceOf(LdapAdminException.class)
                 .hasMessageContaining("undecided");
     }
@@ -188,7 +202,7 @@ class AccessReviewCampaignServiceTest {
         when(decisionRepo.countPendingByCampaignId(campaign.getId())).thenReturn(5L);
         when(campaignRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        AccessReviewCampaign result = service.close(campaign.getId(), true, principal);
+        AccessReviewCampaign result = service.close(directoryId, campaign.getId(), true, principal);
 
         assertThat(result.getStatus()).isEqualTo(CampaignStatus.CLOSED);
         assertThat(result.getCompletedAt()).isNotNull();
@@ -203,13 +217,14 @@ class AccessReviewCampaignServiceTest {
         when(campaignRepo.findById(campaign.getId())).thenReturn(Optional.of(campaign));
         when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount));
         when(decisionRepo.countPendingByCampaignId(campaign.getId())).thenReturn(0L);
+        when(campaignRepo.existsBySourceCampaignId(campaign.getId())).thenReturn(false);
         when(campaignRepo.save(any())).thenAnswer(inv -> {
             AccessReviewCampaign c = inv.getArgument(0);
             if (c.getId() == null) c.setId(UUID.randomUUID());
             return c;
         });
 
-        service.close(campaign.getId(), false, principal);
+        service.close(directoryId, campaign.getId(), false, principal);
 
         // save called twice: once for close, once for follow-up
         verify(campaignRepo, atLeast(2)).save(any());
@@ -222,7 +237,7 @@ class AccessReviewCampaignServiceTest {
         when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount));
         when(campaignRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        AccessReviewCampaign result = service.cancel(campaign.getId(), principal);
+        AccessReviewCampaign result = service.cancel(directoryId, campaign.getId(), principal);
 
         assertThat(result.getStatus()).isEqualTo(CampaignStatus.CANCELLED);
     }
@@ -233,17 +248,18 @@ class AccessReviewCampaignServiceTest {
         campaign.setStatus(CampaignStatus.CLOSED);
         when(campaignRepo.findById(campaign.getId())).thenReturn(Optional.of(campaign));
 
-        assertThatThrownBy(() -> service.cancel(campaign.getId(), principal))
+        assertThatThrownBy(() -> service.cancel(directoryId, campaign.getId(), principal))
                 .isInstanceOf(LdapAdminException.class)
                 .hasMessageContaining("UPCOMING or ACTIVE");
     }
 
     @Test
-    void createRecurringFollowUp_createsNewDraftCampaign() {
+    void createRecurringFollowUp_createsScheduledCampaign() {
         AccessReviewCampaign source = buildActiveCampaign();
         source.setRecurrenceMonths(3);
         source.setDeadlineDays(30);
         when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount));
+        when(campaignRepo.existsBySourceCampaignId(source.getId())).thenReturn(false);
         when(campaignRepo.save(any())).thenAnswer(inv -> {
             AccessReviewCampaign c = inv.getArgument(0);
             c.setId(UUID.randomUUID());
@@ -259,6 +275,39 @@ class AccessReviewCampaignServiceTest {
         assertThat(followUp.getDeadlineDays()).isEqualTo(30);
         assertThat(followUp.getSourceCampaign()).isEqualTo(source);
         assertThat(followUp.getReviewGroups()).hasSize(1);
+        // Follow-up should be scheduled in the future
+        assertThat(followUp.getStartsAt()).isAfter(OffsetDateTime.now().plusMonths(2));
+        assertThat(followUp.getDeadline()).isAfter(followUp.getStartsAt());
+        verify(notificationService).notifyRecurringFollowUpCreated(followUp, source);
+    }
+
+    @Test
+    void createRecurringFollowUp_skipsIfAlreadyExists() {
+        AccessReviewCampaign source = buildActiveCampaign();
+        source.setRecurrenceMonths(3);
+        source.setDeadlineDays(30);
+        when(campaignRepo.existsBySourceCampaignId(source.getId())).thenReturn(true);
+
+        AccessReviewCampaign followUp = service.createRecurringFollowUp(source, principal);
+
+        assertThat(followUp).isNull();
+        verify(campaignRepo, never()).save(any());
+    }
+
+    @Test
+    void expireCampaign_doesNotCallAutoRevoke() {
+        // Fix #1: expireCampaign should only transition status, not execute revocations
+        AccessReviewCampaign campaign = buildActiveCampaign();
+        campaign.setAutoRevokeOnExpiry(true);
+        when(accountRepo.findById(any())).thenReturn(Optional.of(adminAccount));
+        when(campaignRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.expireCampaign(campaign, principal);
+
+        assertThat(campaign.getStatus()).isEqualTo(CampaignStatus.EXPIRED);
+        // Should NOT call executeRevocations — scheduler handles this
+        verify(ldapGroupService, never()).removeMember(any(), any(), any(), any());
+        verify(notificationService).notifyCampaignExpired(campaign);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

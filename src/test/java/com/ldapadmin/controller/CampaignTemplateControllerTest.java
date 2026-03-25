@@ -121,7 +121,7 @@ class CampaignTemplateControllerTest extends BaseControllerTest {
                 templateId, "Updated Template", "Updated desc", dirId,
                 new CampaignTemplateResponse.CampaignTemplateConfigDto(
                         60, 6, true, true,
-                        List.of(new CampaignTemplateResponse.GroupConfigDto("cn=new,dc=test", "member", reviewerId))),
+                        List.of(new CampaignTemplateResponse.GroupConfigDto("cn=new,dc=test", "member", reviewerId, "reviewer"))),
                 "admin", OffsetDateTime.now(), OffsetDateTime.now());
         when(templateService.update(eq(dirId), eq(templateId), any(), any())).thenReturn(updated);
 
@@ -171,7 +171,7 @@ class CampaignTemplateControllerTest extends BaseControllerTest {
                         .with(authentication(superadminAuth())))
                 .andExpect(status().isNoContent());
 
-        verify(templateService).delete(dirId, templateId);
+        verify(templateService).delete(eq(dirId), eq(templateId), any());
     }
 
     @Test
@@ -193,7 +193,7 @@ class CampaignTemplateControllerTest extends BaseControllerTest {
         var campaign = new AccessReviewCampaign();
         campaign.setId(campaignId);
         when(campaignService.create(eq(dirId), any(), any())).thenReturn(campaign);
-        when(campaignService.get(campaignId)).thenReturn(
+        when(campaignService.get(dirId, campaignId)).thenReturn(
                 new CampaignDetailDto(campaignId, "Test Template", "desc", CampaignStatus.UPCOMING,
                         null, OffsetDateTime.now().plusDays(30), 30, null, false, false,
                         OffsetDateTime.now(), null, "admin",
@@ -216,7 +216,7 @@ class CampaignTemplateControllerTest extends BaseControllerTest {
         var campaign = new AccessReviewCampaign();
         campaign.setId(campaignId);
         when(campaignService.create(eq(dirId), any(), any())).thenReturn(campaign);
-        when(campaignService.get(campaignId)).thenReturn(
+        when(campaignService.get(dirId, campaignId)).thenReturn(
                 new CampaignDetailDto(campaignId, "Custom Name", "Custom Desc", CampaignStatus.UPCOMING,
                         null, OffsetDateTime.now().plusDays(30), 30, null, false, false,
                         OffsetDateTime.now(), null, "admin",
@@ -256,7 +256,7 @@ class CampaignTemplateControllerTest extends BaseControllerTest {
                 templateId, "Test Template", "Test desc", dirId,
                 new CampaignTemplateResponse.CampaignTemplateConfigDto(
                         30, null, false, false,
-                        List.of(new CampaignTemplateResponse.GroupConfigDto("cn=admins,dc=test", "member", reviewerId))),
+                        List.of(new CampaignTemplateResponse.GroupConfigDto("cn=admins,dc=test", "member", reviewerId, "reviewer"))),
                 "admin", OffsetDateTime.now(), OffsetDateTime.now());
     }
 

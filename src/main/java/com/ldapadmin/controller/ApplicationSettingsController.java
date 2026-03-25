@@ -7,13 +7,18 @@ import com.ldapadmin.service.ApplicationSettingsService;
 import com.ldapadmin.service.siem.SiemExportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.OffsetDateTime;
+import java.util.Map;
 
 /**
  * Global application settings.
@@ -47,15 +52,37 @@ public class ApplicationSettingsController {
     @PutMapping
     @PreAuthorize("hasRole('SUPERADMIN')")
     public ApplicationSettingsDto upsert(@Valid @RequestBody UpdateApplicationSettingsRequest req) {
-        return service.upsert(req);
+        ApplicationSettingsDto result = service.upsert(req);
+        siemExportService.invalidateCache();
+        return result;
+    }
+
+    /** Marks first-run setup as complete. Called by the setup wizard on the final step. */
+    @PostMapping("/complete-setup")
+    @PreAuthorize("hasRole('SUPERADMIN')")
+    public ApplicationSettingsDto completeSetup() {
+        return service.markSetupComplete();
     }
 
     /** Tests SIEM connectivity by sending a synthetic audit event. */
     @PostMapping("/siem/test")
     @PreAuthorize("hasRole('SUPERADMIN')")
-    public java.util.Map<String, String> testSiem() {
+    public Map<String, String> testSiem() {
         String connectivity = siemExportService.testConnectivity();
         String delivery = siemExportService.sendTestEvent();
-        return java.util.Map.of("connectivity", connectivity, "delivery", delivery);
+        return Map.of("connectivity", connectivity, "delivery", delivery);
+    }
+
+    /**
+     * Exports historical audit events to SIEM for a given date range.
+     * Useful when SIEM is enabled after events have already been recorded.
+     */
+    @PostMapping("/siem/backfill")
+    @PreAuthorize("hasRole('SUPERADMIN')")
+    public Map<String, Object> siemBackfill(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime to) {
+        int exported = siemExportService.backfill(from, to);
+        return Map.of("exported", exported, "from", from.toString(), "to", to.toString());
     }
 }

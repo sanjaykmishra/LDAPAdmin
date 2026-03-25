@@ -148,6 +148,88 @@ public class ApprovalNotificationService {
         sendEmail(recipientEmail, subject, body);
     }
 
+    /**
+     * Sends an email with a file attachment using MIME multipart encoding.
+     */
+    public void sendEmailWithAttachment(String recipientEmail, String subject, String body,
+                                         String attachmentName, String attachmentContentType, byte[] attachmentData) {
+        ApplicationSettings settings = appSettingsService.getEntity();
+        if (settings.getSmtpHost() == null || settings.getSmtpHost().isBlank()
+                || settings.getSmtpSenderAddress() == null || settings.getSmtpSenderAddress().isBlank()) {
+            log.info("SMTP not configured — attachment email logged: to={}, subject={}", recipientEmail, subject);
+            return;
+        }
+
+        try {
+            sendSmtpEmailWithAttachment(settings, recipientEmail, subject, body,
+                    attachmentName, attachmentContentType, attachmentData);
+        } catch (Exception ex) {
+            log.error("Failed to send email with attachment to {}: {}", recipientEmail, ex.getMessage());
+        }
+    }
+
+    private void sendSmtpEmailWithAttachment(ApplicationSettings settings, String to, String subject,
+                                              String body, String attachmentName, String attachmentContentType,
+                                              byte[] attachmentData) throws Exception {
+        String host = settings.getSmtpHost();
+        int port = settings.getSmtpPort() != null ? settings.getSmtpPort() : 587;
+        String from = settings.getSmtpSenderAddress();
+        String boundary = "----=_LDAPAdmin_" + System.currentTimeMillis();
+
+        var socket = new java.net.Socket(host, port);
+        socket.setSoTimeout(10000);
+        var in = new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream()));
+        var out = new java.io.PrintWriter(socket.getOutputStream(), true);
+
+        try {
+            readLine(in);
+            out.println("EHLO ldapadmin");
+            readMultiLine(in);
+
+            if (settings.getSmtpUsername() != null && settings.getSmtpPasswordEncrypted() != null) {
+                String password = encryptionService.decrypt(settings.getSmtpPasswordEncrypted());
+                String auth = Base64.getEncoder().encodeToString(
+                        ("\0" + settings.getSmtpUsername() + "\0" + password).getBytes(StandardCharsets.UTF_8));
+                out.println("AUTH PLAIN " + auth);
+                readLine(in);
+            }
+
+            out.println("MAIL FROM:<" + from + ">");
+            readLine(in);
+            out.println("RCPT TO:<" + to + ">");
+            readLine(in);
+            out.println("DATA");
+            readLine(in);
+
+            out.println("From: " + from);
+            out.println("To: " + to);
+            out.println("Subject: " + subject);
+            out.println("MIME-Version: 1.0");
+            out.println("Content-Type: multipart/mixed; boundary=\"" + boundary + "\"");
+            out.println();
+            // Text body part
+            out.println("--" + boundary);
+            out.println("Content-Type: text/plain; charset=UTF-8");
+            out.println();
+            out.println(body);
+            out.println();
+            // Attachment part
+            out.println("--" + boundary);
+            out.println("Content-Type: " + attachmentContentType + "; name=\"" + attachmentName + "\"");
+            out.println("Content-Disposition: attachment; filename=\"" + attachmentName + "\"");
+            out.println("Content-Transfer-Encoding: base64");
+            out.println();
+            out.println(Base64.getMimeEncoder(76, "\r\n".getBytes()).encodeToString(attachmentData));
+            out.println();
+            out.println("--" + boundary + "--");
+            out.println(".");
+            readLine(in);
+            out.println("QUIT");
+        } finally {
+            socket.close();
+        }
+    }
+
     private void sendEmail(String to, String subject, String body) {
         ApplicationSettings settings = appSettingsService.getEntity();
         if (settings.getSmtpHost() == null || settings.getSmtpHost().isBlank()

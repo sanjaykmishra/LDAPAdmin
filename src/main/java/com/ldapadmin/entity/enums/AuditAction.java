@@ -60,10 +60,18 @@ public enum AuditAction {
     SOD_VIOLATION_DETECTED("sod.violation_detected"),
     SOD_VIOLATION_EXEMPTED("sod.violation_exempted"),
     SOD_VIOLATION_BLOCKED ("sod.violation_blocked"),
+    SOD_VIOLATION_RESOLVED("sod.violation_resolved"),
 
     // ── Lifecycle playbooks ─────────────────────────────────────────────────
     PLAYBOOK_EXECUTED    ("playbook.executed"),
     PLAYBOOK_ROLLED_BACK ("playbook.rolled_back"),
+
+    // ── HR integration ──────────────────────────────────────────────────────
+    HR_SYNC_STARTED      ("hr.sync_started"),
+    HR_SYNC_COMPLETED    ("hr.sync_completed"),
+    HR_SYNC_FAILED       ("hr.sync_failed"),
+    HR_EMPLOYEE_MATCHED  ("hr.employee_matched"),
+    HR_ORPHAN_DETECTED   ("hr.orphan_detected"),
 
     // ── Changelog-sourced (raw LDAP changelog entry) ──────────────────────────
     LDAP_CHANGE          ("ldap.change");

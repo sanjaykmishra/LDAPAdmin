@@ -69,6 +69,16 @@ public class ApplicationSettingsService {
     }
 
     /**
+     * Marks first-run setup as complete without touching any other settings.
+     */
+    @Transactional
+    public ApplicationSettingsDto markSetupComplete() {
+        ApplicationSettings s = settingsRepo.findFirstBy().orElseGet(ApplicationSettings::new);
+        s.setSetupCompleted(true);
+        return toDto(settingsRepo.save(s));
+    }
+
+    /**
      * Creates or replaces the global settings.
      */
     @Transactional

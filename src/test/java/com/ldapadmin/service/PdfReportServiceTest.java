@@ -100,7 +100,7 @@ class PdfReportServiceTest {
         LdapGroup group2 = makeGroup("cn=devs,dc=example,dc=com", "devs",
                 List.of("uid=carol,dc=example,dc=com"));
 
-        when(ldapGroupService.searchGroups(eq(directory), anyString(), isNull(), eq(200),
+        when(ldapGroupService.searchGroups(eq(directory), anyString(), isNull(), eq(500),
                 eq("cn"), eq("member"), eq("uniqueMember"), eq("memberUid")))
                 .thenReturn(List.of(group1, group2));
 
@@ -129,7 +129,7 @@ class PdfReportServiceTest {
         stubSettings();
         when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
 
-        when(ldapGroupService.searchGroups(eq(directory), anyString(), isNull(), eq(200),
+        when(ldapGroupService.searchGroups(eq(directory), anyString(), isNull(), eq(500),
                 eq("cn"), eq("member"), eq("uniqueMember"), eq("memberUid")))
                 .thenReturn(List.of());
 
@@ -143,7 +143,7 @@ class PdfReportServiceTest {
         when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
 
         LdapGroup emptyGroup = makeGroup("cn=empty,dc=example,dc=com", "empty", List.of());
-        when(ldapGroupService.searchGroups(eq(directory), anyString(), isNull(), eq(200),
+        when(ldapGroupService.searchGroups(eq(directory), anyString(), isNull(), eq(500),
                 eq("cn"), eq("member"), eq("uniqueMember"), eq("memberUid")))
                 .thenReturn(List.of(emptyGroup));
 

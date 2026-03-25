@@ -26,6 +26,12 @@ public interface AccessReviewCampaignRepository extends JpaRepository<AccessRevi
 
     long countByStatusAndDeadlineBefore(CampaignStatus status, OffsetDateTime deadline);
 
+    long countByDirectoryIdAndStatus(UUID directoryId, CampaignStatus status);
+
+    List<AccessReviewCampaign> findByStatusAndStartsAtBefore(CampaignStatus status, OffsetDateTime startsAt);
+
+    boolean existsBySourceCampaignId(UUID sourceCampaignId);
+
     @Query("SELECT c FROM AccessReviewCampaign c WHERE c.directory.id = :directoryId "
             + "AND c.createdAt >= :from AND c.createdAt <= :to ORDER BY c.createdAt DESC")
     List<AccessReviewCampaign> findByDirectoryIdAndCreatedAtBetween(

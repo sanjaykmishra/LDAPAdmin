@@ -74,6 +74,10 @@ public class ScheduledReportJob {
     @Column(name = "s3_key_prefix")
     private String s3KeyPrefix;
 
+    /** IANA timezone ID for cron evaluation (e.g. "America/New_York"). Null = UTC. */
+    @Column(name = "timezone", length = 50)
+    private String timezone;
+
     @Column(nullable = false)
     private boolean enabled = true;
 

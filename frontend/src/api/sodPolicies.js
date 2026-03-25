@@ -25,3 +25,6 @@ export const listViolations = (dirId, params) =>
 
 export const exemptViolation = (dirId, violationId, data) =>
   client.post(`${base(dirId)}/violations/${violationId}/exempt`, data)
+
+export const resolveViolation = (dirId, violationId) =>
+  client.post(`${base(dirId)}/violations/${violationId}/resolve`)

@@ -5,6 +5,7 @@ import com.ldapadmin.auth.PrincipalType;
 import com.ldapadmin.dto.sod.*;
 import com.ldapadmin.entity.*;
 import com.ldapadmin.entity.enums.*;
+import com.ldapadmin.exception.ConflictException;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.exception.SodViolationException;
 import com.ldapadmin.ldap.LdapGroupService;
@@ -13,7 +14,6 @@ import com.ldapadmin.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -38,10 +38,12 @@ class SodPolicyServiceTest {
     private SodPolicyService service;
 
     private final UUID directoryId = UUID.randomUUID();
+    private final UUID otherDirectoryId = UUID.randomUUID();
     private final UUID adminId = UUID.randomUUID();
     private final AuthPrincipal principal = new AuthPrincipal(PrincipalType.SUPERADMIN, adminId, "admin");
 
     private DirectoryConnection directory;
+    private DirectoryConnection otherDirectory;
     private Account adminAccount;
 
     @BeforeEach
@@ -54,6 +56,10 @@ class SodPolicyServiceTest {
         directory.setId(directoryId);
         directory.setDisplayName("Test Directory");
 
+        otherDirectory = new DirectoryConnection();
+        otherDirectory.setId(otherDirectoryId);
+        otherDirectory.setDisplayName("Other Directory");
+
         adminAccount = new Account();
         adminAccount.setId(adminId);
         adminAccount.setUsername("admin");
@@ -65,6 +71,7 @@ class SodPolicyServiceTest {
     void create_validRequest_createsPolicyAndAudits() {
         when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
         when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount));
+        when(policyRepo.existsDuplicateGroupPair(any(), any(), any())).thenReturn(false);
         when(policyRepo.save(any())).thenAnswer(inv -> {
             SodPolicy p = inv.getArgument(0);
             p.setId(UUID.randomUUID());
@@ -94,6 +101,36 @@ class SodPolicyServiceTest {
     }
 
     @Test
+    void create_sameGroupDn_throws() {
+        when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount));
+
+        var req = new CreateSodPolicyRequest("X", null,
+                "cn=group,dc=example", "cn=group,dc=example",
+                null, null, SodSeverity.LOW, SodAction.ALERT, true);
+
+        assertThatThrownBy(() -> service.create(directoryId, req, principal))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot be the same");
+    }
+
+    @Test
+    void create_duplicateGroupPair_throws() {
+        when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount));
+        when(policyRepo.existsDuplicateGroupPair(directoryId, "cn=a,dc=example", "cn=b,dc=example"))
+                .thenReturn(true);
+
+        var req = new CreateSodPolicyRequest("X", null,
+                "cn=a,dc=example", "cn=b,dc=example",
+                null, null, SodSeverity.LOW, SodAction.ALERT, true);
+
+        assertThatThrownBy(() -> service.create(directoryId, req, principal))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("already exists");
+    }
+
+    @Test
     void update_updatesFieldsAndAudits() {
         SodPolicy existing = buildPolicy(SodAction.ALERT, SodSeverity.LOW);
         when(policyRepo.findById(existing.getId())).thenReturn(Optional.of(existing));
@@ -101,7 +138,7 @@ class SodPolicyServiceTest {
 
         var req = new UpdateSodPolicyRequest("Updated Name", null, null, null, null, null, SodSeverity.HIGH, null, null);
 
-        SodPolicy result = service.update(existing.getId(), req, principal);
+        SodPolicy result = service.update(directoryId, existing.getId(), req, principal);
 
         assertThat(result.getName()).isEqualTo("Updated Name");
         assertThat(result.getSeverity()).isEqualTo(SodSeverity.HIGH);
@@ -113,8 +150,10 @@ class SodPolicyServiceTest {
     void delete_deletesAndAudits() {
         SodPolicy existing = buildPolicy(SodAction.ALERT, SodSeverity.LOW);
         when(policyRepo.findById(existing.getId())).thenReturn(Optional.of(existing));
+        when(violationRepo.countByPolicyIdAndStatus(existing.getId(), SodViolationStatus.OPEN)).thenReturn(2L);
+        when(violationRepo.countByPolicyIdAndStatus(existing.getId(), SodViolationStatus.EXEMPTED)).thenReturn(1L);
 
-        service.delete(existing.getId(), principal);
+        service.delete(directoryId, existing.getId(), principal);
 
         verify(policyRepo).delete(existing);
         verify(auditService).record(eq(principal), eq(directoryId), eq(AuditAction.SOD_POLICY_DELETED), isNull(), any());
@@ -133,6 +172,71 @@ class SodPolicyServiceTest {
         assertThat(result.get(0).action()).isEqualTo(SodAction.BLOCK);
     }
 
+    // ── Directory ownership tests ───────────────────────────────────────────
+
+    @Test
+    void getPolicy_wrongDirectory_throws() {
+        SodPolicy policy = buildPolicy(SodAction.ALERT, SodSeverity.LOW);
+        when(policyRepo.findById(policy.getId())).thenReturn(Optional.of(policy));
+
+        // policy belongs to directoryId, but we pass otherDirectoryId
+        assertThatThrownBy(() -> service.getPolicy(otherDirectoryId, policy.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void update_wrongDirectory_throws() {
+        SodPolicy policy = buildPolicy(SodAction.ALERT, SodSeverity.LOW);
+        when(policyRepo.findById(policy.getId())).thenReturn(Optional.of(policy));
+
+        var req = new UpdateSodPolicyRequest("X", null, null, null, null, null, null, null, null);
+
+        assertThatThrownBy(() -> service.update(otherDirectoryId, policy.getId(), req, principal))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void delete_wrongDirectory_throws() {
+        SodPolicy policy = buildPolicy(SodAction.ALERT, SodSeverity.LOW);
+        when(policyRepo.findById(policy.getId())).thenReturn(Optional.of(policy));
+
+        assertThatThrownBy(() -> service.delete(otherDirectoryId, policy.getId(), principal))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void exemptViolation_wrongDirectory_throws() {
+        SodPolicy policy = buildPolicy(SodAction.ALERT, SodSeverity.HIGH);
+        SodViolation v = new SodViolation();
+        v.setId(UUID.randomUUID());
+        v.setPolicy(policy);
+        v.setUserDn("uid=alice,dc=example");
+        v.setStatus(SodViolationStatus.OPEN);
+
+        when(violationRepo.findById(v.getId())).thenReturn(Optional.of(v));
+
+        var req = new ExemptViolationRequest("reason", null);
+
+        // violation's policy belongs to directoryId, but we pass otherDirectoryId
+        assertThatThrownBy(() -> service.exemptViolation(otherDirectoryId, v.getId(), req, principal))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void resolveViolation_wrongDirectory_throws() {
+        SodPolicy policy = buildPolicy(SodAction.ALERT, SodSeverity.LOW);
+        SodViolation v = new SodViolation();
+        v.setId(UUID.randomUUID());
+        v.setPolicy(policy);
+        v.setUserDn("uid=alice,dc=example");
+        v.setStatus(SodViolationStatus.OPEN);
+
+        when(violationRepo.findById(v.getId())).thenReturn(Optional.of(v));
+
+        assertThatThrownBy(() -> service.resolveViolation(otherDirectoryId, v.getId(), principal))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
     // ── Scan Tests ──────────────────────────────────────────────────────────
 
     @Test
@@ -147,8 +251,10 @@ class SodPolicyServiceTest {
         when(ldapGroupService.getMembers(directory, policy.getGroupBDn(), "member"))
                 .thenReturn(List.of("uid=alice,dc=example", "uid=charlie,dc=example"));
 
-        when(violationRepo.findByPolicyIdAndUserDnAndStatus(any(), any(), eq(SodViolationStatus.OPEN)))
-                .thenReturn(Optional.empty());
+        when(violationRepo.findByPolicyIdAndUserDnIgnoreCaseAndStatus(any(), any(), eq(SodViolationStatus.OPEN)))
+                .thenReturn(List.of());
+        when(violationRepo.findByPolicyIdAndUserDnIgnoreCaseAndStatus(any(), any(), eq(SodViolationStatus.EXEMPTED)))
+                .thenReturn(List.of());
         when(violationRepo.findByPolicyId(policy.getId())).thenReturn(List.of());
 
         SodScanResultDto result = service.scanDirectory(directoryId, principal);
@@ -200,13 +306,68 @@ class SodPolicyServiceTest {
                 .thenReturn(List.of("uid=alice,dc=example"));
 
         // Already has open violation
-        when(violationRepo.findByPolicyIdAndUserDnAndStatus(policy.getId(), "uid=alice,dc=example", SodViolationStatus.OPEN))
-                .thenReturn(Optional.of(new SodViolation()));
+        when(violationRepo.findByPolicyIdAndUserDnIgnoreCaseAndStatus(any(), eq("uid=alice,dc=example"), eq(SodViolationStatus.OPEN)))
+                .thenReturn(List.of(new SodViolation()));
         when(violationRepo.findByPolicyId(policy.getId())).thenReturn(List.of());
 
         SodScanResultDto result = service.scanDirectory(directoryId, principal);
 
         assertThat(result.newViolations()).isEqualTo(0);
+    }
+
+    @Test
+    void scanDirectory_skipsExemptedUsers() {
+        SodPolicy policy = buildPolicy(SodAction.ALERT, SodSeverity.HIGH);
+        when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
+        when(policyRepo.findByDirectoryIdAndEnabledTrue(directoryId)).thenReturn(List.of(policy));
+
+        when(ldapGroupService.getMembers(directory, policy.getGroupADn(), "member"))
+                .thenReturn(List.of("uid=alice,dc=example"));
+        when(ldapGroupService.getMembers(directory, policy.getGroupBDn(), "member"))
+                .thenReturn(List.of("uid=alice,dc=example"));
+
+        // No open violation, but has active exemption (no expiry = permanent)
+        when(violationRepo.findByPolicyIdAndUserDnIgnoreCaseAndStatus(any(), eq("uid=alice,dc=example"), eq(SodViolationStatus.OPEN)))
+                .thenReturn(List.of());
+        SodViolation exempted = new SodViolation();
+        exempted.setStatus(SodViolationStatus.EXEMPTED);
+        exempted.setExemptionExpiresAt(null); // permanent
+        when(violationRepo.findByPolicyIdAndUserDnIgnoreCaseAndStatus(any(), eq("uid=alice,dc=example"), eq(SodViolationStatus.EXEMPTED)))
+                .thenReturn(List.of(exempted));
+        when(violationRepo.findByPolicyId(policy.getId())).thenReturn(List.of());
+
+        SodScanResultDto result = service.scanDirectory(directoryId, principal);
+
+        assertThat(result.violationsFound()).isEqualTo(1);
+        assertThat(result.newViolations()).isEqualTo(0);
+        verify(violationRepo, never()).save(any());
+    }
+
+    @Test
+    void scanDirectory_createsViolationForExpiredExemption() {
+        SodPolicy policy = buildPolicy(SodAction.ALERT, SodSeverity.HIGH);
+        when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
+        when(policyRepo.findByDirectoryIdAndEnabledTrue(directoryId)).thenReturn(List.of(policy));
+
+        when(ldapGroupService.getMembers(directory, policy.getGroupADn(), "member"))
+                .thenReturn(List.of("uid=alice,dc=example"));
+        when(ldapGroupService.getMembers(directory, policy.getGroupBDn(), "member"))
+                .thenReturn(List.of("uid=alice,dc=example"));
+
+        // No open violation, but has an EXPIRED exemption
+        when(violationRepo.findByPolicyIdAndUserDnIgnoreCaseAndStatus(any(), eq("uid=alice,dc=example"), eq(SodViolationStatus.OPEN)))
+                .thenReturn(List.of());
+        SodViolation expiredExemption = new SodViolation();
+        expiredExemption.setStatus(SodViolationStatus.EXEMPTED);
+        expiredExemption.setExemptionExpiresAt(OffsetDateTime.now().minusDays(1)); // expired
+        when(violationRepo.findByPolicyIdAndUserDnIgnoreCaseAndStatus(any(), eq("uid=alice,dc=example"), eq(SodViolationStatus.EXEMPTED)))
+                .thenReturn(List.of(expiredExemption));
+        when(violationRepo.findByPolicyId(policy.getId())).thenReturn(List.of());
+
+        SodScanResultDto result = service.scanDirectory(directoryId, principal);
+
+        assertThat(result.newViolations()).isEqualTo(1);
+        verify(violationRepo).save(any(SodViolation.class));
     }
 
     // ── checkMembership Tests ───────────────────────────────────────────────
@@ -220,12 +381,57 @@ class SodPolicyServiceTest {
         // Adding user to group A, user already in group B
         when(ldapGroupService.getMembers(directory, policy.getGroupBDn(), "member"))
                 .thenReturn(List.of("uid=alice,dc=example"));
+        // No exemption
+        when(violationRepo.findByPolicyIdAndUserDnIgnoreCaseAndStatus(any(), eq("uid=alice,dc=example"), eq(SodViolationStatus.EXEMPTED)))
+                .thenReturn(List.of());
 
         assertThatThrownBy(() -> service.checkMembership(directoryId, "uid=alice,dc=example", policy.getGroupADn(), principal))
                 .isInstanceOf(SodViolationException.class)
                 .hasMessageContaining("SoD policy");
 
         verify(auditService).record(eq(principal), eq(directoryId), eq(AuditAction.SOD_VIOLATION_BLOCKED), eq("uid=alice,dc=example"), any());
+    }
+
+    @Test
+    void checkMembership_blockPolicy_allowsWithActiveExemption() {
+        SodPolicy policy = buildPolicy(SodAction.BLOCK, SodSeverity.HIGH);
+        when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
+        when(policyRepo.findByDirectoryIdAndEnabledTrue(directoryId)).thenReturn(List.of(policy));
+
+        when(ldapGroupService.getMembers(directory, policy.getGroupBDn(), "member"))
+                .thenReturn(List.of("uid=alice,dc=example"));
+
+        // Active exemption exists
+        SodViolation exempted = new SodViolation();
+        exempted.setStatus(SodViolationStatus.EXEMPTED);
+        exempted.setExemptionExpiresAt(OffsetDateTime.now().plusDays(30)); // still valid
+        when(violationRepo.findByPolicyIdAndUserDnIgnoreCaseAndStatus(any(), eq("uid=alice,dc=example"), eq(SodViolationStatus.EXEMPTED)))
+                .thenReturn(List.of(exempted));
+
+        // Should not throw — exemption overrides BLOCK
+        service.checkMembership(directoryId, "uid=alice,dc=example", policy.getGroupADn(), principal);
+
+        verify(violationRepo, never()).save(any());
+    }
+
+    @Test
+    void checkMembership_blockPolicy_blocksWithExpiredExemption() {
+        SodPolicy policy = buildPolicy(SodAction.BLOCK, SodSeverity.HIGH);
+        when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
+        when(policyRepo.findByDirectoryIdAndEnabledTrue(directoryId)).thenReturn(List.of(policy));
+
+        when(ldapGroupService.getMembers(directory, policy.getGroupBDn(), "member"))
+                .thenReturn(List.of("uid=alice,dc=example"));
+
+        // Expired exemption
+        SodViolation expiredExemption = new SodViolation();
+        expiredExemption.setStatus(SodViolationStatus.EXEMPTED);
+        expiredExemption.setExemptionExpiresAt(OffsetDateTime.now().minusDays(1));
+        when(violationRepo.findByPolicyIdAndUserDnIgnoreCaseAndStatus(any(), eq("uid=alice,dc=example"), eq(SodViolationStatus.EXEMPTED)))
+                .thenReturn(List.of(expiredExemption));
+
+        assertThatThrownBy(() -> service.checkMembership(directoryId, "uid=alice,dc=example", policy.getGroupADn(), principal))
+                .isInstanceOf(SodViolationException.class);
     }
 
     @Test
@@ -236,8 +442,10 @@ class SodPolicyServiceTest {
 
         when(ldapGroupService.getMembers(directory, policy.getGroupBDn(), "member"))
                 .thenReturn(List.of("uid=alice,dc=example"));
-        when(violationRepo.findByPolicyIdAndUserDnAndStatus(any(), any(), eq(SodViolationStatus.OPEN)))
-                .thenReturn(Optional.empty());
+        when(violationRepo.findByPolicyIdAndUserDnIgnoreCaseAndStatus(any(), eq("uid=alice,dc=example"), eq(SodViolationStatus.EXEMPTED)))
+                .thenReturn(List.of());
+        when(violationRepo.findByPolicyIdAndUserDnIgnoreCaseAndStatus(any(), eq("uid=alice,dc=example"), eq(SodViolationStatus.OPEN)))
+                .thenReturn(List.of());
 
         // Should not throw
         service.checkMembership(directoryId, "uid=alice,dc=example", policy.getGroupADn(), principal);
@@ -299,16 +507,39 @@ class SodPolicyServiceTest {
         when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount));
         when(violationRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        SodViolationResponse result = service.exemptViolation(v.getId(), "Business need", principal);
+        OffsetDateTime expiresAt = OffsetDateTime.now().plusDays(90);
+        var req = new ExemptViolationRequest("Business need", expiresAt);
+        SodViolationResponse result = service.exemptViolation(directoryId, v.getId(), req, principal);
 
         assertThat(result.status()).isEqualTo(SodViolationStatus.EXEMPTED);
         assertThat(result.exemptionReason()).isEqualTo("Business need");
+        assertThat(result.exemptionExpiresAt()).isEqualTo(expiresAt);
         assertThat(v.getResolvedAt()).isNotNull();
         verify(auditService).record(eq(principal), eq(directoryId), eq(AuditAction.SOD_VIOLATION_EXEMPTED), eq("uid=alice,dc=example"), any());
     }
 
     @Test
-    void resolveViolation_updatesStatusToResolved() {
+    void exemptViolation_permanentExemption() {
+        SodPolicy policy = buildPolicy(SodAction.ALERT, SodSeverity.HIGH);
+        SodViolation v = new SodViolation();
+        v.setId(UUID.randomUUID());
+        v.setPolicy(policy);
+        v.setUserDn("uid=alice,dc=example");
+        v.setStatus(SodViolationStatus.OPEN);
+        v.setDetectedAt(OffsetDateTime.now().minusDays(1));
+
+        when(violationRepo.findById(v.getId())).thenReturn(Optional.of(v));
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(adminAccount));
+        when(violationRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        var req = new ExemptViolationRequest("Permanent need", null);
+        SodViolationResponse result = service.exemptViolation(directoryId, v.getId(), req, principal);
+
+        assertThat(result.exemptionExpiresAt()).isNull();
+    }
+
+    @Test
+    void resolveViolation_updatesStatusAndAudits() {
         SodPolicy policy = buildPolicy(SodAction.ALERT, SodSeverity.LOW);
         SodViolation v = new SodViolation();
         v.setId(UUID.randomUUID());
@@ -319,10 +550,11 @@ class SodPolicyServiceTest {
         when(violationRepo.findById(v.getId())).thenReturn(Optional.of(v));
         when(violationRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        service.resolveViolation(v.getId());
+        SodViolationResponse result = service.resolveViolation(directoryId, v.getId(), principal);
 
-        assertThat(v.getStatus()).isEqualTo(SodViolationStatus.RESOLVED);
+        assertThat(result.status()).isEqualTo(SodViolationStatus.RESOLVED);
         assertThat(v.getResolvedAt()).isNotNull();
+        verify(auditService).record(eq(principal), eq(directoryId), eq(AuditAction.SOD_VIOLATION_RESOLVED), eq("uid=alice,dc=example"), any());
     }
 
     @Test
@@ -342,6 +574,9 @@ class SodPolicyServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).status()).isEqualTo(SodViolationStatus.OPEN);
+        // Verify group info is included in response
+        assertThat(result.get(0).groupADn()).isEqualTo(p.getGroupADn());
+        assertThat(result.get(0).groupBDn()).isEqualTo(p.getGroupBDn());
     }
 
     @Test
@@ -352,6 +587,31 @@ class SodPolicyServiceTest {
 
         assertThat(result).isEmpty();
         verify(violationRepo).findByDirectoryId(directoryId);
+    }
+
+    @Test
+    void reopenExpiredExemptions_reopensExpired() {
+        SodPolicy policy = buildPolicy(SodAction.ALERT, SodSeverity.HIGH);
+        SodViolation v = new SodViolation();
+        v.setId(UUID.randomUUID());
+        v.setPolicy(policy);
+        v.setUserDn("uid=alice,dc=example");
+        v.setStatus(SodViolationStatus.EXEMPTED);
+        v.setExemptionExpiresAt(OffsetDateTime.now().minusDays(1));
+        v.setExemptionReason("Temporary");
+        v.setResolvedAt(OffsetDateTime.now().minusDays(30));
+
+        when(violationRepo.findExpiredExemptions(eq(SodViolationStatus.EXEMPTED), any()))
+                .thenReturn(List.of(v));
+        when(violationRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        int count = service.reopenExpiredExemptions();
+
+        assertThat(count).isEqualTo(1);
+        assertThat(v.getStatus()).isEqualTo(SodViolationStatus.OPEN);
+        assertThat(v.getResolvedAt()).isNull();
+        assertThat(v.getExemptionReason()).isNull();
+        assertThat(v.getExemptionExpiresAt()).isNull();
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

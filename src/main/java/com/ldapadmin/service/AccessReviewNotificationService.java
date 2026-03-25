@@ -43,18 +43,17 @@ public class AccessReviewNotificationService {
         }
     }
 
+    /**
+     * Sends deadline-approaching notifications only to the specified reviewers
+     * (those with pending work who haven't been recently notified).
+     */
     @Async
-    public void notifyDeadlineApproaching(AccessReviewCampaign campaign) {
+    public void notifyDeadlineApproaching(AccessReviewCampaign campaign, Set<Account> reviewersToNotify) {
         long total = decisionRepo.countTotalByCampaignId(campaign.getId());
         long pending = decisionRepo.countPendingByCampaignId(campaign.getId());
         long decided = total - pending;
 
-        Set<Account> notified = new HashSet<>();
-        for (AccessReviewGroup group : campaign.getReviewGroups()) {
-            Account reviewer = group.getReviewer();
-            if (notified.contains(reviewer)) continue;
-            notified.add(reviewer);
-
+        for (Account reviewer : reviewersToNotify) {
             if (reviewer.getEmail() != null && !reviewer.getEmail().isBlank()) {
                 sendEmail(reviewer.getEmail(),
                         "[LDAPAdmin] Access Review Deadline Approaching — " + campaign.getName(),
@@ -68,7 +67,7 @@ public class AccessReviewNotificationService {
 
         // Also notify creator
         Account creator = campaign.getCreatedBy();
-        if (creator.getEmail() != null && !creator.getEmail().isBlank() && !notified.contains(creator)) {
+        if (creator.getEmail() != null && !creator.getEmail().isBlank() && !reviewersToNotify.contains(creator)) {
             sendEmail(creator.getEmail(),
                     "[LDAPAdmin] Access Review Deadline Approaching — " + campaign.getName(),
                     String.format(
@@ -147,6 +146,26 @@ public class AccessReviewNotificationService {
         }
     }
 
+    @Async
+    public void notifyRecurringFollowUpCreated(AccessReviewCampaign followUp, AccessReviewCampaign source) {
+        Account creator = source.getCreatedBy();
+        if (creator.getEmail() == null || creator.getEmail().isBlank()) {
+            log.info("Campaign creator has no email — follow-up notification logged: campaign={}",
+                    followUp.getName());
+            return;
+        }
+
+        sendEmail(creator.getEmail(),
+                "[LDAPAdmin] Recurring Access Review Scheduled — " + followUp.getName(),
+                String.format(
+                        "A recurring follow-up access review campaign '%s' has been automatically created.\n\n"
+                        + "Scheduled to auto-activate: %s\n"
+                        + "Deadline: %s\n\n"
+                        + "The campaign will activate automatically on the scheduled date "
+                        + "and reviewers will be notified at that time.",
+                        followUp.getName(), followUp.getStartsAt(), followUp.getDeadline()));
+    }
+
     private void sendEmail(String to, String subject, String body) {
         ApplicationSettings settings = appSettingsService.getEntity();
         if (settings.getSmtpHost() == null || settings.getSmtpHost().isBlank()
@@ -167,15 +186,33 @@ public class AccessReviewNotificationService {
         int port = settings.getSmtpPort() != null ? settings.getSmtpPort() : 587;
         String from = settings.getSmtpSenderAddress();
 
-        var socket = new java.net.Socket(host, port);
+        java.net.Socket socket = new java.net.Socket(host, port);
         socket.setSoTimeout(10000);
-        var in = new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream()));
-        var out = new java.io.PrintWriter(socket.getOutputStream(), true);
 
         try {
+            var in = new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream()));
+            var out = new java.io.PrintWriter(socket.getOutputStream(), true);
+
             readLine(in);
             out.println("EHLO ldapadmin");
             readMultiLine(in);
+
+            // Upgrade to TLS via STARTTLS if port suggests it (587, 25)
+            if (port != 465) {
+                out.println("STARTTLS");
+                String tlsResponse = readLine(in);
+                if (tlsResponse != null && tlsResponse.startsWith("220")) {
+                    var sslFactory = (javax.net.ssl.SSLSocketFactory) javax.net.ssl.SSLSocketFactory.getDefault();
+                    socket = sslFactory.createSocket(socket, host, port, true);
+                    in = new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream()));
+                    out = new java.io.PrintWriter(socket.getOutputStream(), true);
+
+                    // Re-issue EHLO after TLS upgrade
+                    out.println("EHLO ldapadmin");
+                    readMultiLine(in);
+                }
+                // If STARTTLS not supported, continue unencrypted (best-effort)
+            }
 
             if (settings.getSmtpUsername() != null && settings.getSmtpPasswordEncrypted() != null) {
                 String password = encryptionService.decrypt(settings.getSmtpPasswordEncrypted());

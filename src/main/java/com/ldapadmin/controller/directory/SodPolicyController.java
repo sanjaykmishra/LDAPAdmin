@@ -31,7 +31,7 @@ public class SodPolicyController {
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody CreateSodPolicyRequest req) {
         var policy = sodPolicyService.create(directoryId, req, principal);
-        return ResponseEntity.status(HttpStatus.CREATED).body(sodPolicyService.getPolicy(policy.getId()));
+        return ResponseEntity.status(HttpStatus.CREATED).body(sodPolicyService.getPolicy(directoryId, policy.getId()));
     }
 
     @GetMapping
@@ -48,7 +48,7 @@ public class SodPolicyController {
             @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID policyId,
             @AuthenticationPrincipal AuthPrincipal principal) {
-        return sodPolicyService.getPolicy(policyId);
+        return sodPolicyService.getPolicy(directoryId, policyId);
     }
 
     @PutMapping("/{policyId}")
@@ -58,8 +58,8 @@ public class SodPolicyController {
             @PathVariable UUID policyId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody UpdateSodPolicyRequest req) {
-        sodPolicyService.update(policyId, req, principal);
-        return sodPolicyService.getPolicy(policyId);
+        sodPolicyService.update(directoryId, policyId, req, principal);
+        return sodPolicyService.getPolicy(directoryId, policyId);
     }
 
     @DeleteMapping("/{policyId}")
@@ -68,7 +68,7 @@ public class SodPolicyController {
             @DirectoryId @PathVariable UUID directoryId,
             @PathVariable UUID policyId,
             @AuthenticationPrincipal AuthPrincipal principal) {
-        sodPolicyService.delete(policyId, principal);
+        sodPolicyService.delete(directoryId, policyId, principal);
         return ResponseEntity.noContent().build();
     }
 
@@ -98,6 +98,15 @@ public class SodPolicyController {
             @PathVariable UUID violationId,
             @AuthenticationPrincipal AuthPrincipal principal,
             @Valid @RequestBody ExemptViolationRequest req) {
-        return sodPolicyService.exemptViolation(violationId, req.reason(), principal);
+        return sodPolicyService.exemptViolation(directoryId, violationId, req, principal);
+    }
+
+    @PostMapping("/violations/{violationId}/resolve")
+    @RequiresFeature(FeatureKey.SOD_MANAGE)
+    public SodViolationResponse resolve(
+            @DirectoryId @PathVariable UUID directoryId,
+            @PathVariable UUID violationId,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        return sodPolicyService.resolveViolation(directoryId, violationId, principal);
     }
 }

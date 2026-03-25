@@ -10,12 +10,10 @@ import com.ldapadmin.ldap.LdapGroupService;
 import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.ldap.model.LdapUser;
 import com.ldapadmin.repository.*;
-import com.ldapadmin.entity.CampaignReminder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,9 +44,6 @@ public class AccessReviewCampaignService {
         DirectoryConnection dir = directoryRepo.findById(directoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("DirectoryConnection", directoryId));
 
-        if (req.deadlineDays() < 1) {
-            throw new LdapAdminException("Deadline must be at least 1 day");
-        }
         if (req.recurrenceMonths() != null && req.recurrenceMonths() < 1) {
             throw new LdapAdminException("Recurrence interval must be at least 1 month");
         }
@@ -102,15 +97,14 @@ public class AccessReviewCampaignService {
     }
 
     @Transactional
-    public AccessReviewCampaign activate(UUID campaignId, AuthPrincipal principal) {
-        AccessReviewCampaign campaign = getCampaignOrThrow(campaignId);
+    public AccessReviewCampaign activate(UUID directoryId, UUID campaignId, AuthPrincipal principal) {
+        AccessReviewCampaign campaign = getCampaignForDirectory(directoryId, campaignId);
         if (campaign.getStatus() != CampaignStatus.UPCOMING) {
             throw new LdapAdminException("Can only activate campaigns in UPCOMING status");
         }
 
         DirectoryConnection dir = campaign.getDirectory();
-        Account actor = accountRepo.findById(principal.id())
-                .orElseThrow(() -> new ResourceNotFoundException("Account", principal.id()));
+        Account actor = accountRepo.findById(principal.id()).orElse(null);
 
         // Snapshot current members for each review group
         for (AccessReviewGroup group : campaign.getReviewGroups()) {
@@ -126,9 +120,15 @@ public class AccessReviewCampaignService {
 
         CampaignStatus oldStatus = campaign.getStatus();
         campaign.setStatus(CampaignStatus.ACTIVE);
+        campaign.setStartsAt(OffsetDateTime.now());
         campaignRepo.save(campaign);
 
-        recordHistory(campaign, oldStatus, CampaignStatus.ACTIVE, actor, "Campaign activated — members snapshot taken");
+        if (actor != null) {
+            recordHistory(campaign, oldStatus, CampaignStatus.ACTIVE, actor, "Campaign activated — members snapshot taken");
+        }
+
+        // Force-initialize lazy collections before passing to @Async notification
+        campaign.getReviewGroups().forEach(g -> g.getReviewer().getUsername());
 
         // Notify reviewers
         notificationService.notifyReviewersAssigned(campaign);
@@ -140,8 +140,8 @@ public class AccessReviewCampaignService {
     }
 
     @Transactional
-    public AccessReviewCampaign close(UUID campaignId, boolean forceClose, AuthPrincipal principal) {
-        AccessReviewCampaign campaign = getCampaignOrThrow(campaignId);
+    public AccessReviewCampaign close(UUID directoryId, UUID campaignId, boolean forceClose, AuthPrincipal principal) {
+        AccessReviewCampaign campaign = getCampaignForDirectory(directoryId, campaignId);
         if (campaign.getStatus() != CampaignStatus.ACTIVE) {
             throw new LdapAdminException("Can only close campaigns in ACTIVE status");
         }
@@ -156,7 +156,7 @@ public class AccessReviewCampaignService {
                 .orElseThrow(() -> new ResourceNotFoundException("Account", principal.id()));
         DirectoryConnection dir = campaign.getDirectory();
 
-        // Execute auto-revocations if enabled
+        // Execute auto-revocations for reviewer-decided REVOKE entries
         if (campaign.isAutoRevoke()) {
             executeRevocations(campaign, dir, principal);
         }
@@ -168,6 +168,9 @@ public class AccessReviewCampaignService {
 
         recordHistory(campaign, oldStatus, CampaignStatus.CLOSED, actor,
                 forceClose ? "Campaign force-closed with " + pendingCount + " undecided items" : "Campaign closed");
+
+        // Force-initialize before @Async notification
+        campaign.getCreatedBy().getUsername();
 
         notificationService.notifyCampaignClosed(campaign);
 
@@ -187,8 +190,8 @@ public class AccessReviewCampaignService {
     }
 
     @Transactional
-    public AccessReviewCampaign cancel(UUID campaignId, AuthPrincipal principal) {
-        AccessReviewCampaign campaign = getCampaignOrThrow(campaignId);
+    public AccessReviewCampaign cancel(UUID directoryId, UUID campaignId, AuthPrincipal principal) {
+        AccessReviewCampaign campaign = getCampaignForDirectory(directoryId, campaignId);
         if (campaign.getStatus() != CampaignStatus.UPCOMING && campaign.getStatus() != CampaignStatus.ACTIVE) {
             throw new LdapAdminException("Can only cancel campaigns in UPCOMING or ACTIVE status");
         }
@@ -216,13 +219,13 @@ public class AccessReviewCampaignService {
     }
 
     @Transactional(readOnly = true)
-    public CampaignDetailDto get(UUID campaignId) {
-        AccessReviewCampaign campaign = getCampaignOrThrow(campaignId);
-        return toDetailDto(campaign);
+    public CampaignDetailDto get(UUID directoryId, UUID campaignId) {
+        return toDetailDto(getCampaignForDirectory(directoryId, campaignId));
     }
 
     @Transactional(readOnly = true)
-    public List<ReviewGroupDto> listReviewGroups(UUID campaignId, AuthPrincipal principal) {
+    public List<ReviewGroupDto> listReviewGroups(UUID directoryId, UUID campaignId, AuthPrincipal principal) {
+        getCampaignForDirectory(directoryId, campaignId);
         List<AccessReviewGroup> groups;
         if (principal.isSuperadmin()) {
             groups = groupRepo.findByCampaignId(campaignId);
@@ -233,7 +236,8 @@ public class AccessReviewCampaignService {
     }
 
     @Transactional(readOnly = true)
-    public List<CampaignHistoryDto> getHistory(UUID campaignId) {
+    public List<CampaignHistoryDto> getHistory(UUID directoryId, UUID campaignId) {
+        getCampaignForDirectory(directoryId, campaignId);
         return historyRepo.findByCampaignIdOrderByChangedAtAsc(campaignId).stream()
                 .map(h -> new CampaignHistoryDto(
                         h.getId(),
@@ -246,8 +250,8 @@ public class AccessReviewCampaignService {
     }
 
     @Transactional(readOnly = true)
-    public byte[] exportCsv(UUID campaignId) {
-        AccessReviewCampaign campaign = getCampaignOrThrow(campaignId);
+    public byte[] exportCsv(UUID directoryId, UUID campaignId) {
+        AccessReviewCampaign campaign = getCampaignForDirectory(directoryId, campaignId);
         StringBuilder csv = new StringBuilder();
         csv.append("Campaign,Group DN,Group Name,Member DN,Member Display,Decision,Decided By,Comment,Decided At,Revoked At\n");
 
@@ -273,7 +277,8 @@ public class AccessReviewCampaignService {
     // ── Reminder history ────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public List<CampaignReminderDto> listReminders(UUID campaignId) {
+    public List<CampaignReminderDto> listReminders(UUID directoryId, UUID campaignId) {
+        getCampaignForDirectory(directoryId, campaignId);
         return reminderRepo.findByCampaignIdOrderBySentAtDesc(campaignId).stream()
                 .map(r -> new CampaignReminderDto(
                         r.getId(),
@@ -290,9 +295,8 @@ public class AccessReviewCampaignService {
     public void expireCampaign(AccessReviewCampaign campaign, AuthPrincipal systemPrincipal) {
         DirectoryConnection dir = campaign.getDirectory();
 
-        if (campaign.isAutoRevokeOnExpiry()) {
-            executeRevocations(campaign, dir, systemPrincipal);
-        }
+        // Note: auto-revoke on expiry is handled by the scheduler before calling this method.
+        // This method only handles the status transition, history, and notification.
 
         CampaignStatus oldStatus = campaign.getStatus();
         campaign.setStatus(CampaignStatus.EXPIRED);
@@ -303,6 +307,10 @@ public class AccessReviewCampaignService {
         if (systemAccount != null) {
             recordHistory(campaign, oldStatus, CampaignStatus.EXPIRED, systemAccount, "Campaign expired — deadline passed");
         }
+
+        // Force-initialize lazy collections before passing to @Async notification
+        campaign.getReviewGroups().forEach(g -> g.getReviewer().getUsername());
+        campaign.getCreatedBy().getUsername();
 
         notificationService.notifyCampaignExpired(campaign);
 
@@ -318,18 +326,28 @@ public class AccessReviewCampaignService {
             return null;
         }
 
+        // Guard against duplicate follow-ups
+        if (campaignRepo.existsBySourceCampaignId(source.getId())) {
+            log.info("Recurring follow-up already exists for campaign '{}' (id={}) — skipping",
+                    source.getName(), source.getId());
+            return null;
+        }
+
         Account creator = accountRepo.findById(systemPrincipal.id()).orElse(null);
         if (creator == null) {
             log.warn("Cannot create recurring follow-up: system principal not found");
             return null;
         }
 
-        OffsetDateTime deadline = OffsetDateTime.now().plusDays(source.getDeadlineDays());
+        // Schedule the follow-up to start after recurrenceMonths, with its own deadline period
+        OffsetDateTime startsAt = OffsetDateTime.now().plusMonths(source.getRecurrenceMonths());
+        OffsetDateTime deadline = startsAt.plusDays(source.getDeadlineDays());
 
         AccessReviewCampaign followUp = new AccessReviewCampaign();
         followUp.setDirectory(source.getDirectory());
         followUp.setName(source.getName());
         followUp.setDescription(source.getDescription());
+        followUp.setStartsAt(startsAt);
         followUp.setDeadline(deadline);
         followUp.setDeadlineDays(source.getDeadlineDays());
         followUp.setRecurrenceMonths(source.getRecurrenceMonths());
@@ -351,14 +369,19 @@ public class AccessReviewCampaignService {
 
         followUp = campaignRepo.save(followUp);
         recordHistory(followUp, null, CampaignStatus.UPCOMING, creator,
-                "Recurring follow-up created from campaign '" + source.getName() + "'");
+                "Recurring follow-up created from campaign '" + source.getName()
+                        + "' — scheduled to auto-activate at " + startsAt);
 
         auditService.record(systemPrincipal, source.getDirectory().getId(), AuditAction.CAMPAIGN_CREATED,
                 null, Map.of("campaignName", followUp.getName(), "campaignId", followUp.getId().toString(),
-                        "sourceCampaignId", source.getId().toString(), "recurring", "true"));
+                        "sourceCampaignId", source.getId().toString(), "recurring", "true",
+                        "scheduledStart", startsAt.toString()));
 
-        log.info("Created recurring follow-up campaign '{}' (id={}) from source campaign id={}",
-                followUp.getName(), followUp.getId(), source.getId());
+        // Notify the original campaign creator
+        notificationService.notifyRecurringFollowUpCreated(followUp, source);
+
+        log.info("Created recurring follow-up campaign '{}' (id={}) from source campaign id={}, scheduled start: {}",
+                followUp.getName(), followUp.getId(), source.getId(), startsAt);
 
         return followUp;
     }
@@ -419,6 +442,17 @@ public class AccessReviewCampaignService {
                 .orElseThrow(() -> new ResourceNotFoundException("AccessReviewCampaign", campaignId));
     }
 
+    /**
+     * Loads a campaign and verifies it belongs to the given directory.
+     */
+    private AccessReviewCampaign getCampaignForDirectory(UUID directoryId, UUID campaignId) {
+        AccessReviewCampaign campaign = getCampaignOrThrow(campaignId);
+        if (!campaign.getDirectory().getId().equals(directoryId)) {
+            throw new ResourceNotFoundException("AccessReviewCampaign", campaignId);
+        }
+        return campaign;
+    }
+
     private CampaignProgressDto buildProgress(UUID campaignId) {
         long total = decisionRepo.countTotalByCampaignId(campaignId);
         long confirmed = decisionRepo.countByCampaignIdAndDecision(campaignId, ReviewDecision.CONFIRM);
@@ -441,7 +475,11 @@ public class AccessReviewCampaignService {
     private CampaignDetailDto toDetailDto(AccessReviewCampaign c) {
         List<ReviewGroupDto> groups = c.getReviewGroups().stream()
                 .map(this::toReviewGroupDto).toList();
-        List<CampaignHistoryDto> history = getHistory(c.getId());
+        List<CampaignHistoryDto> history = historyRepo.findByCampaignIdOrderByChangedAtAsc(c.getId()).stream()
+                .map(h -> new CampaignHistoryDto(
+                        h.getId(), h.getOldStatus(), h.getNewStatus(),
+                        h.getChangedBy().getUsername(), h.getChangedAt(), h.getNote()))
+                .toList();
         return new CampaignDetailDto(
                 c.getId(), c.getName(), c.getDescription(), c.getStatus(),
                 c.getStartsAt(), c.getDeadline(),

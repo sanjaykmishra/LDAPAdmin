@@ -60,6 +60,11 @@ public class AccessReviewDecisionService {
         verifyReviewerAccess(group, principal);
         verifyCampaignActive(group);
 
+        if (d.getDecision() != null) {
+            throw new LdapAdminException("Decision already submitted for this member. "
+                    + "Current decision: " + d.getDecision().name());
+        }
+
         Account actor = accountRepo.findById(principal.id())
                 .orElseThrow(() -> new ResourceNotFoundException("Account", principal.id()));
 
@@ -96,9 +101,43 @@ public class AccessReviewDecisionService {
         verifyReviewerAccess(group, principal);
         verifyCampaignActive(group);
 
+        Account actor = accountRepo.findById(principal.id())
+                .orElseThrow(() -> new ResourceNotFoundException("Account", principal.id()));
+
         List<DecisionDto> results = new ArrayList<>();
         for (BulkDecisionRequest.BulkDecisionItem item : items) {
-            results.add(decide(item.decisionId(), item.decision(), item.comment(), principal));
+            AccessReviewDecision d = decisionRepo.findById(item.decisionId())
+                    .orElseThrow(() -> new ResourceNotFoundException("AccessReviewDecision", item.decisionId()));
+
+            if (d.getDecision() != null) {
+                log.warn("Skipping already-decided item {} in bulk operation", item.decisionId());
+                results.add(toDto(d));
+                continue;
+            }
+
+            d.setDecision(item.decision());
+            d.setComment(item.comment());
+            d.setDecidedBy(actor);
+            d.setDecidedAt(OffsetDateTime.now());
+
+            if (item.decision() == ReviewDecision.REVOKE && group.getCampaign().isAutoRevoke()) {
+                executeImmediateRevoke(d, group, principal);
+            }
+
+            decisionRepo.save(d);
+
+            AuditAction auditAction = item.decision() == ReviewDecision.CONFIRM
+                    ? AuditAction.REVIEW_CONFIRMED
+                    : AuditAction.REVIEW_REVOKED;
+
+            auditService.record(principal, group.getCampaign().getDirectory().getId(), auditAction,
+                    d.getMemberDn(),
+                    Map.of("groupDn", group.getGroupDn(),
+                            "campaignId", group.getCampaign().getId().toString(),
+                            "decision", item.decision().name(),
+                            "bulk", "true"));
+
+            results.add(toDto(d));
         }
         return results;
     }

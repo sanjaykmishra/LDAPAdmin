@@ -54,6 +54,12 @@ const ACTION_LABELS = {
   'SOD_VIOLATION_DETECTED': 'SoD violation detected',
   'SOD_VIOLATION_EXEMPTED': 'SoD violation exempted',
   'SOD_VIOLATION_BLOCKED': 'SoD violation blocked',
+  'SOD_VIOLATION_RESOLVED': 'SoD violation resolved',
+  'HR_SYNC_STARTED': 'HR sync started',
+  'HR_SYNC_COMPLETED': 'HR sync completed',
+  'HR_SYNC_FAILED': 'HR sync failed',
+  'HR_EMPLOYEE_MATCHED': 'HR employee matched',
+  'HR_ORPHAN_DETECTED': 'HR orphan detected',
 }
 
 function actionLabel(action) {
@@ -85,7 +91,7 @@ function postureSeverity(metric) {
     return data.value.openSodViolations === 0 ? 'green' : data.value.openSodViolations <= 5 ? 'yellow' : 'red'
   }
   if (metric === 'campaignCompletion') {
-    if (!data.value) return 'gray'
+    if (!data.value || data.value.campaignCompletionPercent == null) return 'gray'
     return data.value.campaignCompletionPercent >= 90 ? 'green' : data.value.campaignCompletionPercent >= 50 ? 'yellow' : 'red'
   }
   if (metric === 'overdue') {
@@ -140,21 +146,40 @@ function goToApprovals() {
   if (dir) router.push(`/directories/${dir.id}/approvals`)
 }
 
-onMounted(async () => {
+let refreshTimer = null
+
+async function loadDashboard() {
   try {
     const { data: d } = await getDashboard()
     data.value = d
+    error.value = null
   } catch (e) {
     error.value = e.response?.data?.detail || e.message
   } finally {
     loading.value = false
   }
+}
+
+onMounted(() => {
+  loadDashboard()
+  // Auto-refresh every 60 seconds
+  refreshTimer = setInterval(loadDashboard, 60000)
+})
+
+import { onUnmounted } from 'vue'
+onUnmounted(() => {
+  if (refreshTimer) clearInterval(refreshTimer)
 })
 </script>
 
 <template>
   <div class="p-6">
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Compliance Posture Dashboard</h1>
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-gray-900">Compliance Posture Dashboard</h1>
+      <button @click="loadDashboard" :disabled="loading" class="text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50">
+        {{ loading ? 'Refreshing...' : 'Refresh' }}
+      </button>
+    </div>
 
     <div v-if="loading" class="text-gray-400">Loading...</div>
     <div v-else-if="error" class="text-red-500">{{ error }}</div>
@@ -179,7 +204,7 @@ onMounted(async () => {
              @click="goToAccessReviews">
           <p class="text-sm font-medium text-gray-500 mb-1">Campaign Completion</p>
           <p class="text-3xl font-bold" :class="cardValueColor(postureSeverity('campaignCompletion'))">
-            {{ data.campaignCompletionPercent }}%
+            {{ data.campaignCompletionPercent != null ? data.campaignCompletionPercent + '%' : 'N/A' }}
           </p>
           <p class="text-xs text-gray-400 mt-1">Across {{ data.campaignProgress.length }} active campaigns</p>
         </div>
@@ -302,6 +327,7 @@ onMounted(async () => {
                 <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Users</th>
                 <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Groups</th>
                 <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Pending</th>
+                <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Campaigns</th>
                 <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">SoD</th>
               </tr>
             </thead>
@@ -317,6 +343,10 @@ onMounted(async () => {
                 <td class="px-4 py-2.5 text-right text-gray-600">{{ dir.groupCount >= 0 ? dir.groupCount.toLocaleString() : '—' }}</td>
                 <td class="px-4 py-2.5 text-right">
                   <span v-if="dir.pendingApprovals > 0" class="text-amber-600 font-medium">{{ dir.pendingApprovals }}</span>
+                  <span v-else class="text-gray-400">0</span>
+                </td>
+                <td class="px-4 py-2.5 text-right">
+                  <span v-if="dir.activeCampaigns > 0" class="text-blue-600 font-medium">{{ dir.activeCampaigns }}</span>
                   <span v-else class="text-gray-400">0</span>
                 </td>
                 <td class="px-4 py-2.5 text-right">

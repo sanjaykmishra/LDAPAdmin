@@ -55,6 +55,8 @@ public class ComplianceReportController {
             @AuthenticationPrincipal AuthPrincipal principal,
             @PathVariable UUID campaignId) throws IOException {
 
+        // Verify campaign belongs to this directory
+        var campaign = pdfReportService.getCampaignForDirectory(directoryId, campaignId);
         byte[] pdf = pdfReportService.generateAccessReviewSummary(campaignId);
         return pdfResponse(pdf, "access-review-summary.pdf");
     }

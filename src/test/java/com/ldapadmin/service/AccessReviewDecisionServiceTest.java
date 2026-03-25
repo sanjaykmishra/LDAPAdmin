@@ -18,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
+import java.time.OffsetDateTime;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -89,6 +90,17 @@ class AccessReviewDecisionServiceTest {
         assertThat(result.comment()).isEqualTo("Looks good");
         assertThat(result.decidedByUsername()).isEqualTo("reviewer");
         verify(auditService).record(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void decide_alreadyDecided_throwsException() {
+        decision.setDecision(ReviewDecision.CONFIRM);
+        decision.setDecidedAt(OffsetDateTime.now());
+        when(decisionRepo.findById(decision.getId())).thenReturn(Optional.of(decision));
+
+        assertThatThrownBy(() -> service.decide(decision.getId(), ReviewDecision.REVOKE, null, reviewerPrincipal))
+                .isInstanceOf(LdapAdminException.class)
+                .hasMessageContaining("already submitted");
     }
 
     @Test
