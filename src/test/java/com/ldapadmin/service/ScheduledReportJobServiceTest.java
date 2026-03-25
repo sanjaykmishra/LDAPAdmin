@@ -87,6 +87,7 @@ class ScheduledReportJobServiceTest {
                 DeliveryMethod.EMAIL,
                 "admin@example.com",
                 null,
+                null,
                 true);
     }
 
@@ -189,7 +190,7 @@ class ScheduledReportJobServiceTest {
         CreateScheduledReportJobRequest updated = new CreateScheduledReportJobRequest(
                 "Monthly Report", ReportType.DISABLED_ACCOUNTS, null,
                 "0 0 9 1 * *", OutputFormat.CSV, DeliveryMethod.EMAIL,
-                "manager@example.com", null, false);
+                "manager@example.com", null, null, false);
 
         ScheduledReportJobDto dto = service.update(dirId, jobId, updated, adminPrincipal);
 

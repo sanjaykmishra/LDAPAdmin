@@ -75,6 +75,16 @@ class ScheduledReportSchedulerTest {
         assertThat(scheduler.isDue(job)).isFalse();
     }
 
+    @Test
+    void isDue_withTimezone_usesConfiguredZone() {
+        ScheduledReportJob job = buildJob();
+        job.setCronExpression("0 * * * * *"); // every minute
+        job.setLastRunAt(OffsetDateTime.now().minusHours(1));
+        job.setTimezone("America/New_York");
+
+        assertThat(scheduler.isDue(job)).isTrue();
+    }
+
     // ── pollReportJobs tests ─────────────────────────────────────────────────
 
     @Test
@@ -91,7 +101,9 @@ class ScheduledReportSchedulerTest {
 
         verify(reportExecService).run(eq(job.getDirectory()), eq(ReportType.USERS_IN_GROUP),
                 eq(job.getReportParams()), eq(OutputFormat.CSV), eq(job.getDirectory().getId()));
-        verify(notificationService).sendGenericEmail(eq("admin@example.com"), contains("Scheduled Report"), anyString());
+        verify(notificationService).sendEmailWithAttachment(
+                eq("admin@example.com"), contains("Scheduled Report"), anyString(),
+                anyString(), eq("text/csv"), any(byte[].class));
         verify(jobService).recordRunResult(eq(job.getId()), eq("SUCCESS"), anyString());
     }
 

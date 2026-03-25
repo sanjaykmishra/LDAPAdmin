@@ -14,6 +14,7 @@ import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.service.ReportExecutionService;
 import com.ldapadmin.service.ScheduledReportJobService;
+import com.ldapadmin.service.ScheduledReportScheduler;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -61,6 +62,7 @@ public class ScheduledReportJobController {
     private final ReportExecutionService        executionService;
     private final DirectoryConnectionRepository dirRepo;
     private final ApiRateLimiter                rateLimiter;
+    private final ScheduledReportScheduler      scheduler;
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
 
@@ -120,6 +122,22 @@ public class ScheduledReportJobController {
             @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam boolean enabled) {
         return jobService.setEnabled(directoryId, jobId, enabled, principal);
+    }
+
+    @PostMapping("/report-jobs/{jobId}/run-now")
+    @RequiresFeature(FeatureKey.REPORTS_SCHEDULE)
+    public ResponseEntity<java.util.Map<String, String>> runNow(
+            @DirectoryId @PathVariable UUID directoryId,
+            @PathVariable UUID jobId,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        var job = jobService.getJobEntity(directoryId, jobId);
+        try {
+            new Thread(() -> scheduler.executeJobNow(job), "report-run-now-" + jobId).start();
+            return ResponseEntity.ok(java.util.Map.of("status", "started",
+                    "message", "Report job '" + job.getName() + "' execution started"));
+        } catch (Exception e) {
+            return ResponseEntity.ok(java.util.Map.of("status", "failed", "message", e.getMessage()));
+        }
     }
 
     // ── On-demand execution ───────────────────────────────────────────────────

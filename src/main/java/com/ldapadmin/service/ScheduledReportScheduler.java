@@ -13,17 +13,18 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Polls enabled {@link ScheduledReportJob} records and executes them when
  * their cron expression indicates they are due.
- *
- * <p>Follows the same pattern as {@link com.ldapadmin.service.hr.HrSyncScheduler}:
- * a fixed-delay poll evaluates each job's cron expression against its
- * {@code lastRunAt} timestamp.</p>
  */
 @Component
 @Slf4j
@@ -39,11 +40,18 @@ public class ScheduledReportScheduler {
     private final ApprovalNotificationService  notificationService;
     private final S3UploadService              s3UploadService;
 
+    /** Tracks jobs currently executing to prevent concurrent runs of the same job. */
+    private final Set<UUID> inProgress = ConcurrentHashMap.newKeySet();
+
     @Scheduled(fixedDelayString = "${ldapadmin.report.poll-interval-ms:60000}",
                initialDelayString = "${ldapadmin.report.poll-initial-delay-ms:30000}")
     public void pollReportJobs() {
         List<ScheduledReportJob> jobs = jobRepo.findAllByEnabledTrue();
         for (ScheduledReportJob job : jobs) {
+            if (inProgress.contains(job.getId())) {
+                log.debug("Skipping report job '{}' ({}): already in progress", job.getName(), job.getId());
+                continue;
+            }
             try {
                 if (isDue(job)) {
                     log.info("Executing scheduled report job '{}' ({})",
@@ -59,8 +67,15 @@ public class ScheduledReportScheduler {
     }
 
     /**
+     * Executes a specific job immediately (used by "run now" endpoint).
+     */
+    public void executeJobNow(ScheduledReportJob job) {
+        executeJob(job);
+    }
+
+    /**
      * Determines whether a job is due for execution by evaluating its cron
-     * expression against the last run timestamp.
+     * expression against the last run timestamp, using the job's configured timezone.
      */
     public boolean isDue(ScheduledReportJob job) {
         try {
@@ -69,10 +84,14 @@ public class ScheduledReportScheduler {
 
             if (lastRun == null) return true;
 
-            LocalDateTime lastRunLocal = lastRun.atZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
-            LocalDateTime nextExecution = cron.next(lastRunLocal);
+            ZoneId zone = job.getTimezone() != null && !job.getTimezone().isBlank()
+                    ? ZoneId.of(job.getTimezone()) : ZoneOffset.UTC;
 
-            return nextExecution != null && !nextExecution.isAfter(LocalDateTime.now(ZoneOffset.UTC));
+            LocalDateTime lastRunLocal = lastRun.atZoneSameInstant(zone).toLocalDateTime();
+            LocalDateTime nextExecution = cron.next(lastRunLocal);
+            LocalDateTime now = LocalDateTime.now(zone);
+
+            return nextExecution != null && !nextExecution.isAfter(now);
         } catch (Exception e) {
             log.warn("Invalid cron expression '{}' for report job '{}' ({}): {}",
                     job.getCronExpression(), job.getName(), job.getId(), e.getMessage());
@@ -83,8 +102,12 @@ public class ScheduledReportScheduler {
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private void executeJob(ScheduledReportJob job) {
-        DirectoryConnection dc = job.getDirectory();
+        if (!inProgress.add(job.getId())) {
+            log.warn("Report job '{}' is already running — skipping", job.getName());
+            return;
+        }
 
+        DirectoryConnection dc = job.getDirectory();
         try {
             byte[] reportData = reportExecService.run(
                     dc, job.getReportType(), job.getReportParams(),
@@ -98,6 +121,8 @@ public class ScheduledReportScheduler {
             log.error("Failed to execute report job '{}': {}", job.getName(), e.getMessage(), e);
             jobService.recordRunResult(job.getId(), "FAILURE",
                     truncate(e.getMessage(), 2000));
+        } finally {
+            inProgress.remove(job.getId());
         }
     }
 
@@ -109,11 +134,12 @@ public class ScheduledReportScheduler {
         if (job.getDeliveryMethod() == DeliveryMethod.S3) {
             deliverToS3(job, data, fileName, contentType);
         } else {
-            deliverByEmail(job, data, fileName);
+            deliverByEmail(job, data, fileName, contentType);
         }
     }
 
-    private void deliverByEmail(ScheduledReportJob job, byte[] data, String fileName) {
+    private void deliverByEmail(ScheduledReportJob job, byte[] data,
+                                 String fileName, String contentType) {
         String recipients = job.getDeliveryRecipients();
         if (recipients == null || recipients.isBlank()) {
             throw new IllegalStateException(
@@ -126,8 +152,7 @@ public class ScheduledReportScheduler {
                 + "Report type: %s\n"
                 + "Directory: %s\n"
                 + "Generated: %s\n"
-                + "File: %s (%d bytes)\n\n"
-                + "The report is attached to this email.",
+                + "File: %s (%d bytes)",
                 job.getName(),
                 job.getOutputFormat().name(),
                 job.getReportType().name(),
@@ -139,7 +164,8 @@ public class ScheduledReportScheduler {
         for (String recipient : recipients.split(",")) {
             String trimmed = recipient.trim();
             if (!trimmed.isEmpty()) {
-                notificationService.sendGenericEmail(trimmed, subject, body);
+                notificationService.sendEmailWithAttachment(trimmed, subject, body,
+                        fileName, contentType, data);
             }
         }
 

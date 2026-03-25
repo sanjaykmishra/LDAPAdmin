@@ -22,6 +22,7 @@ public record ScheduledReportJobDto(
         DeliveryMethod deliveryMethod,
         String deliveryRecipients,
         String s3KeyPrefix,
+        String timezone,
         boolean enabled,
         OffsetDateTime lastRunAt,
         String lastRunStatus,
