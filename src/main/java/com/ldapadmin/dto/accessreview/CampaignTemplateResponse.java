@@ -25,6 +25,7 @@ public record CampaignTemplateResponse(
     public record GroupConfigDto(
             String groupDn,
             String memberAttribute,
-            UUID reviewerAccountId
+            UUID reviewerAccountId,
+            String reviewerUsername
     ) {}
 }
