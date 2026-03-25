@@ -30,9 +30,16 @@ public class SodPolicy {
     @JoinColumn(name = "directory_id")
     private DirectoryConnection directory;
 
+    @Column(name = "group_a_dn")
     private String groupADn;
+
+    @Column(name = "group_b_dn")
     private String groupBDn;
+
+    @Column(name = "group_a_name")
     private String groupAName;
+
+    @Column(name = "group_b_name")
     private String groupBName;
 
     @Enumerated(EnumType.STRING)
