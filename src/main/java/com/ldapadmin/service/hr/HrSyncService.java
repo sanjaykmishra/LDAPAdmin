@@ -222,7 +222,8 @@ public class HrSyncService {
         if (status == null) return HrEmployeeStatus.ACTIVE;
         return switch (status.toLowerCase()) {
             case "active", "enabled" -> HrEmployeeStatus.ACTIVE;
-            case "terminated", "inactive" -> HrEmployeeStatus.TERMINATED;
+            case "terminated" -> HrEmployeeStatus.TERMINATED;
+            case "inactive" -> HrEmployeeStatus.INACTIVE;
             case "on leave", "leave" -> HrEmployeeStatus.ON_LEAVE;
             default -> HrEmployeeStatus.ACTIVE;
         };

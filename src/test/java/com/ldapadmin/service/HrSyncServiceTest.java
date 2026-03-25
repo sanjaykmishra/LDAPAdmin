@@ -119,7 +119,7 @@ class HrSyncServiceTest {
         when(connectionRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(employeeRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        LdapUser ldapUser = new LdapUser("uid=john,dc=test,dc=com", Map.of());
+        LdapUser ldapUser = new LdapUser("uid=john,dc=test,dc=com", Map.of("uid", List.of("john")));
         when(ldapUserService.searchUsers(eq(directory), contains("john@example.com"), any(), eq(2), any()))
                 .thenReturn(List.of(ldapUser));
 
@@ -151,7 +151,7 @@ class HrSyncServiceTest {
         when(connectionRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(employeeRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        LdapUser ldapUser = new LdapUser("uid=gone,dc=test,dc=com", Map.of());
+        LdapUser ldapUser = new LdapUser("uid=gone,dc=test,dc=com", Map.of("uid", List.of("gone")));
         when(ldapUserService.searchUsers(eq(directory), contains("gone@example.com"), any(), eq(2), any()))
                 .thenReturn(List.of(ldapUser));
 
@@ -237,8 +237,8 @@ class HrSyncServiceTest {
         // Multiple LDAP matches = ambiguous
         when(ldapUserService.searchUsers(eq(directory), contains("dupe@example.com"), any(), eq(2), any()))
                 .thenReturn(List.of(
-                        new LdapUser("uid=user1,dc=test", Map.of()),
-                        new LdapUser("uid=user2,dc=test", Map.of())
+                        new LdapUser("uid=user1,dc=test", Map.of("uid", List.of("user1"))),
+                        new LdapUser("uid=user2,dc=test", Map.of("uid", List.of("user2")))
                 ));
 
         HrSyncRun result = service.sync(hrConnection, HrSyncTrigger.MANUAL, principal);
@@ -336,7 +336,7 @@ class HrSyncServiceTest {
         when(connectionRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(employeeRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        LdapUser ldapUser = new LdapUser("uid=john,dc=test", Map.of());
+        LdapUser ldapUser = new LdapUser("uid=john,dc=test", Map.of("uid", List.of("john")));
         when(ldapUserService.searchUsers(eq(directory), contains("employeeNumber=42"), any(), eq(2), any()))
                 .thenReturn(List.of(ldapUser));
 

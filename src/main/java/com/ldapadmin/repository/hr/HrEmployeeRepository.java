@@ -35,5 +35,8 @@ public interface HrEmployeeRepository extends JpaRepository<HrEmployee, UUID> {
 
     long countByHrConnectionId(UUID hrConnectionId);
 
+    long countByHrConnectionIdAndStatusAndMatchedLdapDnIsNotNull(
+            UUID hrConnectionId, HrEmployeeStatus status);
+
     void deleteByHrConnectionId(UUID hrConnectionId);
 }

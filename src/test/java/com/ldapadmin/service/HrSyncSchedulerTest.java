@@ -12,10 +12,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.ldapadmin.entity.enums.HrSyncTrigger;
+
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class HrSyncSchedulerTest {
@@ -63,6 +69,29 @@ class HrSyncSchedulerTest {
         conn.setLastSyncAt(OffsetDateTime.now().minusDays(1));
 
         assertThat(scheduler.isDue(conn)).isFalse();
+    }
+
+    @Test
+    void pollHrConnections_triggersDueConnections() {
+        HrConnection conn = buildConnection();
+        conn.setLastSyncAt(null); // never synced = due
+        when(connectionRepo.findByEnabledTrue()).thenReturn(List.of(conn));
+
+        scheduler.pollHrConnections();
+
+        verify(syncService).sync(eq(conn), eq(HrSyncTrigger.SCHEDULED), any());
+    }
+
+    @Test
+    void pollHrConnections_skipsNotDueConnections() {
+        HrConnection conn = buildConnection();
+        conn.setSyncCron("0 0 * * * *"); // every hour
+        conn.setLastSyncAt(OffsetDateTime.now()); // just synced
+        when(connectionRepo.findByEnabledTrue()).thenReturn(List.of(conn));
+
+        scheduler.pollHrConnections();
+
+        verify(syncService, never()).sync(any(), any(), any());
     }
 
     private HrConnection buildConnection() {

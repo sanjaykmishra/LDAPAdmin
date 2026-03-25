@@ -22,6 +22,7 @@ import com.ldapadmin.service.hr.BambooHrClient;
 import com.ldapadmin.service.hr.HrSyncService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.support.CronExpression;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -71,7 +72,10 @@ public class HrConnectionController {
         conn.setApiKeyEncrypted(encryptionService.encrypt(req.apiKey()));
         if (req.matchAttribute() != null) conn.setMatchAttribute(req.matchAttribute());
         if (req.matchField() != null) conn.setMatchField(req.matchField());
-        if (req.syncCron() != null) conn.setSyncCron(req.syncCron());
+        if (req.syncCron() != null) {
+            validateCron(req.syncCron());
+            conn.setSyncCron(req.syncCron());
+        }
 
         Account creator = accountRepo.findById(principal.id()).orElse(null);
         conn.setCreatedBy(creator);
@@ -95,7 +99,10 @@ public class HrConnectionController {
         }
         if (req.matchAttribute() != null) conn.setMatchAttribute(req.matchAttribute());
         if (req.matchField() != null) conn.setMatchField(req.matchField());
-        if (req.syncCron() != null) conn.setSyncCron(req.syncCron());
+        if (req.syncCron() != null) {
+            validateCron(req.syncCron());
+            conn.setSyncCron(req.syncCron());
+        }
         if (req.enabled() != null) conn.setEnabled(req.enabled());
 
         connectionRepo.save(conn);
@@ -116,7 +123,7 @@ public class HrConnectionController {
     @RequiresFeature(FeatureKey.HR_MANAGE)
     public ResponseEntity<HrTestConnectionResponse> testConnection(
             @DirectoryId @PathVariable UUID directoryId,
-            @RequestBody CreateHrConnectionRequest req) {
+            @Valid @RequestBody CreateHrConnectionRequest req) {
         int count = bambooHrClient.testConnection(req.subdomain(), req.apiKey());
         if (count >= 0) {
             return ResponseEntity.ok(new HrTestConnectionResponse(true,
@@ -196,10 +203,18 @@ public class HrConnectionController {
         long terminated = employeeRepo.countByHrConnectionIdAndStatus(connId, HrEmployeeStatus.TERMINATED);
         long matched = employeeRepo.countByHrConnectionIdAndMatchedLdapDnIsNotNull(connId);
         long unmatched = employeeRepo.countByHrConnectionIdAndMatchedLdapDnIsNull(connId);
-        long orphaned = employeeRepo.findByHrConnectionIdAndStatusAndMatchedLdapDnIsNotNull(
-                connId, HrEmployeeStatus.TERMINATED).size();
+        long orphaned = employeeRepo.countByHrConnectionIdAndStatusAndMatchedLdapDnIsNotNull(
+                connId, HrEmployeeStatus.TERMINATED);
 
         return ResponseEntity.ok(new HrSyncSummaryDto(
                 total, active, terminated, matched, unmatched, orphaned));
+    }
+
+    private void validateCron(String cron) {
+        try {
+            CronExpression.parse(cron);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid cron expression: " + cron);
+        }
     }
 }

@@ -235,7 +235,7 @@ watch(() => route.params.dirId, (dirId) => {
 })
 
 // Navigate when user picks a different profile
-const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'complianceReports', 'approvals', 'accessReviews']
+const dirSections = ['users', 'groups', 'audit', 'bulk', 'reports', 'complianceReports', 'hrConnection', 'hrEmployees', 'approvals', 'accessReviews']
 watch(currentDirId, (newDirId) => {
   if (!newDirId || newDirId === route.params.dirId) return
   const section = dirSections.includes(route.name) ? route.name : 'users'

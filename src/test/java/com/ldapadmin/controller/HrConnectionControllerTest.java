@@ -236,15 +236,76 @@ class HrConnectionControllerTest extends BaseControllerTest {
         when(employeeRepo.countByHrConnectionIdAndStatus(conn.getId(), HrEmployeeStatus.TERMINATED)).thenReturn(20L);
         when(employeeRepo.countByHrConnectionIdAndMatchedLdapDnIsNotNull(conn.getId())).thenReturn(90L);
         when(employeeRepo.countByHrConnectionIdAndMatchedLdapDnIsNull(conn.getId())).thenReturn(10L);
-        when(employeeRepo.findByHrConnectionIdAndStatusAndMatchedLdapDnIsNotNull(
-                conn.getId(), HrEmployeeStatus.TERMINATED)).thenReturn(List.of());
+        when(employeeRepo.countByHrConnectionIdAndStatusAndMatchedLdapDnIsNotNull(
+                conn.getId(), HrEmployeeStatus.TERMINATED)).thenReturn(5L);
 
         mvc.perform(get("/api/v1/directories/{dirId}/hr/summary", dirId)
                         .with(authentication(superadminAuth())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalEmployees").value(100))
                 .andExpect(jsonPath("$.activeEmployees").value(80))
-                .andExpect(jsonPath("$.matchedCount").value(90));
+                .andExpect(jsonPath("$.matchedCount").value(90))
+                .andExpect(jsonPath("$.orphanedCount").value(5));
+    }
+
+    @Test
+    void updateConnection_returns200() throws Exception {
+        HrConnection conn = buildConnection();
+        when(connectionRepo.findByDirectoryId(dirId)).thenReturn(Optional.of(conn));
+        when(connectionRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        String json = """
+                {"displayName": "Updated HR", "enabled": true}
+                """;
+
+        mvc.perform(put("/api/v1/directories/{dirId}/hr", dirId)
+                        .with(authentication(superadminAuth()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName").value("Updated HR"));
+    }
+
+    @Test
+    void updateConnection_invalidCron_returns400() throws Exception {
+        HrConnection conn = buildConnection();
+        when(connectionRepo.findByDirectoryId(dirId)).thenReturn(Optional.of(conn));
+
+        String json = """
+                {"syncCron": "not-a-cron"}
+                """;
+
+        mvc.perform(put("/api/v1/directories/{dirId}/hr", dirId)
+                        .with(authentication(superadminAuth()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getSyncHistory_returns200() throws Exception {
+        HrConnection conn = buildConnection();
+        when(connectionRepo.findByDirectoryId(dirId)).thenReturn(Optional.of(conn));
+        when(syncRunRepo.findByHrConnectionIdOrderByStartedAtDesc(eq(conn.getId()), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        mvc.perform(get("/api/v1/directories/{dirId}/hr/sync-history", dirId)
+                        .with(authentication(superadminAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
+    }
+
+    @Test
+    void listOrphanedAccounts_returns200() throws Exception {
+        HrConnection conn = buildConnection();
+        when(connectionRepo.findByDirectoryId(dirId)).thenReturn(Optional.of(conn));
+        when(employeeRepo.findByHrConnectionIdAndStatusAndMatchedLdapDnIsNotNull(
+                conn.getId(), HrEmployeeStatus.TERMINATED)).thenReturn(List.of());
+
+        mvc.perform(get("/api/v1/directories/{dirId}/hr/employees/orphaned", dirId)
+                        .with(authentication(superadminAuth())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
