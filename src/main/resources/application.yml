@@ -76,6 +76,8 @@ ldapadmin:
     expiry-cron:         ${ACCESS_REVIEW_EXPIRY_CRON:0 0 2 * * ?}
   sod:
     scan-cron:               ${SOD_SCAN_CRON:0 0 3 * * ?}
+  drift:
+    analysis-cron:           ${DRIFT_ANALYSIS_CRON:0 0 4 * * ?}
   hr:
     poll-interval-ms:       ${HR_POLL_INTERVAL_MS:60000}
     sync-timeout-minutes:   ${HR_SYNC_TIMEOUT_MINUTES:30}

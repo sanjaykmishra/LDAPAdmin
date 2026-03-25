@@ -112,6 +112,13 @@ const router = createRouter({
           component: () => import('@/views/sodPolicies/SodViolationsView.vue'),
         },
 
+        // Access Drift Detection
+        {
+          path: 'directories/:dirId/access-drift',
+          name: 'accessDrift',
+          component: () => import('@/views/drift/AccessDriftView.vue'),
+        },
+
         // Campaign Templates
         {
           path: 'directories/:dirId/campaign-templates',
