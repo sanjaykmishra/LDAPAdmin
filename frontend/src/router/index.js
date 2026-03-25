@@ -259,6 +259,71 @@ const router = createRouter({
           component: () => import('@/views/superadmin/AccessReviewsView.vue'),
           meta: { requiresSuperadmin: true },
         },
+
+        // Superadmin directory-scoped wrappers (with directory picker)
+        {
+          path: 'superadmin/sod-policies',
+          component: () => import('@/views/superadmin/DirectoryScopedWrapper.vue'),
+          props: { defaultChild: 'sodPolicies' },
+          meta: { requiresSuperadmin: true },
+          children: [
+            { path: ':dirId', name: 'superadminSodPolicies', component: () => import('@/views/sodPolicies/SodPoliciesView.vue') },
+          ],
+        },
+        {
+          path: 'superadmin/sod-violations',
+          component: () => import('@/views/superadmin/DirectoryScopedWrapper.vue'),
+          props: { defaultChild: 'sodViolations' },
+          meta: { requiresSuperadmin: true },
+          children: [
+            { path: ':dirId', name: 'superadminSodViolations', component: () => import('@/views/sodPolicies/SodViolationsView.vue') },
+          ],
+        },
+        {
+          path: 'superadmin/access-drift',
+          component: () => import('@/views/superadmin/DirectoryScopedWrapper.vue'),
+          props: { defaultChild: 'accessDrift' },
+          meta: { requiresSuperadmin: true },
+          children: [
+            { path: ':dirId', name: 'superadminAccessDrift', component: () => import('@/views/drift/AccessDriftView.vue') },
+          ],
+        },
+        {
+          path: 'superadmin/reports',
+          component: () => import('@/views/superadmin/DirectoryScopedWrapper.vue'),
+          props: { defaultChild: 'reports' },
+          meta: { requiresSuperadmin: true },
+          children: [
+            { path: ':dirId', name: 'superadminReports', component: () => import('@/views/reports/ReportJobsView.vue') },
+          ],
+        },
+        {
+          path: 'superadmin/compliance-reports',
+          component: () => import('@/views/superadmin/DirectoryScopedWrapper.vue'),
+          props: { defaultChild: 'complianceReports' },
+          meta: { requiresSuperadmin: true },
+          children: [
+            { path: ':dirId', name: 'superadminComplianceReports', component: () => import('@/views/reports/ComplianceReportsView.vue') },
+          ],
+        },
+        {
+          path: 'superadmin/playbooks',
+          component: () => import('@/views/superadmin/DirectoryScopedWrapper.vue'),
+          props: { defaultChild: 'playbooks' },
+          meta: { requiresSuperadmin: true },
+          children: [
+            { path: ':dirId', name: 'superadminPlaybooks', component: () => import('@/views/playbooks/PlaybooksView.vue') },
+          ],
+        },
+        {
+          path: 'superadmin/hr',
+          component: () => import('@/views/superadmin/DirectoryScopedWrapper.vue'),
+          props: { defaultChild: 'hrConnection' },
+          meta: { requiresSuperadmin: true },
+          children: [
+            { path: ':dirId', name: 'superadminHr', component: () => import('@/views/hr/HrConnectionView.vue') },
+          ],
+        },
       ],
     },
 
