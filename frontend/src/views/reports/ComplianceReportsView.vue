@@ -12,8 +12,7 @@
         </p>
         <div class="mb-3">
           <label class="block text-xs font-medium text-gray-600 mb-1">Group DN filter (optional)</label>
-          <input v-model="groupDnFilter" type="text" placeholder="e.g. cn=admins,ou=groups,dc=..."
-                 class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+          <GroupDnPicker v-model="groupDnFilter" :directory-id="dirId()" />
         </div>
         <button @click="downloadUserAccess" :disabled="loading.userAccess"
                 class="w-full bg-blue-600 text-white text-sm font-medium rounded-lg px-4 py-2 hover:bg-blue-700 disabled:opacity-50">
@@ -142,6 +141,7 @@ import {
   downloadPrivilegedAccountInventory,
   generateEvidencePackage,
 } from '@/api/complianceReports'
+import GroupDnPicker from '@/components/GroupDnPicker.vue'
 
 const route = useRoute()
 const auth = useAuthStore()

@@ -1142,7 +1142,7 @@ function toggleApprover(accountId) {
               </div>
               <div v-if="approval.approverMode === 'LDAP_GROUP'">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Approver Group DN</label>
-                <input v-model="approval.approverGroupDn" class="input w-full font-mono text-sm" />
+                <GroupDnPicker v-model="approval.approverGroupDn" :directory-id="selectedDirId" />
               </div>
               <div v-if="approval.approverMode === 'DATABASE'">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Approvers</label>

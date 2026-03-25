@@ -17,7 +17,9 @@
         </div>
         <div v-if="needsParam">
           <label class="block text-sm font-medium text-gray-700 mb-1">{{ paramLabel }}</label>
-          <input v-model="runForm.paramValue" type="text" :placeholder="paramPlaceholder" class="input w-full" />
+          <GroupDnPicker v-if="currentRunType?.param === 'groupDn'" v-model="runForm.paramValue" :directory-id="dirId" />
+          <DnPicker v-else-if="currentRunType?.param === 'branchDn'" v-model="runForm.paramValue" :directory-id="dirId" />
+          <input v-else v-model="runForm.paramValue" type="text" :placeholder="paramPlaceholder" class="input w-full" />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Lookback Days</label>
@@ -112,8 +114,11 @@
         </div>
 
         <!-- Report params -->
-        <div v-if="formNeedsParam" class="grid grid-cols-2 gap-3">
-          <FormField :label="formParamLabel" v-model="form.paramValue" :placeholder="formParamPlaceholder" />
+        <div v-if="formNeedsParam">
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ formParamLabel }}</label>
+          <GroupDnPicker v-if="currentFormType?.param === 'groupDn'" v-model="form.paramValue" :directory-id="dirId" />
+          <DnPicker v-else-if="currentFormType?.param === 'branchDn'" v-model="form.paramValue" :directory-id="dirId" />
+          <FormField v-else :label="formParamLabel" v-model="form.paramValue" :placeholder="formParamPlaceholder" />
         </div>
         <FormField label="Lookback Days" v-model.number="form.lookbackDays" type="number" placeholder="30" />
 
@@ -146,6 +151,8 @@ import { downloadBlob } from '@/composables/useApi'
 import FormField from '@/components/FormField.vue'
 import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import DnPicker from '@/components/DnPicker.vue'
+import GroupDnPicker from '@/components/GroupDnPicker.vue'
 
 const route = useRoute()
 const notif = useNotificationStore()
