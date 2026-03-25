@@ -26,7 +26,14 @@ public class BambooHrClient {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
     private static final String API_BASE = "https://%s.bamboohr.com/api/gateway.php/%s/v1";
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
+
+    /** Shared HTTP client — reused across requests to avoid per-request overhead. */
+    private volatile HttpClient sharedHttpClient;
+
+    public BambooHrClient(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
     /**
      * Fetches all employees from the BambooHR directory endpoint.
@@ -38,11 +45,15 @@ public class BambooHrClient {
     }
 
     /**
-     * Tests API connectivity by making a lightweight call.
-     * Returns the employee count on success, or -1 on failure.
+     * Tests API connectivity with a lightweight meta/fields call.
+     * Returns the employee count on success via a separate directory fetch, or -1 on failure.
      */
     public int testConnection(String subdomain, String apiKey) {
         try {
+            // Use a lightweight endpoint to test auth without fetching all employees
+            String url = String.format(API_BASE + "/meta/fields/", subdomain, subdomain);
+            doGet(url, apiKey);
+            // If meta/fields succeeds, auth is valid — fetch employee count
             List<Map<String, String>> employees = fetchAllEmployees(subdomain, apiKey);
             return employees.size();
         } catch (Exception e) {
@@ -56,10 +67,7 @@ public class BambooHrClient {
         String basicAuth = "Basic " + Base64.getEncoder()
                 .encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
 
-        try (HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(CONNECT_TIMEOUT)
-                .build()) {
-
+        try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(REQUEST_TIMEOUT)
@@ -68,7 +76,7 @@ public class BambooHrClient {
                     .GET()
                     .build();
 
-            HttpResponse<String> response = client.send(request,
+            HttpResponse<String> response = getHttpClient().send(request,
                     HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() == 401) {
@@ -88,6 +96,19 @@ public class BambooHrClient {
         } catch (Exception e) {
             throw new RuntimeException("Failed to call BambooHR API: " + e.getMessage(), e);
         }
+    }
+
+    private HttpClient getHttpClient() {
+        if (sharedHttpClient == null) {
+            synchronized (this) {
+                if (sharedHttpClient == null) {
+                    sharedHttpClient = HttpClient.newBuilder()
+                            .connectTimeout(CONNECT_TIMEOUT)
+                            .build();
+                }
+            }
+        }
+        return sharedHttpClient;
     }
 
     public List<Map<String, String>> parseEmployeeDirectory(String json) {

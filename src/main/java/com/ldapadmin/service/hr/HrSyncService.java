@@ -68,47 +68,54 @@ public class HrSyncService {
             int terminatedCount = 0;
             int orphanedCount = 0;
 
+            int errorCount = 0;
             for (Map<String, String> raw : rawEmployees) {
-                String empId = raw.getOrDefault("id", raw.get("employeeNumber"));
-                if (empId == null || empId.isBlank()) continue;
+                try {
+                    String empId = raw.getOrDefault("id", raw.get("employeeNumber"));
+                    if (empId == null || empId.isBlank()) continue;
 
-                Optional<HrEmployee> existing = employeeRepo.findByHrConnectionIdAndEmployeeId(
-                        connection.getId(), empId);
+                    Optional<HrEmployee> existing = employeeRepo.findByHrConnectionIdAndEmployeeId(
+                            connection.getId(), empId);
 
-                HrEmployee employee;
-                if (existing.isPresent()) {
-                    employee = existing.get();
-                    updatedCount++;
-                } else {
-                    employee = new HrEmployee();
-                    employee.setHrConnection(connection);
-                    employee.setEmployeeId(empId);
-                    newCount++;
-                }
-
-                mapFields(employee, raw);
-                employee.setLastSyncedAt(OffsetDateTime.now());
-
-                // Identity matching
-                String matchResult = matchEmployeeToLdap(directory, employee, connection);
-                if (matchResult != null) {
-                    employee.setMatchedLdapDn(matchResult);
-                    employee.setMatchConfidence(HrMatchConfidence.EXACT);
-                    matchedCount++;
-                } else {
-                    employee.setMatchedLdapDn(null);
-                    employee.setMatchConfidence(HrMatchConfidence.NONE);
-                    unmatchedCount++;
-                }
-
-                if (employee.getStatus() == HrEmployeeStatus.TERMINATED) {
-                    terminatedCount++;
-                    if (employee.getMatchedLdapDn() != null) {
-                        orphanedCount++;
+                    HrEmployee employee;
+                    if (existing.isPresent()) {
+                        employee = existing.get();
+                        updatedCount++;
+                    } else {
+                        employee = new HrEmployee();
+                        employee.setHrConnection(connection);
+                        employee.setEmployeeId(empId);
+                        newCount++;
                     }
-                }
 
-                employeeRepo.save(employee);
+                    mapFields(employee, raw);
+                    employee.setLastSyncedAt(OffsetDateTime.now());
+
+                    // Identity matching
+                    String matchResult = matchEmployeeToLdap(directory, employee, connection);
+                    if (matchResult != null) {
+                        employee.setMatchedLdapDn(matchResult);
+                        employee.setMatchConfidence(HrMatchConfidence.EXACT);
+                        matchedCount++;
+                    } else {
+                        employee.setMatchedLdapDn(null);
+                        employee.setMatchConfidence(HrMatchConfidence.NONE);
+                        unmatchedCount++;
+                    }
+
+                    if (employee.getStatus() == HrEmployeeStatus.TERMINATED) {
+                        terminatedCount++;
+                        if (employee.getMatchedLdapDn() != null) {
+                            orphanedCount++;
+                        }
+                    }
+
+                    employeeRepo.save(employee);
+                } catch (Exception e) {
+                    errorCount++;
+                    String empId = raw.getOrDefault("id", raw.get("employeeNumber"));
+                    log.warn("Failed to sync employee {}: {}", empId, e.getMessage());
+                }
             }
 
             // Complete the run
@@ -207,14 +214,18 @@ public class HrSyncService {
         if (hireDateStr != null && !hireDateStr.isBlank() && !"0000-00-00".equals(hireDateStr)) {
             try {
                 employee.setHireDate(LocalDate.parse(hireDateStr));
-            } catch (Exception ignored) { /* skip unparseable dates */ }
+            } catch (Exception e) {
+                log.debug("Unparseable hire date '{}' for employee {}: {}", hireDateStr, employee.getEmployeeId(), e.getMessage());
+            }
         }
 
         String termDateStr = raw.get("terminationDate");
         if (termDateStr != null && !termDateStr.isBlank() && !"0000-00-00".equals(termDateStr)) {
             try {
                 employee.setTerminationDate(LocalDate.parse(termDateStr));
-            } catch (Exception ignored) { /* skip unparseable dates */ }
+            } catch (Exception e) {
+                log.debug("Unparseable termination date '{}' for employee {}: {}", termDateStr, employee.getEmployeeId(), e.getMessage());
+            }
         }
     }
 
