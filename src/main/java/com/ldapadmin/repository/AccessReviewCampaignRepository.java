@@ -26,6 +26,8 @@ public interface AccessReviewCampaignRepository extends JpaRepository<AccessRevi
 
     long countByStatusAndDeadlineBefore(CampaignStatus status, OffsetDateTime deadline);
 
+    long countByDirectoryIdAndStatus(UUID directoryId, CampaignStatus status);
+
     List<AccessReviewCampaign> findByStatusAndStartsAtBefore(CampaignStatus status, OffsetDateTime startsAt);
 
     boolean existsBySourceCampaignId(UUID sourceCampaignId);

@@ -19,5 +19,9 @@ public interface ScheduledReportJobRepository extends JpaRepository<ScheduledRep
 
     List<ScheduledReportJob> findAllByEnabledTrue();
 
+    long countByEnabledTrue();
+
+    long countByEnabledTrueAndLastRunStatus(String status);
+
     List<ScheduledReportJob> findAllByDirectoryIdAndReportType(UUID directoryId, ReportType reportType);
 }
