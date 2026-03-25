@@ -30,7 +30,7 @@ public interface AccessDriftFindingRepository extends JpaRepository<AccessDriftF
     @Query("SELECT COUNT(f) FROM AccessDriftFinding f WHERE f.snapshot.directory.id = :directoryId AND f.status = :status")
     long countByDirectoryIdAndStatus(@Param("directoryId") UUID directoryId, @Param("status") DriftFindingStatus status);
 
-    @Query("SELECT f FROM AccessDriftFinding f WHERE f.rule.id = :ruleId AND LOWER(f.userDn) = LOWER(:userDn) AND f.groupDn = :groupDn AND f.status = :status")
+    @Query("SELECT f FROM AccessDriftFinding f WHERE f.rule.id = :ruleId AND LOWER(f.userDn) = LOWER(:userDn) AND LOWER(f.groupDn) = LOWER(:groupDn) AND f.status = :status")
     List<AccessDriftFinding> findExisting(@Param("ruleId") UUID ruleId, @Param("userDn") String userDn,
                                            @Param("groupDn") String groupDn, @Param("status") DriftFindingStatus status);
 }

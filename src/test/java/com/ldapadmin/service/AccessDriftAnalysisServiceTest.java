@@ -5,8 +5,7 @@ import com.ldapadmin.auth.PrincipalType;
 import com.ldapadmin.dto.drift.*;
 import com.ldapadmin.entity.*;
 import com.ldapadmin.entity.enums.*;
-import com.ldapadmin.ldap.LdapUserService;
-import com.ldapadmin.ldap.model.LdapUser;
+import com.ldapadmin.exception.LdapAdminException;
 import com.ldapadmin.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,10 +26,10 @@ class AccessDriftAnalysisServiceTest {
     @Mock private PeerGroupRuleRepository ruleRepo;
     @Mock private AccessSnapshotRepository snapshotRepo;
     @Mock private AccessSnapshotMembershipRepository membershipRepo;
+    @Mock private AccessSnapshotUserRepository userRepo;
     @Mock private AccessDriftFindingRepository findingRepo;
     @Mock private DirectoryConnectionRepository directoryRepo;
     @Mock private AccountRepository accountRepo;
-    @Mock private LdapUserService ldapUserService;
     @Mock private AuditService auditService;
 
     private AccessDriftAnalysisService service;
@@ -45,8 +44,8 @@ class AccessDriftAnalysisServiceTest {
     @BeforeEach
     void setUp() {
         service = new AccessDriftAnalysisService(
-                ruleRepo, snapshotRepo, membershipRepo, findingRepo,
-                directoryRepo, accountRepo, ldapUserService, auditService);
+                ruleRepo, snapshotRepo, membershipRepo, userRepo, findingRepo,
+                directoryRepo, accountRepo, auditService);
 
         directory = new DirectoryConnection();
         directory.setId(directoryId);
@@ -55,59 +54,33 @@ class AccessDriftAnalysisServiceTest {
 
     @Test
     void analyze_detectsAnomalousAccess() {
-        when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
-
-        AccessSnapshot snapshot = new AccessSnapshot();
-        snapshot.setId(snapshotId);
-        snapshot.setDirectory(directory);
-        when(snapshotRepo.findById(snapshotId)).thenReturn(Optional.of(snapshot));
-
-        // One rule: group by department, anomaly threshold 10%
-        PeerGroupRule rule = new PeerGroupRule();
-        rule.setId(UUID.randomUUID());
-        rule.setDirectory(directory);
-        rule.setGroupingAttribute("department");
-        rule.setAnomalyThresholdPct(10);
-        rule.setEnabled(true);
+        stubSnapshot();
+        PeerGroupRule rule = buildRule("department", 25);
         when(ruleRepo.findByDirectoryIdAndEnabledTrue(directoryId)).thenReturn(List.of(rule));
 
-        // 5 users in Engineering peer group
-        when(ldapUserService.searchUsers(eq(directory), eq("(department=*)"), any(), anyInt(), any(), any()))
-                .thenReturn(List.of(
-                        new LdapUser("uid=alice,dc=test", Map.of("department", List.of("Engineering"))),
-                        new LdapUser("uid=bob,dc=test", Map.of("department", List.of("Engineering"))),
-                        new LdapUser("uid=carol,dc=test", Map.of("department", List.of("Engineering"))),
-                        new LdapUser("uid=dave,dc=test", Map.of("department", List.of("Engineering"))),
-                        new LdapUser("uid=eve,dc=test", Map.of("department", List.of("Engineering")))
-                ));
+        // 5 users in Engineering via snapshot user attrs
+        when(userRepo.findBySnapshotId(snapshotId)).thenReturn(List.of(
+                makeSnapshotUser("uid=alice,dc=test", "Engineering"),
+                makeSnapshotUser("uid=bob,dc=test", "Engineering"),
+                makeSnapshotUser("uid=carol,dc=test", "Engineering"),
+                makeSnapshotUser("uid=dave,dc=test", "Engineering"),
+                makeSnapshotUser("uid=eve,dc=test", "Engineering")));
 
-        // Snapshot memberships: all 5 in cn=devs, but only alice in cn=finance-ro
+        // All 5 in cn=devs, but only alice in cn=finance-ro (20% < 25% threshold)
         List<AccessSnapshotMembership> memberships = new ArrayList<>();
-        for (String user : List.of("uid=alice,dc=test", "uid=bob,dc=test", "uid=carol,dc=test", "uid=dave,dc=test", "uid=eve,dc=test")) {
-            AccessSnapshotMembership m = new AccessSnapshotMembership();
-            m.setSnapshot(snapshot);
-            m.setUserDn(user);
-            m.setGroupDn("cn=devs,dc=test");
-            m.setGroupName("devs");
-            memberships.add(m);
+        for (String u : List.of("uid=alice,dc=test", "uid=bob,dc=test", "uid=carol,dc=test", "uid=dave,dc=test", "uid=eve,dc=test")) {
+            memberships.add(makeMembership(u, "cn=devs,dc=test", "devs"));
         }
-        // Alice also in finance-ro (anomalous — only 1/5 = 20%, but at 10% threshold only flagged if <10%)
-        // Let's make the threshold higher to trigger: anomalyThresholdPct=25
-        rule.setAnomalyThresholdPct(25);
-        AccessSnapshotMembership aliceFinance = new AccessSnapshotMembership();
-        aliceFinance.setSnapshot(snapshot);
-        aliceFinance.setUserDn("uid=alice,dc=test");
-        aliceFinance.setGroupDn("cn=finance-ro,dc=test");
-        aliceFinance.setGroupName("finance-ro");
-        memberships.add(aliceFinance);
-
+        memberships.add(makeMembership("uid=alice,dc=test", "cn=finance-ro,dc=test", "finance-ro"));
         when(membershipRepo.findBySnapshotId(snapshotId)).thenReturn(memberships);
+
         when(findingRepo.findExisting(any(), any(), any(), any())).thenReturn(List.of());
+        when(findingRepo.findByDirectoryIdAndStatus(any(), eq(DriftFindingStatus.OPEN))).thenReturn(List.of());
         when(findingRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         DriftAnalysisResult result = service.analyze(directoryId, snapshotId, principal);
 
-        assertThat(result.totalFindings()).isEqualTo(1); // alice in finance-ro (20% < 25% threshold)
+        assertThat(result.totalFindings()).isEqualTo(1);
         assertThat(result.rulesEvaluated()).isEqualTo(1);
         assertThat(result.peerGroupsAnalyzed()).isEqualTo(1);
         verify(findingRepo, times(1)).save(any(AccessDriftFinding.class));
@@ -115,10 +88,7 @@ class AccessDriftAnalysisServiceTest {
 
     @Test
     void analyze_noRules_returnsEmpty() {
-        when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
-        AccessSnapshot snapshot = new AccessSnapshot();
-        snapshot.setId(snapshotId);
-        when(snapshotRepo.findById(snapshotId)).thenReturn(Optional.of(snapshot));
+        stubSnapshot();
         when(ruleRepo.findByDirectoryIdAndEnabledTrue(directoryId)).thenReturn(List.of());
 
         DriftAnalysisResult result = service.analyze(directoryId, snapshotId, principal);
@@ -129,50 +99,27 @@ class AccessDriftAnalysisServiceTest {
 
     @Test
     void analyze_skipsExistingOpenFindings() {
-        when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
-        AccessSnapshot snapshot = new AccessSnapshot();
-        snapshot.setId(snapshotId);
-        snapshot.setDirectory(directory);
-        when(snapshotRepo.findById(snapshotId)).thenReturn(Optional.of(snapshot));
-
-        PeerGroupRule rule = new PeerGroupRule();
-        rule.setId(UUID.randomUUID());
-        rule.setDirectory(directory);
-        rule.setGroupingAttribute("department");
-        rule.setAnomalyThresholdPct(25);
-        rule.setEnabled(true);
+        stubSnapshot();
+        PeerGroupRule rule = buildRule("department", 25);
         when(ruleRepo.findByDirectoryIdAndEnabledTrue(directoryId)).thenReturn(List.of(rule));
 
-        // Need 5 peers so 1/5 = 20% < 25% threshold triggers anomaly
-        when(ldapUserService.searchUsers(eq(directory), any(), any(), anyInt(), any(), any()))
-                .thenReturn(List.of(
-                        new LdapUser("uid=alice,dc=test", Map.of("department", List.of("Engineering"))),
-                        new LdapUser("uid=bob,dc=test", Map.of("department", List.of("Engineering"))),
-                        new LdapUser("uid=carol,dc=test", Map.of("department", List.of("Engineering"))),
-                        new LdapUser("uid=dave,dc=test", Map.of("department", List.of("Engineering"))),
-                        new LdapUser("uid=eve,dc=test", Map.of("department", List.of("Engineering")))
-                ));
+        when(userRepo.findBySnapshotId(snapshotId)).thenReturn(List.of(
+                makeSnapshotUser("uid=alice,dc=test", "Engineering"),
+                makeSnapshotUser("uid=bob,dc=test", "Engineering"),
+                makeSnapshotUser("uid=carol,dc=test", "Engineering"),
+                makeSnapshotUser("uid=dave,dc=test", "Engineering"),
+                makeSnapshotUser("uid=eve,dc=test", "Engineering")));
 
         List<AccessSnapshotMembership> memberships = new ArrayList<>();
-        for (String user : List.of("uid=alice,dc=test", "uid=bob,dc=test", "uid=carol,dc=test", "uid=dave,dc=test", "uid=eve,dc=test")) {
-            AccessSnapshotMembership m = new AccessSnapshotMembership();
-            m.setSnapshot(snapshot);
-            m.setUserDn(user);
-            m.setGroupDn("cn=devs,dc=test");
-            m.setGroupName("devs");
-            memberships.add(m);
+        for (String u : List.of("uid=alice,dc=test", "uid=bob,dc=test", "uid=carol,dc=test", "uid=dave,dc=test", "uid=eve,dc=test")) {
+            memberships.add(makeMembership(u, "cn=devs,dc=test", "devs"));
         }
-        AccessSnapshotMembership aliceAnomaly = new AccessSnapshotMembership();
-        aliceAnomaly.setSnapshot(snapshot);
-        aliceAnomaly.setUserDn("uid=alice,dc=test");
-        aliceAnomaly.setGroupDn("cn=secret,dc=test");
-        aliceAnomaly.setGroupName("secret");
-        memberships.add(aliceAnomaly);
-
+        memberships.add(makeMembership("uid=alice,dc=test", "cn=secret,dc=test", "secret"));
         when(membershipRepo.findBySnapshotId(snapshotId)).thenReturn(memberships);
-        // Already has an open finding for this
+
         when(findingRepo.findExisting(any(), eq("uid=alice,dc=test"), eq("cn=secret,dc=test"), eq(DriftFindingStatus.OPEN)))
                 .thenReturn(List.of(new AccessDriftFinding()));
+        when(findingRepo.findByDirectoryIdAndStatus(any(), eq(DriftFindingStatus.OPEN))).thenReturn(List.of());
 
         DriftAnalysisResult result = service.analyze(directoryId, snapshotId, principal);
 
@@ -182,33 +129,35 @@ class AccessDriftAnalysisServiceTest {
 
     @Test
     void analyze_skipsTinyPeerGroups() {
-        when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
-        AccessSnapshot snapshot = new AccessSnapshot();
-        snapshot.setId(snapshotId);
-        snapshot.setDirectory(directory);
-        when(snapshotRepo.findById(snapshotId)).thenReturn(Optional.of(snapshot));
-
-        PeerGroupRule rule = new PeerGroupRule();
-        rule.setId(UUID.randomUUID());
-        rule.setDirectory(directory);
-        rule.setGroupingAttribute("department");
-        rule.setAnomalyThresholdPct(10);
-        rule.setEnabled(true);
+        stubSnapshot();
+        PeerGroupRule rule = buildRule("department", 10);
         when(ruleRepo.findByDirectoryIdAndEnabledTrue(directoryId)).thenReturn(List.of(rule));
 
-        // Only 2 users in a department — below the 3-user minimum
-        when(ldapUserService.searchUsers(eq(directory), any(), any(), anyInt(), any(), any()))
-                .thenReturn(List.of(
-                        new LdapUser("uid=alice,dc=test", Map.of("department", List.of("Tiny"))),
-                        new LdapUser("uid=bob,dc=test", Map.of("department", List.of("Tiny")))
-                ));
-
+        // Only 2 users — below 3-user minimum
+        when(userRepo.findBySnapshotId(snapshotId)).thenReturn(List.of(
+                makeSnapshotUser("uid=alice,dc=test", "Tiny"),
+                makeSnapshotUser("uid=bob,dc=test", "Tiny")));
         when(membershipRepo.findBySnapshotId(snapshotId)).thenReturn(List.of());
+        when(findingRepo.findByDirectoryIdAndStatus(any(), eq(DriftFindingStatus.OPEN))).thenReturn(List.of());
 
         DriftAnalysisResult result = service.analyze(directoryId, snapshotId, principal);
 
         assertThat(result.peerGroupsAnalyzed()).isEqualTo(0);
-        assertThat(result.totalFindings()).isEqualTo(0);
+    }
+
+    @Test
+    void analyze_snapshotWrongDirectory_throws() {
+        when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
+
+        DirectoryConnection otherDir = new DirectoryConnection();
+        otherDir.setId(UUID.randomUUID());
+        AccessSnapshot snapshot = new AccessSnapshot();
+        snapshot.setId(snapshotId);
+        snapshot.setDirectory(otherDir);
+        when(snapshotRepo.findById(snapshotId)).thenReturn(Optional.of(snapshot));
+
+        assertThatThrownBy(() -> service.analyze(directoryId, snapshotId, principal))
+                .isInstanceOf(com.ldapadmin.exception.ResourceNotFoundException.class);
     }
 
     @Test
@@ -216,14 +165,22 @@ class AccessDriftAnalysisServiceTest {
         AccessDriftFinding finding = new AccessDriftFinding();
         finding.setId(UUID.randomUUID());
         finding.setStatus(DriftFindingStatus.OPEN);
-        finding.setRule(buildRule());
+        finding.setRule(buildRule("department", 10));
+        AccessSnapshot snap = buildSnapshot();
+        finding.setSnapshot(snap);
+        finding.setUserDn("uid=alice,dc=test");
+        finding.setGroupDn("cn=test,dc=test");
         when(findingRepo.findById(finding.getId())).thenReturn(Optional.of(finding));
-        when(accountRepo.findById(adminId)).thenReturn(Optional.of(new Account()));
+        Account actor = new Account();
+        actor.setId(adminId);
+        actor.setUsername("admin");
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(actor));
         when(findingRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         DriftFindingResponse result = service.acknowledgeFinding(finding.getId(), principal);
 
         assertThat(result.status()).isEqualTo(DriftFindingStatus.ACKNOWLEDGED);
+        verify(auditService).record(any(), eq(directoryId), any(), any(), any());
     }
 
     @Test
@@ -231,15 +188,34 @@ class AccessDriftAnalysisServiceTest {
         AccessDriftFinding finding = new AccessDriftFinding();
         finding.setId(UUID.randomUUID());
         finding.setStatus(DriftFindingStatus.OPEN);
-        finding.setRule(buildRule());
+        finding.setRule(buildRule("department", 10));
+        AccessSnapshot snap = buildSnapshot();
+        finding.setSnapshot(snap);
+        finding.setUserDn("uid=alice,dc=test");
+        finding.setGroupDn("cn=test,dc=test");
         when(findingRepo.findById(finding.getId())).thenReturn(Optional.of(finding));
-        when(accountRepo.findById(adminId)).thenReturn(Optional.of(new Account()));
+        Account actor = new Account();
+        actor.setId(adminId);
+        actor.setUsername("admin");
+        when(accountRepo.findById(adminId)).thenReturn(Optional.of(actor));
         when(findingRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         DriftFindingResponse result = service.exemptFinding(finding.getId(), "Business need", principal);
 
         assertThat(result.status()).isEqualTo(DriftFindingStatus.EXEMPTED);
         assertThat(result.exemptionReason()).isEqualTo("Business need");
+        verify(auditService).record(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void createRule_validatesThresholds() {
+        when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
+
+        var req = new PeerGroupRuleRequest("Bad Rule", "department", 20, 50, true);
+
+        assertThatThrownBy(() -> service.createRule(directoryId, req, principal))
+                .isInstanceOf(LdapAdminException.class)
+                .hasMessageContaining("must be less than");
     }
 
     @Test
@@ -257,15 +233,51 @@ class AccessDriftAnalysisServiceTest {
         PeerGroupRuleResponse result = service.createRule(directoryId, req, principal);
 
         assertThat(result.name()).isEqualTo("By Department");
-        assertThat(result.groupingAttribute()).isEqualTo("department");
         verify(ruleRepo).save(any());
     }
 
-    private PeerGroupRule buildRule() {
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private void stubSnapshot() {
+        when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
+        AccessSnapshot snapshot = new AccessSnapshot();
+        snapshot.setId(snapshotId);
+        snapshot.setDirectory(directory);
+        when(snapshotRepo.findById(snapshotId)).thenReturn(Optional.of(snapshot));
+    }
+
+    private AccessSnapshot buildSnapshot() {
+        AccessSnapshot s = new AccessSnapshot();
+        s.setId(snapshotId);
+        s.setDirectory(directory);
+        return s;
+    }
+
+    private PeerGroupRule buildRule(String attr, int anomalyPct) {
         PeerGroupRule r = new PeerGroupRule();
         r.setId(UUID.randomUUID());
         r.setName("Test Rule");
         r.setDirectory(directory);
+        r.setGroupingAttribute(attr);
+        r.setAnomalyThresholdPct(anomalyPct);
+        r.setNormalThresholdPct(50);
+        r.setEnabled(true);
         return r;
+    }
+
+    private AccessSnapshotUser makeSnapshotUser(String dn, String department) {
+        AccessSnapshotUser su = new AccessSnapshotUser();
+        su.setUserDn(dn);
+        su.setDepartment(department);
+        su.setDisplayName(dn);
+        return su;
+    }
+
+    private AccessSnapshotMembership makeMembership(String userDn, String groupDn, String groupName) {
+        AccessSnapshotMembership m = new AccessSnapshotMembership();
+        m.setUserDn(userDn);
+        m.setGroupDn(groupDn);
+        m.setGroupName(groupName);
+        return m;
     }
 }

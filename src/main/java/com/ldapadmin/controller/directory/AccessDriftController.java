@@ -69,12 +69,24 @@ public class AccessDriftController {
 
     @PostMapping("/analyze")
     @RequiresFeature(FeatureKey.ACCESS_REVIEW_MANAGE)
-    public DriftAnalysisResult analyze(
+    public java.util.Map<String, String> analyze(
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal) {
-        AccessSnapshot snapshot = snapshotService.captureSnapshot(directoryId);
-        return analysisService.analyze(directoryId, snapshot.getId(), principal);
+        // Run in background thread to avoid HTTP timeout for large directories
+        UUID dirId = directoryId;
+        AuthPrincipal p = principal;
+        new Thread(() -> {
+            try {
+                AccessSnapshot snapshot = snapshotService.captureSnapshot(dirId);
+                analysisService.analyze(dirId, snapshot.getId(), p);
+            } catch (Exception e) {
+                log.error("Background drift analysis failed for directory {}: {}", dirId, e.getMessage());
+            }
+        }, "drift-analysis-" + directoryId).start();
+        return java.util.Map.of("status", "started", "message", "Analysis running in background. Refresh findings when complete.");
     }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AccessDriftController.class);
 
     // ── Findings ────────────────────────────────────────────────────────────
 
