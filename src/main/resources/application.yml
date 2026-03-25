@@ -34,6 +34,7 @@ spring:
     locations:            classpath:db/migration
     baseline-on-migrate:  false
     validate-on-migrate:  true
+    out-of-order:         true
     # After consolidating migration scripts the schema history table in an
     # existing DB will have stale/missing entries.  Setting both vars below
     # to true lets Flyway wipe and recreate the schema automatically.
