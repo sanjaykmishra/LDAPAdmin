@@ -9,7 +9,8 @@
 #   6. Disabled accounts still in sensitive groups
 #
 # Base DN: dc=acmecorp,dc=com
-# Load AFTER acmecorp-5000-users.ldif
+# Load AFTER acmecorp-5000-users.ldif using:
+#   ldapmodify -x -D "cn=admin,dc=acmecorp,dc=com" -w <pw> -a -f acmecorp-test-scenarios.ldif
 # =============================================================================
 
 
@@ -122,55 +123,74 @@ member: uid=camille.kim,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 # These MODIFY existing groups to add users who don't belong based on
 # their department peer group. A Sales person in AWS-Developers, a
 # Marketing person in DataAccess-Financial, etc.
+#
+# All modify operations for the same DN are consolidated into a single
+# block to avoid "value already exists" errors.
 # #############################################################################
 
-# Sales person with AWS-Developers access (anomalous — only ~1% of Sales has this)
+# AWS-Developers: add Sales, HR, and disabled users (all anomalous)
 dn: cn=AWS-Developers,ou=Access,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
 member: uid=nancy.watanabe,ou=Sales,ou=People,dc=acmecorp,dc=com
+member: uid=zachary.weber,ou=HumanResources,ou=People,dc=acmecorp,dc=com
+member: uid=disabled.marcus,ou=Engineering,ou=People,dc=acmecorp,dc=com
+member: uid=disabled.tom,ou=IT,ou=People,dc=acmecorp,dc=com
 
-# Marketing person with DataAccess-Financial access (anomalous)
+# DataAccess-Financial: add Marketing and disabled users (anomalous)
 dn: cn=DataAccess-Financial,ou=Access,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
 member: uid=pierre.gupta,ou=Marketing,ou=People,dc=acmecorp,dc=com
--
-add: member
 member: uid=alyssa.davis,ou=Marketing,ou=People,dc=acmecorp,dc=com
+member: uid=disabled.jane,ou=Finance,ou=People,dc=acmecorp,dc=com
 
-# Sales person with DataAccess-PII access (anomalous)
+# DataAccess-PII: add Sales and disabled users (anomalous)
 dn: cn=DataAccess-PII,ou=Access,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
 member: uid=james.richardson,ou=Sales,ou=People,dc=acmecorp,dc=com
+member: uid=disabled.priya,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 
-# Customer Support person with Code-Deploy-Prod (very anomalous)
+# Code-Deploy-Prod: add IT person and disabled engineer (anomalous)
 dn: cn=Code-Deploy-Prod,ou=Access,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
 member: uid=deborah.rogers,ou=IT,ou=People,dc=acmecorp,dc=com
+member: uid=disabled.marcus,ou=Engineering,ou=People,dc=acmecorp,dc=com
 
-# Finance person in GitHub-Users (anomalous for Finance department)
+# GitHub-Users: add Finance people (anomalous for Finance department)
 dn: cn=GitHub-Users,ou=Access,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
 member: uid=howard.blanc,ou=Finance,ou=People,dc=acmecorp,dc=com
--
-add: member
 member: uid=bobby.harris2,ou=Finance,ou=People,dc=acmecorp,dc=com
 
-# Legal person in BuildSystem-Users (anomalous)
+# BuildSystem-Users: add Legal person (anomalous)
 dn: cn=BuildSystem-Users,ou=Access,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
 member: uid=ann.roux,ou=Legal,ou=People,dc=acmecorp,dc=com
 
-# HR person in AWS-Developers (anomalous)
-dn: cn=AWS-Developers,ou=Access,ou=Groups,dc=acmecorp,dc=com
+# SecurityChampions: add disabled IT admin and stale references
+dn: cn=SecurityChampions,ou=Access,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
-member: uid=zachary.weber,ou=HumanResources,ou=People,dc=acmecorp,dc=com
+member: uid=disabled.tom,ou=IT,ou=People,dc=acmecorp,dc=com
+member: uid=old.securitylead,ou=Engineering,ou=People,dc=acmecorp,dc=com
+member: uid=past.ciso,ou=IT,ou=People,dc=acmecorp,dc=com
+
+# Payroll-Admin: add disabled finance director
+dn: cn=Payroll-Admin,ou=Access,ou=Groups,dc=acmecorp,dc=com
+changetype: modify
+add: member
+member: uid=disabled.jane,ou=Finance,ou=People,dc=acmecorp,dc=com
+
+# HR-DataAdmin: add disabled HR manager
+dn: cn=HR-DataAdmin,ou=Access,ou=Groups,dc=acmecorp,dc=com
+changetype: modify
+add: member
+member: uid=disabled.priya,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 
 
 # #############################################################################
@@ -179,55 +199,44 @@ member: uid=zachary.weber,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 
 # --- 3a. Groups with broken member references (non-existent DNs) ---
 
-# Reference to a user who was deleted but never removed from the group
+# OnCall-Rotation: references to deleted/terminated users
 dn: cn=OnCall-Rotation,ou=Access,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
 member: uid=deleted.user1,ou=Engineering,ou=People,dc=acmecorp,dc=com
--
-add: member
 member: uid=terminated.employee,ou=Sales,ou=People,dc=acmecorp,dc=com
--
-add: member
 member: uid=former.contractor,ou=IT,ou=People,dc=acmecorp,dc=com
 
-# SecurityChampions with stale references
-dn: cn=SecurityChampions,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=old.securitylead,ou=Engineering,ou=People,dc=acmecorp,dc=com
--
-add: member
-member: uid=past.ciso,ou=IT,ou=People,dc=acmecorp,dc=com
-
-# AWS-ReadOnly with a broken reference (typo in DN)
+# AWS-ReadOnly: typo in DN (schimdt instead of schmidt)
 dn: cn=AWS-ReadOnly,ou=Access,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
 member: uid=susan.schimdt,ou=Engineering,ou=People,dc=acmecorp,dc=com
 
-# --- 3b. Empty groups (no members) ---
+# --- 3b. Empty groups (self-referencing placeholder — groupOfNames requires
+#     at least one member, so the group's own DN is used as a placeholder
+#     to represent an effectively empty group) ---
 
 dn: cn=Decommissioned-ProjectX,ou=Projects,ou=Groups,dc=acmecorp,dc=com
 objectClass: top
 objectClass: groupOfNames
 cn: Decommissioned-ProjectX
 description: Former Project X team — all members removed after project ended
-member:
+member: cn=Decommissioned-ProjectX,ou=Projects,ou=Groups,dc=acmecorp,dc=com
 
 dn: cn=Temp-Audit-2025,ou=Access,ou=Groups,dc=acmecorp,dc=com
 objectClass: top
 objectClass: groupOfNames
 cn: Temp-Audit-2025
 description: Temporary group for 2025 audit — never populated
-member:
+member: cn=Temp-Audit-2025,ou=Access,ou=Groups,dc=acmecorp,dc=com
 
 dn: cn=Migration-Staging,ou=Access,ou=Groups,dc=acmecorp,dc=com
 objectClass: top
 objectClass: groupOfNames
 cn: Migration-Staging
 description: Staging group for planned migration — empty
-member:
+member: cn=Migration-Staging,ou=Access,ou=Groups,dc=acmecorp,dc=com
 
 # --- 3c. Orphaned entry (parent OU does not exist) ---
 
@@ -462,11 +471,7 @@ dn: cn=AllEmployees,ou=Access,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
 member: uid=missing.dept.kyle,ou=Engineering,ou=People,dc=acmecorp,dc=com
--
-add: member
 member: uid=missing.dept.anna,ou=Finance,ou=People,dc=acmecorp,dc=com
--
-add: member
 member: uid=missing.dept.lucas,ou=Sales,ou=People,dc=acmecorp,dc=com
 
 
@@ -475,6 +480,7 @@ member: uid=missing.dept.lucas,ou=Sales,ou=People,dc=acmecorp,dc=com
 #
 # These users have nsAccountLock=TRUE (389DS/RHDS convention) and
 # description indicating termination, but remain in sensitive groups.
+# The group membership additions are in Section 2 (consolidated).
 # #############################################################################
 
 dn: uid=disabled.jane,ou=Finance,ou=People,dc=acmecorp,dc=com
@@ -573,48 +579,7 @@ userPassword: {SSHA}placeholder
 nsAccountLock: TRUE
 description: TERMINATED 2026-01-15 — account disabled but still in groups
 
-# Add disabled accounts to sensitive groups (the problem to detect)
-dn: cn=DataAccess-Financial,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=disabled.jane,ou=Finance,ou=People,dc=acmecorp,dc=com
-
-dn: cn=Payroll-Admin,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=disabled.jane,ou=Finance,ou=People,dc=acmecorp,dc=com
-
-dn: cn=AWS-Developers,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=disabled.marcus,ou=Engineering,ou=People,dc=acmecorp,dc=com
-
-dn: cn=Code-Deploy-Prod,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=disabled.marcus,ou=Engineering,ou=People,dc=acmecorp,dc=com
-
-dn: cn=DataAccess-PII,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=disabled.priya,ou=HumanResources,ou=People,dc=acmecorp,dc=com
-
-dn: cn=HR-DataAdmin,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=disabled.priya,ou=HumanResources,ou=People,dc=acmecorp,dc=com
-
-dn: cn=AWS-Developers,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=disabled.tom,ou=IT,ou=People,dc=acmecorp,dc=com
-
-dn: cn=SecurityChampions,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=disabled.tom,ou=IT,ou=People,dc=acmecorp,dc=com
-
-# Also add disabled accounts to their department groups (stale membership)
+# Add disabled accounts to their department groups (stale membership)
 dn: cn=dept-finance,ou=Departments,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
