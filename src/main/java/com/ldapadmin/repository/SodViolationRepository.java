@@ -30,7 +30,11 @@ public interface SodViolationRepository extends JpaRepository<SodViolation, UUID
 
     long countByPolicyIdAndStatus(UUID policyId, SodViolationStatus status);
 
-    Optional<SodViolation> findByPolicyIdAndUserDnAndStatus(UUID policyId, String userDn, SodViolationStatus status);
+    @Query("SELECT v FROM SodViolation v WHERE v.policy.id = :policyId " +
+           "AND LOWER(v.userDn) = LOWER(:userDn) AND v.status = :status ORDER BY v.detectedAt DESC")
+    List<SodViolation> findByPolicyIdAndUserDnIgnoreCaseAndStatus(@Param("policyId") UUID policyId,
+                                                                   @Param("userDn") String userDn,
+                                                                   @Param("status") SodViolationStatus status);
 
     @Query("SELECT COUNT(v) FROM SodViolation v WHERE v.policy.directory.id = :directoryId AND v.status = :status")
     long countByDirectoryIdAndStatus(@Param("directoryId") UUID directoryId,

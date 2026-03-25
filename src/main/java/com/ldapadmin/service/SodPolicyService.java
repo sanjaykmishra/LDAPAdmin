@@ -68,8 +68,8 @@ public class SodPolicyService {
     }
 
     @Transactional
-    public SodPolicy update(UUID policyId, UpdateSodPolicyRequest req, AuthPrincipal principal) {
-        SodPolicy policy = getPolicyOrThrow(policyId);
+    public SodPolicy update(UUID directoryId, UUID policyId, UpdateSodPolicyRequest req, AuthPrincipal principal) {
+        SodPolicy policy = getPolicyForDirectory(directoryId, policyId);
 
         // Determine effective group DNs after update
         String effectiveGroupA = req.groupADn() != null ? req.groupADn() : policy.getGroupADn();
@@ -91,16 +91,15 @@ public class SodPolicyService {
 
         policy = policyRepo.save(policy);
 
-        auditService.record(principal, policy.getDirectory().getId(), AuditAction.SOD_POLICY_UPDATED, null,
+        auditService.record(principal, directoryId, AuditAction.SOD_POLICY_UPDATED, null,
                 Map.of("policyName", policy.getName(), "policyId", policyId.toString()));
 
         return policy;
     }
 
     @Transactional
-    public void delete(UUID policyId, AuthPrincipal principal) {
-        SodPolicy policy = getPolicyOrThrow(policyId);
-        UUID directoryId = policy.getDirectory().getId();
+    public void delete(UUID directoryId, UUID policyId, AuthPrincipal principal) {
+        SodPolicy policy = getPolicyForDirectory(directoryId, policyId);
         String name = policy.getName();
 
         // Audit the violation count being cascade-deleted
@@ -123,8 +122,8 @@ public class SodPolicyService {
     }
 
     @Transactional(readOnly = true)
-    public SodPolicyResponse getPolicy(UUID policyId) {
-        return toResponse(getPolicyOrThrow(policyId));
+    public SodPolicyResponse getPolicy(UUID directoryId, UUID policyId) {
+        return toResponse(getPolicyForDirectory(directoryId, policyId));
     }
 
     // ── Scan ─────────────────────────────────────────────────────────────────
@@ -259,9 +258,7 @@ public class SodPolicyService {
                 }
 
                 // ALERT — create violation record but allow the operation
-                Optional<SodViolation> existing = violationRepo.findByPolicyIdAndUserDnAndStatus(
-                        policy.getId(), userDn, SodViolationStatus.OPEN);
-                if (existing.isEmpty()) {
+                if (findViolation(policy.getId(), userDn, SodViolationStatus.OPEN).isEmpty()) {
                     SodViolation v = new SodViolation();
                     v.setPolicy(policy);
                     v.setUserDn(userDn);
@@ -297,9 +294,8 @@ public class SodPolicyService {
     }
 
     @Transactional
-    public SodViolationResponse exemptViolation(UUID violationId, ExemptViolationRequest req, AuthPrincipal principal) {
-        SodViolation v = violationRepo.findById(violationId)
-                .orElseThrow(() -> new ResourceNotFoundException("SodViolation", violationId));
+    public SodViolationResponse exemptViolation(UUID directoryId, UUID violationId, ExemptViolationRequest req, AuthPrincipal principal) {
+        SodViolation v = getViolationForDirectory(directoryId, violationId);
         Account exemptedBy = accountRepo.findById(principal.id())
                 .orElseThrow(() -> new ResourceNotFoundException("Account", principal.id()));
 
@@ -318,21 +314,20 @@ public class SodPolicyService {
             auditDetails.put("expiresAt", req.expiresAt().toString());
         }
 
-        auditService.record(principal, v.getPolicy().getDirectory().getId(), AuditAction.SOD_VIOLATION_EXEMPTED,
+        auditService.record(principal, directoryId, AuditAction.SOD_VIOLATION_EXEMPTED,
                 v.getUserDn(), auditDetails);
 
         return toViolationResponse(v);
     }
 
     @Transactional
-    public SodViolationResponse resolveViolation(UUID violationId, AuthPrincipal principal) {
-        SodViolation v = violationRepo.findById(violationId)
-                .orElseThrow(() -> new ResourceNotFoundException("SodViolation", violationId));
+    public SodViolationResponse resolveViolation(UUID directoryId, UUID violationId, AuthPrincipal principal) {
+        SodViolation v = getViolationForDirectory(directoryId, violationId);
         v.setStatus(SodViolationStatus.RESOLVED);
         v.setResolvedAt(OffsetDateTime.now());
         violationRepo.save(v);
 
-        auditService.record(principal, v.getPolicy().getDirectory().getId(), AuditAction.SOD_VIOLATION_RESOLVED,
+        auditService.record(principal, directoryId, AuditAction.SOD_VIOLATION_RESOLVED,
                 v.getUserDn(),
                 Map.of("policyName", v.getPolicy().getName(), "violationId", violationId.toString()));
 
@@ -368,12 +363,43 @@ public class SodPolicyService {
     }
 
     /**
+     * Loads a policy and verifies it belongs to the given directory.
+     */
+    private SodPolicy getPolicyForDirectory(UUID directoryId, UUID policyId) {
+        SodPolicy policy = getPolicyOrThrow(policyId);
+        if (!policy.getDirectory().getId().equals(directoryId)) {
+            throw new ResourceNotFoundException("SodPolicy", policyId);
+        }
+        return policy;
+    }
+
+    /**
+     * Loads a violation and verifies it belongs to a policy in the given directory.
+     */
+    private SodViolation getViolationForDirectory(UUID directoryId, UUID violationId) {
+        SodViolation v = violationRepo.findById(violationId)
+                .orElseThrow(() -> new ResourceNotFoundException("SodViolation", violationId));
+        if (!v.getPolicy().getDirectory().getId().equals(directoryId)) {
+            throw new ResourceNotFoundException("SodViolation", violationId);
+        }
+        return v;
+    }
+
+    /**
+     * Case-insensitive lookup returning the first matching violation, safe for multiple rows.
+     */
+    private Optional<SodViolation> findViolation(UUID policyId, String userDn, SodViolationStatus status) {
+        return violationRepo.findByPolicyIdAndUserDnIgnoreCaseAndStatus(policyId, userDn, status)
+                .stream().findFirst();
+    }
+
+    /**
      * Returns true if there's an existing OPEN violation or a non-expired EXEMPTED violation
      * for this policy+user combination — meaning a new OPEN violation should NOT be created.
      */
     private boolean hasActiveViolation(UUID policyId, String userDn) {
         // Already has an OPEN violation
-        if (violationRepo.findByPolicyIdAndUserDnAndStatus(policyId, userDn, SodViolationStatus.OPEN).isPresent()) {
+        if (findViolation(policyId, userDn, SodViolationStatus.OPEN).isPresent()) {
             return true;
         }
         // Has a non-expired exemption
@@ -382,17 +408,18 @@ public class SodPolicyService {
 
     /**
      * Returns true if the user has an active (non-expired) exemption for this policy.
+     * Uses case-insensitive DN matching and handles multiple EXEMPTED rows safely.
      */
     private boolean hasActiveExemption(UUID policyId, String userDn) {
-        Optional<SodViolation> exempted = violationRepo.findByPolicyIdAndUserDnAndStatus(
+        List<SodViolation> exempted = violationRepo.findByPolicyIdAndUserDnIgnoreCaseAndStatus(
                 policyId, userDn, SodViolationStatus.EXEMPTED);
-        if (exempted.isEmpty()) return false;
-
-        SodViolation v = exempted.get();
-        // No expiry set means permanent exemption
-        if (v.getExemptionExpiresAt() == null) return true;
-        // Check if exemption is still valid
-        return v.getExemptionExpiresAt().isAfter(OffsetDateTime.now());
+        for (SodViolation v : exempted) {
+            // No expiry set means permanent exemption
+            if (v.getExemptionExpiresAt() == null) return true;
+            // Check if exemption is still valid
+            if (v.getExemptionExpiresAt().isAfter(OffsetDateTime.now())) return true;
+        }
+        return false;
     }
 
     private void validateGroupPair(String groupADn, String groupBDn) {
