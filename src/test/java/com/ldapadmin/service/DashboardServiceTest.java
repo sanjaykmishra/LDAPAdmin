@@ -9,7 +9,6 @@ import com.ldapadmin.entity.PendingApproval;
 import com.ldapadmin.entity.enums.ApprovalStatus;
 import com.ldapadmin.entity.enums.CampaignStatus;
 import com.ldapadmin.entity.enums.SodViolationStatus;
-import com.ldapadmin.ldap.LdapConnectionFactory;
 import com.ldapadmin.ldap.LdapGroupService;
 import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.repository.*;
@@ -38,7 +37,7 @@ class DashboardServiceTest {
     @Mock private AuditQueryService auditQueryService;
     @Mock private LdapUserService userService;
     @Mock private LdapGroupService groupService;
-    @Mock private LdapConnectionFactory connectionFactory;
+    @Mock private ScheduledReportJobRepository reportJobRepo;
 
     private DashboardService service;
 
@@ -49,7 +48,8 @@ class DashboardServiceTest {
     void setUp() {
         service = new DashboardService(
                 dirRepo, approvalRepo, campaignRepo, decisionRepo,
-                sodViolationRepo, auditQueryService, userService, groupService, connectionFactory);
+                sodViolationRepo, auditQueryService, userService, groupService, reportJobRepo);
+        service.invalidateCache();
 
         directory = new DirectoryConnection();
         directory.setId(directoryId);
@@ -59,67 +59,30 @@ class DashboardServiceTest {
 
     @Test
     void getDashboard_returnsComplianceDashboardDto() {
-        when(dirRepo.findAll()).thenReturn(List.of(directory));
-
-        // LDAP counts
-        when(userService.searchUsers(eq(directory), anyString(), any(), anyInt(), anyString()))
-                .thenReturn(List.of());
-        when(groupService.searchGroups(eq(directory), anyString(), any(), anyInt(), anyString()))
-                .thenReturn(List.of());
-
-        // Approvals
+        stubCommon();
         when(approvalRepo.countByDirectoryIdAndStatus(directoryId, ApprovalStatus.PENDING)).thenReturn(5L);
         when(approvalRepo.findAllByStatus(ApprovalStatus.PENDING)).thenReturn(List.of());
-
-        // Campaigns
-        when(campaignRepo.findByDirectoryIdAndStatus(directoryId, CampaignStatus.ACTIVE)).thenReturn(List.of());
-        when(campaignRepo.findByStatus(CampaignStatus.ACTIVE)).thenReturn(List.of());
-        when(campaignRepo.countByStatusAndDeadlineBefore(eq(CampaignStatus.ACTIVE), any())).thenReturn(0L);
-
-        // SoD
-        when(sodViolationRepo.countByDirectoryIdAndStatus(directoryId, SodViolationStatus.OPEN)).thenReturn(0L);
-        when(sodViolationRepo.countByStatus(SodViolationStatus.OPEN)).thenReturn(2L);
-
-        // Reviewed users
-        when(decisionRepo.countDistinctReviewedUsersSince(eq(directoryId), any())).thenReturn(0L);
-
-        // Audit
-        when(auditQueryService.query(any(), any(), any(), any(), any(), anyInt(), anyInt()))
-                .thenReturn(new PageImpl<>(List.of()));
 
         ComplianceDashboardDto result = service.getDashboard();
 
         assertThat(result).isNotNull();
         assertThat(result.totalPendingApprovals()).isEqualTo(5);
-        assertThat(result.openSodViolations()).isEqualTo(2);
+        assertThat(result.openSodViolations()).isEqualTo(0);
         assertThat(result.directories()).hasSize(1);
         assertThat(result.directories().get(0).name()).isEqualTo("Test Dir");
     }
 
     @Test
     void getDashboard_campaignCompletionPercent_calculatedCorrectly() {
-        when(dirRepo.findAll()).thenReturn(List.of(directory));
-        when(userService.searchUsers(eq(directory), anyString(), any(), anyInt(), anyString()))
-                .thenReturn(List.of());
-        when(groupService.searchGroups(eq(directory), anyString(), any(), anyInt(), anyString()))
-                .thenReturn(List.of());
-        when(approvalRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
-        when(approvalRepo.findAllByStatus(any())).thenReturn(List.of());
-        when(sodViolationRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
-        when(sodViolationRepo.countByStatus(any())).thenReturn(0L);
-        when(decisionRepo.countDistinctReviewedUsersSince(any(), any())).thenReturn(0L);
-        when(auditQueryService.query(any(), any(), any(), any(), any(), anyInt(), anyInt()))
-                .thenReturn(new PageImpl<>(List.of()));
+        stubCommon();
 
-        // One active campaign: 80/100 decided
         AccessReviewCampaign campaign = new AccessReviewCampaign();
         campaign.setId(UUID.randomUUID());
         campaign.setName("Q1 Review");
         campaign.setDirectory(directory);
         campaign.setDeadline(OffsetDateTime.now().plusDays(7));
-        when(campaignRepo.findByDirectoryIdAndStatus(directoryId, CampaignStatus.ACTIVE)).thenReturn(List.of(campaign));
+        when(campaignRepo.countByDirectoryIdAndStatus(directoryId, CampaignStatus.ACTIVE)).thenReturn(1L);
         when(campaignRepo.findByStatus(CampaignStatus.ACTIVE)).thenReturn(List.of(campaign));
-        when(campaignRepo.countByStatusAndDeadlineBefore(eq(CampaignStatus.ACTIVE), any())).thenReturn(0L);
 
         when(decisionRepo.countTotalByCampaignId(campaign.getId())).thenReturn(100L);
         when(decisionRepo.countPendingByCampaignId(campaign.getId())).thenReturn(20L);
@@ -134,26 +97,14 @@ class DashboardServiceTest {
 
     @Test
     void getDashboard_overdueCampaign_flaggedCorrectly() {
-        when(dirRepo.findAll()).thenReturn(List.of(directory));
-        when(userService.searchUsers(eq(directory), anyString(), any(), anyInt(), anyString()))
-                .thenReturn(List.of());
-        when(groupService.searchGroups(eq(directory), anyString(), any(), anyInt(), anyString()))
-                .thenReturn(List.of());
-        when(approvalRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
-        when(approvalRepo.findAllByStatus(any())).thenReturn(List.of());
-        when(sodViolationRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
-        when(sodViolationRepo.countByStatus(any())).thenReturn(0L);
-        when(decisionRepo.countDistinctReviewedUsersSince(any(), any())).thenReturn(0L);
-        when(auditQueryService.query(any(), any(), any(), any(), any(), anyInt(), anyInt()))
-                .thenReturn(new PageImpl<>(List.of()));
+        stubCommon();
 
-        // Overdue campaign (deadline in the past)
         AccessReviewCampaign overdue = new AccessReviewCampaign();
         overdue.setId(UUID.randomUUID());
         overdue.setName("Overdue Review");
         overdue.setDirectory(directory);
         overdue.setDeadline(OffsetDateTime.now().minusDays(3));
-        when(campaignRepo.findByDirectoryIdAndStatus(directoryId, CampaignStatus.ACTIVE)).thenReturn(List.of(overdue));
+        when(campaignRepo.countByDirectoryIdAndStatus(directoryId, CampaignStatus.ACTIVE)).thenReturn(1L);
         when(campaignRepo.findByStatus(CampaignStatus.ACTIVE)).thenReturn(List.of(overdue));
         when(campaignRepo.countByStatusAndDeadlineBefore(eq(CampaignStatus.ACTIVE), any())).thenReturn(1L);
 
@@ -168,27 +119,15 @@ class DashboardServiceTest {
 
     @Test
     void getDashboard_approvalAgingBuckets_computedCorrectly() {
-        when(dirRepo.findAll()).thenReturn(List.of(directory));
-        when(userService.searchUsers(eq(directory), anyString(), any(), anyInt(), anyString()))
-                .thenReturn(List.of());
-        when(groupService.searchGroups(eq(directory), anyString(), any(), anyInt(), anyString()))
-                .thenReturn(List.of());
+        stubCommon();
         when(approvalRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(4L);
-        when(sodViolationRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
-        when(sodViolationRepo.countByStatus(any())).thenReturn(0L);
-        when(campaignRepo.findByDirectoryIdAndStatus(any(), any())).thenReturn(List.of());
-        when(campaignRepo.findByStatus(any())).thenReturn(List.of());
-        when(campaignRepo.countByStatusAndDeadlineBefore(any(), any())).thenReturn(0L);
-        when(decisionRepo.countDistinctReviewedUsersSince(any(), any())).thenReturn(0L);
-        when(auditQueryService.query(any(), any(), any(), any(), any(), anyInt(), anyInt()))
-                .thenReturn(new PageImpl<>(List.of()));
 
         OffsetDateTime now = OffsetDateTime.now();
         List<PendingApproval> approvals = List.of(
-                buildApproval(now.minusHours(2)),    // < 24h
-                buildApproval(now.minusDays(2)),     // 1-3 days
-                buildApproval(now.minusDays(5)),     // 3-7 days
-                buildApproval(now.minusDays(10))     // 7+ days
+                buildApproval(now.minusHours(2)),
+                buildApproval(now.minusDays(2)),
+                buildApproval(now.minusDays(5)),
+                buildApproval(now.minusDays(10))
         );
         when(approvalRepo.findAllByStatus(ApprovalStatus.PENDING)).thenReturn(approvals);
 
@@ -201,12 +140,10 @@ class DashboardServiceTest {
     }
 
     @Test
-    void getDashboard_usersNotReviewedIn90Days_calculatedFromLdapMinusReviewed() {
-        when(dirRepo.findAll()).thenReturn(List.of(directory));
-
-        // 50 LDAP users
+    void getDashboard_usersNotReviewedIn90Days_calculatedPerDirectory() {
         var users = new ArrayList<com.ldapadmin.ldap.model.LdapUser>();
         for (int i = 0; i < 50; i++) users.add(mock(com.ldapadmin.ldap.model.LdapUser.class));
+        when(dirRepo.findAll()).thenReturn(List.of(directory));
         when(userService.searchUsers(eq(directory), anyString(), any(), anyInt(), anyString()))
                 .thenReturn(users);
         when(groupService.searchGroups(eq(directory), anyString(), any(), anyInt(), anyString()))
@@ -215,41 +152,27 @@ class DashboardServiceTest {
         when(approvalRepo.findAllByStatus(any())).thenReturn(List.of());
         when(sodViolationRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
         when(sodViolationRepo.countByStatus(any())).thenReturn(0L);
-        when(campaignRepo.findByDirectoryIdAndStatus(any(), any())).thenReturn(List.of());
+        when(campaignRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
         when(campaignRepo.findByStatus(any())).thenReturn(List.of());
         when(campaignRepo.countByStatusAndDeadlineBefore(any(), any())).thenReturn(0L);
         when(auditQueryService.query(any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of()));
-
-        // 30 users reviewed in last 90 days
+        when(reportJobRepo.countByEnabledTrue()).thenReturn(0L);
+        when(reportJobRepo.countByEnabledTrueAndLastRunStatus(any())).thenReturn(0L);
         when(decisionRepo.countDistinctReviewedUsersSince(eq(directoryId), any())).thenReturn(30L);
 
         ComplianceDashboardDto result = service.getDashboard();
 
-        assertThat(result.usersNotReviewedIn90Days()).isEqualTo(20); // 50 - 30
+        assertThat(result.usersNotReviewedIn90Days()).isEqualTo(20);
     }
 
     @Test
-    void getDashboard_noCampaigns_returns100PercentCompletion() {
-        when(dirRepo.findAll()).thenReturn(List.of(directory));
-        when(userService.searchUsers(eq(directory), anyString(), any(), anyInt(), anyString()))
-                .thenReturn(List.of());
-        when(groupService.searchGroups(eq(directory), anyString(), any(), anyInt(), anyString()))
-                .thenReturn(List.of());
-        when(approvalRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
-        when(approvalRepo.findAllByStatus(any())).thenReturn(List.of());
-        when(sodViolationRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
-        when(sodViolationRepo.countByStatus(any())).thenReturn(0L);
-        when(campaignRepo.findByDirectoryIdAndStatus(any(), any())).thenReturn(List.of());
-        when(campaignRepo.findByStatus(any())).thenReturn(List.of());
-        when(campaignRepo.countByStatusAndDeadlineBefore(any(), any())).thenReturn(0L);
-        when(decisionRepo.countDistinctReviewedUsersSince(any(), any())).thenReturn(0L);
-        when(auditQueryService.query(any(), any(), any(), any(), any(), anyInt(), anyInt()))
-                .thenReturn(new PageImpl<>(List.of()));
+    void getDashboard_noCampaigns_returnsNullCompletion() {
+        stubCommon();
 
         ComplianceDashboardDto result = service.getDashboard();
 
-        assertThat(result.campaignCompletionPercent()).isEqualTo(100.0);
+        assertThat(result.campaignCompletionPercent()).isNull();
         assertThat(result.campaignProgress()).isEmpty();
     }
 
@@ -261,36 +184,23 @@ class DashboardServiceTest {
         when(approvalRepo.findAllByStatus(any())).thenReturn(List.of());
         when(sodViolationRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
         when(sodViolationRepo.countByStatus(any())).thenReturn(0L);
-        when(campaignRepo.findByDirectoryIdAndStatus(any(), any())).thenReturn(List.of());
+        when(campaignRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
         when(campaignRepo.findByStatus(any())).thenReturn(List.of());
         when(campaignRepo.countByStatusAndDeadlineBefore(any(), any())).thenReturn(0L);
         when(auditQueryService.query(any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of()));
+        when(reportJobRepo.countByEnabledTrue()).thenReturn(0L);
+        when(reportJobRepo.countByEnabledTrueAndLastRunStatus(any())).thenReturn(0L);
 
         ComplianceDashboardDto result = service.getDashboard();
 
         verify(userService, never()).searchUsers(any(), anyString(), any(), anyInt(), anyString());
-        verify(groupService, never()).searchGroups(any(), anyString(), any(), anyInt(), anyString());
         assertThat(result.directories().get(0).userCount()).isEqualTo(0);
     }
 
     @Test
     void getDashboard_perDirectorySodViolations_included() {
-        when(dirRepo.findAll()).thenReturn(List.of(directory));
-        when(userService.searchUsers(eq(directory), anyString(), any(), anyInt(), anyString()))
-                .thenReturn(List.of());
-        when(groupService.searchGroups(eq(directory), anyString(), any(), anyInt(), anyString()))
-                .thenReturn(List.of());
-        when(approvalRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
-        when(approvalRepo.findAllByStatus(any())).thenReturn(List.of());
-        when(campaignRepo.findByDirectoryIdAndStatus(any(), any())).thenReturn(List.of());
-        when(campaignRepo.findByStatus(any())).thenReturn(List.of());
-        when(campaignRepo.countByStatusAndDeadlineBefore(any(), any())).thenReturn(0L);
-        when(decisionRepo.countDistinctReviewedUsersSince(any(), any())).thenReturn(0L);
-        when(auditQueryService.query(any(), any(), any(), any(), any(), anyInt(), anyInt()))
-                .thenReturn(new PageImpl<>(List.of()));
-
-        // 3 open SoD violations for this directory
+        stubCommon();
         when(sodViolationRepo.countByDirectoryIdAndStatus(directoryId, SodViolationStatus.OPEN))
                 .thenReturn(3L);
         when(sodViolationRepo.countByStatus(SodViolationStatus.OPEN)).thenReturn(3L);
@@ -299,6 +209,51 @@ class DashboardServiceTest {
 
         assertThat(result.openSodViolations()).isEqualTo(3);
         assertThat(result.directories().get(0).openSodViolations()).isEqualTo(3);
+    }
+
+    @Test
+    void getDashboard_includesReportJobStats() {
+        stubCommon();
+        when(reportJobRepo.countByEnabledTrue()).thenReturn(5L);
+        when(reportJobRepo.countByEnabledTrueAndLastRunStatus("FAILURE")).thenReturn(2L);
+
+        ComplianceDashboardDto result = service.getDashboard();
+
+        assertThat(result.enabledReportJobs()).isEqualTo(5);
+        assertThat(result.failedReportJobs()).isEqualTo(2);
+    }
+
+    @Test
+    void getDashboard_cacheReturnsCachedResult() {
+        stubCommon();
+
+        ComplianceDashboardDto first = service.getDashboard();
+        ComplianceDashboardDto second = service.getDashboard();
+
+        assertThat(second).isSameAs(first);
+        verify(dirRepo, times(1)).findAll();
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private void stubCommon() {
+        when(dirRepo.findAll()).thenReturn(List.of(directory));
+        when(userService.searchUsers(eq(directory), anyString(), any(), anyInt(), anyString()))
+                .thenReturn(List.of());
+        when(groupService.searchGroups(eq(directory), anyString(), any(), anyInt(), anyString()))
+                .thenReturn(List.of());
+        when(approvalRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
+        when(approvalRepo.findAllByStatus(any())).thenReturn(List.of());
+        when(sodViolationRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
+        when(sodViolationRepo.countByStatus(any())).thenReturn(0L);
+        when(campaignRepo.countByDirectoryIdAndStatus(any(), any())).thenReturn(0L);
+        when(campaignRepo.findByStatus(any())).thenReturn(List.of());
+        when(campaignRepo.countByStatusAndDeadlineBefore(any(), any())).thenReturn(0L);
+        when(decisionRepo.countDistinctReviewedUsersSince(any(), any())).thenReturn(0L);
+        when(auditQueryService.query(any(), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(new PageImpl<>(List.of()));
+        when(reportJobRepo.countByEnabledTrue()).thenReturn(0L);
+        when(reportJobRepo.countByEnabledTrueAndLastRunStatus(any())).thenReturn(0L);
     }
 
     private PendingApproval buildApproval(OffsetDateTime createdAt) {

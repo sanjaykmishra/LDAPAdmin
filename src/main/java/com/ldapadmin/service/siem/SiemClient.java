@@ -1,8 +1,10 @@
 package com.ldapadmin.service.siem;
 
 import com.ldapadmin.entity.ApplicationSettings;
+import com.ldapadmin.entity.enums.SiemFormat;
 import com.ldapadmin.entity.enums.SiemProtocol;
 import com.ldapadmin.service.EncryptionService;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -11,6 +13,7 @@ import java.io.OutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -21,7 +24,11 @@ import java.time.Duration;
 
 /**
  * Transport layer for delivering formatted audit events to SIEM targets.
- * Supports UDP syslog, TCP syslog, and HTTPS webhook.
+ * Supports UDP syslog, TCP syslog, TLS syslog (RFC 5425), and HTTPS webhook.
+ *
+ * <p>TCP/TLS connections are maintained persistently and reused across calls
+ * to avoid per-event connection overhead. The shared HttpClient is similarly
+ * reused for webhook delivery.</p>
  */
 @Component
 @Slf4j
@@ -32,12 +39,29 @@ public class SiemClient {
 
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
+    private static final int MAX_RETRIES = 3;
+    private static final int MAX_UDP_SAFE_SIZE = 1024; // RFC 5426 recommendation
+
+    // Persistent TCP/TLS socket (guarded by synchronized methods)
+    private volatile Socket persistentSocket;
+    private volatile OutputStream persistentOut;
+    private volatile String persistentHost;
+    private volatile int persistentPort;
+    private volatile boolean persistentTls;
+
+    // Shared HTTP client for webhook
+    private volatile HttpClient sharedHttpClient;
+
+    @PreDestroy
+    void shutdown() {
+        closePersistentSocket();
+        if (sharedHttpClient != null) {
+            sharedHttpClient.close();
+        }
+    }
 
     /**
      * Sends a formatted message to the configured SIEM target.
-     *
-     * @param settings the current application settings (contains SIEM config)
-     * @param message  the pre-formatted event string
      */
     public void send(ApplicationSettings settings, String message) {
         SiemProtocol protocol = settings.getSiemProtocol();
@@ -48,14 +72,24 @@ public class SiemClient {
 
         switch (protocol) {
             case SYSLOG_UDP -> sendUdp(settings.getSiemHost(), settings.getSiemPort(), message);
-            case SYSLOG_TCP -> sendTcp(settings.getSiemHost(), settings.getSiemPort(), message);
-            case WEBHOOK    -> sendWebhook(settings, message);
+            case SYSLOG_TCP -> sendTcpWithRetry(settings.getSiemHost(), settings.getSiemPort(), message, false);
+            case SYSLOG_TLS -> sendTcpWithRetry(settings.getSiemHost(), settings.getSiemPort(), message, true);
+            case WEBHOOK    -> sendWebhookWithRetry(settings, message);
         }
     }
+
+    // ── UDP ──────────────────────────────────────────────────────────────────
 
     private void sendUdp(String host, Integer port, String message) {
         int targetPort = port != null ? port : 514;
         byte[] data = message.getBytes(StandardCharsets.UTF_8);
+
+        if (data.length > MAX_UDP_SAFE_SIZE) {
+            log.warn("SIEM UDP message size ({} bytes) exceeds recommended maximum ({} bytes) — "
+                    + "message may be truncated by network equipment. Consider TCP/TLS for large events.",
+                    data.length, MAX_UDP_SAFE_SIZE);
+        }
+
         try (DatagramSocket socket = new DatagramSocket()) {
             InetAddress addr = InetAddress.getByName(host);
             DatagramPacket packet = new DatagramPacket(data, data.length, addr, targetPort);
@@ -65,57 +99,151 @@ public class SiemClient {
         }
     }
 
-    private void sendTcp(String host, Integer port, String message) {
-        int targetPort = port != null ? port : 514;
-        try (Socket socket = new Socket()) {
-            socket.connect(new java.net.InetSocketAddress(host, targetPort),
-                    (int) CONNECT_TIMEOUT.toMillis());
-            socket.setSoTimeout((int) REQUEST_TIMEOUT.toMillis());
-            OutputStream out = socket.getOutputStream();
-            // RFC 6587 octet-counting framing
-            byte[] data = message.getBytes(StandardCharsets.UTF_8);
-            String frame = data.length + " ";
-            out.write(frame.getBytes(StandardCharsets.UTF_8));
-            out.write(data);
-            out.flush();
-        } catch (Exception e) {
-            log.error("Failed to send syslog TCP to {}:{}: {}", host, targetPort, e.getMessage());
+    // ── TCP / TLS with persistent connection and retry ───────────────────────
+
+    private synchronized void sendTcpWithRetry(String host, Integer port, String message, boolean tls) {
+        int targetPort = port != null ? port : (tls ? 6514 : 514);
+
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                ensureConnected(host, targetPort, tls);
+
+                // RFC 6587 octet-counting framing
+                byte[] data = message.getBytes(StandardCharsets.UTF_8);
+                String frame = data.length + " ";
+                persistentOut.write(frame.getBytes(StandardCharsets.UTF_8));
+                persistentOut.write(data);
+                persistentOut.flush();
+                return; // success
+            } catch (Exception e) {
+                closePersistentSocket();
+                if (attempt < MAX_RETRIES) {
+                    log.warn("SIEM TCP/TLS send attempt {}/{} failed ({}:{}) — retrying: {}",
+                            attempt, MAX_RETRIES, host, targetPort, e.getMessage());
+                    sleepQuietly(attempt * 1000L);
+                } else {
+                    log.error("SIEM TCP/TLS send failed after {} attempts to {}:{}: {}",
+                            MAX_RETRIES, host, targetPort, e.getMessage());
+                }
+            }
         }
     }
 
-    private void sendWebhook(ApplicationSettings settings, String message) {
+    private void ensureConnected(String host, int port, boolean tls) throws Exception {
+        if (persistentSocket != null && !persistentSocket.isClosed()
+                && persistentSocket.isConnected()
+                && host.equals(persistentHost) && port == persistentPort
+                && tls == persistentTls) {
+            return; // reuse existing connection
+        }
+
+        closePersistentSocket();
+
+        Socket socket;
+        if (tls) {
+            var sslFactory = (javax.net.ssl.SSLSocketFactory) javax.net.ssl.SSLSocketFactory.getDefault();
+            socket = sslFactory.createSocket();
+        } else {
+            socket = new Socket();
+        }
+
+        socket.connect(new InetSocketAddress(host, port), (int) CONNECT_TIMEOUT.toMillis());
+        socket.setSoTimeout((int) REQUEST_TIMEOUT.toMillis());
+
+        persistentSocket = socket;
+        persistentOut = socket.getOutputStream();
+        persistentHost = host;
+        persistentPort = port;
+        persistentTls = tls;
+
+        log.info("SIEM {} connection established to {}:{}", tls ? "TLS" : "TCP", host, port);
+    }
+
+    private void closePersistentSocket() {
+        if (persistentSocket != null) {
+            try {
+                persistentSocket.close();
+            } catch (Exception ignored) {}
+            persistentSocket = null;
+            persistentOut = null;
+        }
+    }
+
+    // ── Webhook with retry ──────────────────────────────────────────────────
+
+    private void sendWebhookWithRetry(ApplicationSettings settings, String message) {
         String url = settings.getWebhookUrl();
         if (url == null || url.isBlank()) {
             log.warn("Webhook URL not configured, skipping");
             return;
         }
 
-        try {
-            HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(REQUEST_TIMEOUT)
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(message, StandardCharsets.UTF_8));
+        // Determine Content-Type based on format
+        String contentType = switch (settings.getSiemFormat()) {
+            case JSON -> "application/json";
+            case CEF, LEEF -> "text/plain";
+            case RFC5424 -> "application/syslog";
+            case null -> "text/plain";
+        };
 
-            // Add Authorization header if configured
-            if (settings.getWebhookAuthHeaderEnc() != null) {
-                String authHeader = encryptionService.decrypt(settings.getWebhookAuthHeaderEnc());
-                reqBuilder.header("Authorization", authHeader);
-            }
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
+                        .uri(URI.create(url))
+                        .timeout(REQUEST_TIMEOUT)
+                        .header("Content-Type", contentType)
+                        .POST(HttpRequest.BodyPublishers.ofString(message, StandardCharsets.UTF_8));
 
-            try (HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(CONNECT_TIMEOUT)
-                    .build()) {
-                HttpResponse<String> resp = client.send(reqBuilder.build(),
+                if (settings.getWebhookAuthHeaderEnc() != null) {
+                    String authHeader = encryptionService.decrypt(settings.getWebhookAuthHeaderEnc());
+                    reqBuilder.header("Authorization", authHeader);
+                }
+
+                HttpResponse<String> resp = getHttpClient().send(reqBuilder.build(),
                         HttpResponse.BodyHandlers.ofString());
-                if (resp.statusCode() >= 400) {
-                    log.error("Webhook returned HTTP {}: {}", resp.statusCode(), resp.body());
+
+                if (resp.statusCode() < 400) {
+                    return; // success
+                }
+
+                // 4xx errors are not retryable
+                if (resp.statusCode() < 500) {
+                    log.error("Webhook returned HTTP {} (non-retryable): {}", resp.statusCode(), resp.body());
+                    return;
+                }
+
+                // 5xx — retryable
+                log.warn("Webhook returned HTTP {} on attempt {}/{}: {}",
+                        resp.statusCode(), attempt, MAX_RETRIES, resp.body());
+            } catch (Exception e) {
+                if (attempt < MAX_RETRIES) {
+                    log.warn("Webhook send attempt {}/{} failed — retrying: {}",
+                            attempt, MAX_RETRIES, e.getMessage());
+                } else {
+                    log.error("Webhook send failed after {} attempts to {}: {}",
+                            MAX_RETRIES, url, e.getMessage());
+                    return;
                 }
             }
-        } catch (Exception e) {
-            log.error("Failed to send webhook to {}: {}", url, e.getMessage());
+
+            sleepQuietly(attempt * 1000L);
         }
     }
+
+    private HttpClient getHttpClient() {
+        if (sharedHttpClient == null) {
+            synchronized (this) {
+                if (sharedHttpClient == null) {
+                    sharedHttpClient = HttpClient.newBuilder()
+                            .connectTimeout(CONNECT_TIMEOUT)
+                            .build();
+                }
+            }
+        }
+        return sharedHttpClient;
+    }
+
+    // ── Connectivity test ───────────────────────────────────────────────────
 
     /**
      * Tests connectivity to the configured SIEM target.
@@ -132,18 +260,28 @@ public class SiemClient {
                     return "UDP: DNS resolved " + settings.getSiemHost() + " successfully. "
                             + "Note: UDP delivery cannot be confirmed.";
                 }
-                case SYSLOG_TCP -> {
-                    int port = settings.getSiemPort() != null ? settings.getSiemPort() : 514;
-                    try (Socket socket = new Socket()) {
-                        socket.connect(new java.net.InetSocketAddress(settings.getSiemHost(), port),
-                                (int) CONNECT_TIMEOUT.toMillis());
+                case SYSLOG_TCP, SYSLOG_TLS -> {
+                    boolean tls = protocol == SiemProtocol.SYSLOG_TLS;
+                    int port = settings.getSiemPort() != null ? settings.getSiemPort() : (tls ? 6514 : 514);
+                    Socket socket;
+                    if (tls) {
+                        var sslFactory = (javax.net.ssl.SSLSocketFactory) javax.net.ssl.SSLSocketFactory.getDefault();
+                        socket = sslFactory.createSocket();
+                    } else {
+                        socket = new Socket();
                     }
-                    return "TCP: Connected to " + settings.getSiemHost() + ":" + port + " successfully.";
+                    try {
+                        socket.connect(new InetSocketAddress(settings.getSiemHost(), port),
+                                (int) CONNECT_TIMEOUT.toMillis());
+                    } finally {
+                        socket.close();
+                    }
+                    String label = tls ? "TLS" : "TCP";
+                    return label + ": Connected to " + settings.getSiemHost() + ":" + port + " successfully.";
                 }
                 case WEBHOOK -> {
                     String url = settings.getWebhookUrl();
                     if (url == null || url.isBlank()) return "Webhook URL not configured.";
-                    // Send an empty test via OPTIONS/HEAD or a test payload
                     return "Webhook: URL " + url + " configured. Send a test event to verify delivery.";
                 }
             }
@@ -151,5 +289,13 @@ public class SiemClient {
             return "Connection test failed: " + e.getMessage();
         }
         return "Unknown protocol.";
+    }
+
+    private void sleepQuietly(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

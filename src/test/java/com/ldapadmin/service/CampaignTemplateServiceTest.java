@@ -39,6 +39,7 @@ class CampaignTemplateServiceTest {
     @Mock private DirectoryConnectionRepository directoryRepo;
     @Mock private AccountRepository accountRepo;
     @Mock private AccessReviewCampaignRepository campaignRepo;
+    @Mock private AuditService auditService;
 
     private CampaignTemplateService service;
 
@@ -54,7 +55,7 @@ class CampaignTemplateServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new CampaignTemplateService(templateRepo, directoryRepo, accountRepo, campaignRepo);
+        service = new CampaignTemplateService(templateRepo, directoryRepo, accountRepo, campaignRepo, auditService);
 
         directory = new DirectoryConnection();
         directory.setId(directoryId);
@@ -67,6 +68,10 @@ class CampaignTemplateServiceTest {
         reviewerAccount = new Account();
         reviewerAccount.setId(reviewerId);
         reviewerAccount.setUsername("reviewer");
+
+        // Stub reviewer resolution for toResponse and toCampaignRequest
+        lenient().when(accountRepo.findById(reviewerId)).thenReturn(Optional.of(reviewerAccount));
+        lenient().when(accountRepo.existsById(reviewerId)).thenReturn(true);
     }
 
     // ── create ─────────────────────────────────────────────────────────────
@@ -255,7 +260,7 @@ class CampaignTemplateServiceTest {
         CampaignTemplate existing = buildTemplate();
         when(templateRepo.findById(templateId)).thenReturn(Optional.of(existing));
 
-        service.delete(directoryId, templateId);
+        service.delete(directoryId, templateId, principal);
 
         verify(templateRepo).delete(existing);
     }
@@ -264,7 +269,7 @@ class CampaignTemplateServiceTest {
     void delete_notFound_throwsException() {
         when(templateRepo.findById(templateId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.delete(directoryId, templateId))
+        assertThatThrownBy(() -> service.delete(directoryId, templateId, principal))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -274,7 +279,7 @@ class CampaignTemplateServiceTest {
         when(templateRepo.findById(templateId)).thenReturn(Optional.of(existing));
 
         UUID otherDirId = UUID.randomUUID();
-        assertThatThrownBy(() -> service.delete(otherDirId, templateId))
+        assertThatThrownBy(() -> service.delete(otherDirId, templateId, principal))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 

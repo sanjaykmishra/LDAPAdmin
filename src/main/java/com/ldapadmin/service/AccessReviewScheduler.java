@@ -14,13 +14,14 @@ import com.ldapadmin.entity.enums.ReviewDecision;
 import com.ldapadmin.ldap.LdapGroupService;
 import com.ldapadmin.repository.AccessReviewCampaignRepository;
 import com.ldapadmin.repository.AccessReviewDecisionRepository;
-import com.ldapadmin.repository.AccountRepository;
+// AccountRepository removed — SYSTEM_PRINCIPAL is static
 import com.ldapadmin.repository.CampaignReminderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.HashSet;
@@ -37,7 +38,6 @@ public class AccessReviewScheduler {
     private final AccessReviewCampaignRepository campaignRepo;
     private final AccessReviewCampaignService campaignService;
     private final AccessReviewNotificationService notificationService;
-    private final AccountRepository accountRepo;
     private final CampaignReminderRepository reminderRepo;
     private final AccessReviewDecisionRepository decisionRepo;
     private final LdapGroupService ldapGroupService;
@@ -203,6 +203,7 @@ public class AccessReviewScheduler {
      * Creates REVOKE decisions with SYSTEM actor and removes LDAP members.
      * Guarded by the global auto-revoke-enabled kill switch.
      */
+    @Transactional
     void executeAutoRevokeOnExpiry(AccessReviewCampaign campaign) {
         log.info("Executing auto-revoke on expiry for campaign '{}' (id={})", campaign.getName(), campaign.getId());
 

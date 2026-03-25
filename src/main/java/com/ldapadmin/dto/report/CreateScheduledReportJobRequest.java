@@ -31,4 +31,6 @@ public record CreateScheduledReportJobRequest(
         String deliveryRecipients,
         /** S3 key prefix (required when deliveryMethod = S3). */
         String s3KeyPrefix,
+        /** IANA timezone for cron evaluation (e.g. "America/New_York"). Null = UTC. */
+        String timezone,
         boolean enabled) {}

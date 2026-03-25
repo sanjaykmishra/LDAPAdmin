@@ -6,6 +6,7 @@ import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.entity.enums.AuditSource;
 import com.ldapadmin.entity.enums.SiemFormat;
 import com.ldapadmin.entity.enums.SiemProtocol;
+import com.ldapadmin.repository.AuditEventRepository;
 import com.ldapadmin.service.ApplicationSettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,12 +28,13 @@ class SiemExportServiceTest {
     @Mock private ApplicationSettingsService settingsService;
     @Mock private SiemFormatter              formatter;
     @Mock private SiemClient                 client;
+    @Mock private AuditEventRepository       auditEventRepo;
 
     private SiemExportService exportService;
 
     @BeforeEach
     void setUp() {
-        exportService = new SiemExportService(settingsService, formatter, client);
+        exportService = new SiemExportService(settingsService, formatter, client, auditEventRepo);
     }
 
     // ── export ──────────────────────────────────────────────────────────────
@@ -100,6 +102,34 @@ class SiemExportServiceTest {
         verify(client, never()).send(any(), any());
     }
 
+    @Test
+    void export_usesCache_doesNotQuerySettingsEveryCall() {
+        ApplicationSettings settings = enabledSettings();
+        when(settingsService.getEntity()).thenReturn(settings);
+        when(formatter.format(any(), any())).thenReturn("formatted");
+
+        // Call export twice rapidly
+        exportService.export(testEvent());
+        exportService.export(testEvent());
+
+        // Settings should only be fetched once (cached)
+        verify(settingsService, times(1)).getEntity();
+    }
+
+    @Test
+    void export_afterCacheInvalidation_refetchesSettings() {
+        ApplicationSettings settings = enabledSettings();
+        when(settingsService.getEntity()).thenReturn(settings);
+        when(formatter.format(any(), any())).thenReturn("formatted");
+
+        exportService.export(testEvent());
+        exportService.invalidateCache();
+        exportService.export(testEvent());
+
+        // Settings fetched twice: before invalidation and after
+        verify(settingsService, times(2)).getEntity();
+    }
+
     // ── sendTestEvent ───────────────────────────────────────────────────────
 
     @Test
@@ -136,6 +166,21 @@ class SiemExportServiceTest {
         String result = exportService.sendTestEvent();
 
         assertThat(result).contains("failed").contains("network down");
+    }
+
+    @Test
+    void sendTestEvent_usesIntegrityCheckAction() {
+        ApplicationSettings settings = enabledSettings();
+        when(settingsService.getEntity()).thenReturn(settings);
+        when(formatter.format(any(), any())).thenReturn("formatted");
+
+        exportService.sendTestEvent();
+
+        // Verify the test event uses INTEGRITY_CHECK (not LDAP_CHANGE)
+        verify(formatter).format(argThat(event ->
+                event.getAction() == AuditAction.INTEGRITY_CHECK
+                && event.getDetail() != null
+                && event.getDetail().containsKey("type")), any());
     }
 
     // ── testConnectivity ────────────────────────────────────────────────────

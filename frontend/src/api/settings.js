@@ -15,3 +15,6 @@ export const completeSetup = () =>
 
 export const testSiem = () =>
   client.post('/settings/siem/test')
+
+export const siemBackfill = (from, to) =>
+  client.post('/settings/siem/backfill', null, { params: { from, to } })

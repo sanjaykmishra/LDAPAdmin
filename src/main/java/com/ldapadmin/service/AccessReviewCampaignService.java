@@ -127,6 +127,9 @@ public class AccessReviewCampaignService {
             recordHistory(campaign, oldStatus, CampaignStatus.ACTIVE, actor, "Campaign activated — members snapshot taken");
         }
 
+        // Force-initialize lazy collections before passing to @Async notification
+        campaign.getReviewGroups().forEach(g -> g.getReviewer().getUsername());
+
         // Notify reviewers
         notificationService.notifyReviewersAssigned(campaign);
 
@@ -165,6 +168,9 @@ public class AccessReviewCampaignService {
 
         recordHistory(campaign, oldStatus, CampaignStatus.CLOSED, actor,
                 forceClose ? "Campaign force-closed with " + pendingCount + " undecided items" : "Campaign closed");
+
+        // Force-initialize before @Async notification
+        campaign.getCreatedBy().getUsername();
 
         notificationService.notifyCampaignClosed(campaign);
 
@@ -301,6 +307,10 @@ public class AccessReviewCampaignService {
         if (systemAccount != null) {
             recordHistory(campaign, oldStatus, CampaignStatus.EXPIRED, systemAccount, "Campaign expired — deadline passed");
         }
+
+        // Force-initialize lazy collections before passing to @Async notification
+        campaign.getReviewGroups().forEach(g -> g.getReviewer().getUsername());
+        campaign.getCreatedBy().getUsername();
 
         notificationService.notifyCampaignExpired(campaign);
 

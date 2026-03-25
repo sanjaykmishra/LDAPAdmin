@@ -5,7 +5,6 @@ import com.ldapadmin.entity.enums.*;
 import com.ldapadmin.ldap.LdapGroupService;
 import com.ldapadmin.repository.AccessReviewCampaignRepository;
 import com.ldapadmin.repository.AccessReviewDecisionRepository;
-import com.ldapadmin.repository.AccountRepository;
 import com.ldapadmin.repository.CampaignReminderRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,7 +29,6 @@ class AccessReviewSchedulerTest {
     @Mock private AccessReviewCampaignRepository campaignRepo;
     @Mock private AccessReviewCampaignService campaignService;
     @Mock private AccessReviewNotificationService notificationService;
-    @Mock private AccountRepository accountRepo;
     @Mock private CampaignReminderRepository reminderRepo;
     @Mock private AccessReviewDecisionRepository decisionRepo;
     @Mock private LdapGroupService ldapGroupService;
@@ -43,7 +41,7 @@ class AccessReviewSchedulerTest {
     @BeforeEach
     void setUp() {
         scheduler = new AccessReviewScheduler(
-                campaignRepo, campaignService, notificationService, accountRepo,
+                campaignRepo, campaignService, notificationService,
                 reminderRepo, decisionRepo, ldapGroupService, auditService);
 
         superadmin = new Account();

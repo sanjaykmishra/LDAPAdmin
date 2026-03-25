@@ -1,10 +1,11 @@
 package com.ldapadmin.dto.dashboard;
 
+import com.ldapadmin.dto.audit.AuditEventResponse;
+
 import java.util.List;
 
 /**
  * Structured compliance posture dashboard response.
- * Replaces the raw Map returned by the original dashboard endpoint.
  */
 public record ComplianceDashboardDto(
         // ── Summary totals ────────────────────────────────────────────────────
@@ -14,7 +15,8 @@ public record ComplianceDashboardDto(
 
         // ── Compliance posture metrics ────────────────────────────────────────
         long openSodViolations,
-        double campaignCompletionPercent,
+        /** Null when there are no active campaigns (avoids misleading "100%"). */
+        Double campaignCompletionPercent,
         long overdueCampaigns,
         long usersNotReviewedIn90Days,
 
@@ -28,7 +30,11 @@ public record ComplianceDashboardDto(
         List<DirectoryStatDto> directories,
 
         // ── Recent audit events ───────────────────────────────────────────────
-        List<?> recentAudit
+        List<AuditEventResponse> recentAudit,
+
+        // ── Scheduled report job status ───────────────────────────────────────
+        long enabledReportJobs,
+        long failedReportJobs
 ) {
 
     public record ApprovalAgingDto(

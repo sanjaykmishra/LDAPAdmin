@@ -6,6 +6,8 @@ import com.ldapadmin.dto.report.ScheduledReportJobDto;
 import com.ldapadmin.entity.Account;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.ScheduledReportJob;
+import com.ldapadmin.entity.enums.DeliveryMethod;
+import com.ldapadmin.exception.LdapAdminException;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.repository.AccountRepository;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
@@ -13,13 +15,15 @@ import com.ldapadmin.repository.ScheduledReportJobRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZoneId;
 import java.util.UUID;
 
 /**
- * CRUD for scheduled report job definitions (§9.2).
+ * CRUD for scheduled report job definitions.
  *
  * <p>Jobs are scoped per directory.  This service only manages job
  * <em>definitions</em>; actual report execution is handled by
@@ -55,6 +59,7 @@ public class ScheduledReportJobService {
                                          CreateScheduledReportJobRequest req,
                                          AuthPrincipal principal) {
         DirectoryConnection dir = loadDirectory(directoryId);
+        validateRequest(req);
         Account creator = principal.id() != null
                 ? accountRepo.findById(principal.id()).orElse(null)
                 : null;
@@ -72,6 +77,7 @@ public class ScheduledReportJobService {
                                          CreateScheduledReportJobRequest req,
                                          AuthPrincipal principal) {
         loadDirectory(directoryId);
+        validateRequest(req);
         ScheduledReportJob job = findJob(jobId, directoryId);
         applyRequest(job, req);
         return toDto(jobRepo.save(job));
@@ -93,7 +99,15 @@ public class ScheduledReportJobService {
         return toDto(jobRepo.save(job));
     }
 
-    // ── Package-visible: used by ReportExecutionService to update last-run ────
+    /**
+     * Returns the job entity for "run now" execution by the controller/scheduler.
+     */
+    @Transactional(readOnly = true)
+    public ScheduledReportJob getJobEntity(UUID directoryId, UUID jobId) {
+        return findJob(jobId, directoryId);
+    }
+
+    // ── Package-visible: used by scheduler to update last-run ────
 
     @Transactional
     void recordRunResult(UUID jobId, String status, String message) {
@@ -106,6 +120,35 @@ public class ScheduledReportJobService {
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    private void validateRequest(CreateScheduledReportJobRequest req) {
+        // Validate cron expression
+        try {
+            CronExpression.parse(req.cronExpression());
+        } catch (IllegalArgumentException e) {
+            throw new LdapAdminException("Invalid cron expression: " + e.getMessage());
+        }
+
+        // Validate delivery configuration
+        if (req.deliveryMethod() == DeliveryMethod.EMAIL) {
+            if (req.deliveryRecipients() == null || req.deliveryRecipients().isBlank()) {
+                throw new LdapAdminException("Email delivery requires at least one recipient address");
+            }
+        }
+        if (req.deliveryMethod() == DeliveryMethod.S3) {
+            // s3KeyPrefix is optional (defaults to root), but we validate it's not the only thing
+            // — the S3 config itself is validated at execution time
+        }
+
+        // Validate timezone if provided
+        if (req.timezone() != null && !req.timezone().isBlank()) {
+            try {
+                ZoneId.of(req.timezone());
+            } catch (Exception e) {
+                throw new LdapAdminException("Invalid timezone: " + req.timezone());
+            }
+        }
+    }
 
     private DirectoryConnection loadDirectory(UUID directoryId) {
         return dirRepo.findById(directoryId)
@@ -132,6 +175,7 @@ public class ScheduledReportJobService {
         job.setDeliveryMethod(req.deliveryMethod());
         job.setDeliveryRecipients(req.deliveryRecipients());
         job.setS3KeyPrefix(req.s3KeyPrefix());
+        job.setTimezone(req.timezone());
         job.setEnabled(req.enabled());
     }
 
@@ -147,6 +191,7 @@ public class ScheduledReportJobService {
                 j.getDeliveryMethod(),
                 j.getDeliveryRecipients(),
                 j.getS3KeyPrefix(),
+                j.getTimezone(),
                 j.isEnabled(),
                 j.getLastRunAt(),
                 j.getLastRunStatus(),

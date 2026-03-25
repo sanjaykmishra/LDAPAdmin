@@ -1,10 +1,10 @@
 package com.ldapadmin.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.ldapadmin.config.AppProperties;
+import com.ldapadmin.dto.audit.AuditEventResponse;
 import com.ldapadmin.entity.*;
+import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.entity.enums.SodViolationStatus;
 import com.ldapadmin.ldap.LdapGroupService;
 import com.ldapadmin.ldap.LdapUserService;
@@ -13,6 +13,7 @@ import com.ldapadmin.ldap.model.LdapUser;
 import com.ldapadmin.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,7 +21,6 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -30,10 +30,10 @@ import java.util.zip.ZipOutputStream;
 
 /**
  * Generates a ZIP evidence package containing compliance reports, campaign data,
- * SoD policies/violations, approval history, and user entitlements.
+ * SoD policies/violations, approval history, audit events, and user entitlements.
  *
  * <p>The manifest includes SHA-256 checksums for each file and is signed with
- * HMAC-SHA256 using the application's encryption key for tamper evidence.
+ * HMAC-SHA256 using the application's encryption key for tamper evidence.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -51,28 +51,27 @@ public class EvidencePackageService {
     private final LdapUserService ldapUserService;
     private final LdapGroupService ldapGroupService;
     private final AppProperties appProperties;
+    private final AccountRepository accountRepo;
+    private final AuditQueryService auditQueryService;
+    private final AuditService auditService;
+    private final ObjectMapper objectMapper;
+
+    private static final String USER_OBJECTCLASS_FILTER =
+            "(|(objectClass=inetOrgPerson)(&(objectClass=user)(!(objectClass=computer))))";
 
     private static final String GROUP_OBJECTCLASS_FILTER =
             "(|(objectClass=groupOfNames)(objectClass=groupOfUniqueNames)(objectClass=posixGroup)(objectClass=group)(objectClass=groupOfURLs))";
 
-    private final ObjectMapper objectMapper = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .enable(SerializationFeature.INDENT_OUTPUT);
+    /** Maximum LDAP entries for entitlements export to prevent OOM. */
+    private static final int MAX_ENTITLEMENT_ENTRIES = 50_000;
 
     /**
      * Generates a complete evidence package as a ZIP byte array.
-     *
-     * @param directoryId    the target directory
-     * @param campaignIds    campaigns to include
-     * @param includeSod     include SoD policies and violations
-     * @param includeEntitlements include LDAP user-entitlement snapshot
-     * @param generatedBy    username of the requesting user
-     * @return ZIP file as byte[]
      */
     @Transactional(readOnly = true)
     public byte[] generateEvidencePackage(UUID directoryId, List<UUID> campaignIds,
                                           boolean includeSod, boolean includeEntitlements,
+                                          boolean includeAuditEvents,
                                           String generatedBy) throws IOException {
         DirectoryConnection dc = directoryRepo.findById(directoryId)
                 .orElseThrow(() -> new IllegalArgumentException("Directory not found: " + directoryId));
@@ -94,6 +93,11 @@ public class EvidencePackageService {
         // ── Approval history ────────────────────────────────────────────────
         addApprovalHistory(files, directoryId);
 
+        // ── Audit events (optional) ─────────────────────────────────────────
+        if (includeAuditEvents) {
+            addAuditEvents(files, directoryId);
+        }
+
         // ── User entitlements (optional) ────────────────────────────────────
         if (includeEntitlements) {
             addUserEntitlements(files, dc);
@@ -103,6 +107,9 @@ public class EvidencePackageService {
         byte[] manifest = buildManifest(files, directoryId, dc.getDisplayName(),
                 generatedAt, generatedBy, campaignIds, includeSod, includeEntitlements);
         files.put("manifest.json", manifest);
+
+        // ── Record audit event ──────────────────────────────────────────────
+        recordGenerationAudit(directoryId, generatedBy, campaignIds, includeSod, includeEntitlements);
 
         // ── Package into ZIP ────────────────────────────────────────────────
         return buildZip(files);
@@ -137,6 +144,13 @@ public class EvidencePackageService {
             }
 
             AccessReviewCampaign campaign = opt.get();
+
+            // Verify campaign belongs to this directory
+            if (!campaign.getDirectory().getId().equals(directoryId)) {
+                log.warn("Campaign {} does not belong to directory {} — skipping", campaignId, directoryId);
+                continue;
+            }
+
             String safeName = sanitizeFilename(campaign.getName());
             String prefix = "campaigns/" + safeName + "/";
 
@@ -204,9 +218,9 @@ public class EvidencePackageService {
             log.warn("Failed to export SoD policies: {}", e.getMessage());
         }
 
+        // Export ALL violations (OPEN, EXEMPTED, RESOLVED) for complete audit picture
         try {
-            List<SodViolation> violations = sodViolationRepo.findByDirectoryIdAndStatus(
-                    directoryId, SodViolationStatus.OPEN);
+            List<SodViolation> violations = sodViolationRepo.findByDirectoryId(directoryId);
             List<Map<String, Object>> violationData = violations.stream().map(v -> {
                 Map<String, Object> entry = new LinkedHashMap<>();
                 entry.put("id", v.getId().toString());
@@ -216,6 +230,10 @@ public class EvidencePackageService {
                 entry.put("userDisplayName", v.getUserDisplayName());
                 entry.put("status", v.getStatus() != null ? v.getStatus().name() : null);
                 entry.put("detectedAt", v.getDetectedAt() != null ? v.getDetectedAt().toString() : null);
+                entry.put("resolvedAt", v.getResolvedAt() != null ? v.getResolvedAt().toString() : null);
+                entry.put("exemptedBy", v.getExemptedBy() != null ? v.getExemptedBy().getUsername() : null);
+                entry.put("exemptionReason", v.getExemptionReason());
+                entry.put("exemptionExpiresAt", v.getExemptionExpiresAt() != null ? v.getExemptionExpiresAt().toString() : null);
                 return entry;
             }).toList();
             files.put("sod/violations.json", objectMapper.writeValueAsBytes(violationData));
@@ -228,14 +246,17 @@ public class EvidencePackageService {
 
     private void addApprovalHistory(Map<String, byte[]> files, UUID directoryId) {
         try {
+            // Pre-load account lookup for resolving UUIDs to usernames
+            Map<UUID, String> accountNames = new HashMap<>();
+
             List<PendingApproval> approvals = approvalRepo.findAllByDirectoryIdOrderByCreatedAtDesc(directoryId);
             List<Map<String, Object>> approvalData = approvals.stream().map(a -> {
                 Map<String, Object> entry = new LinkedHashMap<>();
                 entry.put("id", a.getId().toString());
                 entry.put("requestType", a.getRequestType() != null ? a.getRequestType().name() : null);
                 entry.put("status", a.getStatus() != null ? a.getStatus().name() : null);
-                entry.put("requestedBy", a.getRequestedBy() != null ? a.getRequestedBy().toString() : null);
-                entry.put("reviewedBy", a.getReviewedBy() != null ? a.getReviewedBy().toString() : null);
+                entry.put("requestedBy", resolveAccountName(a.getRequestedBy(), accountNames));
+                entry.put("reviewedBy", resolveAccountName(a.getReviewedBy(), accountNames));
                 entry.put("createdAt", a.getCreatedAt() != null ? a.getCreatedAt().toString() : null);
                 entry.put("reviewedAt", a.getReviewedAt() != null ? a.getReviewedAt().toString() : null);
                 entry.put("rejectReason", a.getRejectReason());
@@ -247,15 +268,40 @@ public class EvidencePackageService {
         }
     }
 
+    private String resolveAccountName(UUID accountId, Map<UUID, String> cache) {
+        if (accountId == null) return null;
+        return cache.computeIfAbsent(accountId, id ->
+                accountRepo.findById(id).map(Account::getUsername).orElse(id.toString()));
+    }
+
+    // ── Audit events ─────────────────────────────────────────────────────────
+
+    private void addAuditEvents(Map<String, byte[]> files, UUID directoryId) {
+        try {
+            // Export last 90 days of audit events for this directory
+            OffsetDateTime from = OffsetDateTime.now().minusDays(90);
+            Page<AuditEventResponse> events = auditQueryService.query(
+                    directoryId, null, null, from, null, 0, 10_000);
+
+            files.put("audit/events.json", objectMapper.writeValueAsBytes(events.getContent()));
+            log.info("Exported {} audit events for evidence package", events.getNumberOfElements());
+        } catch (Exception e) {
+            log.warn("Failed to export audit events: {}", e.getMessage());
+        }
+    }
+
     // ── User entitlements ─────────────────────────────────────────────────────
 
     private void addUserEntitlements(Map<String, byte[]> files, DirectoryConnection dc) {
         try {
-            List<LdapUser> users = ldapUserService.searchUsers(dc, "(objectClass=*)", null,
-                    Integer.MAX_VALUE, "cn", "uid", "sAMAccountName", "displayName", "mail", "memberOf");
+            List<LdapUser> users = ldapUserService.searchUsers(dc, USER_OBJECTCLASS_FILTER, null,
+                    MAX_ENTITLEMENT_ENTRIES, "cn", "uid", "sAMAccountName", "displayName", "mail", "memberOf");
+            if (users.size() >= MAX_ENTITLEMENT_ENTRIES) {
+                log.warn("User entitlements export hit the {} limit — results truncated", MAX_ENTITLEMENT_ENTRIES);
+            }
 
             List<LdapGroup> groups = ldapGroupService.searchGroups(dc, GROUP_OBJECTCLASS_FILTER,
-                    null, Integer.MAX_VALUE, "cn", "member", "uniqueMember", "memberUid");
+                    null, MAX_ENTITLEMENT_ENTRIES, "cn", "member", "uniqueMember", "memberUid");
 
             // Build DN -> group name lookup
             Map<String, List<String>> userToGroups = new HashMap<>();
@@ -288,6 +334,28 @@ public class EvidencePackageService {
             files.put("entitlements/user-entitlements.json", objectMapper.writeValueAsBytes(entitlements));
         } catch (Exception e) {
             log.warn("Failed to export user entitlements: {}", e.getMessage());
+        }
+    }
+
+    // ── Audit trail ──────────────────────────────────────────────────────────
+
+    private void recordGenerationAudit(UUID directoryId, String generatedBy,
+                                        List<UUID> campaignIds, boolean includeSod,
+                                        boolean includeEntitlements) {
+        try {
+            var systemPrincipal = new com.ldapadmin.auth.AuthPrincipal(
+                    com.ldapadmin.auth.PrincipalType.SUPERADMIN, new UUID(0, 0), generatedBy);
+
+            auditService.record(systemPrincipal, directoryId,
+                    AuditAction.BULK_ATTRIBUTE_UPDATE, // closest existing action for "export"
+                    null,
+                    Map.of("operation", "evidence_package_generated",
+                            "generatedBy", generatedBy,
+                            "campaignCount", String.valueOf(campaignIds.size()),
+                            "includeSod", String.valueOf(includeSod),
+                            "includeEntitlements", String.valueOf(includeEntitlements)));
+        } catch (Exception e) {
+            log.warn("Failed to record evidence package audit event: {}", e.getMessage());
         }
     }
 
@@ -375,8 +443,13 @@ public class EvidencePackageService {
         return sb.toString();
     }
 
+    /**
+     * Sanitize a name for use as a ZIP path component.
+     * Strips all characters except alphanumerics, underscores, and hyphens.
+     * Dots are replaced to prevent directory traversal.
+     */
     private static String sanitizeFilename(String name) {
         if (name == null) return "unnamed";
-        return name.replaceAll("[^a-zA-Z0-9._\\-]", "_").toLowerCase();
+        return name.replaceAll("[^a-zA-Z0-9_\\-]", "_").toLowerCase();
     }
 }

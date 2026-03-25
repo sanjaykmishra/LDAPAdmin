@@ -3,68 +3,44 @@ package com.ldapadmin.service;
 import com.ldapadmin.dto.profile.GroupChangePreview;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.ProvisioningProfile;
+import com.ldapadmin.entity.SodViolation;
 import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.entity.enums.OutputFormat;
 import com.ldapadmin.entity.enums.ReportType;
+import com.ldapadmin.entity.enums.SodViolationStatus;
 import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.ldap.model.LdapUser;
 import com.ldapadmin.repository.AuditEventRepository;
 import com.ldapadmin.repository.ProvisioningProfileRepository;
+import com.ldapadmin.repository.SodViolationRepository;
 import com.ldapadmin.util.CsvUtils;
-import com.lowagie.text.Document;
-import com.lowagie.text.DocumentException;
-import com.lowagie.text.Font;
-import com.lowagie.text.PageSize;
-import com.lowagie.text.Paragraph;
-import com.lowagie.text.Phrase;
-import com.lowagie.text.pdf.PdfPCell;
-import com.lowagie.text.pdf.PdfPTable;
-import com.lowagie.text.pdf.PdfWriter;
 import com.unboundid.ldap.sdk.Filter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.awt.Color;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 /**
- * Executes a report on-demand and returns the results as a CSV byte array (§9.1).
+ * Executes a report on-demand and returns the results as CSV or PDF bytes.
  *
- * <h3>Report types and their LDAP queries</h3>
+ * <h3>Report types and their queries</h3>
  * <ul>
- *   <li><b>USERS_IN_GROUP</b>     — {@code (memberOf=<groupDn>)},
- *       base = directory base DN; param {@code groupDn} required.</li>
+ *   <li><b>USERS_IN_GROUP</b>     — {@code (memberOf=<groupDn>)}; param {@code groupDn} required.</li>
  *   <li><b>USERS_IN_BRANCH</b>    — {@code (objectClass=inetOrgPerson)},
  *       base = {@code branchDn}; param {@code branchDn} required.</li>
- *   <li><b>USERS_WITH_NO_GROUP</b>— {@code (&(objectClass=inetOrgPerson)(!(memberOf=*)))},
- *       base = directory base DN; no params.</li>
- *   <li><b>RECENTLY_ADDED</b>     — {@code (createTimestamp>=<timestamp>)},
- *       base = directory base DN; param {@code lookbackDays} (default 30).</li>
- *   <li><b>RECENTLY_MODIFIED</b>  — {@code (modifyTimestamp>=<timestamp>)},
- *       base = directory base DN; param {@code lookbackDays} (default 30).</li>
- *   <li><b>RECENTLY_DELETED</b>   — queries the internal audit events table for
- *       {@link AuditAction#USER_DELETE} events within {@code lookbackDays};
- *       returns dn + actorUsername + occurredAt columns.</li>
- *   <li><b>DISABLED_ACCOUNTS</b>  — {@code (|(pwdAccountLockedTime=*)(loginDisabled=TRUE))},
- *       base = directory base DN; no params.</li>
- *   <li><b>MISSING_PROFILE_GROUPS</b> — for each provisioning profile in the directory,
- *       compares users' actual group memberships against the profile's effective group
- *       set (own + additional + auto-include). Returns userDn, profileName,
- *       missingGroupDn, memberAttribute columns; no params.</li>
+ *   <li><b>USERS_WITH_NO_GROUP</b>— {@code (&(objectClass=inetOrgPerson)(!(memberOf=*)))}.</li>
+ *   <li><b>RECENTLY_ADDED</b>     — {@code (createTimestamp>=<timestamp>)}; param {@code lookbackDays}.</li>
+ *   <li><b>RECENTLY_MODIFIED</b>  — {@code (modifyTimestamp>=<timestamp>)}; param {@code lookbackDays}.</li>
+ *   <li><b>RECENTLY_DELETED</b>   — audit events ({@code USER_DELETE} + changelog deletes).</li>
+ *   <li><b>DISABLED_ACCOUNTS</b>  — {@code (|(pwdAccountLockedTime=*)(loginDisabled=TRUE))}.</li>
+ *   <li><b>MISSING_PROFILE_GROUPS</b> — profile group gap analysis.</li>
+ *   <li><b>SOD_VIOLATIONS</b>     — current SoD violations from the database.</li>
  * </ul>
- *
- * <p>{@link OutputFormat#PDF} is not currently supported and will throw
- * {@link UnsupportedOperationException}.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -74,19 +50,18 @@ public class ReportExecutionService {
     private static final DateTimeFormatter LDAP_TIMESTAMP_FMT =
             DateTimeFormatter.ofPattern("yyyyMMddHHmmss'Z'");
 
+    /** Maximum LDAP entries returned per report to prevent OOM. */
+    private static final int MAX_LDAP_RESULTS = 10_000;
+
     private final LdapUserService                userService;
     private final AuditEventRepository           auditEventRepo;
     private final ProvisioningProfileRepository  profileRepo;
     private final ProvisioningProfileService     profileService;
+    private final SodViolationRepository         sodViolationRepo;
+    private final PdfReportService               pdfReportService;
 
     /**
-     * Runs the report and returns the result as UTF-8 CSV bytes.
-     *
-     * @param dc         target directory connection
-     * @param reportType the type of report to run
-     * @param params     report-specific parameters (may be null/empty)
-     * @param format     output format (only CSV is supported)
-     * @param directoryId  UUID of the directory (used for audit queries)
+     * Runs the report and returns the result as CSV or PDF bytes.
      */
     public byte[] run(DirectoryConnection dc,
                       ReportType reportType,
@@ -96,7 +71,6 @@ public class ReportExecutionService {
 
         Map<String, Object> safeParams = params != null ? params : Map.of();
 
-        // Gather CSV-style row data (shared by both CSV and PDF output)
         ReportData data = switch (reportType) {
             case USERS_IN_GROUP      -> runLdapReportData(dc, buildGroupFilter(safeParams), null);
             case USERS_IN_BRANCH     -> runLdapReportData(dc, "(objectClass=inetOrgPerson)",
@@ -111,10 +85,11 @@ public class ReportExecutionService {
             case DISABLED_ACCOUNTS   -> runLdapReportData(dc,
                                                        "(|(pwdAccountLockedTime=*)(loginDisabled=TRUE))", null);
             case MISSING_PROFILE_GROUPS -> runMissingProfileGroupsReportData(dc, directoryId);
+            case SOD_VIOLATIONS      -> runSodViolationsReportData(directoryId);
         };
 
         if (format == OutputFormat.PDF) {
-            return renderPdf(reportType.name(), data);
+            return pdfReportService.buildPdf(reportType.name().replace('_', ' '), "", data.columns, data.toRowLists());
         }
         return CsvUtils.write(data.columns, data.rows);
     }
@@ -122,21 +97,29 @@ public class ReportExecutionService {
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /** Intermediate report data container (columns + rows). */
-    record ReportData(List<String> columns, List<Map<String, String>> rows) {}
+    record ReportData(List<String> columns, List<Map<String, String>> rows) {
+        /** Convert to list-of-lists for PDF rendering. */
+        List<List<String>> toRowLists() {
+            return rows.stream()
+                    .map(row -> columns.stream().map(c -> row.getOrDefault(c, "")).toList())
+                    .toList();
+        }
+    }
 
-    /**
-     * Queries LDAP and returns structured report data.
-     */
-    private ReportData runLdapReportData(DirectoryConnection dc, String filter,
-                                         String baseDn) {
-        List<LdapUser> users = userService.searchUsers(dc, filter, baseDn);
+    private ReportData runLdapReportData(DirectoryConnection dc, String filter, String baseDn) {
+        List<LdapUser> users = userService.searchUsers(dc, filter, baseDn, MAX_LDAP_RESULTS, "*");
+        if (users.size() >= MAX_LDAP_RESULTS) {
+            log.warn("Report query hit the {} result limit — results may be truncated. "
+                    + "Filter: {}, baseDn: {}", MAX_LDAP_RESULTS, filter, baseDn);
+        }
+
+        // Deterministic column order: dn first, then remaining attributes sorted
+        TreeSet<String> attrNames = new TreeSet<>();
+        users.forEach(u -> attrNames.addAll(u.getAttributes().keySet()));
 
         List<String> columns = new ArrayList<>();
         columns.add("dn");
-        users.stream()
-                .flatMap(u -> u.getAttributes().keySet().stream())
-                .distinct()
-                .forEach(columns::add);
+        columns.addAll(attrNames);
 
         List<Map<String, String>> rows = users.stream()
                 .map(u -> buildRow(u, columns))
@@ -146,7 +129,6 @@ public class ReportExecutionService {
         return new ReportData(columns, rows);
     }
 
-    /** Builds a row from a single LDAP entry; multi-values are pipe-joined. */
     private Map<String, String> buildRow(LdapUser user, List<String> columns) {
         Map<String, String> row = new LinkedHashMap<>();
         for (String col : columns) {
@@ -160,38 +142,56 @@ public class ReportExecutionService {
     }
 
     /**
-     * Queries the internal audit events table for USER_DELETE actions.
+     * Queries audit events for both internal USER_DELETE and LDAP_CHANGE delete events.
      */
-    private ReportData runDeletedReportData(UUID directoryId,
-                                            Map<String, Object> params) {
+    private ReportData runDeletedReportData(UUID directoryId, Map<String, Object> params) {
         int lookbackDays = lookbackDays(params);
         OffsetDateTime from = OffsetDateTime.now().minusDays(lookbackDays);
 
-        var page = auditEventRepo.findAll(
+        // Internal deletes
+        var internalDeletes = auditEventRepo.findAll(
                 directoryId, null, AuditAction.USER_DELETE.getDbValue(),
                 null, from, null, Pageable.unpaged());
 
-        List<String> columns = List.of("dn", "deletedBy", "deletedAt");
-        List<Map<String, String>> rows = page.getContent().stream()
-                .map(e -> {
+        // Changelog deletes (LDAP_CHANGE events where detail contains delete indicators)
+        var changelogDeletes = auditEventRepo.findAll(
+                directoryId, null, AuditAction.LDAP_CHANGE.getDbValue(),
+                null, from, null, Pageable.unpaged());
+
+        List<String> columns = List.of("dn", "deletedBy", "deletedAt", "source");
+        List<Map<String, String>> rows = new ArrayList<>();
+
+        internalDeletes.getContent().forEach(e -> {
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("dn",        e.getTargetDn() != null ? e.getTargetDn() : "");
+            row.put("deletedBy", e.getActorUsername() != null ? e.getActorUsername() : "");
+            row.put("deletedAt", e.getOccurredAt() != null ? e.getOccurredAt().toString() : "");
+            row.put("source",    "INTERNAL");
+            rows.add(row);
+        });
+
+        changelogDeletes.getContent().stream()
+                .filter(e -> e.getDetail() != null && isDeleteChange(e.getDetail()))
+                .forEach(e -> {
                     Map<String, String> row = new LinkedHashMap<>();
                     row.put("dn",        e.getTargetDn() != null ? e.getTargetDn() : "");
-                    row.put("deletedBy", e.getActorUsername() != null ? e.getActorUsername() : "");
-                    row.put("deletedAt", e.getOccurredAt() != null
-                            ? e.getOccurredAt().toString() : "");
-                    return row;
-                })
-                .toList();
+                    row.put("deletedBy", "LDAP_CHANGELOG");
+                    row.put("deletedAt", e.getOccurredAt() != null ? e.getOccurredAt().toString() : "");
+                    row.put("source",    "LDAP_CHANGELOG");
+                    rows.add(row);
+                });
 
         return new ReportData(columns, rows);
     }
 
-    /**
-     * For each enabled profile in the directory, evaluates the group membership
-     * diff and collects missing groups into a flat report.
-     */
-    private ReportData runMissingProfileGroupsReportData(DirectoryConnection dc,
-                                                         UUID directoryId) {
+    private boolean isDeleteChange(Map<String, Object> detail) {
+        Object changeType = detail.get("changeType");
+        if (changeType != null && changeType.toString().equalsIgnoreCase("delete")) return true;
+        Object changes = detail.get("changes");
+        return changes != null && changes.toString().toLowerCase().contains("changetype: delete");
+    }
+
+    private ReportData runMissingProfileGroupsReportData(DirectoryConnection dc, UUID directoryId) {
         List<ProvisioningProfile> profiles =
                 profileRepo.findAllByDirectoryIdAndEnabledTrue(directoryId);
 
@@ -218,72 +218,35 @@ public class ReportExecutionService {
             }
         }
 
-        log.debug("Missing profile groups report → {} rows across {} profiles",
-                rows.size(), profiles.size());
         return new ReportData(columns, rows);
     }
 
-    /**
-     * Renders report data as a styled PDF document.
-     */
-    private byte[] renderPdf(String reportTitle, ReportData data) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        Document document = new Document(PageSize.A4.rotate(), 36, 36, 36, 36);
+    private ReportData runSodViolationsReportData(UUID directoryId) {
+        List<SodViolation> violations = sodViolationRepo.findByDirectoryId(directoryId);
 
-        Font titleFont  = new Font(Font.HELVETICA, 16, Font.BOLD, new Color(33, 37, 41));
-        Font headerFont = new Font(Font.HELVETICA, 9, Font.BOLD, Color.WHITE);
-        Font cellFont   = new Font(Font.HELVETICA, 8, Font.NORMAL, new Color(33, 37, 41));
-        Color headerBg  = new Color(52, 58, 64);
-        Color altRowBg  = new Color(248, 249, 250);
+        List<String> columns = List.of("userDn", "userDisplayName", "policyName",
+                "groupADn", "groupBDn", "status", "detectedAt", "exemptedBy", "exemptionReason");
+        List<Map<String, String>> rows = new ArrayList<>();
 
-        try {
-            PdfWriter.getInstance(document, baos);
-            document.open();
-
-            Paragraph title = new Paragraph(reportTitle.replace('_', ' '), titleFont);
-            title.setSpacingAfter(12);
-            document.add(title);
-
-            if (data.columns.isEmpty()) {
-                document.add(new Paragraph("No data available.", cellFont));
-            } else {
-                PdfPTable table = new PdfPTable(data.columns.size());
-                table.setWidthPercentage(100);
-
-                for (String col : data.columns) {
-                    PdfPCell cell = new PdfPCell(new Phrase(col, headerFont));
-                    cell.setBackgroundColor(headerBg);
-                    cell.setPadding(6);
-                    table.addCell(cell);
-                }
-
-                int rowIdx = 0;
-                for (Map<String, String> row : data.rows) {
-                    Color bg = (rowIdx % 2 == 1) ? altRowBg : Color.WHITE;
-                    for (String col : data.columns) {
-                        String value = row.getOrDefault(col, "");
-                        PdfPCell cell = new PdfPCell(new Phrase(value, cellFont));
-                        cell.setBackgroundColor(bg);
-                        cell.setPadding(5);
-                        table.addCell(cell);
-                    }
-                    rowIdx++;
-                }
-
-                document.add(table);
-            }
-
-            document.close();
-        } catch (DocumentException e) {
-            throw new IOException("Failed to generate PDF: " + e.getMessage(), e);
+        for (SodViolation v : violations) {
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("userDn", v.getUserDn() != null ? v.getUserDn() : "");
+            row.put("userDisplayName", v.getUserDisplayName() != null ? v.getUserDisplayName() : "");
+            row.put("policyName", v.getPolicy().getName());
+            row.put("groupADn", v.getPolicy().getGroupADn());
+            row.put("groupBDn", v.getPolicy().getGroupBDn());
+            row.put("status", v.getStatus().name());
+            row.put("detectedAt", v.getDetectedAt() != null ? v.getDetectedAt().toString() : "");
+            row.put("exemptedBy", v.getExemptedBy() != null ? v.getExemptedBy().getUsername() : "");
+            row.put("exemptionReason", v.getExemptionReason() != null ? v.getExemptionReason() : "");
+            rows.add(row);
         }
 
-        return baos.toByteArray();
+        return new ReportData(columns, rows);
     }
 
     private String buildGroupFilter(Map<String, Object> params) {
         String groupDn = requireString(params, "groupDn");
-        // Escape the DN so LDAP special characters (*, \, (, ), \0) can't corrupt the filter
         return "(memberOf=" + Filter.encodeValue(groupDn) + ")";
     }
 

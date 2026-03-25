@@ -67,6 +67,21 @@ public class PdfReportService {
     private final AdminProfileRoleRepository profileRoleRepo;
     private final AdminFeaturePermissionRepository featurePermRepo;
 
+    private static final int MAX_GROUPS = 500;
+
+    /**
+     * Validates a campaign belongs to a directory. Used by controllers for authorization.
+     */
+    @Transactional(readOnly = true)
+    public AccessReviewCampaign getCampaignForDirectory(UUID directoryId, UUID campaignId) {
+        AccessReviewCampaign campaign = campaignRepo.findById(campaignId)
+                .orElseThrow(() -> new IllegalArgumentException("Campaign not found: " + campaignId));
+        if (!campaign.getDirectory().getId().equals(directoryId)) {
+            throw new IllegalArgumentException("Campaign does not belong to directory: " + directoryId);
+        }
+        return campaign;
+    }
+
     // ── User Access Report ─────────────────────────────────────────────────
 
     /**
@@ -88,7 +103,10 @@ public class PdfReportService {
         } else {
             groups = ldapGroupService.searchGroups(dc,
                     "(|(objectClass=groupOfNames)(objectClass=groupOfUniqueNames)(objectClass=posixGroup))",
-                    null, 200, "cn", "member", "uniqueMember", "memberUid");
+                    null, MAX_GROUPS, "cn", "member", "uniqueMember", "memberUid");
+            if (groups.size() >= MAX_GROUPS) {
+                log.warn("User access report hit the {} group limit — results may be truncated", MAX_GROUPS);
+            }
         }
 
         // Build row data: one row per group+member pair

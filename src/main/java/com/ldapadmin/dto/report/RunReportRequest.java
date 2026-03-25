@@ -9,8 +9,8 @@ import java.util.Map;
 /**
  * Request body for on-demand report execution.
  *
- * <p>The response is a CSV file download ({@link OutputFormat#CSV} only;
- * {@link OutputFormat#PDF} is not yet supported).</p>
+ * <p>Supports both {@link OutputFormat#CSV} and {@link OutputFormat#PDF} output.
+ * If {@code outputFormat} is null, defaults to CSV.</p>
  */
 public record RunReportRequest(
         @NotNull ReportType reportType,

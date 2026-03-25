@@ -3,6 +3,7 @@ package com.ldapadmin.service;
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.dto.accessreview.*;
 import com.ldapadmin.entity.*;
+import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.exception.LdapAdminException;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.repository.AccessReviewCampaignRepository;
@@ -14,7 +15,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -26,6 +29,7 @@ public class CampaignTemplateService {
     private final DirectoryConnectionRepository directoryRepo;
     private final AccountRepository accountRepo;
     private final AccessReviewCampaignRepository campaignRepo;
+    private final AuditService auditService;
 
     @Transactional
     public CampaignTemplateResponse create(UUID directoryId, CreateCampaignTemplateRequest req, AuthPrincipal principal) {
@@ -54,6 +58,11 @@ public class CampaignTemplateService {
         template.setCreatedBy(creator);
 
         template = templateRepo.save(template);
+
+        auditService.record(principal, directoryId, AuditAction.CAMPAIGN_CREATED, null,
+                Map.of("operation", "template_created", "templateName", req.name(),
+                        "templateId", template.getId().toString()));
+
         log.info("Created campaign template '{}' (id={}) for directory {}", req.name(), template.getId(), directoryId);
         return toResponse(template);
     }
@@ -79,6 +88,11 @@ public class CampaignTemplateService {
         template.setConfig(config);
 
         template = templateRepo.save(template);
+
+        auditService.record(principal, directoryId, AuditAction.CAMPAIGN_CREATED, null,
+                Map.of("operation", "template_updated", "templateName", req.name(),
+                        "templateId", templateId.toString()));
+
         log.info("Updated campaign template '{}' (id={})", req.name(), templateId);
         return toResponse(template);
     }
@@ -96,13 +110,19 @@ public class CampaignTemplateService {
     }
 
     @Transactional
-    public void delete(UUID directoryId, UUID templateId) {
+    public void delete(UUID directoryId, UUID templateId, AuthPrincipal principal) {
         CampaignTemplate template = getTemplateOrThrow(templateId, directoryId);
+        String name = template.getName();
         templateRepo.delete(template);
-        log.info("Deleted campaign template '{}' (id={})", template.getName(), templateId);
+
+        auditService.record(principal, directoryId, AuditAction.CAMPAIGN_CREATED, null,
+                Map.of("operation", "template_deleted", "templateName", name,
+                        "templateId", templateId.toString()));
+
+        log.info("Deleted campaign template '{}' (id={})", name, templateId);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public CampaignTemplateResponse createFromCampaign(UUID directoryId, UUID campaignId, AuthPrincipal principal) {
         AccessReviewCampaign campaign = campaignRepo.findById(campaignId)
                 .orElseThrow(() -> new ResourceNotFoundException("AccessReviewCampaign", campaignId));
@@ -121,11 +141,35 @@ public class CampaignTemplateService {
         var req = new CreateCampaignTemplateRequest(
                 campaign.getName() + " (Template)",
                 campaign.getDescription(),
-                campaign.getDeadlineDays(),
+                campaign.getDeadlineDays() != null ? campaign.getDeadlineDays() : 30,
                 campaign.getRecurrenceMonths(),
                 campaign.isAutoRevoke(),
                 campaign.isAutoRevokeOnExpiry(),
                 groups.stream()
+                        .map(g -> new CreateCampaignTemplateRequest.GroupConfig(
+                                g.getGroupDn(), g.getMemberAttribute(), g.getReviewerAccountId()))
+                        .toList()
+        );
+
+        return create(directoryId, req, principal);
+    }
+
+    /**
+     * Duplicates an existing template with a new name.
+     */
+    @Transactional
+    public CampaignTemplateResponse duplicate(UUID directoryId, UUID templateId, AuthPrincipal principal) {
+        CampaignTemplate source = getTemplateOrThrow(templateId, directoryId);
+        CampaignTemplateConfig cfg = source.getConfig();
+
+        var req = new CreateCampaignTemplateRequest(
+                source.getName() + " (Copy)",
+                source.getDescription(),
+                cfg.getDeadlineDays(),
+                cfg.getRecurrenceMonths(),
+                cfg.isAutoRevoke(),
+                cfg.isAutoRevokeOnExpiry(),
+                cfg.getGroups().stream()
                         .map(g -> new CreateCampaignTemplateRequest.GroupConfig(
                                 g.getGroupDn(), g.getMemberAttribute(), g.getReviewerAccountId()))
                         .toList()
@@ -141,6 +185,14 @@ public class CampaignTemplateService {
 
         String name = nameOverride != null && !nameOverride.isBlank() ? nameOverride : template.getName();
         String description = descriptionOverride != null ? descriptionOverride : template.getDescription();
+
+        // Validate that all referenced reviewers still exist
+        for (CampaignTemplateConfig.GroupConfig g : config.getGroups()) {
+            if (!accountRepo.existsById(g.getReviewerAccountId())) {
+                throw new LdapAdminException("Reviewer account " + g.getReviewerAccountId()
+                        + " referenced in template no longer exists. Please update the template.");
+            }
+        }
 
         List<CreateCampaignRequest.GroupAssignment> groups = config.getGroups().stream()
                 .map(g -> new CreateCampaignRequest.GroupAssignment(
@@ -162,7 +214,7 @@ public class CampaignTemplateService {
     // ── Private helpers ─────────────────────────────────────────────────────
 
     private void validateConfig(Integer deadlineDays, Integer recurrenceMonths) {
-        if (deadlineDays < 1) {
+        if (deadlineDays == null || deadlineDays < 1) {
             throw new LdapAdminException("Deadline must be at least 1 day");
         }
         if (recurrenceMonths != null && recurrenceMonths < 1) {
@@ -182,9 +234,17 @@ public class CampaignTemplateService {
     private CampaignTemplateResponse toResponse(CampaignTemplate t) {
         CampaignTemplateConfig c = t.getConfig();
 
+        // Resolve reviewer usernames with in-memory cache for this response
+        Map<UUID, String> reviewerNames = new HashMap<>();
+        for (CampaignTemplateConfig.GroupConfig g : c.getGroups()) {
+            reviewerNames.computeIfAbsent(g.getReviewerAccountId(),
+                    id -> accountRepo.findById(id).map(Account::getUsername).orElse(null));
+        }
+
         var groupDtos = c.getGroups().stream()
                 .map(g -> new CampaignTemplateResponse.GroupConfigDto(
-                        g.getGroupDn(), g.getMemberAttribute(), g.getReviewerAccountId()))
+                        g.getGroupDn(), g.getMemberAttribute(), g.getReviewerAccountId(),
+                        reviewerNames.get(g.getReviewerAccountId())))
                 .toList();
 
         var configDto = new CampaignTemplateResponse.CampaignTemplateConfigDto(

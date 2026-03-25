@@ -68,9 +68,21 @@ public class CampaignTemplateController {
     @PreAuthorize("hasRole('SUPERADMIN')")
     public ResponseEntity<Void> delete(
             @DirectoryId @PathVariable UUID directoryId,
-            @PathVariable UUID templateId) {
-        templateService.delete(directoryId, templateId);
+            @PathVariable UUID templateId,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        templateService.delete(directoryId, templateId, principal);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{templateId}/duplicate")
+    @RequiresFeature(FeatureKey.ACCESS_REVIEW_MANAGE)
+    @PreAuthorize("hasRole('SUPERADMIN')")
+    public ResponseEntity<CampaignTemplateResponse> duplicate(
+            @DirectoryId @PathVariable UUID directoryId,
+            @PathVariable UUID templateId,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        var response = templateService.duplicate(directoryId, templateId, principal);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PostMapping("/{templateId}/create-campaign")
