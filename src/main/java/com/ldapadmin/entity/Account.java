@@ -61,6 +61,9 @@ public class Account {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(name = "theme_preference", length = 10)
+    private String themePreference = "system";
+
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 

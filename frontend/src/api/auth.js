@@ -17,3 +17,9 @@ export const oidcAuthorize = () =>
 
 export const oidcCallback = (code, state) =>
   client.post('/auth/oidc/callback', { code, state })
+
+export const updatePreferences = (prefs) =>
+  client.post('/auth/me/preferences', prefs)
+
+export const changePassword = (currentPassword, newPassword) =>
+  client.post('/auth/me/change-password', { currentPassword, newPassword })

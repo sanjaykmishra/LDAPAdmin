@@ -16,6 +16,7 @@ import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.ldap.LdapConnectionFactory;
 import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.ldap.model.LdapUser;
+import com.ldapadmin.repository.AccountRepository;
 import com.ldapadmin.repository.AdminProfileRoleRepository;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.repository.ProvisioningProfileRepository;
@@ -23,12 +24,15 @@ import com.unboundid.ldap.sdk.BindResult;
 import com.unboundid.ldap.sdk.LDAPConnection;
 import com.unboundid.ldap.sdk.ResultCode;
 import com.unboundid.ldap.sdk.SimpleBindRequest;
+import com.ldapadmin.entity.Account;
+import com.ldapadmin.entity.enums.AccountType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -76,6 +80,8 @@ public class AuthController {
     private final DirectoryConnectionRepository dirRepo;
     private final LdapConnectionFactory         ldapConnectionFactory;
     private final LdapUserService               ldapUserService;
+    private final AccountRepository                              accountRepo;
+    private final PasswordEncoder                                passwordEncoder;
     private final com.ldapadmin.service.ApplicationSettingsService applicationSettingsService;
 
     /**
@@ -122,14 +128,14 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<Map<String, String>> me(
+    public ResponseEntity<Map<String, Object>> me(
             @AuthenticationPrincipal AuthPrincipal principal) {
 
         if (principal == null) {
             throw new BadCredentialsException("Not authenticated");
         }
 
-        Map<String, String> body = new LinkedHashMap<>();
+        Map<String, Object> body = new LinkedHashMap<>();
         body.put("username",    principal.username());
         body.put("accountType", principal.type().name());
         body.put("id",          principal.id().toString());
@@ -139,7 +145,83 @@ public class AuthController {
         if (principal.directoryId() != null) {
             body.put("directoryId", principal.directoryId().toString());
         }
+        // Include user preferences and account info
+        accountRepo.findById(principal.id()).ifPresent(acct -> {
+            body.put("themePreference", acct.getThemePreference() != null ? acct.getThemePreference() : "system");
+            body.put("authType", acct.getAuthType().name());
+            body.put("email", acct.getEmail());
+            body.put("displayName", acct.getDisplayName());
+        });
         return ResponseEntity.ok(body);
+    }
+
+    // ── User preferences ────────────────────────────────────────────────────
+
+    public record UpdatePreferencesRequest(String themePreference, String displayName, String email) {}
+
+    @PostMapping("/me/preferences")
+    @Transactional
+    public ResponseEntity<Map<String, String>> updatePreferences(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @RequestBody UpdatePreferencesRequest req) {
+        if (principal == null) throw new BadCredentialsException("Not authenticated");
+
+        Account acct = accountRepo.findById(principal.id())
+                .orElseThrow(() -> new ResourceNotFoundException("Account", principal.id()));
+
+        if (req.themePreference() != null) {
+            if (!List.of("light", "dark", "system").contains(req.themePreference())) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid theme. Must be light, dark, or system."));
+            }
+            acct.setThemePreference(req.themePreference());
+        }
+        if (req.displayName() != null) acct.setDisplayName(req.displayName());
+        if (req.email() != null) acct.setEmail(req.email());
+        accountRepo.save(acct);
+        return ResponseEntity.ok(Map.of("status", "ok"));
+    }
+
+    // ── Password change (for logged-in admin/superadmin accounts) ────────
+
+    public record ChangePasswordRequest(
+            @NotBlank String currentPassword,
+            @NotBlank String newPassword) {}
+
+    @PostMapping("/me/change-password")
+    @Transactional
+    public ResponseEntity<Map<String, String>> changePassword(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @Valid @RequestBody ChangePasswordRequest req) {
+        if (principal == null) throw new BadCredentialsException("Not authenticated");
+
+        Account acct = accountRepo.findById(principal.id())
+                .orElseThrow(() -> new ResourceNotFoundException("Account", principal.id()));
+
+        if (acct.getAuthType() == AccountType.LOCAL) {
+            // Verify current password
+            if (acct.getPasswordHash() == null || !passwordEncoder.matches(req.currentPassword(), acct.getPasswordHash())) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Current password is incorrect."));
+            }
+            if (req.newPassword().length() < 8) {
+                return ResponseEntity.badRequest().body(Map.of("error", "New password must be at least 8 characters."));
+            }
+            acct.setPasswordHash(passwordEncoder.encode(req.newPassword()));
+            accountRepo.save(acct);
+            return ResponseEntity.ok(Map.of("status", "ok"));
+        } else if (acct.getAuthType() == AccountType.LDAP && acct.getLdapDn() != null) {
+            // LDAP password change: verify current via bind, then reset via service account
+            for (DirectoryConnection dc : dirRepo.findAll()) {
+                try (LDAPConnection conn = ldapConnectionFactory.openUnboundConnection(dc)) {
+                    BindResult result = conn.bind(new SimpleBindRequest(acct.getLdapDn(), req.currentPassword()));
+                    if (result.getResultCode() != ResultCode.SUCCESS) continue;
+                    // Current password verified — now reset via service account
+                    ldapUserService.resetPassword(dc, acct.getLdapDn(), req.newPassword());
+                    return ResponseEntity.ok(Map.of("status", "ok"));
+                } catch (Exception ignored) {}
+            }
+            return ResponseEntity.badRequest().body(Map.of("error", "Current password is incorrect or LDAP password change failed."));
+        }
+        return ResponseEntity.badRequest().body(Map.of("error", "Password change not supported for " + acct.getAuthType() + " accounts."));
     }
 
     // ── Self-service login ─────────────────────────────────────────────────

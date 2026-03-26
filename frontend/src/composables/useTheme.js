@@ -1,8 +1,8 @@
-import { ref, watch, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 
 const STORAGE_KEY = 'ldapadmin-theme'
 
-const theme = ref(localStorage.getItem(STORAGE_KEY) || 'light')
+const theme = ref(localStorage.getItem(STORAGE_KEY) || 'system')
 
 function applyTheme(value) {
   const root = document.documentElement
@@ -16,12 +16,23 @@ function applyTheme(value) {
 
 /**
  * Composable for managing the app theme (light / dark / system).
+ * Persists in both localStorage (for immediate load) and the user's
+ * account preferences (via the auth store / API).
  */
 export function useTheme() {
   function setTheme(value) {
     theme.value = value
     localStorage.setItem(STORAGE_KEY, value)
     applyTheme(value)
+  }
+
+  /** Sync from server-side preference (called after login / init). */
+  function syncFromAccount(serverTheme) {
+    if (serverTheme && ['light', 'dark', 'system'].includes(serverTheme)) {
+      theme.value = serverTheme
+      localStorage.setItem(STORAGE_KEY, serverTheme)
+      applyTheme(serverTheme)
+    }
   }
 
   onMounted(() => {
@@ -33,7 +44,7 @@ export function useTheme() {
     })
   })
 
-  return { theme, setTheme }
+  return { theme, setTheme, syncFromAccount }
 }
 
 // Apply theme immediately on module load so there's no flash
