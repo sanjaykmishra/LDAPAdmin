@@ -94,10 +94,36 @@ public class ReportExecutionService {
         return CsvUtils.write(data.columns, data.rows);
     }
 
+    /**
+     * Runs the report and returns the structured data (columns + rows) for inline display.
+     */
+    public ReportData runAsData(DirectoryConnection dc,
+                                ReportType reportType,
+                                Map<String, Object> params,
+                                UUID directoryId) {
+        Map<String, Object> safeParams = params != null ? params : Map.of();
+        return switch (reportType) {
+            case USERS_IN_GROUP      -> runLdapReportData(dc, buildGroupFilter(safeParams), null);
+            case USERS_IN_BRANCH     -> runLdapReportData(dc, "(objectClass=inetOrgPerson)",
+                                                       requireString(safeParams, "branchDn"));
+            case USERS_WITH_NO_GROUP -> runLdapReportData(dc,
+                                                       "(&(objectClass=inetOrgPerson)(!(memberOf=*)))", null);
+            case RECENTLY_ADDED      -> runLdapReportData(dc,
+                                                       "(createTimestamp>=" + lookbackTimestamp(safeParams) + ")", null);
+            case RECENTLY_MODIFIED   -> runLdapReportData(dc,
+                                                       "(modifyTimestamp>=" + lookbackTimestamp(safeParams) + ")", null);
+            case RECENTLY_DELETED    -> runDeletedReportData(directoryId, safeParams);
+            case DISABLED_ACCOUNTS   -> runLdapReportData(dc,
+                                                       "(|(pwdAccountLockedTime=*)(loginDisabled=TRUE))", null);
+            case MISSING_PROFILE_GROUPS -> runMissingProfileGroupsReportData(dc, directoryId);
+            case SOD_VIOLATIONS      -> runSodViolationsReportData(directoryId);
+        };
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /** Intermediate report data container (columns + rows). */
-    record ReportData(List<String> columns, List<Map<String, String>> rows) {
+    public record ReportData(List<String> columns, List<Map<String, String>> rows) {
         /** Convert to list-of-lists for PDF rendering. */
         List<List<String>> toRowLists() {
             return rows.stream()
