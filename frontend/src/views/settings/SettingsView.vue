@@ -99,7 +99,7 @@
             <FormField label="Service Account Bind DN" v-model="form.ldapAuthBindDn"
               placeholder="cn=admin,dc=example,dc=com" />
             <div>
-              <FormField label="Bind Password" v-model="form.ldapAuthBindPassword" type="password"
+              <FormField label="Bind Password" v-model="form.ldapAuthBindPassword" type="password" autocomplete="new-password"
                 :placeholder="settings?.ldapAuthBindPasswordConfigured ? '●●●●●●●● (leave blank to keep)' : 'Set password'" />
               <p class="text-xs text-gray-400 mt-1">Leave blank to keep existing. Enter a space to clear.</p>
             </div>
@@ -122,7 +122,7 @@
             </div>
             <FormField label="Client ID" v-model="form.oidcClientId" placeholder="your-client-id" />
             <div>
-              <FormField label="Client Secret" v-model="form.oidcClientSecret" type="password"
+              <FormField label="Client Secret" v-model="form.oidcClientSecret" type="password" autocomplete="new-password"
                 :placeholder="settings?.oidcClientSecretConfigured ? '●●●●●●●● (leave blank to keep)' : 'Set secret'" />
               <p class="text-xs text-gray-400 mt-1">Leave blank to keep existing. Enter a space to clear.</p>
             </div>
@@ -140,12 +140,13 @@
           <FormField label="SMTP Host" v-model="form.smtpHost" placeholder="smtp.example.com" />
           <FormField label="SMTP Port" v-model.number="form.smtpPort" type="number" placeholder="587" />
           <FormField label="Sender Address" v-model="form.smtpSenderAddress" placeholder="noreply@example.com" />
-          <FormField label="Username" v-model="form.smtpUsername" placeholder="username" />
+          <FormField label="Username" v-model="form.smtpUsername" placeholder="username" autocomplete="off" />
           <div class="col-span-2">
             <FormField
               label="Password"
               v-model="form.smtpPassword"
               type="password"
+              autocomplete="new-password"
               :placeholder="settings?.smtpPasswordConfigured ? '●●●●●●●● (leave blank to keep)' : 'Set password'"
             />
             <p class="text-xs text-gray-400 mt-1">
@@ -171,6 +172,7 @@
               label="Secret Key"
               v-model="form.s3SecretKey"
               type="password"
+              autocomplete="new-password"
               :placeholder="settings?.s3SecretKeyConfigured ? '●●●●●●●● (leave blank to keep)' : 'Set secret key'"
             />
             <p class="text-xs text-gray-400 mt-1">Leave blank to keep existing. Enter a space to clear.</p>
@@ -233,7 +235,7 @@
               <FormField label="Webhook URL" v-model="form.webhookUrl" placeholder="https://hooks.example.com/audit" />
             </div>
             <div class="col-span-2">
-              <FormField label="Authorization Header" v-model="form.webhookAuthHeader" type="password"
+              <FormField label="Authorization Header" v-model="form.webhookAuthHeader" type="password" autocomplete="new-password"
                 :placeholder="settings?.webhookAuthHeaderConfigured ? '●●●●●●●● (leave blank to keep)' : 'e.g. Bearer your-token'" />
               <p class="text-xs text-gray-400 mt-1">Sent as the Authorization header on each webhook request.</p>
             </div>
