@@ -9,12 +9,117 @@
 #   6. Disabled accounts still in sensitive groups
 #
 # Base DN: dc=acmecorp,dc=com
-# Load AFTER acmecorp-5000-users.ldif
+#
+# IMPORTANT: If re-importing, run the cleanup first:
+#   ldapmodify -x -D "cn=admin,dc=acmecorp,dc=com" -w <pw> -f acmecorp-test-cleanup.ldif
+#   ldapdelete -x -D "cn=admin,dc=acmecorp,dc=com" -w <pw> -f acmecorp-test-cleanup-delete.txt
+# Then load:
+#   ldapmodify -x -D "cn=admin,dc=acmecorp,dc=com" -w <pw> -a -f acmecorp-test-scenarios.ldif
 # =============================================================================
 
 
 # #############################################################################
-# SECTION 1: New groups for SoD conflict pairs
+# SECTION 1: Disabled / terminated accounts (must be created before groups)
+# #############################################################################
+
+dn: uid=disabled.jane,ou=Finance,ou=People,dc=acmecorp,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: posixAccount
+uid: disabled.jane
+cn: Jane Crawford
+givenName: Jane
+sn: Crawford
+displayName: Jane Crawford
+mail: jane.crawford@acmecorp.com
+title: Former Finance Director
+ou: Finance
+employeeNumber: EMP006021
+employeeType: Terminated
+uidNumber: 16021
+gidNumber: 1000
+homeDirectory: /home/disabled.jane
+loginShell: /sbin/nologin
+userPassword: {SSHA}placeholder
+description: TERMINATED 2025-11-15 — account disabled but still in groups
+
+dn: uid=disabled.marcus,ou=Engineering,ou=People,dc=acmecorp,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: posixAccount
+uid: disabled.marcus
+cn: Marcus Webb
+givenName: Marcus
+sn: Webb
+displayName: Marcus Webb
+mail: marcus.webb@acmecorp.com
+title: Former Lead Architect
+ou: Engineering
+employeeNumber: EMP006022
+employeeType: Terminated
+uidNumber: 16022
+gidNumber: 1000
+homeDirectory: /home/disabled.marcus
+loginShell: /sbin/nologin
+userPassword: {SSHA}placeholder
+description: TERMINATED 2025-09-01 — account disabled but still in groups
+
+dn: uid=disabled.priya,ou=HumanResources,ou=People,dc=acmecorp,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: posixAccount
+uid: disabled.priya
+cn: Priya Sharma
+givenName: Priya
+sn: Sharma
+displayName: Priya Sharma
+mail: priya.sharma@acmecorp.com
+title: Former HR Manager
+ou: HumanResources
+employeeNumber: EMP006023
+employeeType: Terminated
+uidNumber: 16023
+gidNumber: 1000
+homeDirectory: /home/disabled.priya
+loginShell: /sbin/nologin
+userPassword: {SSHA}placeholder
+description: TERMINATED 2025-12-31 — account disabled but still in groups
+
+dn: uid=disabled.tom,ou=IT,ou=People,dc=acmecorp,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: posixAccount
+uid: disabled.tom
+cn: Tom Nguyen
+givenName: Tom
+sn: Nguyen
+displayName: Tom Nguyen
+mail: tom.nguyen@acmecorp.com
+title: Former IT Security Admin
+ou: IT
+employeeNumber: EMP006024
+employeeType: Terminated
+uidNumber: 16024
+gidNumber: 1000
+homeDirectory: /home/disabled.tom
+loginShell: /sbin/nologin
+userPassword: {SSHA}placeholder
+description: TERMINATED 2026-01-15 — account disabled but still in groups
+
+
+# #############################################################################
+# SECTION 2: New groups for SoD conflict pairs
+#
+# Disabled accounts are included directly in these groups at creation
+# time so no separate modify is needed.
 # #############################################################################
 
 # Payroll-Admin: can approve and process payroll
@@ -31,6 +136,7 @@ member: uid=judy.williams,ou=Finance,ou=People,dc=acmecorp,dc=com
 member: uid=jose.graham,ou=Finance,ou=People,dc=acmecorp,dc=com
 member: uid=carlos.martin,ou=Finance,ou=People,dc=acmecorp,dc=com
 member: uid=ravi.cook,ou=Finance,ou=People,dc=acmecorp,dc=com
+member: uid=disabled.jane,ou=Finance,ou=People,dc=acmecorp,dc=com
 
 # Payroll-Approver: can approve payroll runs (SoD conflict with Payroll-Admin)
 dn: cn=Payroll-Approver,ou=Access,ou=Groups,dc=acmecorp,dc=com
@@ -74,6 +180,7 @@ member: uid=jason.ross2,ou=Finance,ou=People,dc=acmecorp,dc=com
 member: uid=jose.graham,ou=Finance,ou=People,dc=acmecorp,dc=com
 
 # Code-Deploy-Prod: can deploy to production
+# Includes disabled.marcus (terminated) and deborah.rogers (IT — anomalous)
 dn: cn=Code-Deploy-Prod,ou=Access,ou=Groups,dc=acmecorp,dc=com
 objectClass: top
 objectClass: groupOfNames
@@ -84,9 +191,10 @@ member: uid=susan.schmidt,ou=Engineering,ou=People,dc=acmecorp,dc=com
 member: uid=brandon.parker,ou=Engineering,ou=People,dc=acmecorp,dc=com
 member: uid=philip.singh,ou=Engineering,ou=People,dc=acmecorp,dc=com
 member: uid=kevin.allen2,ou=Engineering,ou=People,dc=acmecorp,dc=com
-# SoD VIOLATORS — engineers who can BOTH deploy AND approve their own code
 member: uid=brian.moreau,ou=Engineering,ou=People,dc=acmecorp,dc=com
 member: uid=maria.dubois,ou=Engineering,ou=People,dc=acmecorp,dc=com
+member: uid=deborah.rogers,ou=IT,ou=People,dc=acmecorp,dc=com
+member: uid=disabled.marcus,ou=Engineering,ou=People,dc=acmecorp,dc=com
 
 # Code-Review-Approver: can approve code merges (SoD conflict with Code-Deploy-Prod)
 dn: cn=Code-Review-Approver,ou=Access,ou=Groups,dc=acmecorp,dc=com
@@ -99,11 +207,12 @@ member: uid=michelle.turner,ou=Engineering,ou=People,dc=acmecorp,dc=com
 member: uid=patrick.kim,ou=Engineering,ou=People,dc=acmecorp,dc=com
 member: uid=danielle.ruiz,ou=Engineering,ou=People,dc=acmecorp,dc=com
 member: uid=jeremy.young,ou=Engineering,ou=People,dc=acmecorp,dc=com
-# SoD VIOLATORS — same 2 engineers as above
+# SoD VIOLATORS — same 2 engineers as Code-Deploy-Prod
 member: uid=brian.moreau,ou=Engineering,ou=People,dc=acmecorp,dc=com
 member: uid=maria.dubois,ou=Engineering,ou=People,dc=acmecorp,dc=com
 
-# HR-DataAdmin: can edit employee PII (SoD conflict with DataAccess-PII read)
+# HR-DataAdmin: can edit employee PII (SoD conflict with DataAccess-PII)
+# Includes disabled.priya (terminated)
 dn: cn=HR-DataAdmin,ou=Access,ou=Groups,dc=acmecorp,dc=com
 objectClass: top
 objectClass: groupOfNames
@@ -114,122 +223,48 @@ member: uid=alexis.meyer,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 member: uid=grace.garcia,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 member: uid=lisa.kumar,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 member: uid=camille.kim,ou=HumanResources,ou=People,dc=acmecorp,dc=com
+member: uid=disabled.priya,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 
 
 # #############################################################################
-# SECTION 2: Access drift — anomalous group memberships
-#
-# These MODIFY existing groups to add users who don't belong based on
-# their department peer group. A Sales person in AWS-Developers, a
-# Marketing person in DataAccess-Financial, etc.
+# SECTION 3: Integrity check — broken references and empty groups
 # #############################################################################
 
-# Sales person with AWS-Developers access (anomalous — only ~1% of Sales has this)
-dn: cn=AWS-Developers,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=nancy.watanabe,ou=Sales,ou=People,dc=acmecorp,dc=com
-
-# Marketing person with DataAccess-Financial access (anomalous)
-dn: cn=DataAccess-Financial,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=pierre.gupta,ou=Marketing,ou=People,dc=acmecorp,dc=com
--
-add: member
-member: uid=alyssa.davis,ou=Marketing,ou=People,dc=acmecorp,dc=com
-
-# Sales person with DataAccess-PII access (anomalous)
-dn: cn=DataAccess-PII,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=james.richardson,ou=Sales,ou=People,dc=acmecorp,dc=com
-
-# Customer Support person with Code-Deploy-Prod (very anomalous)
-dn: cn=Code-Deploy-Prod,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=deborah.rogers,ou=IT,ou=People,dc=acmecorp,dc=com
-
-# Finance person in GitHub-Users (anomalous for Finance department)
-dn: cn=GitHub-Users,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=howard.blanc,ou=Finance,ou=People,dc=acmecorp,dc=com
--
-add: member
-member: uid=bobby.harris2,ou=Finance,ou=People,dc=acmecorp,dc=com
-
-# Legal person in BuildSystem-Users (anomalous)
-dn: cn=BuildSystem-Users,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=ann.roux,ou=Legal,ou=People,dc=acmecorp,dc=com
-
-# HR person in AWS-Developers (anomalous)
-dn: cn=AWS-Developers,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=zachary.weber,ou=HumanResources,ou=People,dc=acmecorp,dc=com
-
-
-# #############################################################################
-# SECTION 3: Integrity check — broken references, orphans, empty groups
-# #############################################################################
-
-# --- 3a. Groups with broken member references (non-existent DNs) ---
-
-# Reference to a user who was deleted but never removed from the group
-dn: cn=OnCall-Rotation,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=deleted.user1,ou=Engineering,ou=People,dc=acmecorp,dc=com
--
-add: member
-member: uid=terminated.employee,ou=Sales,ou=People,dc=acmecorp,dc=com
--
-add: member
-member: uid=former.contractor,ou=IT,ou=People,dc=acmecorp,dc=com
-
-# SecurityChampions with stale references
-dn: cn=SecurityChampions,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=old.securitylead,ou=Engineering,ou=People,dc=acmecorp,dc=com
--
-add: member
-member: uid=past.ciso,ou=IT,ou=People,dc=acmecorp,dc=com
-
-# AWS-ReadOnly with a broken reference (typo in DN)
-dn: cn=AWS-ReadOnly,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=susan.schimdt,ou=Engineering,ou=People,dc=acmecorp,dc=com
-
-# --- 3b. Empty groups (no members) ---
+# --- 3a. Empty groups (self-referencing placeholder — groupOfNames requires
+#     at least one member, so the group's own DN is used) ---
 
 dn: cn=Decommissioned-ProjectX,ou=Projects,ou=Groups,dc=acmecorp,dc=com
 objectClass: top
 objectClass: groupOfNames
 cn: Decommissioned-ProjectX
 description: Former Project X team — all members removed after project ended
-member:
+member: cn=Decommissioned-ProjectX,ou=Projects,ou=Groups,dc=acmecorp,dc=com
 
 dn: cn=Temp-Audit-2025,ou=Access,ou=Groups,dc=acmecorp,dc=com
 objectClass: top
 objectClass: groupOfNames
 cn: Temp-Audit-2025
 description: Temporary group for 2025 audit — never populated
-member:
+member: cn=Temp-Audit-2025,ou=Access,ou=Groups,dc=acmecorp,dc=com
 
 dn: cn=Migration-Staging,ou=Access,ou=Groups,dc=acmecorp,dc=com
 objectClass: top
 objectClass: groupOfNames
 cn: Migration-Staging
 description: Staging group for planned migration — empty
-member:
+member: cn=Migration-Staging,ou=Access,ou=Groups,dc=acmecorp,dc=com
 
-# --- 3c. Orphaned entry (parent OU does not exist) ---
+# --- 3b. Orphaned entries — create temporary parent OUs, add entries,
+#     then delete the parent OUs. This leaves the children orphaned.
+#     NOTE: Not all LDAP servers allow deleting non-leaf entries.
+#     If deletion fails, the OUs stay (entries are not orphaned) and the
+#     orphaned-entry test must be skipped. ---
+
+dn: ou=Contractors,ou=People,dc=acmecorp,dc=com
+objectClass: top
+objectClass: organizationalUnit
+ou: Contractors
+description: Temporary OU — will be deleted to create orphaned entry
 
 dn: uid=ghost.admin,ou=Contractors,ou=People,dc=acmecorp,dc=com
 objectClass: top
@@ -243,7 +278,13 @@ givenName: Ghost
 displayName: Ghost Admin
 mail: ghost.admin@acmecorp.com
 title: External Consultant
-description: Orphaned — ou=Contractors does not exist
+description: Orphaned after ou=Contractors is deleted
+
+dn: ou=Vendors,ou=People,dc=acmecorp,dc=com
+objectClass: top
+objectClass: organizationalUnit
+ou: Vendors
+description: Temporary OU — will be deleted to create orphaned entry
 
 dn: uid=vendor.integrator,ou=Vendors,ou=People,dc=acmecorp,dc=com
 objectClass: top
@@ -257,7 +298,7 @@ givenName: Vendor
 displayName: Vendor Integrator
 mail: integrator@vendor.com
 title: Integration Specialist
-description: Orphaned — ou=Vendors does not exist
+description: Orphaned after ou=Vendors is deleted
 
 
 # #############################################################################
@@ -382,10 +423,6 @@ description: New hire — not yet added to any groups
 
 # #############################################################################
 # SECTION 5: Users missing from their department group
-#
-# These users exist in department OUs but are NOT in the corresponding
-# dept-* group. They're added to AllEmployees so they show up in the
-# directory but are missing their department membership.
 # #############################################################################
 
 dn: uid=missing.dept.kyle,ou=Engineering,ou=People,dc=acmecorp,dc=com
@@ -457,164 +494,81 @@ loginShell: /bin/bash
 userPassword: {SSHA}placeholder
 description: In Sales OU but NOT in dept-sales group
 
-# Add missing-dept users to AllEmployees (but NOT their department group)
-dn: cn=AllEmployees,ou=Access,ou=Groups,dc=acmecorp,dc=com
+
+# #############################################################################
+# SECTION 6: Modify existing groups (add anomalous/broken/disabled members)
+#
+# Each DN appears ONLY ONCE to avoid duplicate-value errors.
+# #############################################################################
+
+# AWS-Developers: Sales + HR anomalies, disabled accounts
+dn: cn=AWS-Developers,ou=Access,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
-member: uid=missing.dept.kyle,ou=Engineering,ou=People,dc=acmecorp,dc=com
--
-add: member
-member: uid=missing.dept.anna,ou=Finance,ou=People,dc=acmecorp,dc=com
--
-add: member
-member: uid=missing.dept.lucas,ou=Sales,ou=People,dc=acmecorp,dc=com
+member: uid=nancy.watanabe,ou=Sales,ou=People,dc=acmecorp,dc=com
+member: uid=zachary.weber,ou=HumanResources,ou=People,dc=acmecorp,dc=com
+member: uid=disabled.marcus,ou=Engineering,ou=People,dc=acmecorp,dc=com
+member: uid=disabled.tom,ou=IT,ou=People,dc=acmecorp,dc=com
 
-
-# #############################################################################
-# SECTION 6: Disabled / terminated accounts still in sensitive groups
-#
-# These users have nsAccountLock=TRUE (389DS/RHDS convention) and
-# description indicating termination, but remain in sensitive groups.
-# #############################################################################
-
-dn: uid=disabled.jane,ou=Finance,ou=People,dc=acmecorp,dc=com
-objectClass: top
-objectClass: inetOrgPerson
-objectClass: organizationalPerson
-objectClass: person
-objectClass: posixAccount
-uid: disabled.jane
-cn: Jane Crawford
-givenName: Jane
-sn: Crawford
-displayName: Jane Crawford
-mail: jane.crawford@acmecorp.com
-title: Former Finance Director
-ou: Finance
-employeeNumber: EMP006021
-employeeType: Terminated
-uidNumber: 16021
-gidNumber: 1000
-homeDirectory: /home/disabled.jane
-loginShell: /sbin/nologin
-userPassword: {SSHA}placeholder
-nsAccountLock: TRUE
-description: TERMINATED 2025-11-15 — account disabled but still in groups
-
-dn: uid=disabled.marcus,ou=Engineering,ou=People,dc=acmecorp,dc=com
-objectClass: top
-objectClass: inetOrgPerson
-objectClass: organizationalPerson
-objectClass: person
-objectClass: posixAccount
-uid: disabled.marcus
-cn: Marcus Webb
-givenName: Marcus
-sn: Webb
-displayName: Marcus Webb
-mail: marcus.webb@acmecorp.com
-title: Former Lead Architect
-ou: Engineering
-employeeNumber: EMP006022
-employeeType: Terminated
-uidNumber: 16022
-gidNumber: 1000
-homeDirectory: /home/disabled.marcus
-loginShell: /sbin/nologin
-userPassword: {SSHA}placeholder
-nsAccountLock: TRUE
-description: TERMINATED 2025-09-01 — account disabled but still in groups
-
-dn: uid=disabled.priya,ou=HumanResources,ou=People,dc=acmecorp,dc=com
-objectClass: top
-objectClass: inetOrgPerson
-objectClass: organizationalPerson
-objectClass: person
-objectClass: posixAccount
-uid: disabled.priya
-cn: Priya Sharma
-givenName: Priya
-sn: Sharma
-displayName: Priya Sharma
-mail: priya.sharma@acmecorp.com
-title: Former HR Manager
-ou: HumanResources
-employeeNumber: EMP006023
-employeeType: Terminated
-uidNumber: 16023
-gidNumber: 1000
-homeDirectory: /home/disabled.priya
-loginShell: /sbin/nologin
-userPassword: {SSHA}placeholder
-nsAccountLock: TRUE
-description: TERMINATED 2025-12-31 — account disabled but still in groups
-
-dn: uid=disabled.tom,ou=IT,ou=People,dc=acmecorp,dc=com
-objectClass: top
-objectClass: inetOrgPerson
-objectClass: organizationalPerson
-objectClass: person
-objectClass: posixAccount
-uid: disabled.tom
-cn: Tom Nguyen
-givenName: Tom
-sn: Nguyen
-displayName: Tom Nguyen
-mail: tom.nguyen@acmecorp.com
-title: Former IT Security Admin
-ou: IT
-employeeNumber: EMP006024
-employeeType: Terminated
-uidNumber: 16024
-gidNumber: 1000
-homeDirectory: /home/disabled.tom
-loginShell: /sbin/nologin
-userPassword: {SSHA}placeholder
-nsAccountLock: TRUE
-description: TERMINATED 2026-01-15 — account disabled but still in groups
-
-# Add disabled accounts to sensitive groups (the problem to detect)
+# DataAccess-Financial: Marketing anomalies, disabled account
 dn: cn=DataAccess-Financial,ou=Access,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
+member: uid=pierre.gupta,ou=Marketing,ou=People,dc=acmecorp,dc=com
+member: uid=alyssa.davis,ou=Marketing,ou=People,dc=acmecorp,dc=com
 member: uid=disabled.jane,ou=Finance,ou=People,dc=acmecorp,dc=com
 
-dn: cn=Payroll-Admin,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=disabled.jane,ou=Finance,ou=People,dc=acmecorp,dc=com
-
-dn: cn=AWS-Developers,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=disabled.marcus,ou=Engineering,ou=People,dc=acmecorp,dc=com
-
-dn: cn=Code-Deploy-Prod,ou=Access,ou=Groups,dc=acmecorp,dc=com
-changetype: modify
-add: member
-member: uid=disabled.marcus,ou=Engineering,ou=People,dc=acmecorp,dc=com
-
+# DataAccess-PII: Sales anomaly, disabled account
 dn: cn=DataAccess-PII,ou=Access,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
+member: uid=james.richardson,ou=Sales,ou=People,dc=acmecorp,dc=com
 member: uid=disabled.priya,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 
-dn: cn=HR-DataAdmin,ou=Access,ou=Groups,dc=acmecorp,dc=com
+# GitHub-Users: Finance anomalies
+dn: cn=GitHub-Users,ou=Access,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
-member: uid=disabled.priya,ou=HumanResources,ou=People,dc=acmecorp,dc=com
+member: uid=howard.blanc,ou=Finance,ou=People,dc=acmecorp,dc=com
+member: uid=bobby.harris2,ou=Finance,ou=People,dc=acmecorp,dc=com
 
-dn: cn=AWS-Developers,ou=Access,ou=Groups,dc=acmecorp,dc=com
+# BuildSystem-Users: Legal anomaly
+dn: cn=BuildSystem-Users,ou=Access,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
-member: uid=disabled.tom,ou=IT,ou=People,dc=acmecorp,dc=com
+member: uid=ann.roux,ou=Legal,ou=People,dc=acmecorp,dc=com
 
+# SecurityChampions: disabled account + broken references
 dn: cn=SecurityChampions,ou=Access,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
 member: uid=disabled.tom,ou=IT,ou=People,dc=acmecorp,dc=com
+member: uid=old.securitylead,ou=Engineering,ou=People,dc=acmecorp,dc=com
+member: uid=past.ciso,ou=IT,ou=People,dc=acmecorp,dc=com
 
-# Also add disabled accounts to their department groups (stale membership)
+# OnCall-Rotation: broken references (non-existent users)
+dn: cn=OnCall-Rotation,ou=Access,ou=Groups,dc=acmecorp,dc=com
+changetype: modify
+add: member
+member: uid=deleted.user1,ou=Engineering,ou=People,dc=acmecorp,dc=com
+member: uid=terminated.employee,ou=Sales,ou=People,dc=acmecorp,dc=com
+member: uid=former.contractor,ou=IT,ou=People,dc=acmecorp,dc=com
+
+# AWS-ReadOnly: broken reference (typo in DN — schimdt vs schmidt)
+dn: cn=AWS-ReadOnly,ou=Access,ou=Groups,dc=acmecorp,dc=com
+changetype: modify
+add: member
+member: uid=susan.schimdt,ou=Engineering,ou=People,dc=acmecorp,dc=com
+
+# AllEmployees: missing-dept users (but NOT their dept group)
+dn: cn=AllEmployees,ou=Access,ou=Groups,dc=acmecorp,dc=com
+changetype: modify
+add: member
+member: uid=missing.dept.kyle,ou=Engineering,ou=People,dc=acmecorp,dc=com
+member: uid=missing.dept.anna,ou=Finance,ou=People,dc=acmecorp,dc=com
+member: uid=missing.dept.lucas,ou=Sales,ou=People,dc=acmecorp,dc=com
+
+# Department groups: disabled accounts (stale membership)
 dn: cn=dept-finance,ou=Departments,ou=Groups,dc=acmecorp,dc=com
 changetype: modify
 add: member
