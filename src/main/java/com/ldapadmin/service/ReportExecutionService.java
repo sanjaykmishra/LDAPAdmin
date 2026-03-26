@@ -657,7 +657,7 @@ public class ReportExecutionService {
         var hrConnOpt = hrConnectionRepo.findByDirectoryId(directoryId);
         if (hrConnOpt.isEmpty()) {
             return new ReportData(
-                    List.of("Employee", "Status", "Termination Date", "Access Revoked At", "Velocity", "SLA Status"),
+                    List.of("Employee", "Termination Date", "Access Revoked At", "Velocity", "SLA Status"),
                     List.of());
         }
         var hrConn = hrConnOpt.get();
@@ -693,8 +693,10 @@ public class ReportExecutionService {
         List<Map<String, String>> rows = new ArrayList<>();
 
         for (var emp : filtered) {
-            String empName = emp.getDisplayName() != null ? emp.getDisplayName()
-                    : (emp.getFirstName() + " " + emp.getLastName());
+            String empName = emp.getDisplayName() != null && !emp.getDisplayName().isBlank()
+                    ? emp.getDisplayName()
+                    : ((emp.getFirstName() != null ? emp.getFirstName() : "") + " " +
+                       (emp.getLastName() != null ? emp.getLastName() : "")).trim();
             String ldapDn = emp.getMatchedLdapDn();
             OffsetDateTime termDate = emp.getTerminationDate().atStartOfDay().atOffset(java.time.ZoneOffset.UTC);
 

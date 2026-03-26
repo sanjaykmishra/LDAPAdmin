@@ -359,6 +359,9 @@ public class AccessDriftAnalysisService {
             return new DriftVisualizationResponse(List.of());
         }
         var snapshot = snapshotOpt.get();
+        if (snapshot.getStatus() != com.ldapadmin.entity.enums.SnapshotStatus.COMPLETED) {
+            return new DriftVisualizationResponse(List.of());
+        }
 
         // Load all users with their peer group attribute (department)
         var snapshotUsers = userRepo.findBySnapshotId(snapshot.getId());

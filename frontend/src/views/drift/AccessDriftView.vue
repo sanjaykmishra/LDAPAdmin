@@ -295,7 +295,7 @@ function heatmapCell(pg, groupName) {
 
 function heatmapColor(pct) {
   if (pct >= 80) return 'bg-blue-500 text-white'
-  if (pct >= 50) return 'bg-blue-300 text-blue-900'
+  if (pct >= 50) return 'bg-blue-400 text-white'
   if (pct >= 20) return 'bg-blue-100 text-blue-800'
   if (pct > 0) return 'bg-amber-100 text-amber-800'
   return 'bg-gray-50 text-gray-400'
