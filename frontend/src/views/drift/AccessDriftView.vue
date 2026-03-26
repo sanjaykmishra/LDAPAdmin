@@ -208,6 +208,33 @@
     <div v-if="showRulesModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="showRulesModal = false">
       <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
         <h3 class="font-semibold text-gray-900 mb-4">Peer Group Rules</h3>
+
+        <!-- How it works -->
+        <details class="mb-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+          <summary class="px-4 py-2.5 cursor-pointer font-medium text-blue-800 select-none hover:bg-blue-100 rounded-lg">
+            How does drift analysis work?
+          </summary>
+          <div class="px-4 pb-3 pt-1 text-blue-900 space-y-2">
+            <p><strong>Peer group comparison</strong> — Users are grouped into peer cohorts based on a shared
+              LDAP attribute (e.g. <code class="bg-blue-100 px-1 rounded">departmentNumber</code> groups all
+              Engineering users together). Each rule defines which attribute to use.</p>
+            <p><strong>Group membership norm</strong> — For each peer group, the system calculates what percentage
+              of peers belong to each access group. For example, if 18 of 20 Engineering users are in
+              <code class="bg-blue-100 px-1 rounded">AWS-Developers</code>, that's a 90% peer membership rate.</p>
+            <p><strong>Anomaly detection</strong> — A user is flagged when they belong to a group that fewer than
+              the <em>anomaly threshold %</em> of their peers also belong to. For example, if only 1 of 20
+              Engineering users (5%) is in <code class="bg-blue-100 px-1 rounded">Payroll-Admin</code> and the
+              anomaly threshold is 10%, that membership is flagged as drift.</p>
+            <p><strong>Severity</strong> — <span class="inline-block bg-red-100 text-red-800 px-1.5 rounded">HIGH</span>
+              when peer membership is ≤ 5%,
+              <span class="inline-block bg-yellow-100 text-yellow-800 px-1.5 rounded">MEDIUM</span> when between
+              5% and the anomaly threshold,
+              <span class="inline-block bg-blue-100 text-blue-800 px-1.5 rounded">LOW</span> otherwise.</p>
+            <p><strong>Normal threshold</strong> — Groups where peer membership exceeds this percentage are
+              considered standard for that cohort and are excluded from analysis.</p>
+          </div>
+        </details>
+
         <div v-if="rules.length" class="space-y-2 mb-4">
           <div v-for="r in rules" :key="r.id" class="flex items-center justify-between bg-gray-50 rounded-lg p-3">
             <div>
