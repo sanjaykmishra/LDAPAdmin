@@ -61,8 +61,8 @@
               <option value="STARTTLS">STARTTLS</option>
             </select>
           </div>
-          <FormField label="Bind DN" v-model="form.bindDn" required />
-          <FormField label="Bind Password" v-model="form.bindPassword" type="password" :placeholder="editing ? 'Leave blank to keep' : ''" />
+          <FormField label="Bind DN" v-model="form.bindDn" required autocomplete="off" />
+          <FormField label="Bind Password" v-model="form.bindPassword" type="password" :placeholder="editing ? 'Leave blank to keep' : ''" autocomplete="new-password" />
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Changelog Format</label>
             <select v-model="form.changelogFormat" @change="onFormatChange" class="input w-full">

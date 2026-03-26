@@ -2,7 +2,7 @@
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Operational Reports</h1>
-      <button @click="openSchedules" class="btn-secondary flex items-center gap-1.5">
+      <button @click="openSchedules" class="bg-blue-50 text-blue-600 rounded-full px-4 py-1.5 text-sm font-medium hover:bg-blue-100 transition-colors flex items-center gap-1.5">
         <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2.5"/></svg>
         Scheduled Jobs
       </button>
@@ -39,7 +39,7 @@
         <!-- Integrity check options -->
         <div v-if="isIntegrityCheck">
           <label class="block text-sm font-medium text-gray-700 mb-1">Checks to Run</label>
-          <div class="flex flex-col gap-1.5 mt-1">
+          <div class="flex flex-row gap-4 mt-1">
             <label v-for="c in integrityChecks" :key="c.value" class="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" v-model="runForm.integrityChecks" :value="c.value" class="rounded border-gray-300" />
               {{ c.label }}
