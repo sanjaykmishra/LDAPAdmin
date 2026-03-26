@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -89,11 +90,17 @@ public class AuditorLinkService {
 
     /**
      * Revokes an auditor link, immediately preventing further access.
+     * Idempotent — calling on an already-revoked link is a no-op.
      */
     @Transactional
     public void revoke(UUID linkId, AuthPrincipal principal) {
         AuditorLink link = auditorLinkRepo.findById(linkId)
                 .orElseThrow(() -> new ResourceNotFoundException("AuditorLink", linkId));
+
+        if (link.isRevoked()) {
+            log.info("Auditor link already revoked: id={}", linkId);
+            return;
+        }
 
         link.setRevoked(true);
         link.setRevokedAt(OffsetDateTime.now());
@@ -143,7 +150,9 @@ public class AuditorLinkService {
         String expectedHmac = cryptoService.hmacSha256(
                 signatureInput.getBytes(StandardCharsets.UTF_8));
 
-        if (!expectedHmac.equals(link.getHmacSignature())) {
+        if (!MessageDigest.isEqual(
+                expectedHmac.getBytes(StandardCharsets.UTF_8),
+                link.getHmacSignature().getBytes(StandardCharsets.UTF_8))) {
             log.warn("HMAC mismatch for auditor link token — possible tampering");
             throw new ResourceNotFoundException("Auditor link not found");
         }

@@ -158,6 +158,31 @@ class AuditorLinkServiceTest {
     }
 
     @Test
+    void revoke_alreadyRevoked_isIdempotent() {
+        UUID linkId = UUID.randomUUID();
+        AuditorLink link = AuditorLink.builder()
+                .directory(directory)
+                .token("token")
+                .expiresAt(OffsetDateTime.now().plusDays(30))
+                .hmacSignature("sig")
+                .createdBy(account)
+                .revoked(true)
+                .build();
+        link.setId(linkId);
+        link.setRevokedAt(OffsetDateTime.now().minusHours(1));
+        OffsetDateTime originalRevokedAt = link.getRevokedAt();
+
+        when(auditorLinkRepo.findById(linkId)).thenReturn(Optional.of(link));
+
+        service.revoke(linkId, principal);
+
+        // Should not save or record audit event — it's a no-op
+        verify(auditorLinkRepo, never()).save(any());
+        verify(auditService, never()).record(any(), any(), any(), any(), any());
+        assertThat(link.getRevokedAt()).isEqualTo(originalRevokedAt);
+    }
+
+    @Test
     void revoke_linkNotFound_throws() {
         UUID linkId = UUID.randomUUID();
         when(auditorLinkRepo.findById(linkId)).thenReturn(Optional.empty());
