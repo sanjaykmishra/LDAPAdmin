@@ -35,3 +35,7 @@ export const exemptFinding = (dirId, findingId, data) =>
 // Snapshots
 export const listSnapshots = (dirId) =>
   client.get(`${base(dirId)}/snapshots`)
+
+// Visualization
+export const getDriftVisualization = (dirId) =>
+  client.get(`${base(dirId)}/visualization`)

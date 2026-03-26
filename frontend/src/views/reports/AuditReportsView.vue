@@ -53,6 +53,19 @@
             <option v-for="c in campaigns" :key="c.id" :value="c.id">{{ c.name }} ({{ c.status }})</option>
           </select>
         </div>
+        <!-- Termination Velocity filters: from, to, SLA -->
+        <div v-if="isTermVelocity">
+          <label class="block text-sm font-medium text-gray-700 mb-1">From</label>
+          <input v-model="runForm.fromDate" type="date" class="input w-full" />
+        </div>
+        <div v-if="isTermVelocity">
+          <label class="block text-sm font-medium text-gray-700 mb-1">To</label>
+          <input v-model="runForm.toDate" type="date" class="input w-full" />
+        </div>
+        <div v-if="isTermVelocity">
+          <label class="block text-sm font-medium text-gray-700 mb-1">SLA Threshold (hours)</label>
+          <input v-model.number="runForm.slaHours" type="number" min="1" class="input w-full" placeholder="24" />
+        </div>
         <!-- Audit Log filters: from, to, action -->
         <div v-if="isAuditLog">
           <label class="block text-sm font-medium text-gray-700 mb-1">From</label>
@@ -160,6 +173,14 @@
                 <!-- Action badge (Audit Log) -->
                 <span v-else-if="col === 'Action'" :class="actionBadgeClass(row[col])" class="inline-block px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap">
                   {{ humanizeEnum(row[col]) }}
+                </span>
+                <!-- SLA Status badge (Termination Velocity) -->
+                <span v-else-if="col === 'SLA Status'" :class="slaBadgeClass(row[col])" class="inline-block px-2 py-0.5 rounded-full text-xs font-medium">
+                  {{ row[col] }}
+                </span>
+                <!-- Velocity (color-coded) -->
+                <span v-else-if="col === 'Velocity'" class="font-mono whitespace-nowrap" :class="velocityColor(row[col])">
+                  {{ row[col] }}
                 </span>
                 <!-- Peer Match percentage -->
                 <span v-else-if="col === 'Peer Match'" class="font-mono whitespace-nowrap">
@@ -321,6 +342,7 @@ const reportTypes = [
   { value: 'PRIVILEGED_ACCOUNT_INVENTORY', label: 'Privileged Account Inventory', lookback: false, statusFilter: false, groupDn: false, campaign: false, policyFilter: false },
   { value: 'ACCESS_DRIFT_REPORT',         label: 'Access Drift',                 lookback: false, statusFilter: false, groupDn: false, campaign: false, policyFilter: false },
   { value: 'SOD_VIOLATIONS',              label: 'SoD Violations',               lookback: false, statusFilter: true,  groupDn: false, campaign: false, policyFilter: true },
+  { value: 'TERMINATION_VELOCITY',       label: 'Termination Velocity',         lookback: false, statusFilter: false, groupDn: false, campaign: false, policyFilter: false },
   { value: 'AUDIT_LOG_REPORT',            label: 'Audit Log',                    lookback: false, statusFilter: false, groupDn: false, campaign: false, policyFilter: false },
 ]
 
@@ -338,7 +360,7 @@ const auditActions = [
 
 const runForm = ref({
   reportType: 'USER_ACCESS_REPORT', groupDn: '', statusFilter: '', lookbackDays: 30, campaignId: '', policyId: '',
-  fromDate: '', toDate: '', auditAction: '', groupFilter: DEFAULT_PRIVILEGED_GROUP_FILTER,
+  fromDate: '', toDate: '', auditAction: '', slaHours: 24, groupFilter: DEFAULT_PRIVILEGED_GROUP_FILTER,
 })
 const groupFilterEditable = ref(false)
 const running = ref(false)
@@ -357,6 +379,7 @@ const needsGroupDn      = computed(() => !!currentType.value?.groupDn)
 const needsCampaign     = computed(() => !!currentType.value?.campaign)
 const needsPolicyFilter = computed(() => !!currentType.value?.policyFilter)
 const isAuditLog        = computed(() => runForm.value.reportType === 'AUDIT_LOG_REPORT')
+const isTermVelocity    = computed(() => runForm.value.reportType === 'TERMINATION_VELOCITY')
 const isPrivilegedReport = computed(() => runForm.value.reportType === 'PRIVILEGED_ACCOUNT_INVENTORY')
 const isSodReport       = computed(() => runForm.value.reportType === 'SOD_VIOLATIONS' && hasResults.value)
 const isDriftReport     = computed(() => runForm.value.reportType === 'ACCESS_DRIFT_REPORT' && hasResults.value)
@@ -485,6 +508,26 @@ function peerMatchColor(pct) {
   return 'text-green-600'
 }
 
+function slaBadgeClass(status) {
+  switch (status) {
+    case 'Within SLA': return 'bg-green-100 text-green-700'
+    case 'Overdue':    return 'bg-red-100 text-red-700'
+    case 'Pending':    return 'bg-amber-100 text-amber-700'
+    default:           return 'bg-gray-100 text-gray-600'
+  }
+}
+
+function velocityColor(val) {
+  if (!val) return ''
+  if (val.includes('pending')) return 'text-amber-600'
+  const match = val.match(/^(\d+)d/)
+  if (match && parseInt(match[1]) > 1) return 'text-red-600 font-semibold'
+  const hMatch = val.match(/^(\d+)h/)
+  if (hMatch && parseInt(hMatch[1]) > 24) return 'text-red-600 font-semibold'
+  if (hMatch && parseInt(hMatch[1]) > 4) return 'text-amber-600'
+  return 'text-green-600'
+}
+
 // ── Sorting / params ──────────────────────────────────────────────────────────
 
 function toggleSort(col) {
@@ -504,6 +547,12 @@ function buildParams() {
     if (runForm.value.toDate) params.to = runForm.value.toDate
     if (runForm.value.auditAction) params.action = runForm.value.auditAction
     if (!runForm.value.fromDate) params.lookbackDays = 30 // default fallback
+  }
+  if (isTermVelocity.value) {
+    if (runForm.value.fromDate) params.from = runForm.value.fromDate
+    if (runForm.value.toDate) params.to = runForm.value.toDate
+    if (runForm.value.slaHours) params.slaHours = runForm.value.slaHours
+    if (!runForm.value.fromDate) params.lookbackDays = 90
   }
   if (isPrivilegedReport.value && runForm.value.groupFilter) {
     params.groupFilter = runForm.value.groupFilter
