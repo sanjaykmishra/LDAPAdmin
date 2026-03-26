@@ -133,6 +133,29 @@ public class AuditorLinkService {
      * @return the validated AuditorLink entity
      * @throws ResourceNotFoundException if the token is invalid, revoked, or expired
      */
+    /**
+     * Validates a token for portal access with optional IP/user-agent logging.
+     */
+    @Transactional
+    public AuditorLink validateToken(String token, String clientIp, String userAgent) {
+        AuditorLink link = validateToken(token);
+        // Fire-and-forget audit event with IP metadata
+        if (clientIp != null) {
+            try {
+                var systemPrincipal = new AuthPrincipal(
+                        com.ldapadmin.auth.PrincipalType.SUPERADMIN, new java.util.UUID(0, 0), "auditor-portal");
+                auditService.record(systemPrincipal, link.getDirectory().getId(),
+                        AuditAction.AUDITOR_LINK_ACCESSED, null,
+                        Map.of("linkId", link.getId().toString(),
+                                "clientIp", clientIp,
+                                "userAgent", userAgent != null ? userAgent : ""));
+            } catch (Exception e) {
+                log.warn("Failed to record portal access audit event: {}", e.getMessage());
+            }
+        }
+        return link;
+    }
+
     @Transactional
     public AuditorLink validateToken(String token) {
         AuditorLink link = auditorLinkRepo.findByTokenAndRevokedFalse(token)

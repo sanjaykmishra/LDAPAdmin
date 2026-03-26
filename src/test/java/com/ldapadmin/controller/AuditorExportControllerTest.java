@@ -60,7 +60,7 @@ class AuditorExportControllerTest extends BaseControllerTest {
         link.setId(UUID.randomUUID());
         link.setCreatedAt(OffsetDateTime.now());
 
-        when(auditorLinkService.validateToken(TOKEN)).thenReturn(link);
+        when(auditorLinkService.validateToken(eq(TOKEN), any(), any())).thenReturn(link);
     }
 
     // ── Campaign CSV ──────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ class AuditorExportControllerTest extends BaseControllerTest {
 
     @Test
     void campaignCsv_invalidToken_returns404() throws Exception {
-        when(auditorLinkService.validateToken("bad"))
+        when(auditorLinkService.validateToken(eq("bad"), any(), any()))
                 .thenThrow(new ResourceNotFoundException("not found"));
 
         mvc.perform(get("/api/v1/auditor/{token}/export/campaigns/{id}/csv", "bad", campaignId))

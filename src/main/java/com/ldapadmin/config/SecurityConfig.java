@@ -128,6 +128,17 @@ public class SecurityConfig {
             config.setMaxAge(3600L);
             source.registerCorsConfiguration("/api/v1/**", config);
         }
+        // Auditor portal: open CORS (public by design, token is the credential).
+        // Uses allowedOriginPatterns("*") instead of allowedOrigins("*") to avoid
+        // conflict with credentialed CORS on /api/v1/**.
+        CorsConfiguration auditorCors = new CorsConfiguration();
+        auditorCors.setAllowedOriginPatterns(List.of("*"));
+        auditorCors.setAllowCredentials(false);
+        auditorCors.setAllowedMethods(List.of("GET", "OPTIONS"));
+        auditorCors.setAllowedHeaders(List.of("*"));
+        auditorCors.setMaxAge(3600L);
+        source.registerCorsConfiguration("/api/v1/auditor/**", auditorCors);
+
         return source;
     }
 }

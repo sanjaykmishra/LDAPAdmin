@@ -72,7 +72,7 @@ class AuditorPortalControllerTest extends BaseControllerTest {
         link.setId(UUID.randomUUID());
         link.setCreatedAt(OffsetDateTime.now());
 
-        when(auditorLinkService.validateToken(TOKEN)).thenReturn(link);
+        when(auditorLinkService.validateToken(eq(TOKEN), any(), any())).thenReturn(link);
         when(settingsService.getBranding()).thenReturn(
                 new BrandingDto("LDAPAdmin", null, "#3b82f6", null, Set.of(AccountType.LOCAL)));
     }
@@ -88,14 +88,15 @@ class AuditorPortalControllerTest extends BaseControllerTest {
                 .andExpect(jsonPath("$.branding.appName").value("LDAPAdmin"))
                 .andExpect(jsonPath("$.scope.includeSod").value(true))
                 .andExpect(header().string("X-Robots-Tag", "noindex"))
-                .andExpect(header().string("Cache-Control", "no-store"));
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().exists("Content-Security-Policy"));
     }
 
     // ── Invalid / expired / revoked tokens → 404 ──────────────────────────
 
     @Test
     void metadata_invalidToken_returns404() throws Exception {
-        when(auditorLinkService.validateToken("bad-token"))
+        when(auditorLinkService.validateToken(eq("bad-token"), any(), any()))
                 .thenThrow(new ResourceNotFoundException("Auditor link not found"));
 
         mvc.perform(get("/api/v1/auditor/bad-token"))
@@ -104,7 +105,7 @@ class AuditorPortalControllerTest extends BaseControllerTest {
 
     @Test
     void metadata_expiredToken_returns404() throws Exception {
-        when(auditorLinkService.validateToken("expired-token"))
+        when(auditorLinkService.validateToken(eq("expired-token"), any(), any()))
                 .thenThrow(new ResourceNotFoundException("Auditor link not found"));
 
         mvc.perform(get("/api/v1/auditor/expired-token"))

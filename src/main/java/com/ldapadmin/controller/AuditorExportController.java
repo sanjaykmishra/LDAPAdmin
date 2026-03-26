@@ -110,13 +110,18 @@ public class AuditorExportController {
 
     private AuditorLink validate(String token, HttpServletRequest request) {
         ipRateLimiter.check(request.getRemoteAddr());
-        return auditorLinkService.validateToken(token);
+        return auditorLinkService.validateToken(token,
+                request.getRemoteAddr(), request.getHeader("User-Agent"));
     }
 
     private static HttpHeaders portalHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-Robots-Tag", "noindex");
         headers.setCacheControl("no-store");
+        headers.set("Content-Security-Policy",
+                "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                + "font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; "
+                + "script-src 'self'; frame-ancestors 'none'");
         return headers;
     }
 
