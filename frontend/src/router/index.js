@@ -295,6 +295,12 @@ const router = createRouter({
           meta: { requiresSuperadmin: true },
         },
         {
+          path: 'superadmin/audit-reports',
+          name: 'superadminAuditReports',
+          component: () => import('@/views/reports/AuditReportsView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
+        {
           path: 'superadmin/compliance-reports',
           component: () => import('@/views/superadmin/DirectoryScopedWrapper.vue'),
           props: { defaultChild: 'complianceReports' },
