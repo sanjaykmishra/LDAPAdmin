@@ -17,9 +17,11 @@ const copied = ref(false)
 
 function copy() {
   const url = window.location.origin + window.location.pathname + '#' + props.anchor
-  navigator.clipboard.writeText(url).then(() => {
+  navigator.clipboard?.writeText(url).then(() => {
     copied.value = true
     setTimeout(() => { copied.value = false }, 2000)
+  }).catch(() => {
+    // Clipboard API unavailable (HTTP context or permission denied) — no-op
   })
 }
 </script>

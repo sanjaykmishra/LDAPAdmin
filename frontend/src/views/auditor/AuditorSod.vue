@@ -100,7 +100,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { getPortalSod } from '@/api/auditorPortal'
 import CopyLinkButton from './components/CopyLinkButton.vue'
 
@@ -149,6 +149,7 @@ onMounted(async () => {
   loading.value = false
 
   if (window.location.hash) {
+    await nextTick()
     const el = document.getElementById(window.location.hash.slice(1))
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }

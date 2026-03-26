@@ -20,8 +20,8 @@
         </div>
       </div>
 
-      <!-- Decisions table -->
-      <section class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-6">
+      <!-- Decisions table (desktop) -->
+      <section class="hidden sm:block bg-white border border-slate-200 rounded-xl overflow-hidden mb-6">
         <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
           <h2 class="text-sm font-semibold text-slate-700">Decisions ({{ filteredDecisions.length }})</h2>
           <input v-model="search" type="text" placeholder="Search members..."
@@ -85,7 +85,7 @@
     </template>
 
     <!-- Mobile: card layout for decisions -->
-    <div class="sm:hidden space-y-2 mb-6" v-if="!loading && campaign && campaign.decisions">
+    <div class="sm:hidden space-y-2 mb-6" v-if="campaign">
       <div v-for="d in pagedDecisions" :key="d.id + '-card'"
            :id="`decision-${d.id}-m`"
            class="bg-white border border-slate-200 rounded-xl p-3">
@@ -100,7 +100,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { getPortalCampaignDetail } from '@/api/auditorPortal'
 import CopyLinkButton from './components/CopyLinkButton.vue'
@@ -125,6 +125,8 @@ const filteredDecisions = computed(() => {
     (d.decidedBy || '').toLowerCase().includes(q)
   )
 })
+
+watch(search, () => { page.value = 0 })
 
 const totalPages = computed(() => Math.ceil(filteredDecisions.value.length / PAGE_SIZE))
 const pagedDecisions = computed(() =>
@@ -162,8 +164,9 @@ onMounted(async () => {
   } catch { /* handled by layout */ }
   loading.value = false
 
-  // Scroll to anchor if present
+  // Scroll to anchor if present (after DOM renders)
   if (window.location.hash) {
+    await nextTick()
     const el = document.getElementById(window.location.hash.slice(1))
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }

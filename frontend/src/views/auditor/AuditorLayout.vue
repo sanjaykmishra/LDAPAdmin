@@ -193,7 +193,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { getPortalMetadata, getPortalVerify, getPortalExport } from '@/api/auditorPortal'
 import AuditorSidebar from './components/AuditorSidebar.vue'
@@ -212,6 +212,9 @@ const exportError = ref(null)
 const showMobileNav = ref(false)
 
 const isLanding = computed(() => route.name === 'auditorLanding')
+
+// Close mobile nav on route change
+watch(() => route.path, () => { showMobileNav.value = false })
 
 const daysRemaining = computed(() => {
   if (!metadata.value.expiresAt) return null
