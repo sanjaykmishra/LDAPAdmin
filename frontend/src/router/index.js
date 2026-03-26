@@ -285,6 +285,12 @@ const router = createRouter({
           meta: { requiresSuperadmin: true },
         },
         {
+          path: 'superadmin/auditor-links',
+          name: 'superadminAuditorLinks',
+          component: () => import('@/views/auditor/AuditorLinksView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
+        {
           path: 'superadmin/playbooks',
           name: 'superadminPlaybooks',
           component: () => import('@/views/playbooks/PlaybooksView.vue'),
@@ -351,6 +357,50 @@ const router = createRouter({
       meta: { public: true },
     },
 
+    // ── Auditor portal (public — no auth, standalone layout) ──────────────
+    {
+      path: '/auditor/:token',
+      component: () => import('@/views/auditor/AuditorLayout.vue'),
+      meta: { public: true },
+      children: [
+        {
+          path: '',
+          name: 'auditorLanding',
+          component: () => import('@/views/auditor/AuditorLanding.vue'),
+        },
+        {
+          path: 'campaigns',
+          name: 'auditorCampaigns',
+          component: () => import('@/views/auditor/AuditorCampaigns.vue'),
+        },
+        {
+          path: 'campaigns/:campaignId',
+          name: 'auditorCampaignDetail',
+          component: () => import('@/views/auditor/AuditorCampaignDetail.vue'),
+        },
+        {
+          path: 'sod',
+          name: 'auditorSod',
+          component: () => import('@/views/auditor/AuditorSod.vue'),
+        },
+        {
+          path: 'entitlements',
+          name: 'auditorEntitlements',
+          component: () => import('@/views/auditor/AuditorEntitlements.vue'),
+        },
+        {
+          path: 'audit-events',
+          name: 'auditorAuditEvents',
+          component: () => import('@/views/auditor/AuditorAuditEvents.vue'),
+        },
+        {
+          path: 'approvals',
+          name: 'auditorApprovals',
+          component: () => import('@/views/auditor/AuditorApprovals.vue'),
+        },
+      ],
+    },
+
     // Catch-all
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
@@ -376,7 +426,7 @@ router.beforeEach(async (to) => {
   await auth.init()
 
   // Public routes — no auth needed
-  if (to.meta.public) return
+  if (to.meta.public || to.matched.some(r => r.meta.public)) return
 
   // Self-service protected routes
   if (to.meta.requiresSelfService) {

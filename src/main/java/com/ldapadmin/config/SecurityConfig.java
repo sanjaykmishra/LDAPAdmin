@@ -75,6 +75,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/oidc/callback").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/settings/branding").permitAll()
                 .requestMatchers("/api/v1/self-service/register/**").permitAll()
+                .requestMatchers("/api/v1/auditor/**").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 // ── Self-service portal (SELF_SERVICE principal only) ─────────
@@ -127,6 +128,17 @@ public class SecurityConfig {
             config.setMaxAge(3600L);
             source.registerCorsConfiguration("/api/v1/**", config);
         }
+        // Auditor portal: open CORS (public by design, token is the credential).
+        // Uses allowedOriginPatterns("*") instead of allowedOrigins("*") to avoid
+        // conflict with credentialed CORS on /api/v1/**.
+        CorsConfiguration auditorCors = new CorsConfiguration();
+        auditorCors.setAllowedOriginPatterns(List.of("*"));
+        auditorCors.setAllowCredentials(false);
+        auditorCors.setAllowedMethods(List.of("GET", "OPTIONS"));
+        auditorCors.setAllowedHeaders(List.of("*"));
+        auditorCors.setMaxAge(3600L);
+        source.registerCorsConfiguration("/api/v1/auditor/**", auditorCors);
+
         return source;
     }
 }
