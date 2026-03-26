@@ -5,21 +5,27 @@
         <h1 class="text-2xl font-bold text-gray-900">Access Drift Detection</h1>
         <p class="text-sm text-gray-500 mt-1">Detect privilege creep by comparing user access against their peer group.</p>
       </div>
-      <div class="flex gap-2">
-        <button @click="showRulesModal = true" class="btn-secondary text-sm">Manage Rules</button>
-        <button @click="handleAnalyze" :disabled="analyzing" class="btn-primary text-sm">
-          {{ analyzing ? 'Analyzing...' : 'Run Analysis' }}
-        </button>
-      </div>
     </div>
 
-    <!-- Directory picker -->
-    <div v-if="showPicker" class="mb-4">
-      <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
-      <select v-model="selectedDir" class="input w-64">
-        <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select directory —' }}</option>
-        <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
-      </select>
+    <!-- Directory picker + action buttons -->
+    <div v-if="showPicker" class="mb-4 flex items-end gap-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
+        <select v-model="selectedDir" class="w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select directory —' }}</option>
+          <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
+        </select>
+      </div>
+      <button @click="showRulesModal = true" class="btn-secondary text-sm h-[38px]">Manage Rules</button>
+      <button @click="handleAnalyze" :disabled="analyzing || !dirId" class="btn-primary text-sm h-[38px]">
+        {{ analyzing ? 'Analyzing...' : 'Run Analysis' }}
+      </button>
+    </div>
+    <div v-else class="mb-4 flex gap-2">
+      <button @click="showRulesModal = true" class="btn-secondary text-sm">Manage Rules</button>
+      <button @click="handleAnalyze" :disabled="analyzing || !dirId" class="btn-primary text-sm">
+        {{ analyzing ? 'Analyzing...' : 'Run Analysis' }}
+      </button>
     </div>
 
     <!-- Summary cards -->
