@@ -89,9 +89,32 @@
     </div>
 
     <!-- Main content -->
-    <main v-else class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-      <RouterView :token="token" :metadata="metadata" :scope="metadata.scope || {}" />
-    </main>
+    <div v-else class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <!-- Landing page: no sidebar -->
+      <div v-if="isLanding">
+        <RouterView :token="token" :metadata="metadata" :scope="metadata.scope || {}" />
+      </div>
+      <!-- Section pages: sidebar + content -->
+      <div v-else class="flex gap-6">
+        <AuditorSidebar :token="token" :scope="metadata.scope || {}" class="hidden md:block" />
+        <!-- Mobile hamburger -->
+        <button @click="showMobileNav = !showMobileNav"
+                class="md:hidden fixed bottom-4 left-4 z-20 bg-slate-700 text-white p-3 rounded-full shadow-lg">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+        </button>
+        <div v-if="showMobileNav" class="md:hidden fixed inset-0 z-30" @click.self="showMobileNav = false">
+          <div class="fixed inset-0 bg-black/30" @click="showMobileNav = false" />
+          <div class="relative w-64 bg-white shadow-xl h-full overflow-y-auto">
+            <AuditorSidebar :token="token" :scope="metadata.scope || {}" @navigate="showMobileNav = false" />
+          </div>
+        </div>
+        <main class="flex-1 min-w-0">
+          <RouterView :token="token" :metadata="metadata" :scope="metadata.scope || {}" />
+        </main>
+      </div>
+    </div>
 
     <!-- Verification detail drawer -->
     <div v-if="showVerifyDrawer" class="fixed inset-0 z-50 flex justify-end"
@@ -173,6 +196,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { getPortalMetadata, getPortalVerify, getPortalExport } from '@/api/auditorPortal'
+import AuditorSidebar from './components/AuditorSidebar.vue'
 
 const route = useRoute()
 const token = computed(() => route.params.token)
@@ -185,6 +209,9 @@ const verification = ref({})
 const showVerifyDrawer = ref(false)
 const exporting = ref(false)
 const exportError = ref(null)
+const showMobileNav = ref(false)
+
+const isLanding = computed(() => route.name === 'auditorLanding')
 
 const daysRemaining = computed(() => {
   if (!metadata.value.expiresAt) return null

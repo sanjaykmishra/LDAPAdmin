@@ -365,17 +365,17 @@ const router = createRouter({
         {
           path: 'campaigns',
           name: 'auditorCampaigns',
-          component: () => import('@/views/auditor/AuditorLanding.vue'), // placeholder — M6 adds dedicated view
+          component: () => import('@/views/auditor/AuditorCampaigns.vue'),
         },
         {
           path: 'campaigns/:campaignId',
           name: 'auditorCampaignDetail',
-          component: () => import('@/views/auditor/AuditorLanding.vue'), // placeholder — M6
+          component: () => import('@/views/auditor/AuditorCampaignDetail.vue'),
         },
         {
           path: 'sod',
           name: 'auditorSod',
-          component: () => import('@/views/auditor/AuditorLanding.vue'), // placeholder — M6
+          component: () => import('@/views/auditor/AuditorSod.vue'),
         },
         {
           path: 'entitlements',
