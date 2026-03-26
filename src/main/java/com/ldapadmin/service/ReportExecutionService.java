@@ -3,6 +3,9 @@ package com.ldapadmin.service;
 import com.ldapadmin.dto.profile.GroupChangePreview;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.ProvisioningProfile;
+import com.ldapadmin.entity.AccessReviewCampaign;
+import com.ldapadmin.entity.AccessReviewDecision;
+import com.ldapadmin.entity.AccessReviewGroup;
 import com.ldapadmin.entity.SodViolation;
 import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.entity.enums.OutputFormat;
@@ -113,7 +116,7 @@ public class ReportExecutionService {
             case MISSING_PROFILE_GROUPS -> runMissingProfileGroupsReportData(dc, directoryId);
             case SOD_VIOLATIONS         -> runSodViolationsReportData(directoryId, params);
             case USER_ACCESS_REPORT     -> runUserAccessReportData(dc, params);
-            case ACCESS_REVIEW_SUMMARY  -> runAccessReviewSummaryData(directoryId, params);
+            case ACCESS_REVIEW_RESULTS  -> runAccessReviewResultsData(directoryId, params);
             case PRIVILEGED_ACCOUNT_INVENTORY -> runPrivilegedAccountInventoryData(dc, params);
             case ACCESS_DRIFT_REPORT    -> runAccessDriftReportData(directoryId);
             case AUDIT_LOG_REPORT       -> runAuditLogReportData(directoryId, params);
@@ -149,7 +152,7 @@ public class ReportExecutionService {
         List<LdapUser> allUsers = userService.searchUsers(dc,
                 "(|(objectClass=inetOrgPerson)(objectClass=person))", null, MAX_LDAP_RESULTS, "*");
 
-        List<String> columns = List.of("dn", "cn", "uid", "mail", "groups");
+        List<String> columns = List.of("User DN", "Name", "User ID", "Email", "Groups");
         List<Map<String, String>> rows = new ArrayList<>();
         for (LdapUser u : allUsers) {
             List<String> groups = userGroups.getOrDefault(u.getDn().toLowerCase(), List.of());
@@ -157,11 +160,11 @@ public class ReportExecutionService {
                 continue; // when filtering by group, skip users not in that group
             }
             Map<String, String> row = new LinkedHashMap<>();
-            row.put("dn", u.getDn());
-            row.put("cn", u.getCn());
-            row.put("uid", u.getUid());
-            row.put("mail", u.getMail());
-            row.put("groups", String.join("; ", groups));
+            row.put("User DN", u.getDn());
+            row.put("Name", u.getCn());
+            row.put("User ID", u.getUid());
+            row.put("Email", u.getMail());
+            row.put("Groups", String.join("; ", groups));
             rows.add(row);
         }
         return new ReportData(columns, rows);
@@ -323,15 +326,15 @@ public class ReportExecutionService {
                 directoryId, null, AuditAction.LDAP_CHANGE.getDbValue(),
                 null, from, null, Pageable.unpaged());
 
-        List<String> columns = List.of("dn", "deletedBy", "deletedAt", "source");
+        List<String> columns = List.of("User", "Deleted By", "Deleted At", "Source");
         List<Map<String, String>> rows = new ArrayList<>();
 
         internalDeletes.getContent().forEach(e -> {
             Map<String, String> row = new LinkedHashMap<>();
-            row.put("dn",        e.getTargetDn() != null ? e.getTargetDn() : "");
-            row.put("deletedBy", e.getActorUsername() != null ? e.getActorUsername() : "");
-            row.put("deletedAt", e.getOccurredAt() != null ? e.getOccurredAt().toString() : "");
-            row.put("source",    "INTERNAL");
+            row.put("User",       e.getTargetDn() != null ? e.getTargetDn() : "");
+            row.put("Deleted By", e.getActorUsername() != null ? e.getActorUsername() : "");
+            row.put("Deleted At", e.getOccurredAt() != null ? e.getOccurredAt().toString() : "");
+            row.put("Source",     "Internal");
             rows.add(row);
         });
 
@@ -339,10 +342,10 @@ public class ReportExecutionService {
                 .filter(e -> e.getDetail() != null && isDeleteChange(e.getDetail()))
                 .forEach(e -> {
                     Map<String, String> row = new LinkedHashMap<>();
-                    row.put("dn",        e.getTargetDn() != null ? e.getTargetDn() : "");
-                    row.put("deletedBy", "LDAP_CHANGELOG");
-                    row.put("deletedAt", e.getOccurredAt() != null ? e.getOccurredAt().toString() : "");
-                    row.put("source",    "LDAP_CHANGELOG");
+                    row.put("User",       e.getTargetDn() != null ? e.getTargetDn() : "");
+                    row.put("Deleted By", "Changelog");
+                    row.put("Deleted At", e.getOccurredAt() != null ? e.getOccurredAt().toString() : "");
+                    row.put("Source",     "Changelog");
                     rows.add(row);
                 });
 
@@ -360,7 +363,7 @@ public class ReportExecutionService {
         List<ProvisioningProfile> profiles =
                 profileRepo.findAllByDirectoryIdAndEnabledTrue(directoryId);
 
-        List<String> columns = List.of("userDn", "profileName", "missingGroupDn", "memberAttribute");
+        List<String> columns = List.of("User", "Profile", "Missing Group", "Attribute");
         List<Map<String, String>> rows = new ArrayList<>();
 
         for (ProvisioningProfile profile : profiles) {
@@ -370,10 +373,10 @@ public class ReportExecutionService {
                 for (GroupChangePreview.UserGroupChange change : preview.changes()) {
                     for (GroupChangePreview.GroupChange add : change.groupsToAdd()) {
                         Map<String, String> row = new LinkedHashMap<>();
-                        row.put("userDn", change.userDn());
-                        row.put("profileName", profile.getName());
-                        row.put("missingGroupDn", add.groupDn());
-                        row.put("memberAttribute", add.memberAttribute());
+                        row.put("User", change.userDn());
+                        row.put("Profile", profile.getName());
+                        row.put("Missing Group", add.groupDn());
+                        row.put("Attribute", add.memberAttribute());
                         rows.add(row);
                     }
                 }
@@ -422,20 +425,57 @@ public class ReportExecutionService {
 
     // ── Audit reports ─────────────────────────────────────────────────────────
 
-    private ReportData runAccessReviewSummaryData(UUID directoryId, Map<String, Object> params) {
-        var campaigns = campaignRepo.findByDirectoryId(directoryId,
-                org.springframework.data.domain.Pageable.unpaged()).getContent();
-        List<String> columns = List.of("name", "status", "startsAt", "deadline", "completedAt", "createdAt");
+    private ReportData runAccessReviewResultsData(UUID directoryId, Map<String, Object> params) {
+        String campaignIdStr = params.containsKey("campaignId") ? (String) params.get("campaignId") : null;
+        if (campaignIdStr == null || campaignIdStr.isBlank()) {
+            // No campaign selected — return campaign listing as fallback
+            var campaigns = campaignRepo.findByDirectoryId(directoryId,
+                    org.springframework.data.domain.Pageable.unpaged()).getContent();
+            List<String> columns = List.of("Campaign", "Status", "Starts", "Deadline", "Completed", "Created");
+            List<Map<String, String>> rows = new ArrayList<>();
+            for (var c : campaigns) {
+                Map<String, String> row = new LinkedHashMap<>();
+                row.put("Campaign", c.getName() != null ? c.getName() : "");
+                row.put("Status", c.getStatus().name());
+                row.put("Starts", c.getStartsAt() != null ? c.getStartsAt().toString() : "");
+                row.put("Deadline", c.getDeadline() != null ? c.getDeadline().toString() : "");
+                row.put("Completed", c.getCompletedAt() != null ? c.getCompletedAt().toString() : "");
+                row.put("Created", c.getCreatedAt() != null ? c.getCreatedAt().toString() : "");
+                rows.add(row);
+            }
+            return new ReportData(columns, rows);
+        }
+
+        // Campaign selected — return decision-level data
+        AccessReviewCampaign campaign = campaignRepo.findById(UUID.fromString(campaignIdStr))
+                .orElseThrow(() -> new IllegalArgumentException("Campaign not found: " + campaignIdStr));
+
+        List<String> columns = List.of("Group", "Member", "Decision", "Reviewer", "Decided At", "Comment");
         List<Map<String, String>> rows = new ArrayList<>();
-        for (var c : campaigns) {
-            Map<String, String> row = new LinkedHashMap<>();
-            row.put("name", c.getName() != null ? c.getName() : "");
-            row.put("status", c.getStatus().name());
-            row.put("startsAt", c.getStartsAt() != null ? c.getStartsAt().toString() : "");
-            row.put("deadline", c.getDeadline() != null ? c.getDeadline().toString() : "");
-            row.put("completedAt", c.getCompletedAt() != null ? c.getCompletedAt().toString() : "");
-            row.put("createdAt", c.getCreatedAt() != null ? c.getCreatedAt().toString() : "");
-            rows.add(row);
+
+        for (AccessReviewGroup reviewGroup : campaign.getReviewGroups()) {
+            String groupLabel = reviewGroup.getGroupName() != null ? reviewGroup.getGroupName() : reviewGroup.getGroupDn();
+            String reviewerName = reviewGroup.getReviewer() != null
+                    ? reviewGroup.getReviewer().getUsername() : "";
+
+            for (AccessReviewDecision decision : reviewGroup.getDecisions()) {
+                Map<String, String> row = new LinkedHashMap<>();
+                row.put("Group", groupLabel);
+                row.put("Member", decision.getMemberDisplay() != null ? decision.getMemberDisplay() : decision.getMemberDn());
+                if (decision.getDecision() == null) {
+                    row.put("Decision", "PENDING");
+                    row.put("Reviewer", reviewerName);
+                    row.put("Decided At", "");
+                    row.put("Comment", "");
+                } else {
+                    row.put("Decision", decision.getDecision().name());
+                    row.put("Reviewer", decision.getDecidedBy() != null
+                            ? decision.getDecidedBy().getUsername() : reviewerName);
+                    row.put("Decided At", decision.getDecidedAt() != null ? decision.getDecidedAt().toString() : "");
+                    row.put("Comment", decision.getComment() != null ? decision.getComment() : "");
+                }
+                rows.add(row);
+            }
         }
         return new ReportData(columns, rows);
     }
@@ -445,15 +485,15 @@ public class ReportExecutionService {
         List<LdapGroup> allGroups = groupService.searchGroups(dc, groupFilter, null, MAX_LDAP_RESULTS,
                 "cn", "member", "uniqueMember", "description");
 
-        List<String> columns = List.of("userDn", "groupDn", "groupName");
+        List<String> columns = List.of("User", "Group DN", "Group");
         List<Map<String, String>> rows = new ArrayList<>();
         for (LdapGroup g : allGroups) {
             String groupName = g.getCn() != null ? g.getCn() : g.getDn();
             for (String memberDn : g.getAllMembers()) {
                 Map<String, String> row = new LinkedHashMap<>();
-                row.put("userDn", memberDn);
-                row.put("groupDn", g.getDn());
-                row.put("groupName", groupName);
+                row.put("User", memberDn);
+                row.put("Group DN", g.getDn());
+                row.put("Group", groupName);
                 rows.add(row);
             }
         }
@@ -462,20 +502,20 @@ public class ReportExecutionService {
 
     private ReportData runAccessDriftReportData(UUID directoryId) {
         var findings = driftFindingRepo.findByDirectoryId(directoryId);
-        List<String> columns = List.of("userDn", "userDisplay", "peerGroupValue",
-                "groupDn", "groupName", "peerMembershipPct", "severity", "status", "detectedAt");
+        List<String> columns = List.of("id", "User", "Name", "Peer Group",
+                "Anomalous Group", "Peer Match", "Severity", "Status", "Detected");
         List<Map<String, String>> rows = new ArrayList<>();
         for (var f : findings) {
             Map<String, String> row = new LinkedHashMap<>();
-            row.put("userDn", f.getUserDn() != null ? f.getUserDn() : "");
-            row.put("userDisplay", f.getUserDisplay() != null ? f.getUserDisplay() : "");
-            row.put("peerGroupValue", f.getPeerGroupValue() != null ? f.getPeerGroupValue() : "");
-            row.put("groupDn", f.getGroupDn() != null ? f.getGroupDn() : "");
-            row.put("groupName", f.getGroupName() != null ? f.getGroupName() : "");
-            row.put("peerMembershipPct", String.valueOf(f.getPeerMembershipPct()));
-            row.put("severity", f.getSeverity().name());
-            row.put("status", f.getStatus().name());
-            row.put("detectedAt", f.getDetectedAt() != null ? f.getDetectedAt().toString() : "");
+            row.put("id", f.getId().toString());
+            row.put("User", f.getUserDn() != null ? f.getUserDn() : "");
+            row.put("Name", f.getUserDisplay() != null ? f.getUserDisplay() : "");
+            row.put("Peer Group", f.getPeerGroupValue() != null ? f.getPeerGroupValue() : "");
+            row.put("Anomalous Group", f.getGroupName() != null ? f.getGroupName() : f.getGroupDn());
+            row.put("Peer Match", Math.round(f.getPeerMembershipPct()) + "%");
+            row.put("Severity", f.getSeverity().name());
+            row.put("Status", f.getStatus().name());
+            row.put("Detected", f.getDetectedAt() != null ? f.getDetectedAt().toString() : "");
             rows.add(row);
         }
         return new ReportData(columns, rows);
@@ -485,15 +525,15 @@ public class ReportExecutionService {
         OffsetDateTime from = OffsetDateTime.now().minusDays(lookbackDays(params));
         var page = auditEventRepo.findAll(directoryId, null, null, null, from, null,
                 org.springframework.data.domain.PageRequest.of(0, MAX_LDAP_RESULTS));
-        List<String> columns = List.of("occurredAt", "action", "actorUsername", "targetDn", "directoryName");
+        List<String> columns = List.of("Time", "Action", "Actor", "Target", "Directory");
         List<Map<String, String>> rows = new ArrayList<>();
         for (var e : page.getContent()) {
             Map<String, String> row = new LinkedHashMap<>();
-            row.put("occurredAt", e.getOccurredAt() != null ? e.getOccurredAt().toString() : "");
-            row.put("action", e.getAction() != null ? e.getAction().name() : "");
-            row.put("actorUsername", e.getActorUsername() != null ? e.getActorUsername() : "");
-            row.put("targetDn", e.getTargetDn() != null ? e.getTargetDn() : "");
-            row.put("directoryName", e.getDirectoryName() != null ? e.getDirectoryName() : "");
+            row.put("Time", e.getOccurredAt() != null ? e.getOccurredAt().toString() : "");
+            row.put("Action", e.getAction() != null ? e.getAction().name() : "");
+            row.put("Actor", e.getActorUsername() != null ? e.getActorUsername() : "");
+            row.put("Target", e.getTargetDn() != null ? e.getTargetDn() : "");
+            row.put("Directory", e.getDirectoryName() != null ? e.getDirectoryName() : "");
             rows.add(row);
         }
         return new ReportData(columns, rows);

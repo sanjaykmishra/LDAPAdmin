@@ -62,6 +62,7 @@
       </div>
 
       <div v-if="resultRows.length === 0" class="p-8 text-center text-sm text-gray-400">
+        <svg class="w-8 h-8 mx-auto mb-2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
         No entries found for this report.
       </div>
 
@@ -72,16 +73,33 @@
               <th v-for="col in visibleColumns" :key="col"
                 @click="toggleSort(col)"
                 class="text-left py-2 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
-                {{ col }}
+                {{ friendlyColumnName(col) }}
                 <span v-if="sortCol === col" class="ml-0.5">{{ sortAsc ? '▲' : '▼' }}</span>
               </th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-50">
-            <tr v-for="(row, i) in pagedRows" :key="i" class="hover:bg-blue-50/30">
+          <tbody>
+            <tr v-for="(row, i) in pagedRows" :key="i" :class="i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'" class="hover:bg-blue-50/30 border-b border-gray-100/50">
               <td v-for="col in visibleColumns" :key="col"
-                class="py-2 px-4 font-mono text-xs text-gray-700 break-all max-w-xs truncate" :title="row[col]">
-                {{ row[col] }}
+                class="py-2 px-4 text-xs text-gray-700 max-w-xs" :title="row[col]">
+                <!-- Integrity check type badge -->
+                <span v-if="col === 'type' && isIntegrityCheck" :class="integrityTypeBadgeClass(row[col])" class="inline-block px-2 py-0.5 rounded-full text-xs font-medium">
+                  {{ friendlyIntegrityType(row[col]) }}
+                </span>
+                <!-- Source badge (Recently Deleted) -->
+                <span v-else-if="col === 'Source'" :class="sourceBadgeClass(row[col])" class="inline-block px-2 py-0.5 rounded-full text-xs font-medium">
+                  {{ row[col] }}
+                </span>
+                <!-- Date columns -->
+                <span v-else-if="isDateColumn(col, row[col])" :title="formatFullDate(row[col])" class="font-mono whitespace-nowrap">
+                  {{ formatRelativeDate(row[col]) }}
+                </span>
+                <!-- DN columns (truncate) -->
+                <span v-else-if="isDnColumn(col, row[col])" :title="row[col]" class="font-mono truncate block max-w-xs">
+                  {{ truncateDn(row[col]) }}
+                </span>
+                <!-- Default -->
+                <span v-else class="font-mono truncate block max-w-xs">{{ row[col] }}</span>
               </td>
             </tr>
           </tbody>
@@ -219,6 +237,12 @@ import {
 import { listDirectories } from '@/api/directories'
 import { checkIntegrity } from '@/api/browse'
 import { downloadBlob } from '@/composables/useApi'
+import {
+  friendlyColumnName, formatRelativeDate, formatFullDate,
+  truncateDn, looksLikeTimestamp, looksLikeDn,
+  integrityTypeBadgeClass, friendlyIntegrityType, sourceBadgeClass,
+  DATE_COLUMNS, HIDDEN_COLUMNS,
+} from '@/composables/useReportFormatting'
 import FormField from '@/components/FormField.vue'
 import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -284,8 +308,18 @@ const paramPlaceholder = computed(() => currentRunType.value?.paramPlaceholder ?
 const needsLookback    = computed(() => !!currentRunType.value?.lookback)
 const isIntegrityCheck = computed(() => runForm.value.reportType === 'INTEGRITY_CHECK')
 
-// Show max 10 columns in table (dn + 9 attributes)
-const visibleColumns = computed(() => resultColumns.value.slice(0, 10))
+// Show max 10 columns, hide internal columns like 'id'
+const visibleColumns = computed(() => resultColumns.value.filter(c => !HIDDEN_COLUMNS.has(c)).slice(0, 10))
+
+// Smart column type detection
+function isDateColumn(col, val) {
+  return DATE_COLUMNS.has(col) || (col.toLowerCase().includes('timestamp') && looksLikeTimestamp(val))
+}
+function isDnColumn(col, val) {
+  if (!val) return false
+  const cl = col.toLowerCase()
+  return (cl === 'dn' || cl.endsWith('dn') || cl === 'user' || cl === 'target' || cl === 'missing group') && looksLikeDn(val)
+}
 
 const sortedRows = computed(() => {
   if (!sortCol.value) return resultRows.value
