@@ -1,11 +1,11 @@
 <template>
-  <div class="p-6 max-w-5xl mx-auto">
+  <div class="p-6 max-w-5xl">
     <h1 class="text-2xl font-bold text-gray-900 mb-4">HR Integration</h1>
 
     <!-- Directory picker -->
     <div v-if="showPicker" class="mb-4">
       <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
-      <select v-model="selectedDir" class="input w-64">
+      <select v-model="selectedDir" class="w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
         <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select directory —' }}</option>
         <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
       </select>
@@ -33,11 +33,11 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Subdomain</label>
-            <input v-model="form.subdomain" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g. acme" />
+            <input v-model="form.subdomain" required autocomplete="off" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g. acme" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
-            <input v-model="form.apiKey" :required="!editing" type="password" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" :placeholder="editing ? '(unchanged)' : 'Enter API key'" />
+            <input v-model="form.apiKey" :required="!editing" type="password" autocomplete="new-password" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" :placeholder="editing ? '(unchanged)' : 'Enter API key'" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Sync Schedule (Cron)</label>

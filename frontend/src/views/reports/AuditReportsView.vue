@@ -1,8 +1,8 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Audit Reports</h1>
-      <button @click="openEvidencePackage" :disabled="!dirId" class="btn-secondary flex items-center gap-1.5">
+      <h1 class="text-2xl font-bold text-gray-900">Compliance Reports</h1>
+      <button @click="openEvidencePackage" :disabled="!dirId" class="bg-blue-50 text-blue-600 rounded-full px-4 py-1.5 text-sm font-medium hover:bg-blue-100 transition-colors disabled:opacity-50 flex items-center gap-1.5">
         <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v12M10 2l4 4M10 2 6 6"/><path d="M3 13v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
         Evidence Package
       </button>
