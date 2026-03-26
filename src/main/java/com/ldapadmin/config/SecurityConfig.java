@@ -75,6 +75,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/oidc/callback").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/settings/branding").permitAll()
                 .requestMatchers("/api/v1/self-service/register/**").permitAll()
+                .requestMatchers("/api/v1/auditor/**").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 // ── Self-service portal (SELF_SERVICE principal only) ─────────
