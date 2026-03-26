@@ -269,37 +269,34 @@ public class LdapGroupService {
     }
 
     private List<String> getNestedMembersRecursive(DirectoryConnection dc, String groupDn) {
-        java.util.Set<String> visited = new java.util.LinkedHashSet<>();
+        java.util.Set<String> members = new java.util.LinkedHashSet<>();
         java.util.Set<String> visitedGroups = new java.util.HashSet<>();
-        resolveGroupRecursive(dc, groupDn, visited, visitedGroups);
-        return new java.util.ArrayList<>(visited);
-    }
-
-    private void resolveGroupRecursive(DirectoryConnection dc, String groupDn,
-                                        java.util.Set<String> members, java.util.Set<String> visitedGroups) {
-        if (!visitedGroups.add(groupDn.toLowerCase())) return; // cycle detection
-
+        // Use a single connection for the entire recursive traversal
         connectionFactory.withConnection(dc, conn -> {
-            try {
-                SearchResultEntry entry = conn.getEntry(groupDn, "member", "uniqueMember", "objectClass");
-                if (entry == null) return null;
-
-                for (String attr : java.util.List.of("member", "uniqueMember")) {
-                    String[] vals = entry.getAttributeValues(attr);
-                    if (vals == null) continue;
-                    for (String memberDn : vals) {
-                        if (memberDn.isBlank()) continue;
-                        members.add(memberDn);
-                        // Check if this member is itself a group (has objectClass=group*)
-                        // Simple heuristic: try to resolve it as a group
-                        resolveGroupRecursive(dc, memberDn, members, visitedGroups);
-                    }
-                }
-            } catch (LDAPException e) {
-                log.debug("Could not resolve nested members for {}: {}", groupDn, e.getMessage());
-            }
+            resolveGroupRecursive(conn, groupDn, members, visitedGroups);
             return null;
         });
+        return new java.util.ArrayList<>(members);
+    }
+
+    private void resolveGroupRecursive(LDAPConnection conn, String groupDn,
+                                        java.util.Set<String> members, java.util.Set<String> visitedGroups) {
+        if (!visitedGroups.add(groupDn.toLowerCase())) return;
+        try {
+            SearchResultEntry entry = conn.getEntry(groupDn, "member", "uniqueMember");
+            if (entry == null) return;
+            for (String attr : java.util.List.of("member", "uniqueMember")) {
+                String[] vals = entry.getAttributeValues(attr);
+                if (vals == null) continue;
+                for (String memberDn : vals) {
+                    if (memberDn.isBlank()) continue;
+                    members.add(memberDn);
+                    resolveGroupRecursive(conn, memberDn, members, visitedGroups);
+                }
+            }
+        } catch (LDAPException e) {
+            log.debug("Could not resolve nested members for {}: {}", groupDn, e.getMessage());
+        }
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

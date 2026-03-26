@@ -130,6 +130,8 @@ public class DirectoryConnectionService {
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private void applyRequest(DirectoryConnection dc, DirectoryConnectionRequest req) {
+        dc.setDirectoryType(req.directoryType() != null ? req.directoryType()
+                : com.ldapadmin.entity.enums.DirectoryType.GENERIC);
         dc.setDisplayName(req.displayName());
         dc.setHost(req.host());
         dc.setPort(req.port());
@@ -148,6 +150,9 @@ public class DirectoryConnectionService {
         dc.setEnableValue(req.enableValue());
         dc.setDisableValue(req.disableValue());
         dc.setEnabled(req.enabled());
+        dc.setSecondaryHost(req.secondaryHost());
+        dc.setSecondaryPort(req.secondaryPort());
+        dc.setGlobalCatalogPort(req.globalCatalogPort());
         dc.setSelfServiceEnabled(req.selfServiceEnabled());
         dc.setSelfServiceLoginAttribute(
                 req.selfServiceLoginAttribute() != null && !req.selfServiceLoginAttribute().isBlank()

@@ -178,7 +178,7 @@ function emptyForm() {
     directoryType: 'GENERIC',
     displayName: '', host: '', port: 389, sslMode: 'NONE',
     trustAllCerts: false, bindDn: '', bindPassword: '', baseDn: '',
-    pagingSize: 500, poolMinSize: 1, poolMaxSize: 10,
+    pagingSize: 500, poolMinSize: 2, poolMaxSize: 10,
     poolConnectTimeoutSeconds: 10, poolResponseTimeoutSeconds: 30,
     enableDisableAttribute: '', enableDisableValueType: 'BOOLEAN',
     enableValue: '', disableValue: '', enabled: true,
