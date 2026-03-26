@@ -56,6 +56,12 @@
       ({{ formatDate(metadata.expiresAt) }})
     </div>
 
+    <!-- Export error banner -->
+    <div v-if="exportError"
+         class="bg-red-50 border-b border-red-200 text-red-700 text-xs text-center py-2 px-4">
+      {{ exportError }}
+    </div>
+
     <!-- Activity transparency footer note -->
     <div class="text-center text-[10px] text-slate-400 py-1 border-b border-slate-100">
       Access logged for compliance audit trail
@@ -88,7 +94,9 @@
     </main>
 
     <!-- Verification detail drawer -->
-    <div v-if="showVerifyDrawer" class="fixed inset-0 z-50 flex justify-end" @click.self="showVerifyDrawer = false">
+    <div v-if="showVerifyDrawer" class="fixed inset-0 z-50 flex justify-end"
+         @click.self="showVerifyDrawer = false" @keydown.escape="showVerifyDrawer = false"
+         role="dialog" aria-label="Integrity Verification" tabindex="-1" ref="verifyDrawerRef">
       <div class="fixed inset-0 bg-black/30" @click="showVerifyDrawer = false" />
       <div class="relative w-full max-w-md bg-white shadow-xl p-6 overflow-y-auto">
         <div class="flex items-center justify-between mb-6">
@@ -117,6 +125,15 @@
             Verification Failed
           </div>
           <p class="text-xs text-red-600">The cryptographic signature does not match. This evidence may have been tampered with.</p>
+        </div>
+        <div v-else-if="verification.error" class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+          <div class="flex items-center gap-2 text-amber-700 font-medium text-sm mb-1">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            Verification Unavailable
+          </div>
+          <p class="text-xs text-amber-600">Could not reach the verification service. This does not indicate tampering — please try again later.</p>
         </div>
 
         <dl class="space-y-3 text-sm">
@@ -167,6 +184,7 @@ const branding = ref({})
 const verification = ref({})
 const showVerifyDrawer = ref(false)
 const exporting = ref(false)
+const exportError = ref(null)
 
 const daysRemaining = computed(() => {
   if (!metadata.value.expiresAt) return null
@@ -177,12 +195,14 @@ const daysRemaining = computed(() => {
 const verifyLabel = computed(() => {
   if (verification.value.verified === true) return 'Integrity Verified'
   if (verification.value.verified === false) return 'Verification Failed'
+  if (verification.value.error) return 'Verification Unavailable'
   return 'Verifying...'
 })
 
 const verifyBadgeClass = computed(() => {
   if (verification.value.verified === true) return 'bg-green-50 text-green-700 border border-green-200'
   if (verification.value.verified === false) return 'bg-red-50 text-red-700 border border-red-200'
+  if (verification.value.error) return 'bg-amber-50 text-amber-700 border border-amber-200'
   return 'bg-slate-100 text-slate-500 border border-slate-200'
 })
 
@@ -204,8 +224,9 @@ async function downloadZip() {
     a.download = 'evidence-package.zip'
     a.click()
     URL.revokeObjectURL(url)
-  } catch {
-    // silently fail — user can retry
+  } catch (e) {
+    exportError.value = 'Failed to download evidence package. Please try again.'
+    setTimeout(() => { exportError.value = null }, 5000)
   } finally {
     exporting.value = false
   }
@@ -223,7 +244,7 @@ onMounted(async () => {
       const { data: v } = await getPortalVerify(token.value)
       verification.value = v
     } catch {
-      verification.value = { verified: false }
+      verification.value = { error: true }
     }
   } catch {
     loading.value = false

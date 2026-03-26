@@ -1,6 +1,16 @@
 <template>
   <svg :width="size" :height="size" :viewBox="`0 0 ${size} ${size}`">
-    <circle v-for="(seg, i) in arcs" :key="i"
+    <!-- Empty state: light gray ring -->
+    <circle v-if="total === 0"
+            :cx="center" :cy="center" :r="radius"
+            fill="none" stroke="#e2e8f0" :stroke-width="strokeWidth" />
+    <!-- Single segment: full ring in that color -->
+    <circle v-else-if="arcs.length === 1"
+            :cx="center" :cy="center" :r="radius"
+            fill="none" :stroke="arcs[0].color" :stroke-width="strokeWidth"
+            :style="{ transition: 'stroke 0.6s ease' }" />
+    <!-- Multi-segment donut -->
+    <circle v-else v-for="(seg, i) in arcs" :key="i"
             :cx="center" :cy="center" :r="radius"
             fill="none" :stroke="seg.color" :stroke-width="strokeWidth"
             :stroke-dasharray="seg.dashArray" :stroke-dashoffset="seg.dashOffset"

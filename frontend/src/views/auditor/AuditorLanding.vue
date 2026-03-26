@@ -67,14 +67,14 @@
     </div>
 
     <!-- SoD zero state -->
-    <div v-if="scope.includeSod && metrics.sodViolations === 0 && !loadingData"
+    <div v-if="scope.includeSod && metrics.sodPolicies > 0 && metrics.sodViolations === 0 && !loadingData"
          class="bg-green-50 border border-green-200 rounded-xl p-5 mb-6 flex items-center gap-3">
       <svg class="w-6 h-6 text-green-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
       <div>
         <div class="text-sm font-medium text-green-800">No Separation of Duties violations detected</div>
-        <div class="text-xs text-green-600">All {{ metrics.sodPolicies }} policies passed without violations</div>
+        <div class="text-xs text-green-600">All {{ metrics.sodPolicies }} {{ metrics.sodPolicies === 1 ? 'policy' : 'policies' }} passed without violations</div>
       </div>
     </div>
 
