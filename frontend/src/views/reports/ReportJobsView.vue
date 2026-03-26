@@ -39,7 +39,7 @@
         <!-- Integrity check options -->
         <div v-if="isIntegrityCheck">
           <label class="block text-sm font-medium text-gray-700 mb-1">Checks to Run</label>
-          <div class="flex flex-col gap-1.5 mt-1">
+          <div class="flex flex-row gap-4 mt-1">
             <label v-for="c in integrityChecks" :key="c.value" class="flex items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" v-model="runForm.integrityChecks" :value="c.value" class="rounded border-gray-300" />
               {{ c.label }}
