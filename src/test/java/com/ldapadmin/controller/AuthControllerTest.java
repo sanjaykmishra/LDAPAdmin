@@ -11,6 +11,7 @@ import com.ldapadmin.auth.dto.LoginResponse;
 import com.ldapadmin.entity.ApplicationSettings;
 import com.ldapadmin.ldap.LdapConnectionFactory;
 import com.ldapadmin.ldap.LdapUserService;
+import com.ldapadmin.repository.AccountRepository;
 import com.ldapadmin.repository.AdminProfileRoleRepository;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.repository.ProvisioningProfileRepository;
@@ -48,6 +49,8 @@ class AuthControllerTest extends BaseControllerTest {
     @MockBean AdminProfileRoleRepository adminProfileRoleRepository;
     @MockBean ProvisioningProfileRepository provisioningProfileRepository;
     @MockBean DirectoryConnectionRepository directoryConnectionRepository;
+    @MockBean AccountRepository accountRepository;
+    @MockBean org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     @MockBean LdapConnectionFactory ldapConnectionFactory;
     @MockBean LdapUserService ldapUserService;
     @MockBean ApplicationSettingsService applicationSettingsService;

@@ -6,21 +6,6 @@
 
     <form v-else @submit.prevent="doSave" class="space-y-4">
 
-      <!-- Theme -->
-      <section class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
-        <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-3">Theme</h2>
-        <div class="flex gap-3">
-          <button v-for="opt in themeOptions" :key="opt.value"
-            @click="setTheme(opt.value)"
-            :class="['px-4 py-2 rounded-lg text-sm font-medium border transition-colors',
-              theme === opt.value
-                ? 'bg-blue-50 dark:bg-blue-900 border-blue-300 dark:border-blue-600 text-blue-700 dark:text-blue-300'
-                : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700']">
-            {{ opt.label }}
-          </button>
-        </div>
-      </section>
-
       <!-- Branding -->
       <section class="bg-white border border-gray-200 rounded-xl p-6">
         <h2 class="text-base font-semibold text-gray-900 mb-3">Branding</h2>
@@ -99,7 +84,7 @@
             <FormField label="Service Account Bind DN" v-model="form.ldapAuthBindDn"
               placeholder="cn=admin,dc=example,dc=com" />
             <div>
-              <FormField label="Bind Password" v-model="form.ldapAuthBindPassword" type="password"
+              <FormField label="Bind Password" v-model="form.ldapAuthBindPassword" type="password" autocomplete="new-password"
                 :placeholder="settings?.ldapAuthBindPasswordConfigured ? '●●●●●●●● (leave blank to keep)' : 'Set password'" />
               <p class="text-xs text-gray-400 mt-1">Leave blank to keep existing. Enter a space to clear.</p>
             </div>
@@ -122,7 +107,7 @@
             </div>
             <FormField label="Client ID" v-model="form.oidcClientId" placeholder="your-client-id" />
             <div>
-              <FormField label="Client Secret" v-model="form.oidcClientSecret" type="password"
+              <FormField label="Client Secret" v-model="form.oidcClientSecret" type="password" autocomplete="new-password"
                 :placeholder="settings?.oidcClientSecretConfigured ? '●●●●●●●● (leave blank to keep)' : 'Set secret'" />
               <p class="text-xs text-gray-400 mt-1">Leave blank to keep existing. Enter a space to clear.</p>
             </div>
@@ -140,12 +125,13 @@
           <FormField label="SMTP Host" v-model="form.smtpHost" placeholder="smtp.example.com" />
           <FormField label="SMTP Port" v-model.number="form.smtpPort" type="number" placeholder="587" />
           <FormField label="Sender Address" v-model="form.smtpSenderAddress" placeholder="noreply@example.com" />
-          <FormField label="Username" v-model="form.smtpUsername" placeholder="username" />
+          <FormField label="Username" v-model="form.smtpUsername" placeholder="username" autocomplete="off" />
           <div class="col-span-2">
             <FormField
               label="Password"
               v-model="form.smtpPassword"
               type="password"
+              autocomplete="new-password"
               :placeholder="settings?.smtpPasswordConfigured ? '●●●●●●●● (leave blank to keep)' : 'Set password'"
             />
             <p class="text-xs text-gray-400 mt-1">
@@ -171,6 +157,7 @@
               label="Secret Key"
               v-model="form.s3SecretKey"
               type="password"
+              autocomplete="new-password"
               :placeholder="settings?.s3SecretKeyConfigured ? '●●●●●●●● (leave blank to keep)' : 'Set secret key'"
             />
             <p class="text-xs text-gray-400 mt-1">Leave blank to keep existing. Enter a space to clear.</p>
@@ -233,7 +220,7 @@
               <FormField label="Webhook URL" v-model="form.webhookUrl" placeholder="https://hooks.example.com/audit" />
             </div>
             <div class="col-span-2">
-              <FormField label="Authorization Header" v-model="form.webhookAuthHeader" type="password"
+              <FormField label="Authorization Header" v-model="form.webhookAuthHeader" type="password" autocomplete="new-password"
                 :placeholder="settings?.webhookAuthHeaderConfigured ? '●●●●●●●● (leave blank to keep)' : 'e.g. Bearer your-token'" />
               <p class="text-xs text-gray-400 mt-1">Sent as the Authorization header on each webhook request.</p>
             </div>
@@ -264,16 +251,8 @@
 import { ref, onMounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
 import { useSettingsStore } from '@/stores/settings'
-import { useTheme } from '@/composables/useTheme'
 import { getSettings, updateSettings, testSiem } from '@/api/settings'
 import FormField from '@/components/FormField.vue'
-
-const { theme, setTheme } = useTheme()
-const themeOptions = [
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'system', label: 'System' },
-]
 
 const notif         = useNotificationStore()
 const settingsStore = useSettingsStore()
