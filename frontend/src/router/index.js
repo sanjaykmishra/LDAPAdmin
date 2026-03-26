@@ -351,6 +351,50 @@ const router = createRouter({
       meta: { public: true },
     },
 
+    // ── Auditor portal (public — no auth, standalone layout) ──────────────
+    {
+      path: '/auditor/:token',
+      component: () => import('@/views/auditor/AuditorLayout.vue'),
+      meta: { public: true },
+      children: [
+        {
+          path: '',
+          name: 'auditorLanding',
+          component: () => import('@/views/auditor/AuditorLanding.vue'),
+        },
+        {
+          path: 'campaigns',
+          name: 'auditorCampaigns',
+          component: () => import('@/views/auditor/AuditorLanding.vue'), // placeholder — M6 adds dedicated view
+        },
+        {
+          path: 'campaigns/:campaignId',
+          name: 'auditorCampaignDetail',
+          component: () => import('@/views/auditor/AuditorLanding.vue'), // placeholder — M6
+        },
+        {
+          path: 'sod',
+          name: 'auditorSod',
+          component: () => import('@/views/auditor/AuditorLanding.vue'), // placeholder — M6
+        },
+        {
+          path: 'entitlements',
+          name: 'auditorEntitlements',
+          component: () => import('@/views/auditor/AuditorLanding.vue'), // placeholder — M7
+        },
+        {
+          path: 'audit-events',
+          name: 'auditorAuditEvents',
+          component: () => import('@/views/auditor/AuditorLanding.vue'), // placeholder — M7
+        },
+        {
+          path: 'approvals',
+          name: 'auditorApprovals',
+          component: () => import('@/views/auditor/AuditorLanding.vue'), // placeholder — M7
+        },
+      ],
+    },
+
     // Catch-all
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
@@ -376,7 +420,7 @@ router.beforeEach(async (to) => {
   await auth.init()
 
   // Public routes — no auth needed
-  if (to.meta.public) return
+  if (to.meta.public || to.matched.some(r => r.meta.public)) return
 
   // Self-service protected routes
   if (to.meta.requiresSelfService) {
