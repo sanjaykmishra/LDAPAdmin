@@ -1,6 +1,15 @@
 <template>
   <div class="p-6 max-w-5xl mx-auto">
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">HR Integration</h1>
+    <h1 class="text-2xl font-bold text-gray-900 mb-4">HR Integration</h1>
+
+    <!-- Directory picker -->
+    <div v-if="showPicker" class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
+      <select v-model="selectedDir" class="input w-64">
+        <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select directory —' }}</option>
+        <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
+      </select>
+    </div>
 
     <!-- Error -->
     <div v-if="error" class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6 text-sm">{{ error }}</div>
@@ -155,16 +164,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRoute, RouterLink } from 'vue-router'
+import { ref, watch, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
+import { useDirectoryPicker } from '@/composables/useDirectoryPicker'
 import {
   getHrConnection, createHrConnection, updateHrConnection,
   testHrConnection, triggerHrSync as apiTriggerSync,
   getHrSyncHistory, getHrSummary
 } from '@/api/hrIntegration'
 
-const route = useRoute()
-const dirId = route.params.dirId
+const { dirId, directories, selectedDir, loadingDirs, showPicker } = useDirectoryPicker()
 
 const loading = ref(true)
 const error = ref('')
@@ -187,14 +196,17 @@ const form = ref({
   syncCron: '0 0 * * * ?',
 })
 
-onMounted(async () => {
+async function initLoad() {
+  if (!dirId.value) { loading.value = false; return }
   await loadConnection()
   loading.value = false
-})
+}
+watch(dirId, () => { loading.value = true; connection.value = null; initLoad() })
+onMounted(initLoad)
 
 async function loadConnection() {
   try {
-    const { data } = await getHrConnection(dirId)
+    const { data } = await getHrConnection(dirId.value)
     connection.value = data
     await Promise.all([loadSummary(), loadHistory()])
   } catch (e) {
@@ -207,14 +219,14 @@ async function loadConnection() {
 
 async function loadSummary() {
   try {
-    const { data } = await getHrSummary(dirId)
+    const { data } = await getHrSummary(dirId.value)
     summary.value = data
   } catch { /* ignore */ }
 }
 
 async function loadHistory() {
   try {
-    const { data } = await getHrSyncHistory(dirId, { page: 0, size: 10 })
+    const { data } = await getHrSyncHistory(dirId.value, { page: 0, size: 10 })
     syncHistory.value = data.content || []
   } catch { /* ignore */ }
 }
@@ -226,9 +238,9 @@ async function saveConnection() {
     if (editing.value) {
       const payload = { ...form.value }
       if (!payload.apiKey) delete payload.apiKey
-      await updateHrConnection(dirId, payload)
+      await updateHrConnection(dirId.value, payload)
     } else {
-      await createHrConnection(dirId, form.value)
+      await createHrConnection(dirId.value, form.value)
     }
     showSetup.value = false
     editing.value = false
@@ -244,7 +256,7 @@ async function testConn() {
   testing.value = true
   testResult.value = null
   try {
-    const { data } = await testHrConnection(dirId, {
+    const { data } = await testHrConnection(dirId.value, {
       displayName: form.value.displayName || 'Test',
       subdomain: form.value.subdomain,
       apiKey: form.value.apiKey,
@@ -260,7 +272,7 @@ async function testConn() {
 async function triggerSync() {
   syncing.value = true
   try {
-    await apiTriggerSync(dirId)
+    await apiTriggerSync(dirId.value)
     await loadConnection()
   } catch (e) {
     error.value = e.response?.data?.detail || 'Sync failed'
@@ -289,7 +301,7 @@ function cancelEdit() {
 
 async function toggleEnabled() {
   try {
-    await updateHrConnection(dirId, { enabled: !connection.value.enabled })
+    await updateHrConnection(dirId.value, { enabled: !connection.value.enabled })
     await loadConnection()
   } catch (e) {
     error.value = e.response?.data?.detail || 'Failed to update'

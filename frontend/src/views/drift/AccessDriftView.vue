@@ -13,6 +13,15 @@
       </div>
     </div>
 
+    <!-- Directory picker -->
+    <div v-if="showPicker" class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
+      <select v-model="selectedDir" class="input w-64">
+        <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select directory —' }}</option>
+        <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
+      </select>
+    </div>
+
     <!-- Summary cards -->
     <div v-if="summary" class="grid grid-cols-4 gap-4 mb-6">
       <div class="rounded-xl border-2 p-5" :class="summary.openHigh > 0 ? 'border-red-200 bg-red-50/30' : 'border-gray-200'">
@@ -147,18 +156,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, watch, onMounted } from 'vue'
 import { useApi } from '@/composables/useApi'
+import { useDirectoryPicker } from '@/composables/useDirectoryPicker'
 import {
   listRules, createRule, deleteRule,
   runAnalysis, listFindings, getFindingsSummary,
   acknowledgeFinding, exemptFinding,
 } from '@/api/accessDrift'
 
-const route = useRoute()
+const { dirId, directories, selectedDir, loadingDirs, showPicker } = useDirectoryPicker()
 const { loading, call } = useApi()
-const dirId = route.params.dirId
 
 const findings = ref([])
 const summary = ref(null)
@@ -184,21 +192,21 @@ function severityBadge(s) {
 async function loadFindings() {
   try {
     const params = statusFilter.value ? { status: statusFilter.value } : {}
-    const res = await call(() => listFindings(dirId, params))
+    const res = await call(() => listFindings(dirId.value, params))
     findings.value = res.data
   } catch { /* handled */ }
 }
 
 async function loadSummary() {
   try {
-    const res = await getFindingsSummary(dirId)
+    const res = await getFindingsSummary(dirId.value)
     summary.value = res.data
   } catch { /* ignore */ }
 }
 
 async function loadRules() {
   try {
-    const res = await listRules(dirId)
+    const res = await listRules(dirId.value)
     rules.value = res.data
   } catch { /* ignore */ }
 }
@@ -206,7 +214,7 @@ async function loadRules() {
 async function handleAnalyze() {
   analyzing.value = true
   try {
-    const res = await call(() => runAnalysis(dirId), { successMsg: 'Analysis complete' })
+    const res = await call(() => runAnalysis(dirId.value), { successMsg: 'Analysis complete' })
     analysisResult.value = res.data
     await loadFindings()
     await loadSummary()
@@ -216,7 +224,7 @@ async function handleAnalyze() {
 
 async function handleAcknowledge(f) {
   try {
-    await call(() => acknowledgeFinding(dirId, f.id), { successMsg: 'Acknowledged' })
+    await call(() => acknowledgeFinding(dirId.value, f.id), { successMsg: 'Acknowledged' })
     await loadFindings()
     await loadSummary()
   } catch { /* handled */ }
@@ -229,7 +237,7 @@ function openExempt(f) {
 
 async function submitExempt() {
   try {
-    await call(() => exemptFinding(dirId, exemptDialog.value.id, { reason: exemptReason.value }),
+    await call(() => exemptFinding(dirId.value, exemptDialog.value.id, { reason: exemptReason.value }),
       { successMsg: 'Exempted' })
     exemptDialog.value = null
     await loadFindings()
@@ -239,7 +247,7 @@ async function submitExempt() {
 
 async function handleCreateRule() {
   try {
-    await call(() => createRule(dirId, { ...newRule.value, enabled: true }), { successMsg: 'Rule created' })
+    await call(() => createRule(dirId.value, { ...newRule.value, enabled: true }), { successMsg: 'Rule created' })
     newRule.value = { name: '', groupingAttribute: '', anomalyThresholdPct: 10, normalThresholdPct: 50 }
     await loadRules()
   } catch { /* handled */ }
@@ -248,16 +256,19 @@ async function handleCreateRule() {
 async function handleDeleteRule(r) {
   if (!confirm(`Delete rule "${r.name}"?`)) return
   try {
-    await call(() => deleteRule(dirId, r.id), { successMsg: 'Rule deleted' })
+    await call(() => deleteRule(dirId.value, r.id), { successMsg: 'Rule deleted' })
     await loadRules()
   } catch { /* handled */ }
 }
 
-onMounted(() => {
+function loadAll() {
+  if (!dirId.value) return
   loadFindings()
   loadSummary()
   loadRules()
-})
+}
+watch(dirId, () => loadAll())
+onMounted(loadAll)
 </script>
 
 <style scoped>

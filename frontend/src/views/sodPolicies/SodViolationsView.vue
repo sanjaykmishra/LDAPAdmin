@@ -2,7 +2,7 @@
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-900">SoD Violations</h1>
-      <div class="flex gap-2 items-center">
+      <div class="flex gap-2 items-center" v-if="dirId">
         <label class="text-sm text-gray-600">Filter:</label>
         <select v-model="statusFilter" @change="loadViolations"
           class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -12,6 +12,15 @@
           <option value="EXEMPTED">Exempted</option>
         </select>
       </div>
+    </div>
+
+    <!-- Directory picker -->
+    <div v-if="showPicker" class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
+      <select v-model="selectedDir" class="input w-64">
+        <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select directory —' }}</option>
+        <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
+      </select>
     </div>
 
     <div v-if="loading && !violations.length" class="text-gray-500">Loading...</div>
@@ -139,15 +148,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, watch, onMounted } from 'vue'
 import { useApi } from '@/composables/useApi'
+import { useDirectoryPicker } from '@/composables/useDirectoryPicker'
 import { listViolations, exemptViolation, resolveViolation } from '@/api/sodPolicies'
 import { searchEntries } from '@/api/browse'
 
-const route = useRoute()
+const { dirId, directories, selectedDir, loadingDirs, showPicker } = useDirectoryPicker()
 const { loading, call } = useApi()
-const dirId = route.params.dirId
 
 const violations = ref([])
 const statusFilter = ref('OPEN')
@@ -186,7 +194,7 @@ async function submitExempt() {
     if (exemptExpiresAt.value) {
       data.expiresAt = new Date(exemptExpiresAt.value).toISOString()
     }
-    await call(() => exemptViolation(dirId, exemptDialog.value.id, data),
+    await call(() => exemptViolation(dirId.value, exemptDialog.value.id, data),
       { successMsg: 'Violation exempted' })
     exemptDialog.value = null
     await loadViolations()
@@ -196,7 +204,7 @@ async function submitExempt() {
 async function handleResolve(v) {
   if (!confirm('Mark this violation as resolved?')) return
   try {
-    await call(() => resolveViolation(dirId, v.id), { successMsg: 'Violation resolved' })
+    await call(() => resolveViolation(dirId.value, v.id), { successMsg: 'Violation resolved' })
     await loadViolations()
   } catch { /* handled */ }
 }
@@ -204,7 +212,7 @@ async function handleResolve(v) {
 async function loadViolations() {
   try {
     const params = statusFilter.value ? { status: statusFilter.value } : {}
-    const res = await call(() => listViolations(dirId, params))
+    const res = await call(() => listViolations(dirId.value, params))
     violations.value = res.data
   } catch { /* handled */ }
 }
@@ -214,7 +222,7 @@ async function showUserDetail(dn) {
   userGroups.value = null
   loadingUser.value = true
   try {
-    const { data } = await searchEntries(dirId, {
+    const { data } = await searchEntries(dirId.value, {
       baseDn: dn,
       scope: 'base',
       filter: '(objectClass=*)',
@@ -230,12 +238,12 @@ async function showUserDetail(dn) {
 }
 
 async function loadUserGroups(dn) {
-  if (!dirId || !dn) return
+  if (!dirId.value || !dn) return
   loadingGroups.value = true
   try {
     const escapedDn = dn.replace(/([\\*()])/g, '\\$1')
     const uid = dn.split(',')[0].split('=')[1] || dn
-    const { data } = await searchEntries(dirId, {
+    const { data } = await searchEntries(dirId.value, {
       scope: 'sub',
       filter: `(|(member=${escapedDn})(uniqueMember=${escapedDn})(memberUid=${uid}))`,
       attributes: 'cn,dn',
@@ -252,7 +260,8 @@ async function loadUserGroups(dn) {
   }
 }
 
-onMounted(loadViolations)
+watch(dirId, (v) => { if (v) loadViolations() })
+onMounted(() => { if (dirId.value) loadViolations() })
 </script>
 
 <style scoped>
