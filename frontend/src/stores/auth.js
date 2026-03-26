@@ -13,6 +13,8 @@ export const useAuthStore = defineStore('auth', () => {
   const isSuperadmin  = computed(() => principal.value?.accountType === 'SUPERADMIN')
   const isSelfService = computed(() => principal.value?.accountType === 'SELF_SERVICE')
   const username      = computed(() => principal.value?.username || '')
+  const themePreference = computed(() => principal.value?.themePreference || 'system')
+  const authType      = computed(() => principal.value?.authType || null)
 
   /**
    * Called once per page load (from the router guard) to restore the session
@@ -24,11 +26,15 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const { data } = await me()
       principal.value = {
-        id:          data.id,
-        username:    data.username,
-        accountType: data.accountType,
-        dn:          data.dn || null,
-        directoryId: data.directoryId || null,
+        id:              data.id,
+        username:        data.username,
+        accountType:     data.accountType,
+        dn:              data.dn || null,
+        directoryId:     data.directoryId || null,
+        themePreference: data.themePreference || 'system',
+        authType:        data.authType || null,
+        email:           data.email || null,
+        displayName:     data.displayName || null,
       }
       // Check if first-run setup wizard is needed for superadmins
       if (data.accountType === 'SUPERADMIN') {
@@ -46,6 +52,12 @@ export const useAuthStore = defineStore('auth', () => {
     setupPending.value = false
   }
 
+  function updatePrincipal(fields) {
+    if (principal.value) {
+      principal.value = { ...principal.value, ...fields }
+    }
+  }
+
   async function login(username, password) {
     const { data } = await apiLogin(username, password)
     principal.value = {
@@ -54,6 +66,16 @@ export const useAuthStore = defineStore('auth', () => {
       accountType: data.accountType,
     }
     initialized.value = true
+    // Re-fetch to get preferences
+    try {
+      const { data: meData } = await me()
+      principal.value = { ...principal.value,
+        themePreference: meData.themePreference || 'system',
+        authType: meData.authType || null,
+        email: meData.email || null,
+        displayName: meData.displayName || null,
+      }
+    } catch { /* ok */ }
   }
 
   async function selfServiceLogin(directoryId, username, password) {
@@ -76,5 +98,10 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { principal, isLoggedIn, isSuperadmin, isSelfService, username, setupPending, init, login, selfServiceLogin, logout, markSetupComplete }
+  return {
+    principal, isLoggedIn, isSuperadmin, isSelfService, username,
+    themePreference, authType,
+    setupPending, init, login, selfServiceLogin, logout,
+    markSetupComplete, updatePrincipal,
+  }
 })

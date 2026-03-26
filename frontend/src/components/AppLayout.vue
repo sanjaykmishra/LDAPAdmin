@@ -179,10 +179,10 @@
 
       <!-- User info / logout -->
       <div class="px-4 py-3 border-t border-white/15 flex items-center justify-between">
-        <div class="text-sm truncate">
+        <button @click="showPreferences = true" class="text-sm truncate text-left hover:text-white/90 transition-colors" title="User Preferences">
           <p class="font-medium">{{ auth.username }}</p>
           <p class="text-xs text-gray-400">{{ auth.isSuperadmin ? 'Superadmin' : 'Admin' }}</p>
-        </div>
+        </button>
         <button @click="handleLogout" class="text-gray-400 hover:text-white text-xs ml-2">Logout</button>
       </div>
     </aside>
@@ -194,6 +194,9 @@
 
     <!-- Keyboard shortcuts help -->
     <KeyboardShortcutsHelp v-model="showShortcutsHelp" />
+
+    <!-- User preferences dialog -->
+    <UserPreferencesDialog v-if="showPreferences" @close="showPreferences = false" />
   </div>
 </template>
 
@@ -206,6 +209,7 @@ import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { myProfiles } from '@/api/auth'
 import { countPendingApprovals } from '@/api/approvals'
 import KeyboardShortcutsHelp from '@/components/KeyboardShortcutsHelp.vue'
+import UserPreferencesDialog from '@/components/UserPreferencesDialog.vue'
 
 const auth     = useAuthStore()
 const settings = useSettingsStore()
@@ -218,6 +222,7 @@ const profiles       = ref([])   // flat list of authorized profiles (admin only
 const pickerValue    = ref('')   // profile id
 const showNoProfiles = ref(false)
 const pendingCount   = ref(0)
+const showPreferences = ref(false)
 
 // Derive the directory id from the selected profile
 const currentDirId = computed(() => {
