@@ -190,7 +190,7 @@ public class ReportExecutionService {
         }
 
         if (memberDns.isEmpty()) {
-            return new ReportData(List.of("dn", "cn", "mail", "uid"), List.of());
+            return new ReportData(List.of("DN", "Name", "Email", "User ID"), List.of());
         }
 
         // Look up each member user
@@ -255,11 +255,14 @@ public class ReportExecutionService {
     private ReportData buildReportDataFromUsers(List<LdapUser> users) {
         TreeSet<String> attrNames = new TreeSet<>();
         users.forEach(u -> attrNames.addAll(u.getAttributes().keySet()));
-        List<String> columns = new ArrayList<>();
-        columns.add("dn");
-        columns.addAll(attrNames);
+        List<String> rawColumns = new ArrayList<>();
+        rawColumns.add("dn");
+        rawColumns.addAll(attrNames);
+
+        // Map raw columns to friendly names
+        List<String> columns = rawColumns.stream().map(ReportExecutionService::friendlyLdapColumn).toList();
         List<Map<String, String>> rows = users.stream()
-                .map(u -> buildRow(u, columns))
+                .map(u -> buildFriendlyRow(u, rawColumns))
                 .toList();
         return new ReportData(columns, rows);
     }
@@ -285,28 +288,78 @@ public class ReportExecutionService {
         TreeSet<String> attrNames = new TreeSet<>();
         users.forEach(u -> attrNames.addAll(u.getAttributes().keySet()));
 
-        List<String> columns = new ArrayList<>();
-        columns.add("dn");
-        columns.addAll(attrNames);
+        List<String> rawColumns = new ArrayList<>();
+        rawColumns.add("dn");
+        rawColumns.addAll(attrNames);
 
+        List<String> columns = rawColumns.stream().map(ReportExecutionService::friendlyLdapColumn).toList();
         List<Map<String, String>> rows = users.stream()
-                .map(u -> buildRow(u, columns))
+                .map(u -> buildFriendlyRow(u, rawColumns))
                 .toList();
 
         log.debug("Report query [filter={}, base={}] → {} entries", filter, baseDn, rows.size());
         return new ReportData(columns, rows);
     }
 
-    private Map<String, String> buildRow(LdapUser user, List<String> columns) {
+    private Map<String, String> buildFriendlyRow(LdapUser user, List<String> rawColumns) {
         Map<String, String> row = new LinkedHashMap<>();
-        for (String col : columns) {
+        for (String col : rawColumns) {
+            String friendly = friendlyLdapColumn(col);
             if ("dn".equals(col)) {
-                row.put("dn", user.getDn());
+                row.put(friendly, user.getDn());
             } else {
-                row.put(col, String.join("|", user.getValues(col)));
+                row.put(friendly, String.join("|", user.getValues(col)));
             }
         }
         return row;
+    }
+
+    private static final Map<String, String> LDAP_COLUMN_NAMES = Map.ofEntries(
+            Map.entry("dn", "DN"),
+            Map.entry("cn", "Name"),
+            Map.entry("uid", "User ID"),
+            Map.entry("mail", "Email"),
+            Map.entry("sn", "Last Name"),
+            Map.entry("givenname", "First Name"),
+            Map.entry("displayname", "Display Name"),
+            Map.entry("telephonenumber", "Phone"),
+            Map.entry("title", "Title"),
+            Map.entry("description", "Description"),
+            Map.entry("objectclass", "Object Class"),
+            Map.entry("createtimestamp", "Created"),
+            Map.entry("modifytimestamp", "Modified"),
+            Map.entry("employeenumber", "Employee #"),
+            Map.entry("employeetype", "Employee Type"),
+            Map.entry("departmentnumber", "Dept #"),
+            Map.entry("o", "Organization"),
+            Map.entry("ou", "Org Unit"),
+            Map.entry("l", "Location"),
+            Map.entry("st", "State"),
+            Map.entry("postalcode", "Postal Code"),
+            Map.entry("street", "Street"),
+            Map.entry("memberof", "Member Of"),
+            Map.entry("manager", "Manager"),
+            Map.entry("loginshell", "Login Shell"),
+            Map.entry("homedirectory", "Home Dir"),
+            Map.entry("uidnumber", "UID #"),
+            Map.entry("gidnumber", "GID #"),
+            Map.entry("useraccountcontrol", "UAC"),
+            Map.entry("samaccountname", "SAM Account"),
+            Map.entry("userprincipalname", "UPN"),
+            Map.entry("pwdaccountlockedtime", "Locked Since"),
+            Map.entry("nsaccountlock", "Account Lock"),
+            Map.entry("userpassword", "Password"),
+            Map.entry("entryuuid", "Entry UUID"),
+            Map.entry("entrydn", "Entry DN"),
+            Map.entry("structuralobjectclass", "Structural Class"),
+            Map.entry("subschemasubentry", "Subschema"),
+            Map.entry("hassubordinates", "Has Children"),
+            Map.entry("numsubordinates", "# Children")
+    );
+
+    private static String friendlyLdapColumn(String raw) {
+        String friendly = LDAP_COLUMN_NAMES.get(raw.toLowerCase());
+        return friendly != null ? friendly : raw;
     }
 
     /**
