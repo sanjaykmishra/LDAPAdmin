@@ -112,11 +112,59 @@ public class ReportExecutionService {
             case DISABLED_ACCOUNTS      -> runDisabledAccountsReportData(dc);
             case MISSING_PROFILE_GROUPS -> runMissingProfileGroupsReportData(dc, directoryId);
             case SOD_VIOLATIONS         -> runSodViolationsReportData(directoryId);
+            case USER_ACCESS_REPORT     -> runUserAccessReportData(dc, params);
             case ACCESS_REVIEW_SUMMARY  -> runAccessReviewSummaryData(directoryId, params);
             case PRIVILEGED_ACCOUNT_INVENTORY -> runPrivilegedAccountInventoryData(dc, params);
             case ACCESS_DRIFT_REPORT    -> runAccessDriftReportData(directoryId);
             case AUDIT_LOG_REPORT       -> runAuditLogReportData(directoryId, params);
         };
+    }
+
+    /**
+     * User Access Report: lists all users and their group memberships.
+     * Optionally filtered by a specific group DN.
+     */
+    private ReportData runUserAccessReportData(DirectoryConnection dc, Map<String, Object> params) {
+        String groupDnFilter = params.containsKey("groupDn") ? (String) params.get("groupDn") : null;
+
+        // Load all groups and build a DN -> group name map
+        String groupFilter = "(|(objectClass=groupOfNames)(objectClass=groupOfUniqueNames)(objectClass=posixGroup)(objectClass=group))";
+        List<LdapGroup> allGroups = groupService.searchGroups(dc, groupFilter, null, MAX_LDAP_RESULTS,
+                "cn", "member", "uniqueMember", "memberUid");
+
+        // Build user DN -> list of group names
+        Map<String, List<String>> userGroups = new HashMap<>();
+        for (LdapGroup g : allGroups) {
+            if (groupDnFilter != null && !groupDnFilter.isBlank()
+                    && !g.getDn().equalsIgnoreCase(groupDnFilter)) {
+                continue;
+            }
+            String groupName = g.getCn() != null ? g.getCn() : g.getDn();
+            for (String memberDn : g.getAllMembers()) {
+                userGroups.computeIfAbsent(memberDn.toLowerCase(), k -> new ArrayList<>()).add(groupName);
+            }
+        }
+
+        // Load all users
+        List<LdapUser> allUsers = userService.searchUsers(dc,
+                "(|(objectClass=inetOrgPerson)(objectClass=person))", null, MAX_LDAP_RESULTS, "*");
+
+        List<String> columns = List.of("dn", "cn", "uid", "mail", "groups");
+        List<Map<String, String>> rows = new ArrayList<>();
+        for (LdapUser u : allUsers) {
+            List<String> groups = userGroups.getOrDefault(u.getDn().toLowerCase(), List.of());
+            if (groupDnFilter != null && !groupDnFilter.isBlank() && groups.isEmpty()) {
+                continue; // when filtering by group, skip users not in that group
+            }
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("dn", u.getDn());
+            row.put("cn", u.getCn());
+            row.put("uid", u.getUid());
+            row.put("mail", u.getMail());
+            row.put("groups", String.join("; ", groups));
+            rows.add(row);
+        }
+        return new ReportData(columns, rows);
     }
 
     /**

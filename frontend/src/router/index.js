@@ -69,13 +69,6 @@ const router = createRouter({
           component: () => import('@/views/reports/ReportJobsView.vue'),
         },
 
-        // Compliance Reports (PDF)
-        {
-          path: 'directories/:dirId/compliance-reports',
-          name: 'complianceReports',
-          component: () => import('@/views/reports/ComplianceReportsView.vue'),
-        },
-
         // Lifecycle Playbooks
         {
           path: 'directories/:dirId/playbooks',
@@ -299,15 +292,6 @@ const router = createRouter({
           name: 'superadminAuditReports',
           component: () => import('@/views/reports/AuditReportsView.vue'),
           meta: { requiresSuperadmin: true },
-        },
-        {
-          path: 'superadmin/compliance-reports',
-          component: () => import('@/views/superadmin/DirectoryScopedWrapper.vue'),
-          props: { defaultChild: 'complianceReports' },
-          meta: { requiresSuperadmin: true },
-          children: [
-            { path: ':dirId', name: 'superadminComplianceReports', component: () => import('@/views/reports/ComplianceReportsView.vue') },
-          ],
         },
         {
           path: 'superadmin/playbooks',
