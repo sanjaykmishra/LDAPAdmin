@@ -380,17 +380,17 @@ const router = createRouter({
         {
           path: 'entitlements',
           name: 'auditorEntitlements',
-          component: () => import('@/views/auditor/AuditorLanding.vue'), // placeholder — M7
+          component: () => import('@/views/auditor/AuditorEntitlements.vue'),
         },
         {
           path: 'audit-events',
           name: 'auditorAuditEvents',
-          component: () => import('@/views/auditor/AuditorLanding.vue'), // placeholder — M7
+          component: () => import('@/views/auditor/AuditorAuditEvents.vue'),
         },
         {
           path: 'approvals',
           name: 'auditorApprovals',
-          component: () => import('@/views/auditor/AuditorLanding.vue'), // placeholder — M7
+          component: () => import('@/views/auditor/AuditorApprovals.vue'),
         },
       ],
     },
