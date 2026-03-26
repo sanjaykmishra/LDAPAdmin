@@ -111,7 +111,7 @@ public class ReportExecutionService {
             case RECENTLY_DELETED       -> runDeletedReportData(directoryId, params);
             case DISABLED_ACCOUNTS      -> runDisabledAccountsReportData(dc);
             case MISSING_PROFILE_GROUPS -> runMissingProfileGroupsReportData(dc, directoryId);
-            case SOD_VIOLATIONS         -> runSodViolationsReportData(directoryId);
+            case SOD_VIOLATIONS         -> runSodViolationsReportData(directoryId, params);
             case USER_ACCESS_REPORT     -> runUserAccessReportData(dc, params);
             case ACCESS_REVIEW_SUMMARY  -> runAccessReviewSummaryData(directoryId, params);
             case PRIVILEGED_ACCOUNT_INVENTORY -> runPrivilegedAccountInventoryData(dc, params);
@@ -386,24 +386,34 @@ public class ReportExecutionService {
         return new ReportData(columns, rows);
     }
 
-    private ReportData runSodViolationsReportData(UUID directoryId) {
-        List<SodViolation> violations = sodViolationRepo.findByDirectoryId(directoryId);
+    private ReportData runSodViolationsReportData(UUID directoryId, Map<String, Object> params) {
+        String policyIdStr = params.containsKey("policyId") ? (String) params.get("policyId") : null;
 
-        List<String> columns = List.of("userDn", "userDisplayName", "policyName",
-                "groupADn", "groupBDn", "status", "detectedAt", "exemptedBy", "exemptionReason");
+        List<SodViolation> violations;
+        if (policyIdStr != null && !policyIdStr.isBlank()) {
+            violations = sodViolationRepo.findByDirectoryIdAndPolicyId(directoryId, UUID.fromString(policyIdStr));
+        } else {
+            violations = sodViolationRepo.findByDirectoryId(directoryId);
+        }
+
+        List<String> columns = List.of("id", "User", "Policy", "Conflicting Groups",
+                "Severity", "Status", "Detected", "Exempted By", "Exemption Reason");
         List<Map<String, String>> rows = new ArrayList<>();
 
         for (SodViolation v : violations) {
             Map<String, String> row = new LinkedHashMap<>();
-            row.put("userDn", v.getUserDn() != null ? v.getUserDn() : "");
-            row.put("userDisplayName", v.getUserDisplayName() != null ? v.getUserDisplayName() : "");
-            row.put("policyName", v.getPolicy().getName());
-            row.put("groupADn", v.getPolicy().getGroupADn());
-            row.put("groupBDn", v.getPolicy().getGroupBDn());
-            row.put("status", v.getStatus().name());
-            row.put("detectedAt", v.getDetectedAt() != null ? v.getDetectedAt().toString() : "");
-            row.put("exemptedBy", v.getExemptedBy() != null ? v.getExemptedBy().getUsername() : "");
-            row.put("exemptionReason", v.getExemptionReason() != null ? v.getExemptionReason() : "");
+            row.put("id", v.getId().toString());
+            row.put("User", v.getUserDisplayName() != null && !v.getUserDisplayName().isBlank()
+                    ? v.getUserDisplayName() : v.getUserDn());
+            row.put("Policy", v.getPolicy().getName());
+            String groupA = v.getPolicy().getGroupAName() != null ? v.getPolicy().getGroupAName() : v.getPolicy().getGroupADn();
+            String groupB = v.getPolicy().getGroupBName() != null ? v.getPolicy().getGroupBName() : v.getPolicy().getGroupBDn();
+            row.put("Conflicting Groups", groupA + " / " + groupB);
+            row.put("Severity", v.getPolicy().getSeverity() != null ? v.getPolicy().getSeverity().name() : "");
+            row.put("Status", v.getStatus().name());
+            row.put("Detected", v.getDetectedAt() != null ? v.getDetectedAt().toString() : "");
+            row.put("Exempted By", v.getExemptedBy() != null ? v.getExemptedBy().getUsername() : "");
+            row.put("Exemption Reason", v.getExemptionReason() != null ? v.getExemptionReason() : "");
             rows.add(row);
         }
 

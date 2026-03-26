@@ -38,6 +38,13 @@
             <option value="EXEMPTED">Exempted</option>
           </select>
         </div>
+        <div v-if="needsPolicyFilter">
+          <label class="block text-sm font-medium text-gray-700 mb-1">SoD Policy</label>
+          <select v-model="runForm.policyId" class="input w-full">
+            <option value="">All Policies</option>
+            <option v-for="p in sodPolicies" :key="p.id" :value="p.id">{{ p.name }}</option>
+          </select>
+        </div>
         <div v-if="needsLookback">
           <label class="block text-sm font-medium text-gray-700 mb-1">Lookback Days</label>
           <input v-model.number="runForm.lookbackDays" type="number" min="1" class="input w-full" placeholder="30" />
@@ -60,6 +67,15 @@
       <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
         <span class="text-sm text-gray-600">{{ resultRows.length }} result{{ resultRows.length !== 1 ? 's' : '' }}</span>
         <div class="flex gap-2">
+          <!-- SoD bulk actions -->
+          <template v-if="isSodReport && selectedIds.size > 0">
+            <button @click="bulkResolve" :disabled="actioning" class="bg-green-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-green-700 disabled:opacity-50">
+              Resolve ({{ selectedIds.size }})
+            </button>
+            <button @click="showExemptModal = true" :disabled="actioning" class="bg-amber-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-amber-600 disabled:opacity-50">
+              Exempt ({{ selectedIds.size }})
+            </button>
+          </template>
           <button @click="doExport('CSV')" :disabled="exporting" class="btn-secondary text-xs">Export CSV</button>
           <button @click="doExport('PDF')" :disabled="exporting" class="btn-secondary text-xs">Export PDF</button>
         </div>
@@ -73,6 +89,9 @@
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50">
+              <th v-if="isSodReport" class="py-2 px-3 w-8">
+                <input type="checkbox" :checked="allPageSelected" @change="toggleSelectAll" class="rounded border-gray-300" />
+              </th>
               <th v-for="col in visibleColumns" :key="col"
                 @click="toggleSort(col)"
                 class="text-left py-2 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none whitespace-nowrap">
@@ -83,9 +102,18 @@
           </thead>
           <tbody class="divide-y divide-gray-50">
             <tr v-for="(row, i) in pagedRows" :key="i" class="hover:bg-blue-50/30">
+              <td v-if="isSodReport" class="py-2 px-3 w-8">
+                <input type="checkbox" :checked="selectedIds.has(row['id'])" @change="toggleSelect(row['id'])" class="rounded border-gray-300" />
+              </td>
               <td v-for="col in visibleColumns" :key="col"
-                class="py-2 px-4 font-mono text-xs text-gray-700 break-all max-w-xs truncate" :title="row[col]">
-                {{ row[col] }}
+                class="py-2 px-4 text-xs text-gray-700 break-all max-w-xs truncate" :title="row[col]">
+                <span v-if="col === 'Status'" :class="statusBadgeClass(row[col])" class="inline-block px-2 py-0.5 rounded-full text-xs font-medium">
+                  {{ row[col] }}
+                </span>
+                <span v-else-if="col === 'Severity'" :class="severityBadgeClass(row[col])" class="inline-block px-2 py-0.5 rounded-full text-xs font-medium">
+                  {{ row[col] }}
+                </span>
+                <span v-else class="font-mono">{{ row[col] }}</span>
               </td>
             </tr>
           </tbody>
@@ -101,6 +129,27 @@
         </div>
       </div>
     </section>
+
+    <!-- Exempt Modal -->
+    <AppModal v-model="showExemptModal" title="Exempt Violations" size="md">
+      <p class="text-sm text-gray-600 mb-4">Exempting {{ selectedIds.size }} violation{{ selectedIds.size !== 1 ? 's' : '' }}.</p>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Reason <span class="text-red-500">*</span></label>
+          <textarea v-model="exemptReason" rows="3" class="input w-full" placeholder="Provide a reason for the exemption..."></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Expiration Date (optional)</label>
+          <input v-model="exemptExpires" type="date" class="input w-full" />
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 mt-5">
+        <button @click="showExemptModal = false" class="btn-secondary text-sm">Cancel</button>
+        <button @click="bulkExempt" :disabled="!exemptReason.trim() || actioning" class="bg-amber-500 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-amber-600 disabled:opacity-50">
+          {{ actioning ? 'Processing...' : 'Exempt' }}
+        </button>
+      </div>
+    </AppModal>
 
     <!-- Evidence Package Modal -->
     <AppModal v-model="showEvidence" title="Evidence Package" size="xl">
@@ -173,12 +222,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useNotificationStore } from '@/stores/notifications'
 import { runReport, runReportData } from '@/api/reports'
 import { listDirectories } from '@/api/directories'
 import { listCampaigns } from '@/api/accessReviews'
+import { listPolicies, exemptViolation, resolveViolation } from '@/api/sodPolicies'
 import { generateEvidencePackage } from '@/api/complianceReports'
 import { downloadBlob } from '@/composables/useApi'
 import GroupDnPicker from '@/components/GroupDnPicker.vue'
@@ -196,16 +246,16 @@ const dirId = computed(() => routeDirId || selectedDir.value)
 const PAGE_SIZE = 50
 
 const reportTypes = [
-  { value: 'USER_ACCESS_REPORT',          label: 'User Access Report',           lookback: false, statusFilter: false, groupDn: true,  campaign: false },
-  { value: 'ACCESS_REVIEW_SUMMARY',       label: 'Access Review Summary',        lookback: false, statusFilter: false, groupDn: false, campaign: true },
-  { value: 'PRIVILEGED_ACCOUNT_INVENTORY', label: 'Privileged Account Inventory', lookback: false, statusFilter: false, groupDn: false, campaign: false },
-  { value: 'ACCESS_DRIFT_REPORT',         label: 'Access Drift',                 lookback: false, statusFilter: false, groupDn: false, campaign: false },
-  { value: 'SOD_VIOLATIONS',              label: 'SoD Violations',               lookback: false, statusFilter: true,  groupDn: false, campaign: false },
-  { value: 'AUDIT_LOG_REPORT',            label: 'Audit Log',                    lookback: true,  statusFilter: false, groupDn: false, campaign: false },
+  { value: 'USER_ACCESS_REPORT',          label: 'User Access Report',           lookback: false, statusFilter: false, groupDn: true,  campaign: false, policyFilter: false },
+  { value: 'ACCESS_REVIEW_SUMMARY',       label: 'Access Review Summary',        lookback: false, statusFilter: false, groupDn: false, campaign: true,  policyFilter: false },
+  { value: 'PRIVILEGED_ACCOUNT_INVENTORY', label: 'Privileged Account Inventory', lookback: false, statusFilter: false, groupDn: false, campaign: false, policyFilter: false },
+  { value: 'ACCESS_DRIFT_REPORT',         label: 'Access Drift',                 lookback: false, statusFilter: false, groupDn: false, campaign: false, policyFilter: false },
+  { value: 'SOD_VIOLATIONS',              label: 'SoD Violations',               lookback: false, statusFilter: true,  groupDn: false, campaign: false, policyFilter: true },
+  { value: 'AUDIT_LOG_REPORT',            label: 'Audit Log',                    lookback: true,  statusFilter: false, groupDn: false, campaign: false, policyFilter: false },
 ]
 
 const runForm = ref({
-  reportType: 'USER_ACCESS_REPORT', groupDn: '', statusFilter: '', lookbackDays: 30, campaignId: '',
+  reportType: 'USER_ACCESS_REPORT', groupDn: '', statusFilter: '', lookbackDays: 30, campaignId: '', policyId: '',
 })
 const running = ref(false)
 const exporting = ref(false)
@@ -216,13 +266,16 @@ const sortCol = ref('')
 const sortAsc = ref(true)
 const page = ref(0)
 
-const currentType      = computed(() => reportTypes.find(t => t.value === runForm.value.reportType))
-const needsLookback    = computed(() => !!currentType.value?.lookback)
+const currentType       = computed(() => reportTypes.find(t => t.value === runForm.value.reportType))
+const needsLookback     = computed(() => !!currentType.value?.lookback)
 const needsStatusFilter = computed(() => !!currentType.value?.statusFilter)
-const needsGroupDn     = computed(() => !!currentType.value?.groupDn)
-const needsCampaign    = computed(() => !!currentType.value?.campaign)
+const needsGroupDn      = computed(() => !!currentType.value?.groupDn)
+const needsCampaign     = computed(() => !!currentType.value?.campaign)
+const needsPolicyFilter = computed(() => !!currentType.value?.policyFilter)
+const isSodReport       = computed(() => runForm.value.reportType === 'SOD_VIOLATIONS' && hasResults.value)
 
-const visibleColumns = computed(() => resultColumns.value.slice(0, 10))
+// Hide the 'id' column from visible display (used internally for selection)
+const visibleColumns = computed(() => resultColumns.value.filter(c => c !== 'id').slice(0, 10))
 
 const sortedRows = computed(() => {
   if (!sortCol.value) return resultRows.value
@@ -234,8 +287,102 @@ const sortedRows = computed(() => {
 const totalPages = computed(() => Math.ceil(sortedRows.value.length / PAGE_SIZE))
 const pagedRows = computed(() => sortedRows.value.slice(page.value * PAGE_SIZE, (page.value + 1) * PAGE_SIZE))
 
+// SoD policies for filter
+const sodPolicies = ref([])
+
 // Campaigns (for Access Review Summary + Evidence Package)
 const campaigns = ref([])
+
+// ── Selection state (SoD) ─────────────────────────────────────────────────────
+const selectedIds = ref(new Set())
+
+const allPageSelected = computed(() => {
+  if (!pagedRows.value.length) return false
+  return pagedRows.value.every(r => selectedIds.value.has(r['id']))
+})
+
+function toggleSelect(id) {
+  const s = new Set(selectedIds.value)
+  if (s.has(id)) s.delete(id); else s.add(id)
+  selectedIds.value = s
+}
+
+function toggleSelectAll() {
+  const s = new Set(selectedIds.value)
+  if (allPageSelected.value) {
+    pagedRows.value.forEach(r => s.delete(r['id']))
+  } else {
+    pagedRows.value.forEach(r => s.add(r['id']))
+  }
+  selectedIds.value = s
+}
+
+// ── Bulk actions ──────────────────────────────────────────────────────────────
+const actioning = ref(false)
+const showExemptModal = ref(false)
+const exemptReason = ref('')
+const exemptExpires = ref('')
+
+async function bulkResolve() {
+  if (!selectedIds.value.size) return
+  actioning.value = true
+  let ok = 0, fail = 0
+  for (const vid of selectedIds.value) {
+    try {
+      await resolveViolation(dirId.value, vid)
+      ok++
+    } catch { fail++ }
+  }
+  actioning.value = false
+  notif.success(`Resolved ${ok} violation${ok !== 1 ? 's' : ''}${fail ? `, ${fail} failed` : ''}`)
+  selectedIds.value = new Set()
+  await doRun()
+}
+
+async function bulkExempt() {
+  if (!selectedIds.value.size || !exemptReason.value.trim()) return
+  actioning.value = true
+  const body = {
+    reason: exemptReason.value.trim(),
+    expiresAt: exemptExpires.value ? new Date(exemptExpires.value).toISOString() : null,
+  }
+  let ok = 0, fail = 0
+  for (const vid of selectedIds.value) {
+    try {
+      await exemptViolation(dirId.value, vid, body)
+      ok++
+    } catch { fail++ }
+  }
+  actioning.value = false
+  showExemptModal.value = false
+  exemptReason.value = ''
+  exemptExpires.value = ''
+  notif.success(`Exempted ${ok} violation${ok !== 1 ? 's' : ''}${fail ? `, ${fail} failed` : ''}`)
+  selectedIds.value = new Set()
+  await doRun()
+}
+
+// ── Status / Severity badges ──────────────────────────────────────────────────
+function statusBadgeClass(status) {
+  switch (status) {
+    case 'OPEN':     return 'bg-red-100 text-red-700'
+    case 'RESOLVED': return 'bg-green-100 text-green-700'
+    case 'EXEMPTED': return 'bg-amber-100 text-amber-700'
+    default:         return 'bg-gray-100 text-gray-700'
+  }
+}
+
+function severityBadgeClass(severity) {
+  switch (severity) {
+    case 'CRITICAL': return 'bg-red-100 text-red-700'
+    case 'HIGH':     return 'bg-orange-100 text-orange-700'
+    case 'MEDIUM':   return 'bg-yellow-100 text-yellow-700'
+    case 'LOW':      return 'bg-blue-100 text-blue-700'
+    default:         return 'bg-gray-100 text-gray-700'
+  }
+}
+
+// ── Sorting / params ──────────────────────────────────────────────────────────
 
 function toggleSort(col) {
   if (sortCol.value === col) { sortAsc.value = !sortAsc.value }
@@ -249,6 +396,7 @@ function buildParams() {
   if (needsGroupDn.value && runForm.value.groupDn) params.groupDn = runForm.value.groupDn
   if (needsStatusFilter.value && runForm.value.statusFilter) params.status = runForm.value.statusFilter
   if (needsCampaign.value && runForm.value.campaignId) params.campaignId = runForm.value.campaignId
+  if (needsPolicyFilter.value && runForm.value.policyId) params.policyId = runForm.value.policyId
   return params
 }
 
@@ -256,6 +404,7 @@ async function doRun() {
   if (!dirId.value) { notif.error('Please select a directory.'); return }
   running.value = true
   hasResults.value = false
+  selectedIds.value = new Set()
   try {
     const { data } = await runReportData(dirId.value, {
       reportType: runForm.value.reportType,
@@ -360,6 +509,22 @@ async function loadCampaigns() {
   }
 }
 
+async function loadSodPolicies() {
+  if (!dirId.value) return
+  try {
+    const { data } = await listPolicies(dirId.value)
+    sodPolicies.value = data.content || data
+  } catch (e) {
+    console.warn('Failed to load SoD policies:', e)
+  }
+}
+
+// Reload policies/campaigns when directory changes
+watch(dirId, () => {
+  loadCampaigns()
+  loadSodPolicies()
+})
+
 onMounted(async () => {
   if (!routeDirId) {
     loadingDirs.value = true
@@ -373,7 +538,7 @@ onMounted(async () => {
       loadingDirs.value = false
     }
   }
-  await loadCampaigns()
+  await Promise.all([loadCampaigns(), loadSodPolicies()])
 })
 </script>
 
