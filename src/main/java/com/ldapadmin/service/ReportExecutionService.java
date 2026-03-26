@@ -8,7 +8,9 @@ import com.ldapadmin.entity.enums.AuditAction;
 import com.ldapadmin.entity.enums.OutputFormat;
 import com.ldapadmin.entity.enums.ReportType;
 import com.ldapadmin.entity.enums.SodViolationStatus;
+import com.ldapadmin.ldap.LdapGroupService;
 import com.ldapadmin.ldap.LdapUserService;
+import com.ldapadmin.ldap.model.LdapGroup;
 import com.ldapadmin.ldap.model.LdapUser;
 import com.ldapadmin.repository.AuditEventRepository;
 import com.ldapadmin.repository.ProvisioningProfileRepository;
@@ -54,6 +56,7 @@ public class ReportExecutionService {
     private static final int MAX_LDAP_RESULTS = 10_000;
 
     private final LdapUserService                userService;
+    private final LdapGroupService              groupService;
     private final AuditEventRepository           auditEventRepo;
     private final ProvisioningProfileRepository  profileRepo;
     private final ProvisioningProfileService     profileService;
@@ -71,22 +74,7 @@ public class ReportExecutionService {
 
         Map<String, Object> safeParams = params != null ? params : Map.of();
 
-        ReportData data = switch (reportType) {
-            case USERS_IN_GROUP      -> runLdapReportData(dc, buildGroupFilter(safeParams), null);
-            case USERS_IN_BRANCH     -> runLdapReportData(dc, "(objectClass=inetOrgPerson)",
-                                                       requireString(safeParams, "branchDn"));
-            case USERS_WITH_NO_GROUP -> runLdapReportData(dc,
-                                                       "(&(objectClass=inetOrgPerson)(!(memberOf=*)))", null);
-            case RECENTLY_ADDED      -> runLdapReportData(dc,
-                                                       "(createTimestamp>=" + lookbackTimestamp(safeParams) + ")", null);
-            case RECENTLY_MODIFIED   -> runLdapReportData(dc,
-                                                       "(modifyTimestamp>=" + lookbackTimestamp(safeParams) + ")", null);
-            case RECENTLY_DELETED    -> runDeletedReportData(directoryId, safeParams);
-            case DISABLED_ACCOUNTS   -> runLdapReportData(dc,
-                                                       "(|(pwdAccountLockedTime=*)(loginDisabled=TRUE))", null);
-            case MISSING_PROFILE_GROUPS -> runMissingProfileGroupsReportData(dc, directoryId);
-            case SOD_VIOLATIONS      -> runSodViolationsReportData(directoryId);
-        };
+        ReportData data = buildReportData(dc, reportType, safeParams, directoryId);
 
         if (format == OutputFormat.PDF) {
             return pdfReportService.buildPdf(reportType.name().replace('_', ' '), "", data.columns, data.toRowLists());
@@ -102,25 +90,122 @@ public class ReportExecutionService {
                                 Map<String, Object> params,
                                 UUID directoryId) {
         Map<String, Object> safeParams = params != null ? params : Map.of();
-        return switch (reportType) {
-            case USERS_IN_GROUP      -> runLdapReportData(dc, buildGroupFilter(safeParams), null);
-            case USERS_IN_BRANCH     -> runLdapReportData(dc, "(objectClass=inetOrgPerson)",
-                                                       requireString(safeParams, "branchDn"));
-            case USERS_WITH_NO_GROUP -> runLdapReportData(dc,
-                                                       "(&(objectClass=inetOrgPerson)(!(memberOf=*)))", null);
-            case RECENTLY_ADDED      -> runLdapReportData(dc,
-                                                       "(createTimestamp>=" + lookbackTimestamp(safeParams) + ")", null);
-            case RECENTLY_MODIFIED   -> runLdapReportData(dc,
-                                                       "(modifyTimestamp>=" + lookbackTimestamp(safeParams) + ")", null);
-            case RECENTLY_DELETED    -> runDeletedReportData(directoryId, safeParams);
-            case DISABLED_ACCOUNTS   -> runLdapReportData(dc,
-                                                       "(|(pwdAccountLockedTime=*)(loginDisabled=TRUE))", null);
-            case MISSING_PROFILE_GROUPS -> runMissingProfileGroupsReportData(dc, directoryId);
-            case SOD_VIOLATIONS      -> runSodViolationsReportData(directoryId);
-        };
+        return buildReportData(dc, reportType, safeParams, directoryId);
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    private ReportData buildReportData(DirectoryConnection dc, ReportType reportType,
+                                        Map<String, Object> params, UUID directoryId) {
+        return switch (reportType) {
+            case USERS_IN_GROUP         -> runUsersInGroupReportData(dc, params);
+            case USERS_IN_BRANCH        -> runLdapReportData(dc,
+                    "(|(objectClass=inetOrgPerson)(objectClass=person))", requireString(params, "branchDn"));
+            case USERS_WITH_NO_GROUP    -> runUsersWithNoGroupReportData(dc);
+            case RECENTLY_ADDED         -> runLdapReportData(dc,
+                    "(createTimestamp>=" + lookbackTimestamp(params) + ")", null);
+            case RECENTLY_MODIFIED      -> runLdapReportData(dc,
+                    "(modifyTimestamp>=" + lookbackTimestamp(params) + ")", null);
+            case RECENTLY_DELETED       -> runDeletedReportData(directoryId, params);
+            case DISABLED_ACCOUNTS      -> runDisabledAccountsReportData(dc);
+            case MISSING_PROFILE_GROUPS -> runMissingProfileGroupsReportData(dc, directoryId);
+            case SOD_VIOLATIONS         -> runSodViolationsReportData(directoryId);
+        };
+    }
+
+    /**
+     * Users in Group: reads the group's member/uniqueMember attributes directly
+     * instead of relying on memberOf overlay.
+     */
+    private ReportData runUsersInGroupReportData(DirectoryConnection dc, Map<String, Object> params) {
+        String groupDn = requireString(params, "groupDn");
+        String groupFilter = "(|(objectClass=groupOfNames)(objectClass=groupOfUniqueNames)(objectClass=posixGroup)(objectClass=group))";
+        List<LdapGroup> groups = groupService.searchGroups(dc, groupFilter, null, 1,
+                "cn", "member", "uniqueMember", "memberUid");
+
+        // Read the specific group directly
+        List<String> memberDns = new ArrayList<>();
+        try {
+            LdapGroup group = groupService.getGroup(dc, groupDn, "member", "uniqueMember", "memberUid");
+            memberDns.addAll(group.getAllMembers());
+        } catch (Exception e) {
+            log.warn("Could not read group {}: {}", groupDn, e.getMessage());
+        }
+
+        if (memberDns.isEmpty()) {
+            return new ReportData(List.of("dn", "cn", "mail", "uid"), List.of());
+        }
+
+        // Look up each member user
+        List<LdapUser> users = new ArrayList<>();
+        for (String memberDn : memberDns) {
+            try {
+                List<LdapUser> found = userService.searchUsers(dc,
+                        "(objectClass=*)", memberDn, 1, "*");
+                users.addAll(found);
+            } catch (Exception e) {
+                // Member DN might not exist or might not be a user
+                log.debug("Skipping member {}: {}", memberDn, e.getMessage());
+            }
+        }
+        return buildReportDataFromUsers(users);
+    }
+
+    /**
+     * Users with no group: two-pass approach that doesn't rely on memberOf overlay.
+     * 1. Collect all DNs that appear as members in any group
+     * 2. Search all users, filter out those in the member set
+     */
+    private ReportData runUsersWithNoGroupReportData(DirectoryConnection dc) {
+        // Pass 1: collect all member DNs from all groups
+        String groupFilter = "(|(objectClass=groupOfNames)(objectClass=groupOfUniqueNames)(objectClass=posixGroup)(objectClass=group))";
+        List<LdapGroup> allGroups = groupService.searchGroups(dc, groupFilter, null, MAX_LDAP_RESULTS,
+                "member", "uniqueMember", "memberUid");
+
+        Set<String> memberedDns = new HashSet<>();
+        for (LdapGroup g : allGroups) {
+            for (String m : g.getAllMembers()) {
+                memberedDns.add(m.toLowerCase());
+            }
+        }
+
+        // Pass 2: search all users
+        List<LdapUser> allUsers = userService.searchUsers(dc,
+                "(|(objectClass=inetOrgPerson)(objectClass=person))", null, MAX_LDAP_RESULTS, "*");
+
+        // Filter to users not in any group
+        List<LdapUser> ungrouped = allUsers.stream()
+                .filter(u -> !memberedDns.contains(u.getDn().toLowerCase()))
+                .toList();
+
+        log.info("Users with no group: {} ungrouped out of {} total users ({} groups scanned)",
+                ungrouped.size(), allUsers.size(), allGroups.size());
+        return buildReportDataFromUsers(ungrouped);
+    }
+
+    /**
+     * Disabled accounts: broadened filter that checks multiple disable indicators
+     * across OpenLDAP, 389DS, and AD conventions.
+     */
+    private ReportData runDisabledAccountsReportData(DirectoryConnection dc) {
+        String filter = dc.getDirectoryType() == com.ldapadmin.entity.enums.DirectoryType.ACTIVE_DIRECTORY
+                ? "(userAccountControl:1.2.840.113556.1.4.803:=2)"  // AD: ACCOUNTDISABLE bit
+                : "(|(pwdAccountLockedTime=*)(nsAccountLock=TRUE)(loginDisabled=TRUE)"
+                  + "(employeeType=Terminated)(loginShell=/sbin/nologin))";
+        return runLdapReportData(dc, filter, null);
+    }
+
+    private ReportData buildReportDataFromUsers(List<LdapUser> users) {
+        TreeSet<String> attrNames = new TreeSet<>();
+        users.forEach(u -> attrNames.addAll(u.getAttributes().keySet()));
+        List<String> columns = new ArrayList<>();
+        columns.add("dn");
+        columns.addAll(attrNames);
+        List<Map<String, String>> rows = users.stream()
+                .map(u -> buildRow(u, columns))
+                .toList();
+        return new ReportData(columns, rows);
+    }
 
     /** Intermediate report data container (columns + rows). */
     public record ReportData(List<String> columns, List<Map<String, String>> rows) {
