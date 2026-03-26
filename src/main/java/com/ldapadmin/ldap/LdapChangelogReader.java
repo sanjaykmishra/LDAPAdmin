@@ -6,6 +6,7 @@ import com.ldapadmin.entity.enums.SslMode;
 import com.ldapadmin.exception.LdapConnectionException;
 import com.ldapadmin.ldap.changelog.AccesslogStrategy;
 import com.ldapadmin.ldap.changelog.ChangelogStrategy;
+import com.ldapadmin.ldap.changelog.DirSyncChangelogStrategy;
 import com.ldapadmin.ldap.changelog.DseeChangelogStrategy;
 import com.ldapadmin.repository.AuditDataSourceRepository;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
@@ -63,13 +64,15 @@ public class LdapChangelogReader {
 
     // ── Strategy instances (stateless, reusable) ─────────────────────────────
 
-    private static final DseeChangelogStrategy DSEE_STRATEGY = new DseeChangelogStrategy();
-    private static final AccesslogStrategy     ACCESSLOG_STRATEGY = new AccesslogStrategy();
+    private static final DseeChangelogStrategy    DSEE_STRATEGY      = new DseeChangelogStrategy();
+    private static final AccesslogStrategy       ACCESSLOG_STRATEGY = new AccesslogStrategy();
+    private static final DirSyncChangelogStrategy DIRSYNC_STRATEGY  = new DirSyncChangelogStrategy();
 
     private static ChangelogStrategy strategyFor(AuditDataSource src) {
         return switch (src.getChangelogFormat()) {
             case DSEE_CHANGELOG     -> DSEE_STRATEGY;
             case OPENLDAP_ACCESSLOG -> ACCESSLOG_STRATEGY;
+            case AD_DIRSYNC         -> DIRSYNC_STRATEGY;
         };
     }
 

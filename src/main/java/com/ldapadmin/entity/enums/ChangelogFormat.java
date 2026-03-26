@@ -9,5 +9,8 @@ public enum ChangelogFormat {
     DSEE_CHANGELOG,
 
     /** OpenLDAP {@code slapo-accesslog} overlay — {@code cn=accesslog} with {@code reqStart}. */
-    OPENLDAP_ACCESSLOG
+    OPENLDAP_ACCESSLOG,
+
+    /** Active Directory DirSync control — polls incremental changes via OID 1.2.840.113556.1.4.417. */
+    AD_DIRSYNC
 }

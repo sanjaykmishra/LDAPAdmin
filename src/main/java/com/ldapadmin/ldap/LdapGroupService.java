@@ -235,6 +235,73 @@ public class LdapGroupService {
         return group.getValues(memberAttribute);
     }
 
+    /**
+     * Returns all members of a group, including nested/transitive members.
+     * For Active Directory, uses LDAP_MATCHING_RULE_IN_CHAIN (OID 1.2.840.113556.1.4.1941)
+     * for efficient server-side resolution. For other directories, performs
+     * client-side recursive enumeration with cycle detection.
+     */
+    public List<String> getNestedMembers(DirectoryConnection dc, String groupDn) {
+        if (dc.getDirectoryType() == com.ldapadmin.entity.enums.DirectoryType.ACTIVE_DIRECTORY) {
+            return getNestedMembersAD(dc, groupDn);
+        }
+        return getNestedMembersRecursive(dc, groupDn);
+    }
+
+    private List<String> getNestedMembersAD(DirectoryConnection dc, String groupDn) {
+        // AD's LDAP_MATCHING_RULE_IN_CHAIN resolves all transitive members server-side
+        String filter = "(memberOf:1.2.840.113556.1.4.1941:=" + groupDn + ")";
+        return connectionFactory.withConnection(dc, conn -> {
+            List<String> members = new java.util.ArrayList<>();
+            SearchRequest request = new SearchRequest(dc.getBaseDn(), SearchScope.SUB, filter, "1.1");
+            ASN1OctetString cookie = null;
+            do {
+                request.setControls(new SimplePagedResultsControl(dc.getPagingSize(), cookie));
+                SearchResult result = conn.search(request);
+                for (SearchResultEntry entry : result.getSearchEntries()) {
+                    members.add(entry.getDN());
+                }
+                SimplePagedResultsControl resp = SimplePagedResultsControl.get(result);
+                cookie = (resp != null && resp.moreResultsToReturn()) ? resp.getCookie() : null;
+            } while (cookie != null);
+            return members;
+        });
+    }
+
+    private List<String> getNestedMembersRecursive(DirectoryConnection dc, String groupDn) {
+        java.util.Set<String> visited = new java.util.LinkedHashSet<>();
+        java.util.Set<String> visitedGroups = new java.util.HashSet<>();
+        resolveGroupRecursive(dc, groupDn, visited, visitedGroups);
+        return new java.util.ArrayList<>(visited);
+    }
+
+    private void resolveGroupRecursive(DirectoryConnection dc, String groupDn,
+                                        java.util.Set<String> members, java.util.Set<String> visitedGroups) {
+        if (!visitedGroups.add(groupDn.toLowerCase())) return; // cycle detection
+
+        connectionFactory.withConnection(dc, conn -> {
+            try {
+                SearchResultEntry entry = conn.getEntry(groupDn, "member", "uniqueMember", "objectClass");
+                if (entry == null) return null;
+
+                for (String attr : java.util.List.of("member", "uniqueMember")) {
+                    String[] vals = entry.getAttributeValues(attr);
+                    if (vals == null) continue;
+                    for (String memberDn : vals) {
+                        if (memberDn.isBlank()) continue;
+                        members.add(memberDn);
+                        // Check if this member is itself a group (has objectClass=group*)
+                        // Simple heuristic: try to resolve it as a group
+                        resolveGroupRecursive(dc, memberDn, members, visitedGroups);
+                    }
+                }
+            } catch (LDAPException e) {
+                log.debug("Could not resolve nested members for {}: {}", groupDn, e.getMessage());
+            }
+            return null;
+        });
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private void checkResult(LDAPResult result, String operation, String dn) {
