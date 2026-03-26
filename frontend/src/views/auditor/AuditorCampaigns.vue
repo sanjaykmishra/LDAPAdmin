@@ -2,13 +2,18 @@
   <div>
     <h1 class="text-xl font-bold text-slate-900 mb-4">Access Review Campaigns</h1>
 
-    <div v-if="loading" class="text-sm text-slate-500">Loading campaigns...</div>
+    <SkeletonLoader v-if="loading" :rows="3" />
+    <ErrorCard v-else-if="error" title="Failed to load campaigns" @retry="load" />
 
-    <div v-else-if="campaigns.length === 0" class="bg-slate-50 border border-slate-200 rounded-xl p-8 text-center">
-      <p class="text-sm text-slate-500">No campaigns included in this evidence package.</p>
+    <div v-else-if="campaigns.length === 0" class="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
+      <svg class="w-8 h-8 mx-auto mb-2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <p class="text-sm text-green-800 font-medium">No campaigns included in this evidence package</p>
     </div>
 
-    <div v-else class="space-y-3">
+    <FadeIn :show="!loading && campaigns.length > 0">
+    <div class="space-y-3">
       <RouterLink v-for="c in campaigns" :key="c.id"
                   :to="`/auditor/${token}/campaigns/${c.id}`"
                   class="block bg-white border border-slate-200 rounded-xl p-4 hover:border-slate-300 hover:shadow-sm transition-all">
@@ -38,6 +43,7 @@
         </div>
       </RouterLink>
     </div>
+    </FadeIn>
   </div>
 </template>
 
@@ -45,10 +51,14 @@
 import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { getPortalCampaigns } from '@/api/auditorPortal'
+import SkeletonLoader from './components/SkeletonLoader.vue'
+import ErrorCard from './components/ErrorCard.vue'
+import FadeIn from './components/FadeIn.vue'
 
 const props = defineProps({ token: String, metadata: Object, scope: Object })
 
 const loading = ref(true)
+const error = ref(false)
 const campaigns = ref([])
 
 function statusClass(status) {
@@ -67,11 +77,14 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-onMounted(async () => {
+async function load() {
+  loading.value = true
+  error.value = false
   try {
     const { data } = await getPortalCampaigns(props.token)
     campaigns.value = data
-  } catch { /* handled by layout */ }
+  } catch { error.value = true }
   loading.value = false
-})
+}
+onMounted(load)
 </script>

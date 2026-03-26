@@ -19,7 +19,7 @@
         <!-- Center: verification badge -->
         <button @click="showVerifyDrawer = true"
                 class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
-                :class="verifyBadgeClass">
+                :class="[verifyBadgeClass, verification.verified === true ? 'verify-pulse' : '']">
           <svg v-if="verification.verified === true" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
@@ -309,6 +309,15 @@ onMounted(async () => {
 </script>
 
 <style>
+/* Verification badge pulse on first load */
+@keyframes verify-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+}
+.verify-pulse {
+  animation: verify-pulse 2s ease-in-out 1;
+}
+
 @media print {
   /* Hide interactive/navigation elements */
   header, nav, .print\\:hidden,

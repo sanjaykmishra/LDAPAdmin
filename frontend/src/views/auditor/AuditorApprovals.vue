@@ -2,7 +2,8 @@
   <div>
     <h1 class="text-xl font-bold text-slate-900 mb-4">Approval History</h1>
 
-    <div v-if="loading" class="text-sm text-slate-500">Loading approvals...</div>
+    <SkeletonLoader v-if="loading" :rows="3" />
+    <ErrorCard v-else-if="error" title="Failed to load approvals" @retry="load" />
 
     <template v-else>
       <!-- Filters -->
@@ -88,6 +89,8 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { getPortalApprovals } from '@/api/auditorPortal'
+import SkeletonLoader from './components/SkeletonLoader.vue'
+import ErrorCard from './components/ErrorCard.vue'
 
 const props = defineProps({ token: String, metadata: Object, scope: Object })
 
@@ -97,6 +100,7 @@ const search = ref('')
 const statusFilter = ref('')
 const page = ref(0)
 const PAGE_SIZE = 50
+const error = ref(false)
 
 const filtered = computed(() => {
   let result = approvals.value
@@ -138,13 +142,16 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-onMounted(async () => {
+async function load() {
+  loading.value = true
+  error.value = false
   try {
     const { data } = await getPortalApprovals(props.token)
     approvals.value = data
-  } catch { /* handled by layout */ }
+  } catch { error.value = true }
   loading.value = false
-})
+}
+onMounted(load)
 </script>
 
 <style scoped>

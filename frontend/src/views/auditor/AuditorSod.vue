@@ -5,7 +5,8 @@
       <ExportDropdown v-if="!loading" :options="exportOptions" />
     </div>
 
-    <div v-if="loading" class="text-sm text-slate-500">Loading SoD data...</div>
+    <SkeletonLoader v-if="loading" :rows="3" />
+    <ErrorCard v-else-if="error" title="Failed to load SoD data" @retry="load" />
 
     <template v-else>
       <!-- Zero-state: no violations -->
@@ -107,6 +108,8 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { getPortalSod, exportSodPdf } from '@/api/auditorPortal'
 import CopyLinkButton from './components/CopyLinkButton.vue'
 import ExportDropdown from './components/ExportDropdown.vue'
+import SkeletonLoader from './components/SkeletonLoader.vue'
+import ErrorCard from './components/ErrorCard.vue'
 
 const props = defineProps({ token: String, metadata: Object, scope: Object })
 
@@ -114,6 +117,7 @@ const loading = ref(true)
 const policies = ref([])
 const violations = ref([])
 const statusFilter = ref('')
+const error = ref(false)
 
 const exportOptions = computed(() => [
   { label: 'Export PDF', filename: 'sod-report.pdf', fn: () => exportSodPdf(props.token) },
@@ -148,12 +152,14 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-onMounted(async () => {
+async function load() {
+  loading.value = true
+  error.value = false
   try {
     const { data } = await getPortalSod(props.token)
     policies.value = data.policies || []
     violations.value = data.violations || []
-  } catch { /* handled by layout */ }
+  } catch { error.value = true }
   loading.value = false
 
   if (window.location.hash) {
@@ -161,5 +167,6 @@ onMounted(async () => {
     const el = document.getElementById(window.location.hash.slice(1))
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
-})
+}
+onMounted(load)
 </script>

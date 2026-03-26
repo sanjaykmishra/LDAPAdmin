@@ -2,7 +2,8 @@
   <div>
     <h1 class="text-xl font-bold text-slate-900 mb-4">User Entitlements</h1>
 
-    <div v-if="loading" class="text-sm text-slate-500">Loading entitlements...</div>
+    <SkeletonLoader v-if="loading" :rows="5" />
+    <ErrorCard v-else-if="error" title="Failed to load entitlements" @retry="load" />
 
     <template v-else>
       <!-- Search -->
@@ -95,6 +96,8 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { getPortalEntitlements } from '@/api/auditorPortal'
+import SkeletonLoader from './components/SkeletonLoader.vue'
+import ErrorCard from './components/ErrorCard.vue'
 
 const props = defineProps({ token: String, metadata: Object, scope: Object })
 
@@ -103,6 +106,7 @@ const entitlements = ref([])
 const search = ref('')
 const page = ref(0)
 const PAGE_SIZE = 50
+const error = ref(false)
 const groupsExpanded = reactive({})
 
 const filtered = computed(() => {
@@ -123,13 +127,16 @@ const paged = computed(() => filtered.value.slice(page.value * PAGE_SIZE, (page.
 
 watch(search, () => { page.value = 0 })
 
-onMounted(async () => {
+async function load() {
+  loading.value = true
+  error.value = false
   try {
     const { data } = await getPortalEntitlements(props.token)
     entitlements.value = data
-  } catch { /* handled by layout */ }
+  } catch { error.value = true }
   loading.value = false
-})
+}
+onMounted(load)
 </script>
 
 <style scoped>

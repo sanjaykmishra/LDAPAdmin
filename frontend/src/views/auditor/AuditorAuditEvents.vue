@@ -9,7 +9,8 @@
       </div>
     </div>
 
-    <div v-if="loading" class="text-sm text-slate-500">Loading audit events...</div>
+    <SkeletonLoader v-if="loading" :rows="5" />
+    <ErrorCard v-else-if="error" title="Failed to load audit events" @retry="load" />
 
     <template v-else>
       <!-- Filters -->
@@ -96,6 +97,8 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { getPortalAuditEvents, exportAuditEventsCsv, exportAuditEventsPdf } from '@/api/auditorPortal'
 import ExportDropdown from './components/ExportDropdown.vue'
+import SkeletonLoader from './components/SkeletonLoader.vue'
+import ErrorCard from './components/ErrorCard.vue'
 
 const props = defineProps({ token: String, metadata: Object, scope: Object })
 
@@ -109,6 +112,7 @@ const sortCol = ref('occurredAt')
 const sortAsc = ref(false)
 const page = ref(0)
 const PAGE_SIZE = 50
+const error = ref(false)
 
 const exportOptions = [
   { label: 'Export CSV', filename: 'audit-events.csv', fn: () => exportAuditEventsCsv(props.token) },
@@ -191,13 +195,16 @@ function timelineDotClass(action) {
   return 'border-slate-300 bg-white'
 }
 
-onMounted(async () => {
+async function load() {
+  loading.value = true
+  error.value = false
   try {
     const { data } = await getPortalAuditEvents(props.token)
     events.value = data
-  } catch { /* handled by layout */ }
+  } catch { error.value = true }
   loading.value = false
-})
+}
+onMounted(load)
 </script>
 
 <style scoped>
