@@ -1,5 +1,5 @@
 package com.ldapadmin.entity.enums;
 
 public enum SodSeverity {
-    HIGH, MEDIUM, LOW
+    CRITICAL, HIGH, MEDIUM, LOW
 }

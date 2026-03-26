@@ -51,6 +51,7 @@
             <label class="block text-sm font-medium text-gray-700 mb-1">Severity *</label>
             <select v-model="form.severity" required
               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+              <option value="CRITICAL">CRITICAL</option>
               <option value="HIGH">HIGH</option>
               <option value="MEDIUM">MEDIUM</option>
               <option value="LOW">LOW</option>

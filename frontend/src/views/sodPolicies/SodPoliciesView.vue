@@ -82,6 +82,7 @@ const scanResult = ref(null)
 function severityClass(s) {
   const base = 'px-2 py-0.5 rounded-full text-xs font-medium'
   switch (s) {
+    case 'CRITICAL': return base + ' bg-red-200 text-red-900'
     case 'HIGH': return base + ' bg-red-100 text-red-800'
     case 'MEDIUM': return base + ' bg-yellow-100 text-yellow-800'
     case 'LOW': return base + ' bg-blue-100 text-blue-800'

@@ -126,6 +126,28 @@
             </tbody>
           </table>
           <p v-if="!Object.keys(selectedEntry.attributes || {}).length" class="text-sm text-gray-400 text-center py-4">No attributes returned.</p>
+
+          <!-- Group membership lookup -->
+          <div class="mt-4 border-t border-gray-200 pt-4">
+            <button @click="loadGroups(selectedEntry.dn)" :disabled="loadingGroups" class="btn-secondary text-sm">
+              {{ loadingGroups ? 'Loading…' : (entryGroups !== null ? 'Refresh Groups' : 'View Groups') }}
+            </button>
+
+            <div v-if="entryGroups !== null" class="mt-3">
+              <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                Group Memberships ({{ entryGroups.length }})
+              </p>
+              <div v-if="entryGroups.length === 0" class="text-sm text-gray-400">Not a member of any groups.</div>
+              <div v-else class="space-y-1 max-h-48 overflow-y-auto">
+                <div v-for="g in entryGroups" :key="g.dn"
+                  class="font-mono text-xs text-gray-700 bg-gray-50 rounded px-3 py-1.5 break-all">
+                  <span class="font-medium text-gray-900">{{ g.cn || '' }}</span>
+                  <span v-if="g.cn" class="text-gray-400 ml-1">—</span>
+                  {{ g.dn }}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -151,6 +173,8 @@ const searching   = ref(false)
 const hasSearched = ref(false)
 const results      = ref([])
 const selectedEntry = ref(null)
+const entryGroups   = ref(null)
+const loadingGroups = ref(false)
 
 const form = ref({
   directoryId: '',
@@ -221,6 +245,30 @@ function doExportResults() {
 
 function showEntryDetail(entry) {
   selectedEntry.value = entry
+  entryGroups.value = null
+}
+
+async function loadGroups(dn) {
+  if (!form.value.directoryId || !dn) return
+  loadingGroups.value = true
+  try {
+    const escapedDn = dn.replace(/([\\*()])/g, '\\$1')
+    const { data } = await searchEntries(form.value.directoryId, {
+      scope: 'sub',
+      filter: `(|(member=${escapedDn})(uniqueMember=${escapedDn})(memberUid=${dn.split(',')[0].split('=')[1] || dn}))`,
+      attributes: 'cn,dn',
+      limit: 200,
+    })
+    entryGroups.value = (Array.isArray(data) ? data : []).map(e => ({
+      dn: e.dn,
+      cn: (e.attributes?.cn || [])[0] || '',
+    })).sort((a, b) => (a.cn || a.dn).localeCompare(b.cn || b.dn))
+  } catch (e) {
+    notif.error('Failed to load groups: ' + (e.response?.data?.detail || e.message))
+    entryGroups.value = []
+  } finally {
+    loadingGroups.value = false
+  }
 }
 
 function clearForm() {
