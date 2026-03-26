@@ -285,6 +285,12 @@ const router = createRouter({
           meta: { requiresSuperadmin: true },
         },
         {
+          path: 'superadmin/auditor-links',
+          name: 'superadminAuditorLinks',
+          component: () => import('@/views/auditor/AuditorLinksView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
+        {
           path: 'superadmin/playbooks',
           name: 'superadminPlaybooks',
           component: () => import('@/views/playbooks/PlaybooksView.vue'),
