@@ -10,6 +10,15 @@
 
     <!-- Report runner -->
     <section class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+      <!-- Directory picker (superadmin only — when no dirId from route) -->
+      <div v-if="!routeDirId" class="mb-3">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
+        <select v-model="selectedDir" class="input w-full max-w-sm">
+          <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select —' }}</option>
+          <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
+        </select>
+      </div>
+
       <div class="grid grid-cols-2 gap-3 mb-3">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
@@ -27,8 +36,18 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">Lookback Days</label>
           <input v-model.number="runForm.lookbackDays" type="number" min="1" class="input w-full" placeholder="30" />
         </div>
+        <!-- Integrity check options -->
+        <div v-if="isIntegrityCheck">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Checks to Run</label>
+          <div class="flex flex-col gap-1.5 mt-1">
+            <label v-for="c in integrityChecks" :key="c.value" class="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" v-model="runForm.integrityChecks" :value="c.value" class="rounded border-gray-300" />
+              {{ c.label }}
+            </label>
+          </div>
+        </div>
       </div>
-      <button @click="doRun" :disabled="running" class="btn-primary">
+      <button @click="doRun" :disabled="running || !dirId" class="btn-primary">
         {{ running ? 'Running…' : 'Run Report' }}
       </button>
     </section>
@@ -39,7 +58,7 @@
         <span class="text-sm text-gray-600">{{ resultRows.length }} result{{ resultRows.length !== 1 ? 's' : '' }}</span>
         <div class="flex gap-2">
           <button @click="doExport('CSV')" :disabled="exporting" class="btn-secondary text-xs">Export CSV</button>
-          <button @click="doExport('PDF')" :disabled="exporting" class="btn-secondary text-xs">Export PDF</button>
+          <button @click="doExport('PDF')" :disabled="exporting || isIntegrityCheck" class="btn-secondary text-xs">Export PDF</button>
         </div>
       </div>
 
@@ -135,7 +154,7 @@
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
                 <select v-model="jobForm.reportType" class="input w-full" required>
-                  <option v-for="t in reportTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
+                  <option v-for="t in schedulableTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
                 </select>
               </div>
             </div>
@@ -169,7 +188,9 @@
               <DnPicker v-else-if="currentJobFormType?.param === 'branchDn'" v-model="jobForm.paramValue" :directory-id="dirId" />
               <FormField v-else :label="jobFormParamLabel" v-model="jobForm.paramValue" />
             </div>
-            <FormField label="Lookback Days" v-model.number="jobForm.lookbackDays" type="number" placeholder="30" />
+            <div v-if="jobFormNeedsLookback">
+              <FormField label="Lookback Days" v-model.number="jobForm.lookbackDays" type="number" placeholder="30" />
+            </div>
             <div class="flex items-center gap-2">
               <input type="checkbox" id="jobEnabled" v-model="jobForm.enabled" class="rounded" />
               <label for="jobEnabled" class="text-sm text-gray-700">Enabled</label>
@@ -196,6 +217,8 @@ import {
   listReportJobs, createReportJob, updateReportJob,
   deleteReportJob, setReportJobEnabled, runReport, runReportData,
 } from '@/api/reports'
+import { listDirectories } from '@/api/directories'
+import { checkIntegrity } from '@/api/browse'
 import { downloadBlob } from '@/composables/useApi'
 import FormField from '@/components/FormField.vue'
 import AppModal from '@/components/AppModal.vue'
@@ -205,7 +228,14 @@ import GroupDnPicker from '@/components/GroupDnPicker.vue'
 
 const route = useRoute()
 const notif = useNotificationStore()
-const dirId = route.params.dirId
+const routeDirId = route.params.dirId
+
+// Directory picker for superadmin (when no dirId from route)
+const directories = ref([])
+const loadingDirs = ref(false)
+const selectedDir = ref('')
+
+const dirId = computed(() => routeDirId || selectedDir.value)
 
 const PAGE_SIZE = 50
 
@@ -219,6 +249,16 @@ const reportTypes = [
   { value: 'DISABLED_ACCOUNTS',    label: 'Disabled Accounts',      param: null, lookback: false },
   { value: 'MISSING_PROFILE_GROUPS', label: 'Missing Profile Groups', param: null, lookback: false },
   { value: 'SOD_VIOLATIONS',       label: 'SoD Violations',         param: null, lookback: false },
+  { value: 'INTEGRITY_CHECK',      label: 'Integrity Check',        param: null, lookback: false },
+]
+
+// Scheduled jobs can't use INTEGRITY_CHECK (it's not a backend report type)
+const schedulableTypes = computed(() => reportTypes.filter(t => t.value !== 'INTEGRITY_CHECK'))
+
+const integrityChecks = [
+  { value: 'BROKEN_MEMBER',  label: 'Broken Member References' },
+  { value: 'ORPHANED_ENTRY', label: 'Orphaned Entries' },
+  { value: 'EMPTY_GROUP',    label: 'Empty Groups' },
 ]
 
 function labelFor(type) { return reportTypes.find(t => t.value === type)?.label ?? type }
@@ -226,7 +266,10 @@ function fmtDate(iso) { return new Date(iso).toLocaleString() }
 
 // ── Report runner ─────────────────────────────────────────────────────────────
 
-const runForm = ref({ reportType: 'RECENTLY_ADDED', paramValue: '', lookbackDays: 30 })
+const runForm = ref({
+  reportType: 'RECENTLY_ADDED', paramValue: '', lookbackDays: 30,
+  integrityChecks: ['BROKEN_MEMBER', 'ORPHANED_ENTRY', 'EMPTY_GROUP'],
+})
 const running = ref(false)
 const exporting = ref(false)
 const hasResults = ref(false)
@@ -236,11 +279,12 @@ const sortCol = ref('')
 const sortAsc = ref(true)
 const page = ref(0)
 
-const currentRunType = computed(() => reportTypes.find(t => t.value === runForm.value.reportType))
-const needsParam     = computed(() => !!currentRunType.value?.param)
-const paramLabel     = computed(() => currentRunType.value?.paramLabel ?? '')
+const currentRunType   = computed(() => reportTypes.find(t => t.value === runForm.value.reportType))
+const needsParam       = computed(() => !!currentRunType.value?.param)
+const paramLabel       = computed(() => currentRunType.value?.paramLabel ?? '')
 const paramPlaceholder = computed(() => currentRunType.value?.paramPlaceholder ?? '')
-const needsLookback  = computed(() => !!currentRunType.value?.lookback)
+const needsLookback    = computed(() => !!currentRunType.value?.lookback)
+const isIntegrityCheck = computed(() => runForm.value.reportType === 'INTEGRITY_CHECK')
 
 // Show max 10 columns in table (dn + 9 attributes)
 const visibleColumns = computed(() => resultColumns.value.slice(0, 10))
@@ -268,15 +312,20 @@ function buildReportParams() {
 }
 
 async function doRun() {
+  if (!dirId.value) { notif.error('Please select a directory.'); return }
   running.value = true
   hasResults.value = false
   try {
-    const { data } = await runReportData(dirId, {
-      reportType: runForm.value.reportType,
-      reportParams: buildReportParams(),
-    })
-    resultColumns.value = data.columns || []
-    resultRows.value = data.rows || []
+    if (isIntegrityCheck.value) {
+      await runIntegrityCheck()
+    } else {
+      const { data } = await runReportData(dirId.value, {
+        reportType: runForm.value.reportType,
+        reportParams: buildReportParams(),
+      })
+      resultColumns.value = data.columns || []
+      resultRows.value = data.rows || []
+    }
     hasResults.value = true
     sortCol.value = ''
     page.value = 0
@@ -287,10 +336,29 @@ async function doRun() {
   }
 }
 
+async function runIntegrityCheck() {
+  const checks = runForm.value.integrityChecks
+  if (!checks.length) { notif.error('Select at least one check.'); return }
+  const { data } = await checkIntegrity(dirId.value, '', checks)
+  const issues = data.issues || []
+  resultColumns.value = ['type', 'dn', 'description']
+  resultRows.value = issues.map(i => ({ type: i.type, dn: i.dn, description: i.description }))
+}
+
 async function doExport(format) {
+  if (!dirId.value) return
+  if (isIntegrityCheck.value) {
+    // Export integrity results as CSV from current data
+    const header = resultColumns.value.join(',')
+    const rows = resultRows.value.map(r => resultColumns.value.map(c => `"${(r[c] || '').replace(/"/g, '""')}"`).join(','))
+    const csv = [header, ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    downloadBlob(blob, 'integrity_check.csv')
+    return
+  }
   exporting.value = true
   try {
-    const { data } = await runReport(dirId, {
+    const { data } = await runReport(dirId.value, {
       reportType: runForm.value.reportType,
       reportParams: buildReportParams(),
       outputFormat: format,
@@ -323,15 +391,17 @@ function blankJobForm() {
   }
 }
 
-const currentJobFormType = computed(() => reportTypes.find(t => t.value === jobForm.value.reportType))
-const jobFormNeedsParam  = computed(() => !!currentJobFormType.value?.param)
-const jobFormParamLabel  = computed(() => currentJobFormType.value?.paramLabel ?? '')
+const currentJobFormType   = computed(() => reportTypes.find(t => t.value === jobForm.value.reportType))
+const jobFormNeedsParam    = computed(() => !!currentJobFormType.value?.param)
+const jobFormParamLabel    = computed(() => currentJobFormType.value?.paramLabel ?? '')
+const jobFormNeedsLookback = computed(() => !!currentJobFormType.value?.lookback)
 
 async function openSchedules() {
+  if (!dirId.value) { notif.error('Please select a directory first.'); return }
   showSchedules.value = true
   loadingJobs.value = true
   try {
-    const { data } = await listReportJobs(dirId, { size: 50 })
+    const { data } = await listReportJobs(dirId.value, { size: 50 })
     jobs.value = data.content ?? data
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
@@ -386,14 +456,14 @@ async function saveJob() {
   try {
     const payload = buildJobPayload()
     if (editJob.value) {
-      await updateReportJob(dirId, editJob.value.id, payload)
+      await updateReportJob(dirId.value, editJob.value.id, payload)
       notif.success('Job updated')
     } else {
-      await createReportJob(dirId, payload)
+      await createReportJob(dirId.value, payload)
       notif.success('Job created')
     }
     cancelJobForm()
-    const { data } = await listReportJobs(dirId, { size: 50 })
+    const { data } = await listReportJobs(dirId.value, { size: 50 })
     jobs.value = data.content ?? data
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
@@ -404,7 +474,7 @@ async function saveJob() {
 
 async function toggleEnabled(job) {
   try {
-    const { data } = await setReportJobEnabled(dirId, job.id, !job.enabled)
+    const { data } = await setReportJobEnabled(dirId.value, job.id, !job.enabled)
     job.enabled = data.enabled
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
@@ -415,16 +485,34 @@ function confirmDelete(job) { deleteTarget.value = job }
 
 async function doDelete() {
   try {
-    await deleteReportJob(dirId, deleteTarget.value.id)
+    await deleteReportJob(dirId.value, deleteTarget.value.id)
     notif.success('Job deleted')
     deleteTarget.value = null
-    const { data } = await listReportJobs(dirId, { size: 50 })
+    const { data } = await listReportJobs(dirId.value, { size: 50 })
     jobs.value = data.content ?? data
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
     deleteTarget.value = null
   }
 }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+onMounted(async () => {
+  if (!routeDirId) {
+    // Superadmin mode — load directory list
+    loadingDirs.value = true
+    try {
+      const { data } = await listDirectories()
+      directories.value = data
+      if (data.length === 1) selectedDir.value = data[0].id
+    } catch (e) {
+      notif.error(e.response?.data?.detail || e.message)
+    } finally {
+      loadingDirs.value = false
+    }
+  }
+})
 </script>
 
 <style scoped>
