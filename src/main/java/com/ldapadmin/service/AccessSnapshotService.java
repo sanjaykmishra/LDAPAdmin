@@ -83,7 +83,7 @@ public class AccessSnapshotService {
 
             // 2. Capture user attributes for peer grouping (at snapshot time, not analysis time)
             List<LdapUser> users = ldapUserService.searchUsers(dc, USER_FILTER, null, MAX_USERS,
-                    "cn", "displayName", "department", "title", "ou");
+                    "cn", "displayName", "departmentNumber", "title", "ou");
             List<AccessSnapshotUser> userBatch = new ArrayList<>();
 
             for (LdapUser user : users) {
@@ -91,7 +91,7 @@ public class AccessSnapshotService {
                 su.setSnapshot(snapshot);
                 su.setUserDn(user.getDn());
                 su.setDisplayName(user.getDisplayName() != null ? user.getDisplayName() : user.getCn());
-                su.setDepartment(user.getFirstValue("department"));
+                su.setDepartment(user.getFirstValue("departmentNumber"));
                 su.setTitle(user.getFirstValue("title"));
                 su.setOu(user.getFirstValue("ou"));
                 userBatch.add(su);
