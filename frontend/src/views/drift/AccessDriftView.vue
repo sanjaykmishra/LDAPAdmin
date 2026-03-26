@@ -58,6 +58,15 @@
       <button @click="analysisResult = null" class="text-blue-400 hover:text-blue-600">Dismiss</button>
     </div>
 
+    <!-- View toggle -->
+    <div class="flex gap-1 mb-4 bg-gray-100 p-1 rounded-lg w-fit">
+      <button @click="viewMode = 'findings'" :class="viewMode === 'findings' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'" class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors">Findings</button>
+      <button @click="viewMode = 'visualization'; loadVisualization()" :class="viewMode === 'visualization' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'" class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors">Visualization</button>
+    </div>
+
+    <!-- ═══ Findings tab ═══ -->
+    <template v-if="viewMode === 'findings'">
+
     <!-- Filter -->
     <div class="flex gap-2 items-center mb-4">
       <label class="text-sm text-gray-600">Filter:</label>
@@ -99,6 +108,85 @@
         <span v-else class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{{ f.status }}</span>
       </div>
     </div>
+
+    </template>
+
+    <!-- ═══ Visualization tab ═══ -->
+    <template v-if="viewMode === 'visualization'">
+      <div v-if="vizLoading" class="text-gray-400 text-sm py-8 text-center">Loading visualization...</div>
+      <div v-else-if="!vizData?.peerGroups?.length" class="bg-white rounded-lg border p-8 text-center text-gray-500">
+        No snapshot data available. Run an analysis first.
+      </div>
+      <div v-else class="space-y-6">
+        <!-- Heatmap -->
+        <div class="bg-white border border-gray-200 rounded-xl p-5">
+          <h3 class="text-sm font-semibold text-gray-900 mb-3">Group Membership by Department</h3>
+          <div class="overflow-x-auto">
+            <table class="text-xs">
+              <thead>
+                <tr>
+                  <th class="text-left py-1.5 px-2 font-medium text-gray-500 sticky left-0 bg-white min-w-[140px]">Department</th>
+                  <th v-for="g in heatmapGroups" :key="g" class="py-1.5 px-2 font-medium text-gray-500 text-center whitespace-nowrap" :title="g">
+                    {{ g.length > 14 ? g.slice(0, 12) + '…' : g }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="pg in vizData.peerGroups" :key="pg.name" class="border-t border-gray-100">
+                  <td class="py-1.5 px-2 font-medium text-gray-700 sticky left-0 bg-white">
+                    {{ pg.name }} <span class="text-gray-400 font-normal">({{ pg.userCount }})</span>
+                  </td>
+                  <td v-for="g in heatmapGroups" :key="g" class="py-1.5 px-2 text-center">
+                    <span v-if="heatmapCell(pg, g) !== null"
+                      :class="heatmapColor(heatmapCell(pg, g))"
+                      class="inline-block w-10 py-0.5 rounded text-xs font-mono"
+                      :title="`${pg.name} → ${g}: ${heatmapCell(pg, g)}%`">
+                      {{ heatmapCell(pg, g) }}
+                    </span>
+                    <span v-else class="text-gray-200">—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Per peer-group detail with bar chart -->
+        <div v-for="pg in vizData.peerGroups" :key="pg.name" class="bg-white border border-gray-200 rounded-xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-gray-900">{{ pg.name }} <span class="font-normal text-gray-400">({{ pg.userCount }} users)</span></h3>
+            <span v-if="pg.outliers.length" class="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-medium">{{ pg.outliers.length }} outlier{{ pg.outliers.length !== 1 ? 's' : '' }}</span>
+          </div>
+
+          <!-- Bar chart -->
+          <div class="space-y-1.5 mb-4">
+            <div v-for="g in pg.groups.slice(0, 15)" :key="g.groupName" class="flex items-center gap-2">
+              <span class="text-xs text-gray-600 w-32 truncate shrink-0" :title="g.groupName">{{ g.groupName }}</span>
+              <div class="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
+                <div :style="{ width: g.membershipPct + '%' }"
+                  :class="g.membershipPct > 80 ? 'bg-blue-500' : g.membershipPct > 30 ? 'bg-blue-400' : g.membershipPct > 10 ? 'bg-amber-400' : 'bg-red-400'"
+                  class="h-4 rounded-full transition-all"></div>
+              </div>
+              <span class="text-xs font-mono text-gray-500 w-10 text-right shrink-0">{{ g.membershipPct }}%</span>
+            </div>
+          </div>
+
+          <!-- Outlier cards -->
+          <div v-if="pg.outliers.length" class="border-t border-gray-100 pt-3">
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Outliers</p>
+            <div class="flex flex-wrap gap-2">
+              <div v-for="o in pg.outliers" :key="o.userDn" class="bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-xs">
+                <div class="font-medium text-gray-900">{{ o.displayName || o.userDn }}</div>
+                <div class="flex flex-wrap gap-1 mt-1">
+                  <span v-for="g in o.extraGroups" :key="g" class="bg-red-100 text-red-700 px-1.5 py-0.5 rounded text-xs">{{ g }}</span>
+                </div>
+                <span :class="o.severity === 'HIGH' ? 'text-red-600' : o.severity === 'MEDIUM' ? 'text-amber-600' : 'text-gray-500'" class="text-xs font-medium mt-1 block">{{ o.severity }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
 
     <!-- Exempt dialog -->
     <div v-if="exemptDialog" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="exemptDialog = null">
@@ -162,13 +250,13 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useApi } from '@/composables/useApi'
 import { useDirectoryPicker } from '@/composables/useDirectoryPicker'
 import {
   listRules, createRule, deleteRule,
   runAnalysis, listFindings, getFindingsSummary,
-  acknowledgeFinding, exemptFinding,
+  acknowledgeFinding, exemptFinding, getDriftVisualization,
 } from '@/api/accessDrift'
 
 const { dirId, directories, selectedDir, loadingDirs, showPicker } = useDirectoryPicker()
@@ -184,6 +272,47 @@ const showRulesModal = ref(false)
 const exemptDialog = ref(null)
 const exemptReason = ref('')
 const newRule = ref({ name: '', groupingAttribute: '', anomalyThresholdPct: 10, normalThresholdPct: 50 })
+
+// Visualization state
+const viewMode = ref('findings')
+const vizData = ref(null)
+const vizLoading = ref(false)
+
+// Heatmap helpers
+const heatmapGroups = computed(() => {
+  if (!vizData.value?.peerGroups?.length) return []
+  const groupSet = new Set()
+  for (const pg of vizData.value.peerGroups) {
+    for (const g of pg.groups) groupSet.add(g.groupName)
+  }
+  return [...groupSet].slice(0, 20) // limit to top 20 groups
+})
+
+function heatmapCell(pg, groupName) {
+  const g = pg.groups.find(x => x.groupName === groupName)
+  return g ? g.membershipPct : null
+}
+
+function heatmapColor(pct) {
+  if (pct >= 80) return 'bg-blue-500 text-white'
+  if (pct >= 50) return 'bg-blue-300 text-blue-900'
+  if (pct >= 20) return 'bg-blue-100 text-blue-800'
+  if (pct > 0) return 'bg-amber-100 text-amber-800'
+  return 'bg-gray-50 text-gray-400'
+}
+
+async function loadVisualization() {
+  if (!dirId.value || vizData.value) return
+  vizLoading.value = true
+  try {
+    const { data } = await getDriftVisualization(dirId.value)
+    vizData.value = data
+  } catch (e) {
+    console.warn('Failed to load visualization:', e)
+  } finally {
+    vizLoading.value = false
+  }
+}
 
 function severityBadge(s) {
   const base = 'px-2 py-0.5 rounded-full text-xs font-medium shrink-0'
@@ -269,6 +398,7 @@ async function handleDeleteRule(r) {
 
 function loadAll() {
   if (!dirId.value) return
+  vizData.value = null // reset visualization on dir change
   loadFindings()
   loadSummary()
   loadRules()

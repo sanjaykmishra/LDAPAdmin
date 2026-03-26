@@ -348,4 +348,92 @@ public class AccessDriftAnalysisService {
                 r.getCreatedBy() != null ? r.getCreatedBy().getUsername() : null,
                 r.getCreatedAt());
     }
+
+    // ── Visualization ─────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public DriftVisualizationResponse buildVisualization(UUID directoryId) {
+        // Get latest completed snapshot
+        var snapshotOpt = snapshotRepo.findFirstByDirectoryIdOrderByCapturedAtDesc(directoryId);
+        if (snapshotOpt.isEmpty()) {
+            return new DriftVisualizationResponse(List.of());
+        }
+        var snapshot = snapshotOpt.get();
+
+        // Load all users with their peer group attribute (department)
+        var snapshotUsers = userRepo.findBySnapshotId(snapshot.getId());
+        var memberships = membershipRepo.findBySnapshotId(snapshot.getId());
+
+        // Build user → groups map
+        Map<String, List<String>> userGroups = new HashMap<>();
+        for (var m : memberships) {
+            userGroups.computeIfAbsent(m.getUserDn().toLowerCase(), k -> new ArrayList<>())
+                    .add(m.getGroupName() != null ? m.getGroupName() : m.getGroupDn());
+        }
+
+        // Group users by peer group (department)
+        Map<String, List<AccessSnapshotUser>> peerGroupUsers = new LinkedHashMap<>();
+        for (var u : snapshotUsers) {
+            String pg = u.getDepartment() != null && !u.getDepartment().isBlank()
+                    ? u.getDepartment() : "(No Department)";
+            peerGroupUsers.computeIfAbsent(pg, k -> new ArrayList<>()).add(u);
+        }
+
+        // Load open drift findings for outlier detection
+        var findings = findingRepo.findByDirectoryIdAndStatus(directoryId, DriftFindingStatus.OPEN);
+        Map<String, List<AccessDriftFinding>> userFindings = new HashMap<>();
+        for (var f : findings) {
+            userFindings.computeIfAbsent(f.getUserDn().toLowerCase(), k -> new ArrayList<>()).add(f);
+        }
+
+        // Build visualization per peer group
+        List<DriftVisualizationResponse.PeerGroupViz> peerGroupVizs = new ArrayList<>();
+
+        for (var entry : peerGroupUsers.entrySet()) {
+            String pgName = entry.getKey();
+            List<AccessSnapshotUser> users = entry.getValue();
+            int userCount = users.size();
+
+            // Count membership percentages per group
+            Map<String, Integer> groupMemberCount = new LinkedHashMap<>();
+            for (var u : users) {
+                var groups = userGroups.getOrDefault(u.getUserDn().toLowerCase(), List.of());
+                for (String g : groups) {
+                    groupMemberCount.merge(g, 1, Integer::sum);
+                }
+            }
+
+            // Build group membership list sorted by percentage desc
+            List<DriftVisualizationResponse.GroupMembership> groupMemberships = new ArrayList<>();
+            for (var ge : groupMemberCount.entrySet()) {
+                double pct = userCount > 0 ? (ge.getValue() * 100.0 / userCount) : 0;
+                groupMemberships.add(new DriftVisualizationResponse.GroupMembership(ge.getKey(), Math.round(pct * 10) / 10.0));
+            }
+            groupMemberships.sort((a, b) -> Double.compare(b.membershipPct(), a.membershipPct()));
+
+            // Build outliers list (users with open drift findings)
+            List<DriftVisualizationResponse.Outlier> outliers = new ArrayList<>();
+            for (var u : users) {
+                var uFindings = userFindings.get(u.getUserDn().toLowerCase());
+                if (uFindings != null && !uFindings.isEmpty()) {
+                    List<String> extraGroups = uFindings.stream()
+                            .map(f -> f.getGroupName() != null ? f.getGroupName() : f.getGroupDn())
+                            .distinct().toList();
+                    String severity = uFindings.stream()
+                            .map(f -> f.getSeverity().name())
+                            .min(Comparator.comparingInt(s -> switch (s) { case "HIGH" -> 0; case "MEDIUM" -> 1; default -> 2; }))
+                            .orElse("LOW");
+                    outliers.add(new DriftVisualizationResponse.Outlier(
+                            u.getUserDn(), u.getDisplayName(), extraGroups, severity));
+                }
+            }
+
+            peerGroupVizs.add(new DriftVisualizationResponse.PeerGroupViz(pgName, userCount, groupMemberships, outliers));
+        }
+
+        // Sort by user count desc
+        peerGroupVizs.sort((a, b) -> Integer.compare(b.userCount(), a.userCount()));
+
+        return new DriftVisualizationResponse(peerGroupVizs);
+    }
 }

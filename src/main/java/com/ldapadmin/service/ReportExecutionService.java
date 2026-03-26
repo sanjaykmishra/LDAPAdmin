@@ -66,6 +66,8 @@ public class ReportExecutionService {
     private final SodViolationRepository         sodViolationRepo;
     private final com.ldapadmin.repository.AccessReviewCampaignRepository campaignRepo;
     private final com.ldapadmin.repository.AccessDriftFindingRepository   driftFindingRepo;
+    private final com.ldapadmin.repository.hr.HrConnectionRepository     hrConnectionRepo;
+    private final com.ldapadmin.repository.hr.HrEmployeeRepository       hrEmployeeRepo;
     private final PdfReportService               pdfReportService;
 
     /**
@@ -119,6 +121,7 @@ public class ReportExecutionService {
             case ACCESS_REVIEW_RESULTS  -> runAccessReviewResultsData(directoryId, params);
             case PRIVILEGED_ACCOUNT_INVENTORY -> runPrivilegedAccountInventoryData(dc, params);
             case ACCESS_DRIFT_REPORT    -> runAccessDriftReportData(directoryId);
+            case TERMINATION_VELOCITY   -> runTerminationVelocityData(directoryId, params);
             case AUDIT_LOG_REPORT       -> runAuditLogReportData(directoryId, params);
         };
     }
@@ -647,6 +650,95 @@ public class ReportExecutionService {
                 }
             }
         }
+    }
+
+    private ReportData runTerminationVelocityData(UUID directoryId, Map<String, Object> params) {
+        // Find HR connection for this directory
+        var hrConnOpt = hrConnectionRepo.findByDirectoryId(directoryId);
+        if (hrConnOpt.isEmpty()) {
+            return new ReportData(
+                    List.of("Employee", "Status", "Termination Date", "Access Revoked At", "Velocity", "SLA Status"),
+                    List.of());
+        }
+        var hrConn = hrConnOpt.get();
+
+        // SLA threshold in hours (default 24)
+        int slaHours = 24;
+        Object slaRaw = params.get("slaHours");
+        if (slaRaw instanceof Number n) slaHours = n.intValue();
+        else if (slaRaw instanceof String s) { try { slaHours = Integer.parseInt(s); } catch (NumberFormatException ignored) { } }
+
+        // Date range
+        OffsetDateTime from = parseDateTime(params, "from");
+        if (from == null) from = OffsetDateTime.now().minusDays(lookbackDays(params));
+        OffsetDateTime to = parseDateTime(params, "to");
+
+        // Get all terminated employees
+        var employees = hrEmployeeRepo.findByHrConnectionIdAndStatusAndMatchedLdapDnIsNotNull(
+                hrConn.getId(), com.ldapadmin.entity.enums.HrEmployeeStatus.TERMINATED);
+
+        // Filter by date range using terminationDate
+        final OffsetDateTime fromFinal = from;
+        final OffsetDateTime toFinal = to;
+        var filtered = employees.stream()
+                .filter(e -> e.getTerminationDate() != null)
+                .filter(e -> {
+                    OffsetDateTime termAt = e.getTerminationDate().atStartOfDay().atOffset(java.time.ZoneOffset.UTC);
+                    if (termAt.isBefore(fromFinal)) return false;
+                    return toFinal == null || !termAt.isAfter(toFinal);
+                })
+                .toList();
+
+        List<String> columns = List.of("Employee", "Termination Date", "Access Revoked At", "Velocity", "SLA Status");
+        List<Map<String, String>> rows = new ArrayList<>();
+
+        for (var emp : filtered) {
+            String empName = emp.getDisplayName() != null ? emp.getDisplayName()
+                    : (emp.getFirstName() + " " + emp.getLastName());
+            String ldapDn = emp.getMatchedLdapDn();
+            OffsetDateTime termDate = emp.getTerminationDate().atStartOfDay().atOffset(java.time.ZoneOffset.UTC);
+
+            // Find the earliest USER_DELETE or USER_DISABLE audit event for this user after termination
+            var auditEvents = auditEventRepo.findAll(
+                    directoryId, null, null, ldapDn, termDate, null,
+                    org.springframework.data.domain.PageRequest.of(0, 10));
+
+            OffsetDateTime revokedAt = null;
+            for (var ae : auditEvents.getContent()) {
+                if (ae.getAction() != null &&
+                        (ae.getAction() == AuditAction.USER_DELETE || ae.getAction() == AuditAction.USER_DISABLE)) {
+                    revokedAt = ae.getOccurredAt();
+                    break;
+                }
+            }
+
+            // Calculate velocity
+            String velocity;
+            String slaStatus;
+            if (revokedAt != null) {
+                long hours = java.time.Duration.between(termDate, revokedAt).toHours();
+                long minutes = java.time.Duration.between(termDate, revokedAt).toMinutes() % 60;
+                if (hours < 1) velocity = minutes + "m";
+                else if (hours < 48) velocity = hours + "h " + minutes + "m";
+                else velocity = (hours / 24) + "d " + (hours % 24) + "h";
+                slaStatus = hours <= slaHours ? "Within SLA" : "Overdue";
+            } else {
+                long hours = java.time.Duration.between(termDate, OffsetDateTime.now()).toHours();
+                if (hours < 48) velocity = hours + "h (pending)";
+                else velocity = (hours / 24) + "d (pending)";
+                slaStatus = hours <= slaHours ? "Pending" : "Overdue";
+            }
+
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("Employee", empName);
+            row.put("Termination Date", termDate.toString());
+            row.put("Access Revoked At", revokedAt != null ? revokedAt.toString() : "");
+            row.put("Velocity", velocity);
+            row.put("SLA Status", slaStatus);
+            rows.add(row);
+        }
+
+        return new ReportData(columns, rows);
     }
 
     private String buildGroupFilter(Map<String, Object> params) {
