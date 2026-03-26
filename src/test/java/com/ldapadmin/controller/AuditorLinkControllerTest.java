@@ -146,6 +146,22 @@ class AuditorLinkControllerTest extends BaseControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void create_directoryNotFound_returns404() throws Exception {
+        when(auditorLinkService.create(eq(dirId), any(), any()))
+                .thenThrow(new com.ldapadmin.exception.ResourceNotFoundException("Directory", dirId));
+
+        CreateAuditorLinkRequest request = new CreateAuditorLinkRequest(
+                "Audit", List.of(), true, false, true, null, null, 30);
+
+        mvc.perform(post(BASE_URL, dirId)
+                        .with(authentication(superadminAuth()))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+    }
+
     // ── GET (list) ────────────────────────────────────────────────────────────
 
     @Test
@@ -196,6 +212,19 @@ class AuditorLinkControllerTest extends BaseControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(auditorLinkService).revoke(eq(linkId), any());
+    }
+
+    @Test
+    void revoke_linkNotFound_returns404() throws Exception {
+        UUID linkId = UUID.randomUUID();
+
+        doThrow(new com.ldapadmin.exception.ResourceNotFoundException("AuditorLink", linkId))
+                .when(auditorLinkService).revoke(eq(linkId), any());
+
+        mvc.perform(delete(BASE_URL + "/{linkId}", dirId, linkId)
+                        .with(authentication(superadminAuth()))
+                        .with(csrf()))
+                .andExpect(status().isNotFound());
     }
 
     @Test
