@@ -66,6 +66,10 @@ public class AuditDataSource {
     @Column(nullable = false)
     private boolean enabled = true;
 
+    /** DirSync cookie for AD incremental polling. */
+    @Column(name = "dirsync_cookie")
+    private byte[] dirsyncCookie;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

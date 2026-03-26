@@ -1,5 +1,6 @@
 package com.ldapadmin.entity;
 
+import com.ldapadmin.entity.enums.DirectoryType;
 import com.ldapadmin.entity.enums.EnableDisableValueType;
 import com.ldapadmin.entity.enums.SslMode;
 import jakarta.persistence.*;
@@ -26,6 +27,10 @@ public class DirectoryConnection {
 
     @Column(name = "display_name", nullable = false)
     private String displayName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "directory_type", nullable = false, length = 20)
+    private DirectoryType directoryType = DirectoryType.GENERIC;
 
     @Column(nullable = false)
     private String host;
@@ -122,6 +127,17 @@ public class DirectoryConnection {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "audit_data_source_id")
     private AuditDataSource auditDataSource;
+
+    // ── Multi-DC failover (AD) ──────────────────────────────────────────────
+
+    @Column(name = "secondary_host")
+    private String secondaryHost;
+
+    @Column(name = "secondary_port")
+    private Integer secondaryPort;
+
+    @Column(name = "global_catalog_port")
+    private Integer globalCatalogPort;
 
     @Column(nullable = false)
     private boolean enabled = true;

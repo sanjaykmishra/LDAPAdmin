@@ -22,3 +22,6 @@ export const setReportJobEnabled = (dirId, jobId, enabled) =>
 
 export const runReport = (dirId, data) =>
   client.post(`/directories/${dirId}/reports/run`, data, { responseType: 'blob' })
+
+export const runReportData = (dirId, data) =>
+  client.post(`/directories/${dirId}/reports/run-data`, data)

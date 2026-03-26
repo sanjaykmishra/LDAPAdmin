@@ -51,6 +51,7 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
     DirectoryConnectionResponse sampleResponse() {
         return new DirectoryConnectionResponse(
                 DIR_ID,
+                com.ldapadmin.entity.enums.DirectoryType.GENERIC, // directoryType
                 "Corp LDAP",                        // displayName
                 "ldap.example.com",                 // host
                 389,                                // port
@@ -73,17 +74,22 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
                 null,                               // selfServiceLoginAttribute
                 List.of(),                          // userBaseDns
                 List.of(),                          // groupBaseDns
+                null,                               // secondaryHost
+                null,                               // secondaryPort
+                null,                               // globalCatalogPort
                 OffsetDateTime.now(),               // createdAt
                 OffsetDateTime.now());              // updatedAt
     }
 
     DirectoryConnectionRequest validRequest() {
         return new DirectoryConnectionRequest(
+                com.ldapadmin.entity.enums.DirectoryType.GENERIC,
                 "Corp LDAP", "ldap.example.com", 389, SslMode.NONE,
                 false, null, "cn=admin,dc=example,dc=com", "secret",
                 "dc=example,dc=com", 500, 1, 10, 5, 30,
                 null, null, null, null, null, true,
-                false, null, List.of(), List.of());
+                false, null, null, null, null,
+                List.of(), List.of());
     }
 
     // ── GET list ──────────────────────────────────────────────────────────────
@@ -129,11 +135,13 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
     @Test
     void createDirectory_blankHost_returns400() throws Exception {
         DirectoryConnectionRequest bad = new DirectoryConnectionRequest(
+                com.ldapadmin.entity.enums.DirectoryType.GENERIC,
                 "Corp LDAP", "", 389, SslMode.NONE,
                 false, null, "cn=admin,dc=example,dc=com", "secret",
                 "dc=example,dc=com", 500, 1, 10, 5, 30,
                 null, null, null, null, null, true,
-                false, null, List.of(), List.of());
+                false, null, null, null, null,
+                List.of(), List.of());
 
         mockMvc.perform(post(BASE_URL)
                         .with(authentication(superadminAuth()))
@@ -145,11 +153,13 @@ class DirectoryConnectionControllerTest extends BaseControllerTest {
     @Test
     void createDirectory_portOutOfRange_returns400() throws Exception {
         DirectoryConnectionRequest bad = new DirectoryConnectionRequest(
+                com.ldapadmin.entity.enums.DirectoryType.GENERIC,
                 "Corp LDAP", "ldap.example.com", 99999, SslMode.NONE,
                 false, null, "cn=admin,dc=example,dc=com", "secret",
                 "dc=example,dc=com", 500, 1, 10, 5, 30,
                 null, null, null, null, null, true,
-                false, null, List.of(), List.of());
+                false, null, null, null, null,
+                List.of(), List.of());
 
         mockMvc.perform(post(BASE_URL)
                         .with(authentication(superadminAuth()))

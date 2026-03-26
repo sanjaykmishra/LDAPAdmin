@@ -49,8 +49,15 @@
     <AppModal v-model="showModal" :title="editing ? 'Edit Directory' : 'New Directory'" size="lg">
       <form @submit.prevent="save" class="space-y-2">
         <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Directory Type</label>
+            <select v-model="form.directoryType" @change="applyPreset" class="input w-full">
+              <option value="GENERIC">Generic LDAP</option>
+              <option value="ACTIVE_DIRECTORY">Active Directory</option>
+              <option value="OPENLDAP">OpenLDAP</option>
+            </select>
+          </div>
           <FormField label="Display Name" v-model="form.displayName" required />
-          <FormField label="Host" v-model="form.host" required />
           <FormField label="Port" v-model.number="form.port" type="number" placeholder="389" />
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">SSL Mode</label>
@@ -102,6 +109,10 @@
             <FormField label="Pool Max Size" v-model.number="form.poolMaxSize" type="number" />
             <FormField label="Connect Timeout (s)" v-model.number="form.poolConnectTimeoutSeconds" type="number" />
             <FormField label="Response Timeout (s)" v-model.number="form.poolResponseTimeoutSeconds" type="number" />
+            <FormField label="Secondary Host" v-model="form.secondaryHost" placeholder="Failover DC (optional)" />
+            <FormField label="Secondary Port" v-model.number="form.secondaryPort" type="number" placeholder="Same as primary" />
+            <FormField label="Global Catalog Port" v-model.number="form.globalCatalogPort" type="number" placeholder="3268 (AD only)" />
+            <div></div>
             <FormField label="Enable/Disable Attribute" v-model="form.enableDisableAttribute" placeholder="e.g. nsAccountLock" />
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Enable/Disable Value Type</label>
@@ -164,13 +175,35 @@ const form = ref(emptyForm())
 
 function emptyForm() {
   return {
+    directoryType: 'GENERIC',
     displayName: '', host: '', port: 389, sslMode: 'NONE',
     trustAllCerts: false, bindDn: '', bindPassword: '', baseDn: '',
-    pagingSize: 500, poolMinSize: 1, poolMaxSize: 10,
+    pagingSize: 500, poolMinSize: 2, poolMaxSize: 10,
     poolConnectTimeoutSeconds: 10, poolResponseTimeoutSeconds: 30,
     enableDisableAttribute: '', enableDisableValueType: 'BOOLEAN',
     enableValue: '', disableValue: '', enabled: true,
     selfServiceEnabled: false, selfServiceLoginAttribute: 'uid',
+    secondaryHost: '', secondaryPort: null, globalCatalogPort: null,
+  }
+}
+
+function applyPreset() {
+  const t = form.value.directoryType
+  if (t === 'ACTIVE_DIRECTORY') {
+    if (!form.value.port || form.value.port === 389) form.value.port = 636
+    if (form.value.sslMode === 'NONE') form.value.sslMode = 'LDAPS'
+    if (!form.value.selfServiceLoginAttribute || form.value.selfServiceLoginAttribute === 'uid')
+      form.value.selfServiceLoginAttribute = 'sAMAccountName'
+    if (!form.value.enableDisableAttribute) {
+      form.value.enableDisableAttribute = 'userAccountControl'
+      form.value.enableDisableValueType = 'BOOLEAN'
+      form.value.enableValue = '512'
+      form.value.disableValue = '514'
+    }
+  } else if (t === 'OPENLDAP') {
+    if (!form.value.port || form.value.port === 636) form.value.port = 389
+    if (!form.value.selfServiceLoginAttribute || form.value.selfServiceLoginAttribute === 'sAMAccountName')
+      form.value.selfServiceLoginAttribute = 'uid'
   }
 }
 
@@ -198,6 +231,7 @@ function openCreate() {
 function openEdit(d) {
   editing.value = d.id
   form.value = {
+    directoryType: d.directoryType || 'GENERIC',
     displayName: d.displayName, host: d.host, port: d.port, sslMode: d.sslMode,
     trustAllCerts: d.trustAllCerts, bindDn: d.bindDn, bindPassword: '', baseDn: d.baseDn,
     pagingSize: d.pagingSize, poolMinSize: d.poolMinSize, poolMaxSize: d.poolMaxSize,
@@ -209,6 +243,9 @@ function openEdit(d) {
     enabled: d.enabled,
     selfServiceEnabled: d.selfServiceEnabled || false,
     selfServiceLoginAttribute: d.selfServiceLoginAttribute || 'uid',
+    secondaryHost: d.secondaryHost || '',
+    secondaryPort: d.secondaryPort || null,
+    globalCatalogPort: d.globalCatalogPort || null,
   }
   testResult.value = null
   showModal.value = true
