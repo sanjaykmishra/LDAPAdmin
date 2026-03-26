@@ -141,7 +141,11 @@
           <p class="text-xs text-gray-400 uppercase tracking-wider mt-4 mb-1 px-3">Reports</p>
           <RouterLink to="/superadmin/reports" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V10M10 16V4M15 16v-4"/></svg>
-            Reports
+            Operational Reports
+          </RouterLink>
+          <RouterLink to="/superadmin/audit-reports" class="nav-item">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-4z"/><path d="M7 10l2 2 4-4"/></svg>
+            Audit Reports
           </RouterLink>
           <RouterLink to="/superadmin/compliance-reports" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M8 7h4M8 10h4M8 13h2"/><path d="M13 2v3h3"/></svg>

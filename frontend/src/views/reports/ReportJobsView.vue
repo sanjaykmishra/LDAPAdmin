@@ -10,16 +10,15 @@
 
     <!-- Report runner -->
     <section class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
-      <!-- Directory picker (superadmin only — when no dirId from route) -->
-      <div v-if="!routeDirId" class="mb-3">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
-        <select v-model="selectedDir" class="input w-full max-w-sm">
-          <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select —' }}</option>
-          <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
-        </select>
-      </div>
-
       <div class="grid grid-cols-2 gap-3 mb-3">
+        <!-- Directory picker (superadmin only — when no dirId from route) -->
+        <div v-if="!routeDirId">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
+          <select v-model="selectedDir" class="input w-full">
+            <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select —' }}</option>
+            <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
+          </select>
+        </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
           <select v-model="runForm.reportType" class="input w-full">
@@ -248,7 +247,6 @@ const reportTypes = [
   { value: 'RECENTLY_DELETED',     label: 'Recently Deleted',       param: null, lookback: true },
   { value: 'DISABLED_ACCOUNTS',    label: 'Disabled Accounts',      param: null, lookback: false },
   { value: 'MISSING_PROFILE_GROUPS', label: 'Missing Profile Groups', param: null, lookback: false },
-  { value: 'SOD_VIOLATIONS',       label: 'SoD Violations',         param: null, lookback: false },
   { value: 'INTEGRITY_CHECK',      label: 'Integrity Check',        param: null, lookback: false },
 ]
 

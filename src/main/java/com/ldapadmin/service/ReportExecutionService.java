@@ -61,6 +61,8 @@ public class ReportExecutionService {
     private final ProvisioningProfileRepository  profileRepo;
     private final ProvisioningProfileService     profileService;
     private final SodViolationRepository         sodViolationRepo;
+    private final com.ldapadmin.repository.AccessReviewCampaignRepository campaignRepo;
+    private final com.ldapadmin.repository.AccessDriftFindingRepository   driftFindingRepo;
     private final PdfReportService               pdfReportService;
 
     /**
@@ -110,6 +112,10 @@ public class ReportExecutionService {
             case DISABLED_ACCOUNTS      -> runDisabledAccountsReportData(dc);
             case MISSING_PROFILE_GROUPS -> runMissingProfileGroupsReportData(dc, directoryId);
             case SOD_VIOLATIONS         -> runSodViolationsReportData(directoryId);
+            case ACCESS_REVIEW_SUMMARY  -> runAccessReviewSummaryData(directoryId, params);
+            case PRIVILEGED_ACCOUNT_INVENTORY -> runPrivilegedAccountInventoryData(dc, params);
+            case ACCESS_DRIFT_REPORT    -> runAccessDriftReportData(directoryId);
+            case AUDIT_LOG_REPORT       -> runAuditLogReportData(directoryId, params);
         };
     }
 
@@ -353,6 +359,85 @@ public class ReportExecutionService {
             rows.add(row);
         }
 
+        return new ReportData(columns, rows);
+    }
+
+    // ── Audit reports ─────────────────────────────────────────────────────────
+
+    private ReportData runAccessReviewSummaryData(UUID directoryId, Map<String, Object> params) {
+        var campaigns = campaignRepo.findByDirectoryId(directoryId,
+                org.springframework.data.domain.Pageable.unpaged()).getContent();
+        List<String> columns = List.of("name", "status", "startsAt", "deadline", "completedAt", "createdAt");
+        List<Map<String, String>> rows = new ArrayList<>();
+        for (var c : campaigns) {
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("name", c.getName() != null ? c.getName() : "");
+            row.put("status", c.getStatus().name());
+            row.put("startsAt", c.getStartsAt() != null ? c.getStartsAt().toString() : "");
+            row.put("deadline", c.getDeadline() != null ? c.getDeadline().toString() : "");
+            row.put("completedAt", c.getCompletedAt() != null ? c.getCompletedAt().toString() : "");
+            row.put("createdAt", c.getCreatedAt() != null ? c.getCreatedAt().toString() : "");
+            rows.add(row);
+        }
+        return new ReportData(columns, rows);
+    }
+
+    private ReportData runPrivilegedAccountInventoryData(DirectoryConnection dc, Map<String, Object> params) {
+        String groupFilter = "(|(objectClass=groupOfNames)(objectClass=groupOfUniqueNames)(objectClass=group))";
+        List<LdapGroup> allGroups = groupService.searchGroups(dc, groupFilter, null, MAX_LDAP_RESULTS,
+                "cn", "member", "uniqueMember", "description");
+
+        List<String> columns = List.of("userDn", "groupDn", "groupName");
+        List<Map<String, String>> rows = new ArrayList<>();
+        for (LdapGroup g : allGroups) {
+            String groupName = g.getCn() != null ? g.getCn() : g.getDn();
+            for (String memberDn : g.getAllMembers()) {
+                Map<String, String> row = new LinkedHashMap<>();
+                row.put("userDn", memberDn);
+                row.put("groupDn", g.getDn());
+                row.put("groupName", groupName);
+                rows.add(row);
+            }
+        }
+        return new ReportData(columns, rows);
+    }
+
+    private ReportData runAccessDriftReportData(UUID directoryId) {
+        var findings = driftFindingRepo.findByDirectoryId(directoryId);
+        List<String> columns = List.of("userDn", "userDisplay", "peerGroupValue",
+                "groupDn", "groupName", "peerMembershipPct", "severity", "status", "detectedAt");
+        List<Map<String, String>> rows = new ArrayList<>();
+        for (var f : findings) {
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("userDn", f.getUserDn() != null ? f.getUserDn() : "");
+            row.put("userDisplay", f.getUserDisplay() != null ? f.getUserDisplay() : "");
+            row.put("peerGroupValue", f.getPeerGroupValue() != null ? f.getPeerGroupValue() : "");
+            row.put("groupDn", f.getGroupDn() != null ? f.getGroupDn() : "");
+            row.put("groupName", f.getGroupName() != null ? f.getGroupName() : "");
+            row.put("peerMembershipPct", String.valueOf(f.getPeerMembershipPct()));
+            row.put("severity", f.getSeverity().name());
+            row.put("status", f.getStatus().name());
+            row.put("detectedAt", f.getDetectedAt() != null ? f.getDetectedAt().toString() : "");
+            rows.add(row);
+        }
+        return new ReportData(columns, rows);
+    }
+
+    private ReportData runAuditLogReportData(UUID directoryId, Map<String, Object> params) {
+        OffsetDateTime from = OffsetDateTime.now().minusDays(lookbackDays(params));
+        var page = auditEventRepo.findAll(directoryId, null, null, null, from, null,
+                org.springframework.data.domain.PageRequest.of(0, MAX_LDAP_RESULTS));
+        List<String> columns = List.of("occurredAt", "action", "actorUsername", "targetDn", "directoryName");
+        List<Map<String, String>> rows = new ArrayList<>();
+        for (var e : page.getContent()) {
+            Map<String, String> row = new LinkedHashMap<>();
+            row.put("occurredAt", e.getOccurredAt() != null ? e.getOccurredAt().toString() : "");
+            row.put("action", e.getAction() != null ? e.getAction().name() : "");
+            row.put("actorUsername", e.getActorUsername() != null ? e.getActorUsername() : "");
+            row.put("targetDn", e.getTargetDn() != null ? e.getTargetDn() : "");
+            row.put("directoryName", e.getDirectoryName() != null ? e.getDirectoryName() : "");
+            rows.add(row);
+        }
         return new ReportData(columns, rows);
     }
 
