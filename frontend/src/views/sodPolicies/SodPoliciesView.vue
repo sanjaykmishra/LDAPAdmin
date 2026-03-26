@@ -2,23 +2,28 @@
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Separation of Duties Policies</h1>
-      <div class="flex gap-2">
-        <button @click="handleScan" :disabled="scanning || !dirId" class="btn-secondary text-sm">
-          {{ scanning ? 'Scanning...' : 'Run Scan' }}
-        </button>
-        <router-link :to="{ name: 'sodPolicyCreate', params: { dirId } }" v-if="dirId" class="btn-primary text-sm">
+      <router-link :to="{ name: 'sodPolicyCreate', params: { dirId } }" v-if="dirId" class="btn-primary text-sm">
           New Policy
         </router-link>
-      </div>
     </div>
 
-    <!-- Directory picker -->
-    <div v-if="showPicker" class="mb-4">
-      <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
-      <select v-model="selectedDir" class="input w-64">
-        <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select directory —' }}</option>
-        <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
-      </select>
+    <!-- Directory picker + Run Scan -->
+    <div v-if="showPicker" class="mb-4 flex items-end gap-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
+        <select v-model="selectedDir" class="w-64 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select directory —' }}</option>
+          <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
+        </select>
+      </div>
+      <button @click="handleScan" :disabled="scanning || !dirId" class="btn-secondary text-sm h-[38px]">
+        {{ scanning ? 'Scanning...' : 'Run Scan' }}
+      </button>
+    </div>
+    <div v-else class="mb-4">
+      <button @click="handleScan" :disabled="scanning || !dirId" class="btn-secondary text-sm">
+        {{ scanning ? 'Scanning...' : 'Run Scan' }}
+      </button>
     </div>
 
     <!-- Scan result banner -->
