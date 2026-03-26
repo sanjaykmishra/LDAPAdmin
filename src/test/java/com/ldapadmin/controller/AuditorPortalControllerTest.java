@@ -269,4 +269,12 @@ class AuditorPortalControllerTest extends BaseControllerTest {
         mvc.perform(get(BASE + "/campaigns")).andExpect(status().isOk());
         mvc.perform(get(BASE + "/approvals")).andExpect(status().isOk());
     }
+
+    @Test
+    void securedEndpoints_stillRequireAuth_afterPermitAllChange() throws Exception {
+        // Verify that the SecurityConfig permitAll for /api/v1/auditor/**
+        // does NOT accidentally open other /api/v1/ endpoints
+        mvc.perform(get("/api/v1/directories/" + UUID.randomUUID() + "/auditor-links"))
+                .andExpect(status().isUnauthorized());
+    }
 }
