@@ -24,8 +24,11 @@
       <section class="hidden sm:block bg-white border border-slate-200 rounded-xl overflow-hidden mb-6">
         <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
           <h2 class="text-sm font-semibold text-slate-700">Decisions ({{ filteredDecisions.length }})</h2>
-          <input v-model="search" type="text" placeholder="Search members..."
-                 class="border border-slate-200 rounded-lg px-3 py-1.5 text-xs w-48 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+          <div class="flex items-center gap-2">
+            <input v-model="search" type="text" placeholder="Search members..."
+                   class="border border-slate-200 rounded-lg px-3 py-1.5 text-xs w-48 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+            <ExportDropdown :options="exportOptions" />
+          </div>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
@@ -101,9 +104,11 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
+
 import { RouterLink, useRoute } from 'vue-router'
-import { getPortalCampaignDetail } from '@/api/auditorPortal'
+import { getPortalCampaignDetail, exportCampaignCsv, exportCampaignPdf } from '@/api/auditorPortal'
 import CopyLinkButton from './components/CopyLinkButton.vue'
+import ExportDropdown from './components/ExportDropdown.vue'
 
 const props = defineProps({ token: String, metadata: Object, scope: Object })
 const route = useRoute()
@@ -113,6 +118,12 @@ const campaign = ref(null)
 const search = ref('')
 const page = ref(0)
 const PAGE_SIZE = 50
+const campaignId = computed(() => route.params.campaignId)
+
+const exportOptions = computed(() => [
+  { label: 'Export CSV', filename: 'campaign-decisions.csv', fn: () => exportCampaignCsv(props.token, campaignId.value) },
+  { label: 'Export PDF', filename: 'campaign-decisions.pdf', fn: () => exportCampaignPdf(props.token, campaignId.value) },
+])
 
 const filteredDecisions = computed(() => {
   if (!campaign.value?.decisions) return []
@@ -158,8 +169,7 @@ function formatDate(iso) {
 
 onMounted(async () => {
   try {
-    const campaignId = route.params.campaignId
-    const { data } = await getPortalCampaignDetail(props.token, campaignId)
+    const { data } = await getPortalCampaignDetail(props.token, campaignId.value)
     campaign.value = data
   } catch { /* handled by layout */ }
   loading.value = false

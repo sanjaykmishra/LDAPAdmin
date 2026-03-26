@@ -37,3 +37,23 @@ export const getPortalVerify = (token) =>
 
 export const getPortalExport = (token) =>
   portalClient.get(`${base(token)}/export`, { responseType: 'blob' })
+
+// ── Per-section exports ─────────────────────────────────────────────────
+
+export const exportCampaignCsv = (token, campaignId) =>
+  portalClient.get(`${base(token)}/export/campaigns/${campaignId}/csv`, { responseType: 'blob' })
+
+export const exportCampaignPdf = (token, campaignId) =>
+  portalClient.get(`${base(token)}/export/campaigns/${campaignId}/pdf`, { responseType: 'blob' })
+
+export const exportSodPdf = (token) =>
+  portalClient.get(`${base(token)}/export/sod/pdf`, { responseType: 'blob' })
+
+export const exportAuditEventsCsv = (token) =>
+  portalClient.get(`${base(token)}/export/audit-events/csv`, { responseType: 'blob' })
+
+export const exportAuditEventsPdf = (token) =>
+  portalClient.get(`${base(token)}/export/audit-events/pdf`, { responseType: 'blob' })
+
+export const exportWorkpaper = (token) =>
+  portalClient.get(`${base(token)}/export/workpaper`, { responseType: 'blob' })

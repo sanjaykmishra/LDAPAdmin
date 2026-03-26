@@ -1,6 +1,9 @@
 <template>
   <div>
-    <h1 class="text-xl font-bold text-slate-900 mb-4">Separation of Duties</h1>
+    <div class="flex items-center justify-between mb-4">
+      <h1 class="text-xl font-bold text-slate-900">Separation of Duties</h1>
+      <ExportDropdown v-if="!loading" :options="exportOptions" />
+    </div>
 
     <div v-if="loading" class="text-sm text-slate-500">Loading SoD data...</div>
 
@@ -101,8 +104,9 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
-import { getPortalSod } from '@/api/auditorPortal'
+import { getPortalSod, exportSodPdf } from '@/api/auditorPortal'
 import CopyLinkButton from './components/CopyLinkButton.vue'
+import ExportDropdown from './components/ExportDropdown.vue'
 
 const props = defineProps({ token: String, metadata: Object, scope: Object })
 
@@ -110,6 +114,10 @@ const loading = ref(true)
 const policies = ref([])
 const violations = ref([])
 const statusFilter = ref('')
+
+const exportOptions = computed(() => [
+  { label: 'Export PDF', filename: 'sod-report.pdf', fn: () => exportSodPdf(props.token) },
+])
 
 const filteredViolations = computed(() => {
   if (!statusFilter.value) return violations.value

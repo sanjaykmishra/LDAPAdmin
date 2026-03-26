@@ -3,6 +3,7 @@
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-xl font-bold text-slate-900">Audit Log</h1>
       <div class="flex items-center gap-2">
+        <ExportDropdown v-if="!loading" :options="exportOptions" />
         <button @click="viewMode = 'table'" class="view-btn" :class="{ active: viewMode === 'table' }">Table</button>
         <button @click="viewMode = 'timeline'" class="view-btn" :class="{ active: viewMode === 'timeline' }">Timeline</button>
       </div>
@@ -93,7 +94,8 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { getPortalAuditEvents } from '@/api/auditorPortal'
+import { getPortalAuditEvents, exportAuditEventsCsv, exportAuditEventsPdf } from '@/api/auditorPortal'
+import ExportDropdown from './components/ExportDropdown.vue'
 
 const props = defineProps({ token: String, metadata: Object, scope: Object })
 
@@ -107,6 +109,11 @@ const sortCol = ref('occurredAt')
 const sortAsc = ref(false)
 const page = ref(0)
 const PAGE_SIZE = 50
+
+const exportOptions = [
+  { label: 'Export CSV', filename: 'audit-events.csv', fn: () => exportAuditEventsCsv(props.token) },
+  { label: 'Export PDF', filename: 'audit-events.pdf', fn: () => exportAuditEventsPdf(props.token) },
+]
 
 const uniqueActions = computed(() => [...new Set(events.value.map(e => e.action).filter(Boolean))].sort())
 

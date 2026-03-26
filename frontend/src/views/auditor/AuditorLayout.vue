@@ -45,6 +45,13 @@
             </svg>
             ZIP
           </button>
+          <button @click="window.print()"
+                  class="text-slate-600 text-xs font-medium px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 hidden sm:flex items-center gap-1.5 print:hidden">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 20 20" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659" />
+            </svg>
+            Print
+          </button>
         </div>
       </div>
     </header>
@@ -282,3 +289,35 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style>
+@media print {
+  /* Hide interactive/navigation elements */
+  header, nav, .print\\:hidden,
+  button, [role="dialog"],
+  .fixed { display: none !important; }
+
+  /* Reset layout */
+  body { background: white !important; }
+  main, .max-w-7xl { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+
+  /* Clean tables for print */
+  table { page-break-inside: auto; font-size: 9pt !important; }
+  tr { page-break-inside: avoid; }
+  th, td { padding: 4px 8px !important; }
+
+  /* Show HMAC signature in footer */
+  .print-footer {
+    display: block !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    font-size: 7pt;
+    color: #999;
+    text-align: center;
+    border-top: 1px solid #ddd;
+    padding: 4px;
+  }
+}
+</style>
