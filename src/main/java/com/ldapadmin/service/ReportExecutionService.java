@@ -480,20 +480,35 @@ public class ReportExecutionService {
         return new ReportData(columns, rows);
     }
 
+    /** Default LDAP filter for groups considered privileged. */
+    private static final String DEFAULT_PRIVILEGED_GROUP_FILTER =
+            "(&(|(objectClass=groupOfNames)(objectClass=groupOfUniqueNames)(objectClass=group))" +
+            "(|(cn=*admin*)(cn=*Admin*)(cn=*root*)(cn=*superuser*)(cn=*operator*)" +
+            "(cn=*prod*)(cn=*Prod*)(cn=mgr-*)(cn=*DataAccess*)(cn=*Security*)" +
+            "(cn=*privileged*)(cn=*Privileged*)(cn=Domain Admins)(cn=Enterprise Admins)" +
+            "(cn=Schema Admins)(cn=Account Operators)(cn=Server Operators)))";
+
     private ReportData runPrivilegedAccountInventoryData(DirectoryConnection dc, Map<String, Object> params) {
-        String groupFilter = "(|(objectClass=groupOfNames)(objectClass=groupOfUniqueNames)(objectClass=group))";
+        String groupFilter = params.containsKey("groupFilter") && params.get("groupFilter") != null
+                && !params.get("groupFilter").toString().isBlank()
+                ? params.get("groupFilter").toString()
+                : DEFAULT_PRIVILEGED_GROUP_FILTER;
+
         List<LdapGroup> allGroups = groupService.searchGroups(dc, groupFilter, null, MAX_LDAP_RESULTS,
                 "cn", "member", "uniqueMember", "description");
 
-        List<String> columns = List.of("User", "Group DN", "Group");
+        List<String> columns = List.of("User", "Group DN", "Group", "Description");
         List<Map<String, String>> rows = new ArrayList<>();
         for (LdapGroup g : allGroups) {
             String groupName = g.getCn() != null ? g.getCn() : g.getDn();
+            String desc = g.getAttributes().containsKey("description")
+                    ? String.join("; ", g.getValues("description")) : "";
             for (String memberDn : g.getAllMembers()) {
                 Map<String, String> row = new LinkedHashMap<>();
                 row.put("User", memberDn);
                 row.put("Group DN", g.getDn());
                 row.put("Group", groupName);
+                row.put("Description", desc);
                 rows.add(row);
             }
         }

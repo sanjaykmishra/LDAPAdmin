@@ -1,17 +1,19 @@
 <template>
   <div class="p-6">
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">LDAP Search</h1>
+    <h1 class="text-2xl font-bold text-gray-900 mb-4">Directory Search</h1>
+
+    <!-- Directory picker -->
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
+      <select v-model="form.directoryId" class="input w-64">
+        <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select directory —' }}</option>
+        <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
+      </select>
+    </div>
 
     <!-- Search form -->
-    <div class="bg-white border border-gray-200 rounded-xl p-5 mb-6" > 
-      <div class="grid grid-cols-4 gap-4 mb-4" style="grid-template-columns: 1fr 1fr 2.5fr .5fr ;">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
-          <select v-model="form.directoryId" class="input w-full">
-            <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select —' }}</option>
-            <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
-          </select>
-        </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-5 mb-6" >
+      <div class="grid grid-cols-3 gap-4 mb-4" style="grid-template-columns: 1fr 2.5fr .5fr ;">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Scope</label>
           <select v-model="form.scope" class="input w-full">

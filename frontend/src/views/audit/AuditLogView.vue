@@ -1,6 +1,15 @@
 <template>
   <div class="p-6">
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Audit Log</h1>
+    <h1 class="text-2xl font-bold text-gray-900 mb-4">Audit Log</h1>
+
+    <!-- Directory picker (superadmin only) -->
+    <div v-if="showPicker" class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
+      <select v-model="selectedDir" class="input w-64">
+        <option value="">All Directories</option>
+        <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
+      </select>
+    </div>
 
     <!-- Filters -->
     <div class="bg-white border border-gray-200 rounded-xl p-4 mb-2 grid grid-cols-3 gap-2">
@@ -38,6 +47,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useApi } from '@/composables/useApi'
+import { useDirectoryPicker } from '@/composables/useDirectoryPicker'
 import { getAuditLog } from '@/api/audit'
 import DataTable from '@/components/DataTable.vue'
 import FormField from '@/components/FormField.vue'
@@ -45,7 +55,7 @@ import RelativeTime from '@/components/RelativeTime.vue'
 
 const route = useRoute()
 const { loading, call } = useApi()
-const dirId = route.params.dirId
+const { dirId, directories, selectedDir, loadingDirs, showPicker } = useDirectoryPicker()
 
 const events     = ref([])
 const page       = ref(0)
@@ -89,7 +99,7 @@ async function load(p = 0) {
     await call(async () => {
       const params = {
         page: p, size: pageSize,
-        directoryId:   dirId || undefined,
+        directoryId:   dirId.value || undefined,
         from:          filters.value.from  || undefined,
         to:            filters.value.to    || undefined,
         action:        filters.value.action || undefined,

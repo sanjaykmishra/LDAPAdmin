@@ -8,16 +8,18 @@
       </button>
     </div>
 
+    <!-- Directory picker (superadmin only) -->
+    <div v-if="!routeDirId" class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
+      <select v-model="selectedDir" class="input w-64">
+        <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select directory —' }}</option>
+        <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
+      </select>
+    </div>
+
     <!-- Report runner -->
     <section class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
       <div class="grid grid-cols-4 gap-3 mb-3">
-        <div v-if="!routeDirId">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
-          <select v-model="selectedDir" class="input w-full">
-            <option value="" disabled>{{ loadingDirs ? 'Loading...' : '-- Select --' }}</option>
-            <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
-          </select>
-        </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
           <select v-model="runForm.reportType" class="input w-full">
@@ -66,6 +68,20 @@
             <option value="">All Actions</option>
             <option v-for="a in auditActions" :key="a" :value="a">{{ humanizeEnum(a) }}</option>
           </select>
+        </div>
+        <!-- Privileged Account Inventory: group filter -->
+        <div v-if="isPrivilegedReport" class="col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Privileged Group Filter (LDAP)</label>
+          <div class="flex gap-1.5">
+            <input v-model="runForm.groupFilter" :disabled="!groupFilterEditable" type="text"
+              class="input w-full font-mono text-xs" :class="{ 'bg-gray-50 text-gray-500': !groupFilterEditable }" />
+            <button @click="groupFilterEditable = !groupFilterEditable" type="button"
+              class="btn-secondary text-xs shrink-0 flex items-center gap-1" :title="groupFilterEditable ? 'Lock filter' : 'Edit filter'">
+              <svg v-if="!groupFilterEditable" class="w-3.5 h-3.5" fill="none" viewBox="0 0 20 20" stroke="currentColor" stroke-width="1.5"><path d="M13.586 3.586a2 2 0 112.828 2.828l-8.793 8.793-3.536.707.707-3.536 8.793-8.793z"/></svg>
+              <svg v-else class="w-3.5 h-3.5" fill="none" viewBox="0 0 20 20" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+              {{ groupFilterEditable ? 'Lock' : 'Edit' }}
+            </button>
+          </div>
         </div>
       </div>
       <button @click="doRun" :disabled="running || !dirId" class="btn-primary">
@@ -292,6 +308,13 @@ const dirId = computed(() => routeDirId || selectedDir.value)
 
 const PAGE_SIZE = 50
 
+const DEFAULT_PRIVILEGED_GROUP_FILTER =
+  '(&(|(objectClass=groupOfNames)(objectClass=groupOfUniqueNames)(objectClass=group))' +
+  '(|(cn=*admin*)(cn=*Admin*)(cn=*root*)(cn=*superuser*)(cn=*operator*)' +
+  '(cn=*prod*)(cn=*Prod*)(cn=mgr-*)(cn=*DataAccess*)(cn=*Security*)' +
+  '(cn=*privileged*)(cn=*Privileged*)(cn=Domain Admins)(cn=Enterprise Admins)' +
+  '(cn=Schema Admins)(cn=Account Operators)(cn=Server Operators)))'
+
 const reportTypes = [
   { value: 'USER_ACCESS_REPORT',          label: 'User Access Report',           lookback: false, statusFilter: false, groupDn: true,  campaign: false, policyFilter: false },
   { value: 'ACCESS_REVIEW_RESULTS',       label: 'Access Review Results',        lookback: false, statusFilter: false, groupDn: false, campaign: true,  policyFilter: false },
@@ -315,8 +338,9 @@ const auditActions = [
 
 const runForm = ref({
   reportType: 'USER_ACCESS_REPORT', groupDn: '', statusFilter: '', lookbackDays: 30, campaignId: '', policyId: '',
-  fromDate: '', toDate: '', auditAction: '',
+  fromDate: '', toDate: '', auditAction: '', groupFilter: DEFAULT_PRIVILEGED_GROUP_FILTER,
 })
+const groupFilterEditable = ref(false)
 const running = ref(false)
 const exporting = ref(false)
 const hasResults = ref(false)
@@ -333,6 +357,7 @@ const needsGroupDn      = computed(() => !!currentType.value?.groupDn)
 const needsCampaign     = computed(() => !!currentType.value?.campaign)
 const needsPolicyFilter = computed(() => !!currentType.value?.policyFilter)
 const isAuditLog        = computed(() => runForm.value.reportType === 'AUDIT_LOG_REPORT')
+const isPrivilegedReport = computed(() => runForm.value.reportType === 'PRIVILEGED_ACCOUNT_INVENTORY')
 const isSodReport       = computed(() => runForm.value.reportType === 'SOD_VIOLATIONS' && hasResults.value)
 const isDriftReport     = computed(() => runForm.value.reportType === 'ACCESS_DRIFT_REPORT' && hasResults.value)
 const hasActionableRows = computed(() => isSodReport.value || isDriftReport.value)
@@ -479,6 +504,9 @@ function buildParams() {
     if (runForm.value.toDate) params.to = runForm.value.toDate
     if (runForm.value.auditAction) params.action = runForm.value.auditAction
     if (!runForm.value.fromDate) params.lookbackDays = 30 // default fallback
+  }
+  if (isPrivilegedReport.value && runForm.value.groupFilter) {
+    params.groupFilter = runForm.value.groupFilter
   }
   return params
 }
