@@ -1,7 +1,7 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Reports</h1>
+      <h1 class="text-2xl font-bold text-gray-900">Operational Reports</h1>
       <button @click="openSchedules" class="btn-secondary flex items-center gap-1.5">
         <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2.5"/></svg>
         Scheduled Jobs
@@ -10,7 +10,7 @@
 
     <!-- Report runner -->
     <section class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
-      <div class="grid grid-cols-2 gap-3 mb-3">
+      <div class="grid grid-cols-3 gap-3 mb-3">
         <!-- Directory picker (superadmin only — when no dirId from route) -->
         <div v-if="!routeDirId">
           <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>

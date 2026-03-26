@@ -12,6 +12,7 @@ public enum ReportType {
     SOD_VIOLATIONS,
 
     // Audit reports
+    USER_ACCESS_REPORT,
     ACCESS_REVIEW_SUMMARY,
     PRIVILEGED_ACCOUNT_INVENTORY,
     ACCESS_DRIFT_REPORT,
