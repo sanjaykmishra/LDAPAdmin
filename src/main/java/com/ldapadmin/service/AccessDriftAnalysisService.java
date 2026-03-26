@@ -274,7 +274,7 @@ public class AccessDriftAnalysisService {
         Map<String, List<String>> buckets = new HashMap<>();
         for (AccessSnapshotUser su : snapshotUsers) {
             String value = switch (groupingAttribute) {
-                case "department" -> su.getDepartment();
+                case "department", "departmentNumber" -> su.getDepartment();
                 case "title" -> su.getTitle();
                 case "ou" -> su.getOu();
                 default -> null;

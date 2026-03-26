@@ -3,7 +3,7 @@
 # Apply with: ldapmodify -x -D "cn=admin,dc=acmecorp,dc=com" -w <password> -f testdata/acmecorp-drift-test.ldif
 #
 # This LDIF:
-# 1. Adds 'department' attribute to users (needed for peer-group analysis)
+# 1. Adds 'departmentNumber' attribute to users (needed for peer-group analysis)
 # 2. Creates drift-specific access groups
 # 3. Adds anomalous group memberships to create detectable drift outliers
 #
@@ -14,8 +14,8 @@
 # - HR: 1 outlier with production access (Code-Deploy-Prod, AWS-Developers)
 # =============================================================================
 
-# ─── Step 1: Add department attribute to users ────────────────────────────────
-# (needed because the peer group analysis groups by 'department')
+# ─── Step 1: Add departmentNumber attribute to users ───────────────────────────
+# (needed because the peer group analysis groups by 'departmentNumber')
 # We add it to a representative sample from each department.
 
 # --- Engineering users (20 users) ---
@@ -23,364 +23,304 @@ dn: uid=laura.miller,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=brian.moreau,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=susan.schmidt,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=maria.dubois,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=roy.bailey,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=deborah.alvarez,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=amy.long,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=emily.lopez,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=noah.bailey,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=austin.jackson,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=noah.cooper,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=thomas.watson,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=petra.jenkins,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=sean.becker,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=stephen.chen,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=samantha.henderson,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=jennifer.robinson,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=takeshi.green,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=carolyn.liu,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 dn: uid=brandon.myers,ou=Engineering,ou=People,dc=acmecorp,dc=com
 changetype: modify
 add: departmentNumber
 departmentNumber: Engineering
--
-add: department
-department: Engineering
 
 # --- Finance users (15 users) ---
 dn: uid=howard.blanc,ou=Finance,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Finance
+add: departmentNumber
+departmentNumber: Finance
 
 dn: uid=heather.fontaine,ou=Finance,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Finance
+add: departmentNumber
+departmentNumber: Finance
 
 dn: uid=madison.castro,ou=Finance,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Finance
+add: departmentNumber
+departmentNumber: Finance
 
 dn: uid=jason.ross2,ou=Finance,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Finance
+add: departmentNumber
+departmentNumber: Finance
 
 dn: uid=judy.williams,ou=Finance,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Finance
+add: departmentNumber
+departmentNumber: Finance
 
 dn: uid=jennifer.wood,ou=Finance,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Finance
+add: departmentNumber
+departmentNumber: Finance
 
 dn: uid=diego.hernandez,ou=Finance,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Finance
+add: departmentNumber
+departmentNumber: Finance
 
 dn: uid=carolyn.cooper2,ou=Finance,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Finance
+add: departmentNumber
+departmentNumber: Finance
 
 dn: uid=victoria.smith,ou=Finance,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Finance
+add: departmentNumber
+departmentNumber: Finance
 
 dn: uid=lisa.james,ou=Finance,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Finance
+add: departmentNumber
+departmentNumber: Finance
 
 dn: uid=ali.ortiz,ou=Finance,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Finance
+add: departmentNumber
+departmentNumber: Finance
 
 dn: uid=joan.brown,ou=Finance,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Finance
+add: departmentNumber
+departmentNumber: Finance
 
 dn: uid=nancy.ruiz,ou=Finance,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Finance
+add: departmentNumber
+departmentNumber: Finance
 
 dn: uid=victor.evans,ou=Finance,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Finance
+add: departmentNumber
+departmentNumber: Finance
 
 dn: uid=jerry.vasquez,ou=Finance,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Finance
+add: departmentNumber
+departmentNumber: Finance
 
 # --- Sales users (15 users) ---
 dn: uid=nancy.watanabe,ou=Sales,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Sales
+add: departmentNumber
+departmentNumber: Sales
 
 dn: uid=stephanie.brown,ou=Sales,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Sales
+add: departmentNumber
+departmentNumber: Sales
 
 dn: uid=noor.kumar,ou=Sales,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Sales
+add: departmentNumber
+departmentNumber: Sales
 
 dn: uid=james.richardson,ou=Sales,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Sales
+add: departmentNumber
+departmentNumber: Sales
 
 dn: uid=brittany.durand,ou=Sales,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Sales
+add: departmentNumber
+departmentNumber: Sales
 
 dn: uid=tyler.allen,ou=Sales,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Sales
+add: departmentNumber
+departmentNumber: Sales
 
 dn: uid=kevin.harris,ou=Sales,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Sales
+add: departmentNumber
+departmentNumber: Sales
 
 dn: uid=keith.mitchell,ou=Sales,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Sales
+add: departmentNumber
+departmentNumber: Sales
 
 dn: uid=austin.king,ou=Sales,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Sales
+add: departmentNumber
+departmentNumber: Sales
 
 dn: uid=sarah.foster,ou=Sales,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Sales
+add: departmentNumber
+departmentNumber: Sales
 
 dn: uid=sarah.stewart,ou=Sales,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Sales
+add: departmentNumber
+departmentNumber: Sales
 
 dn: uid=louis.carter,ou=Sales,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Sales
+add: departmentNumber
+departmentNumber: Sales
 
 dn: uid=luis.ortiz,ou=Sales,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Sales
+add: departmentNumber
+departmentNumber: Sales
 
 dn: uid=connor.gray,ou=Sales,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Sales
+add: departmentNumber
+departmentNumber: Sales
 
 dn: uid=sofia.harris,ou=Sales,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Sales
+add: departmentNumber
+departmentNumber: Sales
 
 # --- HR users (10 users) ---
 dn: uid=keith.king,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Human Resources
+add: departmentNumber
+departmentNumber: Human Resources
 
 dn: uid=jeremy.chavez,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Human Resources
+add: departmentNumber
+departmentNumber: Human Resources
 
 dn: uid=patricia.cox,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Human Resources
+add: departmentNumber
+departmentNumber: Human Resources
 
 dn: uid=alexis.meyer,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Human Resources
+add: departmentNumber
+departmentNumber: Human Resources
 
 dn: uid=hiroshi.price,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Human Resources
+add: departmentNumber
+departmentNumber: Human Resources
 
 dn: uid=albert.gonzales,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Human Resources
+add: departmentNumber
+departmentNumber: Human Resources
 
 dn: uid=diana.tanaka,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Human Resources
+add: departmentNumber
+departmentNumber: Human Resources
 
 dn: uid=johnny.fisher,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Human Resources
+add: departmentNumber
+departmentNumber: Human Resources
 
 dn: uid=elizabeth.chen,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Human Resources
+add: departmentNumber
+departmentNumber: Human Resources
 
 dn: uid=henry.brooks,ou=HumanResources,ou=People,dc=acmecorp,dc=com
 changetype: modify
-add: department
-department: Human Resources
+add: departmentNumber
+departmentNumber: Human Resources
 
 # ─── Step 2: Create drift-specific access groups ──────────────────────────────
 # These groups represent typical per-department access patterns.
