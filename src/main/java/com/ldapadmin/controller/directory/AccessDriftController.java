@@ -140,4 +140,13 @@ public class AccessDriftController {
 
     record SnapshotResponse(UUID id, java.time.OffsetDateTime capturedAt, String status,
                              Integer totalUsers, Integer totalGroups, java.time.OffsetDateTime completedAt) {}
+
+    // ── Visualization ────────────────────────────────────────────────────────
+
+    @GetMapping("/visualization")
+    @RequiresFeature(FeatureKey.ACCESS_REVIEW_MANAGE)
+    public DriftVisualizationResponse visualization(
+            @DirectoryId @PathVariable UUID directoryId) {
+        return analysisService.buildVisualization(directoryId);
+    }
 }
