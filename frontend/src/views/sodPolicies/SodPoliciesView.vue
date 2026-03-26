@@ -3,13 +3,22 @@
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Separation of Duties Policies</h1>
       <div class="flex gap-2">
-        <button @click="handleScan" :disabled="scanning" class="btn-secondary text-sm">
+        <button @click="handleScan" :disabled="scanning || !dirId" class="btn-secondary text-sm">
           {{ scanning ? 'Scanning...' : 'Run Scan' }}
         </button>
-        <router-link :to="{ name: 'sodPolicyCreate', params: { dirId } }" class="btn-primary text-sm">
+        <router-link :to="{ name: 'sodPolicyCreate', params: { dirId } }" v-if="dirId" class="btn-primary text-sm">
           New Policy
         </router-link>
       </div>
+    </div>
+
+    <!-- Directory picker -->
+    <div v-if="showPicker" class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
+      <select v-model="selectedDir" class="input w-64">
+        <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select directory —' }}</option>
+        <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
+      </select>
     </div>
 
     <!-- Scan result banner -->
@@ -66,14 +75,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, watch, onMounted } from 'vue'
 import { useApi } from '@/composables/useApi'
+import { useDirectoryPicker } from '@/composables/useDirectoryPicker'
 import { listPolicies, scanDirectory } from '@/api/sodPolicies'
 
-const route = useRoute()
+const { dirId, directories, selectedDir, loadingDirs, showPicker } = useDirectoryPicker()
 const { loading, call } = useApi()
-const dirId = route.params.dirId
 
 const policies = ref([])
 const scanning = ref(false)
@@ -100,7 +108,7 @@ function actionClass(a) {
 async function handleScan() {
   scanning.value = true
   try {
-    const res = await call(() => scanDirectory(dirId), { successMsg: 'Scan complete' })
+    const res = await call(() => scanDirectory(dirId.value), { successMsg: 'Scan complete' })
     scanResult.value = res.data
     await loadPolicies()
   } catch { /* handled */ }
@@ -109,12 +117,13 @@ async function handleScan() {
 
 async function loadPolicies() {
   try {
-    const res = await call(() => listPolicies(dirId))
+    const res = await call(() => listPolicies(dirId.value))
     policies.value = res.data
   } catch { /* handled */ }
 }
 
-onMounted(loadPolicies)
+watch(dirId, (v) => { if (v) loadPolicies() })
+onMounted(() => { if (dirId.value) loadPolicies() })
 </script>
 
 <style scoped>

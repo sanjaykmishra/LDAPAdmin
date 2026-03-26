@@ -1,7 +1,7 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
+import { useDirectoryPicker } from '@/composables/useDirectoryPicker'
 import {
   listPlaybooks, createPlaybook, updatePlaybook, deletePlaybook,
   previewPlaybook, executePlaybook, rollbackExecution, listExecutions
@@ -12,8 +12,7 @@ import DataTable from '@/components/DataTable.vue'
 import GroupDnPicker from '@/components/GroupDnPicker.vue'
 import DnPicker from '@/components/DnPicker.vue'
 
-const route = useRoute()
-const dirId = route.params.dirId
+const { dirId, directories, selectedDir, loadingDirs, showPicker } = useDirectoryPicker()
 const notif = useNotificationStore()
 
 const playbooks = ref([])
@@ -81,14 +80,13 @@ function emptyPlaybook() {
 
 const playbook = ref(emptyPlaybook())
 
-onMounted(async () => {
-  await reload()
-})
+watch(dirId, (v) => { if (v) reload() })
+onMounted(() => { if (dirId.value) reload() })
 
 async function reload() {
   loading.value = true
   try {
-    const { data } = await listPlaybooks(dirId)
+    const { data } = await listPlaybooks(dirId.value)
     playbooks.value = data.map(p => ({ ...p, stepCount: p.steps?.length || 0 }))
   } catch (e) {
     notif.error(e.response?.data?.detail || e.message)
@@ -133,10 +131,10 @@ async function save() {
       }))
     }
     if (editing.value) {
-      await updatePlaybook(dirId, editing.value, payload)
+      await updatePlaybook(dirId.value, editing.value, payload)
       notif.success('Playbook updated')
     } else {
-      await createPlaybook(dirId, payload)
+      await createPlaybook(dirId.value, payload)
       notif.success('Playbook created')
     }
     showModal.value = false
@@ -152,7 +150,7 @@ function confirmDelete(p) { deleteTarget.value = p; showDeleteConfirm.value = tr
 
 async function doDelete() {
   try {
-    await deletePlaybook(dirId, deleteTarget.value.id)
+    await deletePlaybook(dirId.value, deleteTarget.value.id)
     notif.success('Playbook deleted')
     showDeleteConfirm.value = false
     await reload()
@@ -187,7 +185,7 @@ function openRunDialog(p) {
 async function doPreview() {
   if (!executeTarget.value.dn) { notif.error('Enter a user DN'); return }
   try {
-    const { data } = await previewPlaybook(dirId, executeTarget.value.playbookId, executeTarget.value.dn)
+    const { data } = await previewPlaybook(dirId.value, executeTarget.value.playbookId, executeTarget.value.dn)
     previewData.value = data
   } catch (e) { notif.error(e.response?.data?.detail || e.message) }
 }
@@ -195,7 +193,7 @@ async function doPreview() {
 async function doExecute() {
   executing.value = true
   try {
-    const { data } = await executePlaybook(dirId, executeTarget.value.playbookId, [executeTarget.value.dn])
+    const { data } = await executePlaybook(dirId.value, executeTarget.value.playbookId, [executeTarget.value.dn])
     executionResult.value = data[0]
     showPreviewModal.value = false
     showResultModal.value = true
@@ -205,7 +203,7 @@ async function doExecute() {
 
 async function doRollback(executionId) {
   try {
-    await rollbackExecution(dirId, executionId)
+    await rollbackExecution(dirId.value, executionId)
     notif.success('Rollback completed')
     showResultModal.value = false
   } catch (e) { notif.error(e.response?.data?.detail || e.message) }
@@ -214,7 +212,7 @@ async function doRollback(executionId) {
 async function openHistory(p) {
   historyPlaybookName.value = p.name
   try {
-    const { data } = await listExecutions(dirId, p.id)
+    const { data } = await listExecutions(dirId.value, p.id)
     historyData.value = data
     showHistoryModal.value = true
   } catch (e) { notif.error(e.response?.data?.detail || e.message) }
@@ -229,7 +227,16 @@ function parsedStepResults(json) {
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Lifecycle Playbooks</h1>
-      <button class="btn-primary" @click="openCreate">New Playbook</button>
+      <button class="btn-primary" @click="openCreate" v-if="dirId">New Playbook</button>
+    </div>
+
+    <!-- Directory picker -->
+    <div v-if="showPicker" class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
+      <select v-model="selectedDir" class="input w-64">
+        <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select directory —' }}</option>
+        <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
+      </select>
     </div>
 
     <DataTable :columns="cols" :rows="playbooks" :loading="loading" empty-icon="clipboard">

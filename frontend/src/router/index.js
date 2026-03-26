@@ -253,33 +253,24 @@ const router = createRouter({
           meta: { requiresSuperadmin: true },
         },
 
-        // Superadmin directory-scoped wrappers (with directory picker)
+        // Superadmin directory-scoped pages (with inline directory picker)
         {
           path: 'superadmin/sod-policies',
-          component: () => import('@/views/superadmin/DirectoryScopedWrapper.vue'),
-          props: { defaultChild: 'sodPolicies' },
+          name: 'superadminSodPolicies',
+          component: () => import('@/views/sodPolicies/SodPoliciesView.vue'),
           meta: { requiresSuperadmin: true },
-          children: [
-            { path: ':dirId', name: 'superadminSodPolicies', component: () => import('@/views/sodPolicies/SodPoliciesView.vue') },
-          ],
         },
         {
           path: 'superadmin/sod-violations',
-          component: () => import('@/views/superadmin/DirectoryScopedWrapper.vue'),
-          props: { defaultChild: 'sodViolations' },
+          name: 'superadminSodViolations',
+          component: () => import('@/views/sodPolicies/SodViolationsView.vue'),
           meta: { requiresSuperadmin: true },
-          children: [
-            { path: ':dirId', name: 'superadminSodViolations', component: () => import('@/views/sodPolicies/SodViolationsView.vue') },
-          ],
         },
         {
           path: 'superadmin/access-drift',
-          component: () => import('@/views/superadmin/DirectoryScopedWrapper.vue'),
-          props: { defaultChild: 'accessDrift' },
+          name: 'superadminAccessDrift',
+          component: () => import('@/views/drift/AccessDriftView.vue'),
           meta: { requiresSuperadmin: true },
-          children: [
-            { path: ':dirId', name: 'superadminAccessDrift', component: () => import('@/views/drift/AccessDriftView.vue') },
-          ],
         },
         {
           path: 'superadmin/reports',
@@ -295,21 +286,15 @@ const router = createRouter({
         },
         {
           path: 'superadmin/playbooks',
-          component: () => import('@/views/superadmin/DirectoryScopedWrapper.vue'),
-          props: { defaultChild: 'playbooks' },
+          name: 'superadminPlaybooks',
+          component: () => import('@/views/playbooks/PlaybooksView.vue'),
           meta: { requiresSuperadmin: true },
-          children: [
-            { path: ':dirId', name: 'superadminPlaybooks', component: () => import('@/views/playbooks/PlaybooksView.vue') },
-          ],
         },
         {
           path: 'superadmin/hr',
-          component: () => import('@/views/superadmin/DirectoryScopedWrapper.vue'),
-          props: { defaultChild: 'hrConnection' },
+          name: 'superadminHr',
+          component: () => import('@/views/hr/HrConnectionView.vue'),
           meta: { requiresSuperadmin: true },
-          children: [
-            { path: ':dirId', name: 'superadminHr', component: () => import('@/views/hr/HrConnectionView.vue') },
-          ],
         },
       ],
     },

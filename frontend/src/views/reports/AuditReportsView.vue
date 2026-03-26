@@ -8,16 +8,18 @@
       </button>
     </div>
 
+    <!-- Directory picker (superadmin only) -->
+    <div v-if="!routeDirId" class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
+      <select v-model="selectedDir" class="input w-64">
+        <option value="" disabled>{{ loadingDirs ? 'Loading…' : '— Select directory —' }}</option>
+        <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
+      </select>
+    </div>
+
     <!-- Report runner -->
     <section class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
       <div class="grid grid-cols-4 gap-3 mb-3">
-        <div v-if="!routeDirId">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
-          <select v-model="selectedDir" class="input w-full">
-            <option value="" disabled>{{ loadingDirs ? 'Loading...' : '-- Select --' }}</option>
-            <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName }}</option>
-          </select>
-        </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
           <select v-model="runForm.reportType" class="input w-full">
