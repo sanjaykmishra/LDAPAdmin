@@ -176,7 +176,7 @@ const router = createRouter({
         {
           path: 'superadmin/schema',
           name: 'schema',
-          component: () => import('@/views/schema/SchemaView.vue'),
+          component: () => import('@/views/schema/SchemaBrowserView.vue'),
           meta: { requiresSuperadmin: true },
         },
 
