@@ -52,6 +52,13 @@
             </svg>
             Print
           </button>
+          <button @click="notesDrawerRef?.toggle()"
+                  class="text-slate-600 text-xs font-medium px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-1.5 print:hidden">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+            </svg>
+            Notes
+          </button>
         </div>
       </div>
     </header>
@@ -97,9 +104,13 @@
 
     <!-- Main content -->
     <div v-else class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <!-- Guided walkthrough banner -->
+      <GuidedWalkthrough ref="walkthroughRef" :token="token" :scope="metadata.scope || {}" />
+
       <!-- Landing page: no sidebar -->
       <div v-if="isLanding">
-        <RouterView :token="token" :metadata="metadata" :scope="metadata.scope || {}" />
+        <RouterView :token="token" :metadata="metadata" :scope="metadata.scope || {}"
+                    :walkthrough="walkthroughRef" />
       </div>
       <!-- Section pages: sidebar + content -->
       <div v-else class="flex gap-6">
@@ -196,6 +207,9 @@
         </dl>
       </div>
     </div>
+
+    <!-- Auditor notes drawer -->
+    <AuditorNotesDrawer ref="notesDrawerRef" :token="token" :scope="metadata.scope || {}" />
   </div>
 </template>
 
@@ -204,6 +218,8 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { getPortalMetadata, getPortalVerify, getPortalExport } from '@/api/auditorPortal'
 import AuditorSidebar from './components/AuditorSidebar.vue'
+import AuditorNotesDrawer from './components/AuditorNotesDrawer.vue'
+import GuidedWalkthrough from './components/GuidedWalkthrough.vue'
 
 const route = useRoute()
 const token = computed(() => route.params.token)
@@ -216,6 +232,8 @@ const verification = ref({})
 const showVerifyDrawer = ref(false)
 const exporting = ref(false)
 const exportError = ref(null)
+const notesDrawerRef = ref(null)
+const walkthroughRef = ref(null)
 const showMobileNav = ref(false)
 
 const isLanding = computed(() => route.name === 'auditorLanding')
