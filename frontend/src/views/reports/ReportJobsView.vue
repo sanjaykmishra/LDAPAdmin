@@ -10,7 +10,7 @@
 
     <!-- Report runner -->
     <section class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
-      <div class="grid grid-cols-3 gap-3 mb-3">
+      <div class="grid grid-cols-4 gap-3 mb-3">
         <!-- Directory picker (superadmin only — when no dirId from route) -->
         <div v-if="!routeDirId">
           <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>

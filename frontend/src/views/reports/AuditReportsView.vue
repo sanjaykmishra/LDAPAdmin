@@ -10,7 +10,7 @@
 
     <!-- Report runner -->
     <section class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
-      <div class="grid grid-cols-3 gap-3 mb-3">
+      <div class="grid grid-cols-4 gap-3 mb-3">
         <div v-if="!routeDirId">
           <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
           <select v-model="selectedDir" class="input w-full">
@@ -44,15 +44,27 @@
             <option v-for="p in sodPolicies" :key="p.id" :value="p.id">{{ p.name }}</option>
           </select>
         </div>
-        <div v-if="needsLookback">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Lookback Days</label>
-          <input v-model.number="runForm.lookbackDays" type="number" min="1" class="input w-full" placeholder="30" />
-        </div>
         <div v-if="needsCampaign">
           <label class="block text-sm font-medium text-gray-700 mb-1">Campaign</label>
           <select v-model="runForm.campaignId" class="input w-full">
             <option value="">-- select to see decisions --</option>
             <option v-for="c in campaigns" :key="c.id" :value="c.id">{{ c.name }} ({{ c.status }})</option>
+          </select>
+        </div>
+        <!-- Audit Log filters: from, to, action -->
+        <div v-if="isAuditLog">
+          <label class="block text-sm font-medium text-gray-700 mb-1">From</label>
+          <input v-model="runForm.fromDate" type="datetime-local" class="input w-full" />
+        </div>
+        <div v-if="isAuditLog">
+          <label class="block text-sm font-medium text-gray-700 mb-1">To</label>
+          <input v-model="runForm.toDate" type="datetime-local" class="input w-full" />
+        </div>
+        <div v-if="isAuditLog">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Action</label>
+          <select v-model="runForm.auditAction" class="input w-full">
+            <option value="">All Actions</option>
+            <option v-for="a in auditActions" :key="a" :value="a">{{ humanizeEnum(a) }}</option>
           </select>
         </div>
       </div>
@@ -140,6 +152,12 @@
                 <!-- Groups column (semicolon-separated tags) -->
                 <span v-else-if="col === 'Groups' && row[col]" class="flex flex-wrap gap-1">
                   <span v-for="g in row[col].split('; ').filter(Boolean)" :key="g" class="inline-block bg-blue-50 text-blue-700 text-xs px-1.5 py-0.5 rounded">{{ g }}</span>
+                </span>
+                <!-- Detail column (stacked key-value pairs) -->
+                <span v-else-if="col === 'Detail' && row[col]" class="block max-w-sm">
+                  <span v-for="(line, li) in row[col].split('\n').filter(Boolean)" :key="li" class="block text-xs leading-snug">
+                    <span class="text-gray-500">{{ line.split(': ')[0] }}:</span> <span class="text-gray-700">{{ line.substring(line.indexOf(': ') + 2) }}</span>
+                  </span>
                 </span>
                 <!-- Date columns -->
                 <span v-else-if="isDateColumn(col, row[col])" :title="formatFullDate(row[col])" class="font-mono whitespace-nowrap">
@@ -280,11 +298,24 @@ const reportTypes = [
   { value: 'PRIVILEGED_ACCOUNT_INVENTORY', label: 'Privileged Account Inventory', lookback: false, statusFilter: false, groupDn: false, campaign: false, policyFilter: false },
   { value: 'ACCESS_DRIFT_REPORT',         label: 'Access Drift',                 lookback: false, statusFilter: false, groupDn: false, campaign: false, policyFilter: false },
   { value: 'SOD_VIOLATIONS',              label: 'SoD Violations',               lookback: false, statusFilter: true,  groupDn: false, campaign: false, policyFilter: true },
-  { value: 'AUDIT_LOG_REPORT',            label: 'Audit Log',                    lookback: true,  statusFilter: false, groupDn: false, campaign: false, policyFilter: false },
+  { value: 'AUDIT_LOG_REPORT',            label: 'Audit Log',                    lookback: false, statusFilter: false, groupDn: false, campaign: false, policyFilter: false },
+]
+
+const auditActions = [
+  'USER_CREATE', 'USER_UPDATE', 'USER_DELETE', 'USER_ENABLE', 'USER_DISABLE', 'USER_MOVE', 'PASSWORD_RESET',
+  'GROUP_CREATE', 'GROUP_UPDATE', 'GROUP_DELETE', 'GROUP_MEMBER_ADD', 'GROUP_MEMBER_REMOVE', 'GROUP_BULK_IMPORT',
+  'ENTRY_CREATE', 'ENTRY_UPDATE', 'ENTRY_DELETE', 'ENTRY_MOVE', 'ENTRY_RENAME', 'LDIF_IMPORT', 'INTEGRITY_CHECK',
+  'APPROVAL_SUBMITTED', 'APPROVAL_APPROVED', 'APPROVAL_REJECTED',
+  'CAMPAIGN_CREATED', 'CAMPAIGN_ACTIVATED', 'CAMPAIGN_CLOSED', 'REVIEW_CONFIRMED', 'REVIEW_REVOKED',
+  'SOD_POLICY_CREATED', 'SOD_POLICY_UPDATED', 'SOD_SCAN_EXECUTED', 'SOD_VIOLATION_DETECTED', 'SOD_VIOLATION_EXEMPTED', 'SOD_VIOLATION_RESOLVED',
+  'PLAYBOOK_EXECUTED', 'PLAYBOOK_ROLLED_BACK',
+  'HR_SYNC_STARTED', 'HR_SYNC_COMPLETED', 'HR_SYNC_FAILED',
+  'LDAP_CHANGE',
 ]
 
 const runForm = ref({
   reportType: 'USER_ACCESS_REPORT', groupDn: '', statusFilter: '', lookbackDays: 30, campaignId: '', policyId: '',
+  fromDate: '', toDate: '', auditAction: '',
 })
 const running = ref(false)
 const exporting = ref(false)
@@ -301,6 +332,7 @@ const needsStatusFilter = computed(() => !!currentType.value?.statusFilter)
 const needsGroupDn      = computed(() => !!currentType.value?.groupDn)
 const needsCampaign     = computed(() => !!currentType.value?.campaign)
 const needsPolicyFilter = computed(() => !!currentType.value?.policyFilter)
+const isAuditLog        = computed(() => runForm.value.reportType === 'AUDIT_LOG_REPORT')
 const isSodReport       = computed(() => runForm.value.reportType === 'SOD_VIOLATIONS' && hasResults.value)
 const isDriftReport     = computed(() => runForm.value.reportType === 'ACCESS_DRIFT_REPORT' && hasResults.value)
 const hasActionableRows = computed(() => isSodReport.value || isDriftReport.value)
@@ -438,11 +470,16 @@ function toggleSort(col) {
 
 function buildParams() {
   const params = {}
-  if (needsLookback.value) params.lookbackDays = runForm.value.lookbackDays || 30
   if (needsGroupDn.value && runForm.value.groupDn) params.groupDn = runForm.value.groupDn
   if (needsStatusFilter.value && runForm.value.statusFilter) params.status = runForm.value.statusFilter
   if (needsCampaign.value && runForm.value.campaignId) params.campaignId = runForm.value.campaignId
   if (needsPolicyFilter.value && runForm.value.policyId) params.policyId = runForm.value.policyId
+  if (isAuditLog.value) {
+    if (runForm.value.fromDate) params.from = runForm.value.fromDate
+    if (runForm.value.toDate) params.to = runForm.value.toDate
+    if (runForm.value.auditAction) params.action = runForm.value.auditAction
+    if (!runForm.value.fromDate) params.lookbackDays = 30 // default fallback
+  }
   return params
 }
 
