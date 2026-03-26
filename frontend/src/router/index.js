@@ -174,7 +174,7 @@ const router = createRouter({
 
         // Schema Browser (superadmin)
         {
-          path: 'superadmin/schema',
+          path: 'superadmin/directory-schema',
           name: 'schema',
           component: () => import('@/views/schema/SchemaBrowserView.vue'),
           meta: { requiresSuperadmin: true },
@@ -229,13 +229,13 @@ const router = createRouter({
           meta: { requiresSuperadmin: true },
         },
         {
-          path: 'superadmin/browser',
+          path: 'superadmin/directory-browser',
           name: 'directoryBrowser',
           component: () => import('@/views/superadmin/DirectoryBrowserView.vue'),
           meta: { requiresSuperadmin: true },
         },
         {
-          path: 'superadmin/search',
+          path: 'superadmin/directory-search',
           name: 'directorySearch',
           component: () => import('@/views/superadmin/DirectorySearchView.vue'),
           meta: { requiresSuperadmin: true },

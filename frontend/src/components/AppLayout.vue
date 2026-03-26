@@ -95,15 +95,15 @@
 
           <!-- Explore -->
           <p class="nav-header">Explore</p>
-          <RouterLink to="/superadmin/browser" class="nav-item">
+          <RouterLink to="/superadmin/directory-browser" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h5l2 2h7a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M8 10h4M10 8v4"/></svg>
             Directory Browser
           </RouterLink>
-          <RouterLink to="/superadmin/search" class="nav-item">
+          <RouterLink to="/superadmin/directory-search" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M14 14l4 4"/></svg>
             Directory Search
           </RouterLink>
-          <RouterLink to="/superadmin/schema" class="nav-item">
+          <RouterLink to="/superadmin/directory-schema" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M18 18l-4-4"/></svg>
             Schema Browser
           </RouterLink>
