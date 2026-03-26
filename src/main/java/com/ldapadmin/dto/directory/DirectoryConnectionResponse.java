@@ -3,6 +3,7 @@ package com.ldapadmin.dto.directory;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.DirectoryGroupBaseDn;
 import com.ldapadmin.entity.DirectoryUserBaseDn;
+import com.ldapadmin.entity.enums.DirectoryType;
 import com.ldapadmin.entity.enums.EnableDisableValueType;
 import com.ldapadmin.entity.enums.SslMode;
 
@@ -13,6 +14,7 @@ import java.util.UUID;
 /** Directory connection response — bind password is never included. */
 public record DirectoryConnectionResponse(
         UUID id,
+        DirectoryType directoryType,
         String displayName,
         String host,
         int port,
@@ -35,6 +37,9 @@ public record DirectoryConnectionResponse(
         String selfServiceLoginAttribute,
         List<BaseDnItem> userBaseDns,
         List<BaseDnItem> groupBaseDns,
+        String secondaryHost,
+        Integer secondaryPort,
+        Integer globalCatalogPort,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
 
@@ -53,6 +58,7 @@ public record DirectoryConnectionResponse(
                                                    List<DirectoryGroupBaseDn> groupDns) {
         return new DirectoryConnectionResponse(
                 dc.getId(),
+                dc.getDirectoryType(),
                 dc.getDisplayName(),
                 dc.getHost(),
                 dc.getPort(),
@@ -75,6 +81,9 @@ public record DirectoryConnectionResponse(
                 dc.getSelfServiceLoginAttribute(),
                 userDns.stream().map(BaseDnItem::fromUser).toList(),
                 groupDns.stream().map(BaseDnItem::fromGroup).toList(),
+                dc.getSecondaryHost(),
+                dc.getSecondaryPort(),
+                dc.getGlobalCatalogPort(),
                 dc.getCreatedAt(),
                 dc.getUpdatedAt());
     }

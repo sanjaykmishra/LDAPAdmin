@@ -1,5 +1,6 @@
 package com.ldapadmin.dto.directory;
 
+import com.ldapadmin.entity.enums.DirectoryType;
 import com.ldapadmin.entity.enums.EnableDisableValueType;
 import com.ldapadmin.entity.enums.SslMode;
 import jakarta.validation.Valid;
@@ -20,6 +21,7 @@ import java.util.UUID;
  * the existing encrypted value.</p>
  */
 public record DirectoryConnectionRequest(
+        DirectoryType directoryType,
         @NotBlank @Size(max = 255) String displayName,
         @NotBlank @Size(max = 255) String host,
         @Min(1) @Max(65535) int port,
@@ -42,6 +44,9 @@ public record DirectoryConnectionRequest(
         boolean enabled,
         boolean selfServiceEnabled,
         String selfServiceLoginAttribute,
+        String secondaryHost,
+        @Min(1) @Max(65535) Integer secondaryPort,
+        @Min(1) @Max(65535) Integer globalCatalogPort,
         @Valid List<BaseDnRequest> userBaseDns,
         @Valid List<BaseDnRequest> groupBaseDns) {
 }

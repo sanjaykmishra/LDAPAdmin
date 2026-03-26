@@ -6,6 +6,7 @@ import com.ldapadmin.entity.enums.SslMode;
 import com.ldapadmin.exception.LdapConnectionException;
 import com.ldapadmin.ldap.changelog.AccesslogStrategy;
 import com.ldapadmin.ldap.changelog.ChangelogStrategy;
+import com.ldapadmin.ldap.changelog.DirSyncChangelogStrategy;
 import com.ldapadmin.ldap.changelog.DseeChangelogStrategy;
 import com.ldapadmin.repository.AuditDataSourceRepository;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
@@ -63,13 +64,15 @@ public class LdapChangelogReader {
 
     // ── Strategy instances (stateless, reusable) ─────────────────────────────
 
-    private static final DseeChangelogStrategy DSEE_STRATEGY = new DseeChangelogStrategy();
-    private static final AccesslogStrategy     ACCESSLOG_STRATEGY = new AccesslogStrategy();
+    private static final DseeChangelogStrategy    DSEE_STRATEGY      = new DseeChangelogStrategy();
+    private static final AccesslogStrategy       ACCESSLOG_STRATEGY = new AccesslogStrategy();
+    private static final DirSyncChangelogStrategy DIRSYNC_STRATEGY  = new DirSyncChangelogStrategy();
 
     private static ChangelogStrategy strategyFor(AuditDataSource src) {
         return switch (src.getChangelogFormat()) {
             case DSEE_CHANGELOG     -> DSEE_STRATEGY;
             case OPENLDAP_ACCESSLOG -> ACCESSLOG_STRATEGY;
+            case AD_DIRSYNC         -> DIRSYNC_STRATEGY;
         };
     }
 
@@ -163,10 +166,47 @@ public class LdapChangelogReader {
 
         try (LDAPConnection conn = openConnection(src)) {
             SearchRequest searchReq = strategy.buildSearchRequest(src, MAX_CHANGELOG_ENTRIES_PER_POLL);
+
+            // For AD DirSync: attach the DirSync control with the persisted cookie
+            if (src.getChangelogFormat() == com.ldapadmin.entity.enums.ChangelogFormat.AD_DIRSYNC) {
+                byte[] cookie = src.getDirsyncCookie();
+                // DirSync control OID 1.2.840.113556.1.4.841
+                // Value: SEQUENCE { flags INTEGER, maxBytes INTEGER, cookie OCTET STRING }
+                com.unboundid.asn1.ASN1OctetString cookieValue = (cookie != null && cookie.length > 0)
+                        ? new com.unboundid.asn1.ASN1OctetString(cookie)
+                        : new com.unboundid.asn1.ASN1OctetString();
+                com.unboundid.asn1.ASN1Sequence seq = new com.unboundid.asn1.ASN1Sequence(
+                        new com.unboundid.asn1.ASN1Integer(0x80000001),
+                        new com.unboundid.asn1.ASN1Integer(Integer.MAX_VALUE),
+                        cookieValue);
+                searchReq.addControl(new com.unboundid.ldap.sdk.Control(
+                        "1.2.840.113556.1.4.841", true,
+                        new com.unboundid.asn1.ASN1OctetString(seq.encode())));
+            }
+
             SearchResult result = conn.search(searchReq);
 
             for (SearchResultEntry entry : result.getSearchEntries()) {
                 processEntry(src, linkedDirs, entry, strategy);
+            }
+
+            // For AD DirSync: extract and persist the updated cookie
+            if (src.getChangelogFormat() == com.ldapadmin.entity.enums.ChangelogFormat.AD_DIRSYNC) {
+                com.unboundid.ldap.sdk.Control respControl = result.getResponseControl("1.2.840.113556.1.4.841");
+                if (respControl != null && respControl.getValue() != null) {
+                    try {
+                        com.unboundid.asn1.ASN1Sequence seq =
+                                com.unboundid.asn1.ASN1Sequence.decodeAsSequence(respControl.getValue().getValue());
+                        com.unboundid.asn1.ASN1Element[] elements = seq.elements();
+                        if (elements.length >= 3) {
+                            byte[] newCookie = elements[2].getValue();
+                            src.setDirsyncCookie(newCookie);
+                            auditSourceRepo.save(src);
+                        }
+                    } catch (Exception e) {
+                        log.warn("Failed to extract DirSync cookie from response: {}", e.getMessage());
+                    }
+                }
             }
 
             log.debug("Processed {} changelog entries for source [{}]",

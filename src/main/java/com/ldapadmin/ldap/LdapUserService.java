@@ -305,16 +305,26 @@ public class LdapUserService {
     // ── Reset password ─────────────────────────────────────────────────────────
 
     /**
-     * Resets the user's password by replacing the {@code userPassword} attribute.
-     *
-     * @param dc          directory connection
-     * @param dn          distinguished name of the user
-     * @param newPassword the new password (cleartext — OpenLDAP will hash it
-     *                    server-side if the ppolicy overlay is configured)
+     * Resets the user's password. For Active Directory, uses the {@code unicodePwd}
+     * attribute with UTF-16LE encoding over SSL. For other directories, replaces
+     * the {@code userPassword} attribute.
      */
     public void resetPassword(DirectoryConnection dc, String dn, String newPassword) {
-        Modification mod = new Modification(ModificationType.REPLACE, "userPassword", newPassword);
-        updateUser(dc, dn, List.of(mod));
+        if (dc.getDirectoryType() == com.ldapadmin.entity.enums.DirectoryType.ACTIVE_DIRECTORY) {
+            // AD requires password wrapped in quotes, encoded as UTF-16LE
+            String quotedPassword = "\"" + newPassword + "\"";
+            byte[] encodedPassword;
+            try {
+                encodedPassword = quotedPassword.getBytes("UTF-16LE");
+            } catch (java.io.UnsupportedEncodingException e) {
+                throw new LdapOperationException("Failed to encode password for Active Directory", e);
+            }
+            Modification mod = new Modification(ModificationType.REPLACE, "unicodePwd", encodedPassword);
+            updateUser(dc, dn, List.of(mod));
+        } else {
+            Modification mod = new Modification(ModificationType.REPLACE, "userPassword", newPassword);
+            updateUser(dc, dn, List.of(mod));
+        }
         log.info("Reset password for LDAP user {}", dn);
     }
 

@@ -227,12 +227,28 @@ public class LdapConnectionFactory {
 
     private ServerSet buildServerSet(DirectoryConnection dc,
                                      LDAPConnectionOptions options) throws Exception {
+        ServerSet primary;
         if (dc.getSslMode() == SslMode.LDAPS) {
-            SSLUtil sslUtil = buildSslUtil(dc);
-            SSLSocketFactory sslSocketFactory = sslUtil.createSSLSocketFactory();
-            return new SingleServerSet(dc.getHost(), dc.getPort(), sslSocketFactory, options);
+            javax.net.ssl.SSLSocketFactory sslSocketFactory = buildSslUtil(dc).createSSLSocketFactory();
+            primary = new SingleServerSet(dc.getHost(), dc.getPort(), sslSocketFactory, options);
+        } else {
+            primary = new SingleServerSet(dc.getHost(), dc.getPort(), options);
         }
-        return new SingleServerSet(dc.getHost(), dc.getPort(), options);
+
+        // Multi-DC failover: if a secondary host is configured, wrap in FailoverServerSet
+        if (dc.getSecondaryHost() != null && !dc.getSecondaryHost().isBlank()) {
+            int secondaryPort = dc.getSecondaryPort() != null ? dc.getSecondaryPort() : dc.getPort();
+            ServerSet secondary;
+            if (dc.getSslMode() == SslMode.LDAPS) {
+                javax.net.ssl.SSLSocketFactory sslSocketFactory = buildSslUtil(dc).createSSLSocketFactory();
+                secondary = new SingleServerSet(dc.getSecondaryHost(), secondaryPort, sslSocketFactory, options);
+            } else {
+                secondary = new SingleServerSet(dc.getSecondaryHost(), secondaryPort, options);
+            }
+            return new FailoverServerSet(primary, secondary);
+        }
+
+        return primary;
     }
 
     private SSLUtil buildSslUtil(DirectoryConnection dc) throws Exception {

@@ -143,7 +143,23 @@ public class ScheduledReportJobController {
     // ── On-demand execution ───────────────────────────────────────────────────
 
     /**
-     * Runs a report immediately and returns the result as a CSV file download.
+     * Runs a report and returns the structured data as JSON for inline display.
+     */
+    @PostMapping("/reports/run-data")
+    @RequiresFeature(FeatureKey.REPORTS_RUN)
+    public ReportExecutionService.ReportData runData(
+            @DirectoryId @PathVariable UUID directoryId,
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @Valid @RequestBody RunReportRequest req) {
+
+        rateLimiter.check(principal.username(), "report-run");
+        DirectoryConnection dc = dirRepo.findById(directoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("DirectoryConnection", directoryId));
+        return executionService.runAsData(dc, req.reportType(), req.reportParams(), directoryId);
+    }
+
+    /**
+     * Runs a report immediately and returns the result as a CSV or PDF file download.
      */
     @PostMapping("/reports/run")
     @RequiresFeature(FeatureKey.REPORTS_RUN)

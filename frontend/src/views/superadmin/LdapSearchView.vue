@@ -121,6 +121,15 @@
                 <td class="py-2 pr-4 font-medium text-gray-600 align-top whitespace-nowrap">{{ attr }}</td>
                 <td class="py-2 font-mono text-xs text-gray-800 break-all">
                   <div v-for="(v, i) in values" :key="i">{{ v }}</div>
+                  <div v-if="attr === 'userAccountControl' && values.length" class="mt-1 flex flex-wrap gap-1">
+                    <span v-for="flag in decodeUAC(values[0])" :key="flag"
+                      :class="['px-1.5 py-0.5 rounded text-xs font-medium',
+                        flag === 'DISABLED' || flag === 'LOCKED_OUT' ? 'bg-red-100 text-red-800' :
+                        flag === 'PASSWORD_EXPIRED' || flag === 'PASSWORD_NEVER_EXPIRES' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-gray-100 text-gray-700']">
+                      {{ flag }}
+                    </span>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -241,6 +250,20 @@ function doExportResults() {
   a.download = 'search-export.ldif'
   a.click()
   URL.revokeObjectURL(url)
+}
+
+function decodeUAC(value) {
+  const uac = parseInt(value, 10)
+  if (isNaN(uac)) return []
+  const flags = []
+  if (uac & 0x0002) flags.push('DISABLED')
+  if (uac & 0x0010) flags.push('LOCKED_OUT')
+  if (uac & 0x0020) flags.push('PASSWORD_NOT_REQUIRED')
+  if (uac & 0x0200) flags.push('NORMAL_ACCOUNT')
+  if (uac & 0x10000) flags.push('PASSWORD_NEVER_EXPIRES')
+  if (uac & 0x800000) flags.push('PASSWORD_EXPIRED')
+  if (uac & 0x40000) flags.push('SMARTCARD_REQUIRED')
+  return flags
 }
 
 function showEntryDetail(entry) {
