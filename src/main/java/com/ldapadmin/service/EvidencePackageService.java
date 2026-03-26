@@ -1,7 +1,6 @@
 package com.ldapadmin.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ldapadmin.config.AppProperties;
 import com.ldapadmin.dto.audit.AuditEventResponse;
 import com.ldapadmin.entity.*;
 import com.ldapadmin.entity.enums.AuditAction;
@@ -17,11 +16,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.security.MessageDigest;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -50,7 +46,7 @@ public class EvidencePackageService {
     private final PdfReportService pdfReportService;
     private final LdapUserService ldapUserService;
     private final LdapGroupService ldapGroupService;
-    private final AppProperties appProperties;
+    private final CryptoService cryptoService;
     private final AccountRepository accountRepo;
     private final AuditQueryService auditQueryService;
     private final AuditService auditService;
@@ -411,36 +407,14 @@ public class EvidencePackageService {
         return baos.toByteArray();
     }
 
-    // ── Crypto helpers ────────────────────────────────────────────────────────
+    // ── Crypto helpers (delegated to CryptoService) ─────────────────────────
 
     String sha256Hex(byte[] data) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(data);
-            return bytesToHex(hash);
-        } catch (Exception e) {
-            throw new RuntimeException("SHA-256 not available", e);
-        }
+        return cryptoService.sha256Hex(data);
     }
 
     String hmacSha256(byte[] data) {
-        try {
-            byte[] keyBytes = Base64.getDecoder().decode(appProperties.getEncryption().getKey());
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(keyBytes, "HmacSHA256"));
-            byte[] hmac = mac.doFinal(data);
-            return bytesToHex(hmac);
-        } catch (Exception e) {
-            throw new RuntimeException("HMAC-SHA256 signing failed", e);
-        }
-    }
-
-    private static String bytesToHex(byte[] bytes) {
-        StringBuilder sb = new StringBuilder(bytes.length * 2);
-        for (byte b : bytes) {
-            sb.append(String.format("%02x", b));
-        }
-        return sb.toString();
+        return cryptoService.hmacSha256(data);
     }
 
     /**

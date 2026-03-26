@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.ldapadmin.config.AppProperties;
 import com.ldapadmin.entity.*;
 import com.ldapadmin.entity.enums.*;
 import com.ldapadmin.ldap.LdapGroupService;
@@ -42,7 +41,7 @@ class EvidencePackageServiceTest {
     @Mock private PdfReportService pdfReportService;
     @Mock private LdapUserService ldapUserService;
     @Mock private LdapGroupService ldapGroupService;
-    @Mock private AppProperties appProperties;
+    @Mock private CryptoService cryptoService;
     @Mock private AccountRepository accountRepo;
     @Mock private AuditQueryService auditQueryService;
     @Mock private AuditService auditService;
@@ -60,7 +59,7 @@ class EvidencePackageServiceTest {
         service = new EvidencePackageService(
                 directoryRepo, campaignRepo, historyRepo, campaignService,
                 sodPolicyRepo, sodViolationRepo, approvalRepo, pdfReportService,
-                ldapUserService, ldapGroupService, appProperties, accountRepo,
+                ldapUserService, ldapGroupService, cryptoService, accountRepo,
                 auditQueryService, auditService, objectMapper);
 
         directory = new DirectoryConnection();
@@ -68,10 +67,26 @@ class EvidencePackageServiceTest {
         directory.setDisplayName("Test Directory");
         directory.setEnabled(true);
 
-        // Default encryption key for HMAC
-        AppProperties.Encryption enc = new AppProperties.Encryption();
-        enc.setKey(Base64.getEncoder().encodeToString(new byte[32]));
-        lenient().when(appProperties.getEncryption()).thenReturn(enc);
+        // Default crypto stubs for manifest building
+        lenient().when(cryptoService.sha256Hex(any(byte[].class)))
+                .thenAnswer(inv -> {
+                    byte[] data = inv.getArgument(0);
+                    var digest = java.security.MessageDigest.getInstance("SHA-256");
+                    byte[] hash = digest.digest(data);
+                    var sb = new StringBuilder(hash.length * 2);
+                    for (byte b : hash) sb.append(String.format("%02x", b));
+                    return sb.toString();
+                });
+        lenient().when(cryptoService.hmacSha256(any(byte[].class)))
+                .thenAnswer(inv -> {
+                    byte[] data = inv.getArgument(0);
+                    // Use SHA-256 as a stand-in for HMAC in tests (deterministic, input-dependent)
+                    var digest = java.security.MessageDigest.getInstance("SHA-256");
+                    byte[] hash = digest.digest(data);
+                    var sb = new StringBuilder(hash.length * 2);
+                    for (byte b : hash) sb.append(String.format("%02x", b));
+                    return sb.toString();
+                });
     }
 
     @Test
@@ -252,18 +267,19 @@ class EvidencePackageServiceTest {
     }
 
     @Test
-    void sha256Hex_producesCorrectHash() {
+    void sha256Hex_delegatesToCryptoService() {
         String hash = service.sha256Hex(new byte[0]);
+        // The mock computes a real SHA-256
         assertThat(hash).isEqualTo("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+        verify(cryptoService).sha256Hex(new byte[0]);
     }
 
     @Test
-    void hmacSha256_producesConsistentSignature() {
+    void hmacSha256_delegatesToCryptoService() {
         byte[] data = "test data".getBytes();
-        String sig1 = service.hmacSha256(data);
-        String sig2 = service.hmacSha256(data);
-        assertThat(sig1).isEqualTo(sig2);
-        assertThat(sig1).hasSize(64);
+        String sig = service.hmacSha256(data);
+        assertThat(sig).isNotEmpty();
+        verify(cryptoService).hmacSha256(data);
     }
 
     @Test

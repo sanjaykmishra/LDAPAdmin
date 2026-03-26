@@ -36,7 +36,8 @@ public enum FeatureKey {
     SOD_MANAGE           ("sod.manage"),
     SOD_VIEW             ("sod.view"),
     HR_MANAGE            ("hr.manage"),
-    HR_VIEW              ("hr.view");
+    HR_VIEW              ("hr.view"),
+    AUDITOR_MANAGE       ("auditor.manage");
 
     private final String dbValue;
 
