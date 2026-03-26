@@ -11,7 +11,6 @@
     <!-- Report runner -->
     <section class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
       <div class="grid grid-cols-3 gap-3 mb-3">
-        <!-- Directory picker (superadmin — when no dirId from route) -->
         <div v-if="!routeDirId">
           <label class="block text-sm font-medium text-gray-700 mb-1">Directory</label>
           <select v-model="selectedDir" class="input w-full">
@@ -52,7 +51,7 @@
         <div v-if="needsCampaign">
           <label class="block text-sm font-medium text-gray-700 mb-1">Campaign</label>
           <select v-model="runForm.campaignId" class="input w-full">
-            <option value="">-- select campaign --</option>
+            <option value="">-- select to see decisions --</option>
             <option v-for="c in campaigns" :key="c.id" :value="c.id">{{ c.name }} ({{ c.status }})</option>
           </select>
         </div>
@@ -67,14 +66,24 @@
       <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
         <span class="text-sm text-gray-600">{{ resultRows.length }} result{{ resultRows.length !== 1 ? 's' : '' }}</span>
         <div class="flex gap-2">
-          <!-- SoD bulk actions -->
-          <template v-if="isSodReport && selectedIds.size > 0">
-            <button @click="bulkResolve" :disabled="actioning" class="bg-green-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-green-700 disabled:opacity-50">
-              Resolve ({{ selectedIds.size }})
-            </button>
-            <button @click="showExemptModal = true" :disabled="actioning" class="bg-amber-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-amber-600 disabled:opacity-50">
-              Exempt ({{ selectedIds.size }})
-            </button>
+          <!-- SoD / Drift bulk actions -->
+          <template v-if="hasActionableRows && selectedIds.size > 0">
+            <template v-if="isSodReport">
+              <button @click="bulkResolve" :disabled="actioning" class="bg-green-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-green-700 disabled:opacity-50">
+                Resolve ({{ selectedIds.size }})
+              </button>
+              <button @click="showExemptModal = true" :disabled="actioning" class="bg-amber-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-amber-600 disabled:opacity-50">
+                Exempt ({{ selectedIds.size }})
+              </button>
+            </template>
+            <template v-if="isDriftReport">
+              <button @click="bulkAcknowledge" :disabled="actioning" class="bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                Acknowledge ({{ selectedIds.size }})
+              </button>
+              <button @click="showExemptModal = true" :disabled="actioning" class="bg-amber-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-amber-600 disabled:opacity-50">
+                Exempt ({{ selectedIds.size }})
+              </button>
+            </template>
           </template>
           <button @click="doExport('CSV')" :disabled="exporting" class="btn-secondary text-xs">Export CSV</button>
           <button @click="doExport('PDF')" :disabled="exporting" class="btn-secondary text-xs">Export PDF</button>
@@ -82,6 +91,7 @@
       </div>
 
       <div v-if="resultRows.length === 0" class="p-8 text-center text-sm text-gray-400">
+        <svg class="w-8 h-8 mx-auto mb-2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
         No entries found for this report.
       </div>
 
@@ -89,7 +99,7 @@
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50">
-              <th v-if="isSodReport" class="py-2 px-3 w-8">
+              <th v-if="hasActionableRows" class="py-2 px-3 w-8">
                 <input type="checkbox" :checked="allPageSelected" @change="toggleSelectAll" class="rounded border-gray-300" />
               </th>
               <th v-for="col in visibleColumns" :key="col"
@@ -100,20 +110,47 @@
               </th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-50">
-            <tr v-for="(row, i) in pagedRows" :key="i" class="hover:bg-blue-50/30">
-              <td v-if="isSodReport" class="py-2 px-3 w-8">
+          <tbody>
+            <tr v-for="(row, i) in pagedRows" :key="i" :class="i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'" class="hover:bg-blue-50/30 border-b border-gray-100/50">
+              <td v-if="hasActionableRows" class="py-2 px-3 w-8">
                 <input type="checkbox" :checked="selectedIds.has(row['id'])" @change="toggleSelect(row['id'])" class="rounded border-gray-300" />
               </td>
               <td v-for="col in visibleColumns" :key="col"
-                class="py-2 px-4 text-xs text-gray-700 break-all max-w-xs truncate" :title="row[col]">
+                class="py-2 px-4 text-xs text-gray-700 max-w-xs" :title="row[col]">
+                <!-- Status badge -->
                 <span v-if="col === 'Status'" :class="statusBadgeClass(row[col])" class="inline-block px-2 py-0.5 rounded-full text-xs font-medium">
                   {{ row[col] }}
                 </span>
+                <!-- Severity badge -->
                 <span v-else-if="col === 'Severity'" :class="severityBadgeClass(row[col])" class="inline-block px-2 py-0.5 rounded-full text-xs font-medium">
                   {{ row[col] }}
                 </span>
-                <span v-else class="font-mono">{{ row[col] }}</span>
+                <!-- Decision badge (Access Review) -->
+                <span v-else-if="col === 'Decision'" :class="decisionBadgeClass(row[col])" class="inline-block px-2 py-0.5 rounded-full text-xs font-medium">
+                  {{ row[col] === 'CONFIRM' ? 'Confirmed' : row[col] === 'REVOKE' ? 'Revoked' : 'Pending' }}
+                </span>
+                <!-- Action badge (Audit Log) -->
+                <span v-else-if="col === 'Action'" :class="actionBadgeClass(row[col])" class="inline-block px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap">
+                  {{ humanizeEnum(row[col]) }}
+                </span>
+                <!-- Peer Match percentage -->
+                <span v-else-if="col === 'Peer Match'" class="font-mono whitespace-nowrap">
+                  <span :class="peerMatchColor(row[col])">{{ row[col] }}</span>
+                </span>
+                <!-- Groups column (semicolon-separated tags) -->
+                <span v-else-if="col === 'Groups' && row[col]" class="flex flex-wrap gap-1">
+                  <span v-for="g in row[col].split('; ').filter(Boolean)" :key="g" class="inline-block bg-blue-50 text-blue-700 text-xs px-1.5 py-0.5 rounded">{{ g }}</span>
+                </span>
+                <!-- Date columns -->
+                <span v-else-if="isDateColumn(col, row[col])" :title="formatFullDate(row[col])" class="font-mono whitespace-nowrap">
+                  {{ formatRelativeDate(row[col]) }}
+                </span>
+                <!-- DN columns (truncate) -->
+                <span v-else-if="isDnColumn(col, row[col])" :title="row[col]" class="font-mono truncate block max-w-xs">
+                  {{ truncateDn(row[col]) }}
+                </span>
+                <!-- Default -->
+                <span v-else class="font-mono truncate block max-w-xs">{{ row[col] }}</span>
               </td>
             </tr>
           </tbody>
@@ -130,15 +167,15 @@
       </div>
     </section>
 
-    <!-- Exempt Modal -->
-    <AppModal v-model="showExemptModal" title="Exempt Violations" size="md">
-      <p class="text-sm text-gray-600 mb-4">Exempting {{ selectedIds.size }} violation{{ selectedIds.size !== 1 ? 's' : '' }}.</p>
+    <!-- Exempt Modal (shared by SoD + Drift) -->
+    <AppModal v-model="showExemptModal" title="Exempt Findings" size="md">
+      <p class="text-sm text-gray-600 mb-4">Exempting {{ selectedIds.size }} finding{{ selectedIds.size !== 1 ? 's' : '' }}.</p>
       <div class="space-y-3">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Reason <span class="text-red-500">*</span></label>
           <textarea v-model="exemptReason" rows="3" class="input w-full" placeholder="Provide a reason for the exemption..."></textarea>
         </div>
-        <div>
+        <div v-if="isSodReport">
           <label class="block text-sm font-medium text-gray-700 mb-1">Expiration Date (optional)</label>
           <input v-model="exemptExpires" type="date" class="input w-full" />
         </div>
@@ -157,19 +194,13 @@
         Generate a comprehensive ZIP package containing all compliance artifacts: PDF reports,
         campaign decisions, SoD data, approval history, and user entitlements.
       </p>
-
       <div class="grid gap-6 md:grid-cols-2">
-        <!-- Campaign selection -->
         <div>
-          <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
-            Include Campaigns
-          </label>
+          <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Include Campaigns</label>
           <div v-if="!campaigns.length" class="text-sm text-gray-400">No campaigns available.</div>
           <div v-else class="max-h-48 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
-            <label v-for="c in campaigns" :key="c.id"
-                   class="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-              <input type="checkbox" :value="c.id" v-model="evidencePackageCampaignIds"
-                     class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+            <label v-for="c in campaigns" :key="c.id" class="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+              <input type="checkbox" :value="c.id" v-model="evidencePackageCampaignIds" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
               <div class="min-w-0">
                 <span class="text-sm font-medium text-gray-900 block truncate">{{ c.name }}</span>
                 <span class="text-xs text-gray-400">{{ c.status }}</span>
@@ -177,29 +208,22 @@
             </label>
           </div>
         </div>
-
-        <!-- Options -->
         <div class="space-y-4">
-          <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
-            Options
-          </label>
+          <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Options</label>
           <label class="flex items-start gap-3 cursor-pointer">
-            <input type="checkbox" v-model="evidenceIncludeSod"
-                   class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+            <input type="checkbox" v-model="evidenceIncludeSod" class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
             <div>
               <span class="text-sm font-medium text-gray-900">Include SoD Policies &amp; Violations</span>
               <p class="text-xs text-gray-500">Exports all separation-of-duties policy definitions and open violations.</p>
             </div>
           </label>
           <label class="flex items-start gap-3 cursor-pointer">
-            <input type="checkbox" v-model="evidenceIncludeEntitlements"
-                   class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+            <input type="checkbox" v-model="evidenceIncludeEntitlements" class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
             <div>
               <span class="text-sm font-medium text-gray-900">Include Entitlement Snapshot</span>
               <p class="text-xs text-gray-500">Exports a point-in-time snapshot of all users and their group memberships from LDAP.</p>
             </div>
           </label>
-
           <button @click="downloadEvidencePackage"
                   :disabled="loadingEvidence || evidencePackageCampaignIds.length === 0"
                   class="w-full bg-green-600 text-white text-sm font-medium rounded-lg px-4 py-2.5 hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
@@ -211,8 +235,6 @@
           </button>
         </div>
       </div>
-
-      <!-- Success toast -->
       <div v-if="evidenceSuccess" class="mt-4 bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
         Evidence package downloaded successfully ({{ evidenceFileSize }}).
@@ -229,8 +251,15 @@ import { runReport, runReportData } from '@/api/reports'
 import { listDirectories } from '@/api/directories'
 import { listCampaigns } from '@/api/accessReviews'
 import { listPolicies, exemptViolation, resolveViolation } from '@/api/sodPolicies'
+import { acknowledgeFinding, exemptFinding } from '@/api/accessDrift'
 import { generateEvidencePackage } from '@/api/complianceReports'
 import { downloadBlob } from '@/composables/useApi'
+import {
+  statusBadgeClass, severityBadgeClass, decisionBadgeClass, actionBadgeClass,
+  formatRelativeDate, formatFullDate, truncateDn,
+  looksLikeTimestamp, looksLikeDn, humanizeEnum,
+  DATE_COLUMNS, HIDDEN_COLUMNS,
+} from '@/composables/useReportFormatting'
 import GroupDnPicker from '@/components/GroupDnPicker.vue'
 import AppModal from '@/components/AppModal.vue'
 
@@ -247,7 +276,7 @@ const PAGE_SIZE = 50
 
 const reportTypes = [
   { value: 'USER_ACCESS_REPORT',          label: 'User Access Report',           lookback: false, statusFilter: false, groupDn: true,  campaign: false, policyFilter: false },
-  { value: 'ACCESS_REVIEW_SUMMARY',       label: 'Access Review Summary',        lookback: false, statusFilter: false, groupDn: false, campaign: true,  policyFilter: false },
+  { value: 'ACCESS_REVIEW_RESULTS',       label: 'Access Review Results',        lookback: false, statusFilter: false, groupDn: false, campaign: true,  policyFilter: false },
   { value: 'PRIVILEGED_ACCOUNT_INVENTORY', label: 'Privileged Account Inventory', lookback: false, statusFilter: false, groupDn: false, campaign: false, policyFilter: false },
   { value: 'ACCESS_DRIFT_REPORT',         label: 'Access Drift',                 lookback: false, statusFilter: false, groupDn: false, campaign: false, policyFilter: false },
   { value: 'SOD_VIOLATIONS',              label: 'SoD Violations',               lookback: false, statusFilter: true,  groupDn: false, campaign: false, policyFilter: true },
@@ -273,9 +302,11 @@ const needsGroupDn      = computed(() => !!currentType.value?.groupDn)
 const needsCampaign     = computed(() => !!currentType.value?.campaign)
 const needsPolicyFilter = computed(() => !!currentType.value?.policyFilter)
 const isSodReport       = computed(() => runForm.value.reportType === 'SOD_VIOLATIONS' && hasResults.value)
+const isDriftReport     = computed(() => runForm.value.reportType === 'ACCESS_DRIFT_REPORT' && hasResults.value)
+const hasActionableRows = computed(() => isSodReport.value || isDriftReport.value)
 
-// Hide the 'id' column from visible display (used internally for selection)
-const visibleColumns = computed(() => resultColumns.value.filter(c => c !== 'id').slice(0, 10))
+// Hide 'id' column from display
+const visibleColumns = computed(() => resultColumns.value.filter(c => !HIDDEN_COLUMNS.has(c)).slice(0, 10))
 
 const sortedRows = computed(() => {
   if (!sortCol.value) return resultRows.value
@@ -287,13 +318,11 @@ const sortedRows = computed(() => {
 const totalPages = computed(() => Math.ceil(sortedRows.value.length / PAGE_SIZE))
 const pagedRows = computed(() => sortedRows.value.slice(page.value * PAGE_SIZE, (page.value + 1) * PAGE_SIZE))
 
-// SoD policies for filter
+// SoD policies & campaigns
 const sodPolicies = ref([])
-
-// Campaigns (for Access Review Summary + Evidence Package)
 const campaigns = ref([])
 
-// ── Selection state (SoD) ─────────────────────────────────────────────────────
+// ── Selection ─────────────────────────────────────────────────────────────────
 const selectedIds = ref(new Set())
 
 const allPageSelected = computed(() => {
@@ -328,10 +357,7 @@ async function bulkResolve() {
   actioning.value = true
   let ok = 0, fail = 0
   for (const vid of selectedIds.value) {
-    try {
-      await resolveViolation(dirId.value, vid)
-      ok++
-    } catch { fail++ }
+    try { await resolveViolation(dirId.value, vid); ok++ } catch { fail++ }
   }
   actioning.value = false
   notif.success(`Resolved ${ok} violation${ok !== 1 ? 's' : ''}${fail ? `, ${fail} failed` : ''}`)
@@ -339,47 +365,67 @@ async function bulkResolve() {
   await doRun()
 }
 
-async function bulkExempt() {
-  if (!selectedIds.value.size || !exemptReason.value.trim()) return
+async function bulkAcknowledge() {
+  if (!selectedIds.value.size) return
   actioning.value = true
-  const body = {
-    reason: exemptReason.value.trim(),
-    expiresAt: exemptExpires.value ? new Date(exemptExpires.value).toISOString() : null,
-  }
   let ok = 0, fail = 0
-  for (const vid of selectedIds.value) {
-    try {
-      await exemptViolation(dirId.value, vid, body)
-      ok++
-    } catch { fail++ }
+  for (const fid of selectedIds.value) {
+    try { await acknowledgeFinding(dirId.value, fid); ok++ } catch { fail++ }
   }
   actioning.value = false
-  showExemptModal.value = false
-  exemptReason.value = ''
-  exemptExpires.value = ''
-  notif.success(`Exempted ${ok} violation${ok !== 1 ? 's' : ''}${fail ? `, ${fail} failed` : ''}`)
+  notif.success(`Acknowledged ${ok} finding${ok !== 1 ? 's' : ''}${fail ? `, ${fail} failed` : ''}`)
   selectedIds.value = new Set()
   await doRun()
 }
 
-// ── Status / Severity badges ──────────────────────────────────────────────────
-function statusBadgeClass(status) {
-  switch (status) {
-    case 'OPEN':     return 'bg-red-100 text-red-700'
-    case 'RESOLVED': return 'bg-green-100 text-green-700'
-    case 'EXEMPTED': return 'bg-amber-100 text-amber-700'
-    default:         return 'bg-gray-100 text-gray-700'
+async function bulkExempt() {
+  if (!selectedIds.value.size || !exemptReason.value.trim()) return
+  actioning.value = true
+  let ok = 0, fail = 0
+
+  if (isSodReport.value) {
+    const body = {
+      reason: exemptReason.value.trim(),
+      expiresAt: exemptExpires.value ? new Date(exemptExpires.value).toISOString() : null,
+    }
+    for (const vid of selectedIds.value) {
+      try { await exemptViolation(dirId.value, vid, body); ok++ } catch { fail++ }
+    }
+  } else if (isDriftReport.value) {
+    const body = { reason: exemptReason.value.trim() }
+    for (const fid of selectedIds.value) {
+      try { await exemptFinding(dirId.value, fid, body); ok++ } catch { fail++ }
+    }
   }
+
+  actioning.value = false
+  showExemptModal.value = false
+  exemptReason.value = ''
+  exemptExpires.value = ''
+  notif.success(`Exempted ${ok} finding${ok !== 1 ? 's' : ''}${fail ? `, ${fail} failed` : ''}`)
+  selectedIds.value = new Set()
+  await doRun()
 }
 
-function severityBadgeClass(severity) {
-  switch (severity) {
-    case 'CRITICAL': return 'bg-red-100 text-red-700'
-    case 'HIGH':     return 'bg-orange-100 text-orange-700'
-    case 'MEDIUM':   return 'bg-yellow-100 text-yellow-700'
-    case 'LOW':      return 'bg-blue-100 text-blue-700'
-    default:         return 'bg-gray-100 text-gray-700'
-  }
+// ── Cell rendering helpers ────────────────────────────────────────────────────
+
+function isDateColumn(col, val) {
+  return DATE_COLUMNS.has(col) || (col.toLowerCase().includes('timestamp') && looksLikeTimestamp(val))
+}
+
+function isDnColumn(col, val) {
+  if (!val) return false
+  const cl = col.toLowerCase()
+  return (cl === 'dn' || cl.endsWith(' dn') || cl === 'user' || cl === 'target' || cl === 'user dn') && looksLikeDn(val)
+}
+
+function peerMatchColor(pct) {
+  if (!pct) return ''
+  const n = parseInt(pct)
+  if (n <= 10) return 'text-red-600 font-semibold'
+  if (n <= 30) return 'text-orange-600 font-semibold'
+  if (n <= 60) return 'text-amber-600'
+  return 'text-green-600'
 }
 
 // ── Sorting / params ──────────────────────────────────────────────────────────
@@ -450,9 +496,7 @@ const evidenceIncludeEntitlements = ref(false)
 const evidenceSuccess = ref(false)
 const evidenceFileSize = ref('')
 
-function openEvidencePackage() {
-  showEvidence.value = true
-}
+function openEvidencePackage() { showEvidence.value = true }
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + ' B'
@@ -463,12 +507,9 @@ function formatBytes(bytes) {
 function triggerDownload(blob, filename) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  a.href = url; a.download = filename
+  document.body.appendChild(a); a.click()
+  document.body.removeChild(a); URL.revokeObjectURL(url)
 }
 
 async function downloadEvidencePackage() {
@@ -504,9 +545,7 @@ async function loadCampaigns() {
   try {
     const { data } = await listCampaigns(dirId.value, { size: 100 })
     campaigns.value = data.content || data
-  } catch (e) {
-    console.warn('Failed to load campaigns:', e)
-  }
+  } catch (e) { console.warn('Failed to load campaigns:', e) }
 }
 
 async function loadSodPolicies() {
@@ -514,16 +553,10 @@ async function loadSodPolicies() {
   try {
     const { data } = await listPolicies(dirId.value)
     sodPolicies.value = data.content || data
-  } catch (e) {
-    console.warn('Failed to load SoD policies:', e)
-  }
+  } catch (e) { console.warn('Failed to load SoD policies:', e) }
 }
 
-// Reload policies/campaigns when directory changes
-watch(dirId, () => {
-  loadCampaigns()
-  loadSodPolicies()
-})
+watch(dirId, () => { loadCampaigns(); loadSodPolicies() })
 
 onMounted(async () => {
   if (!routeDirId) {
