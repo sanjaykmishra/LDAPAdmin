@@ -224,10 +224,11 @@
           <select v-model="newRule.groupingAttribute" class="input w-full">
             <option value="">— Grouping attribute —</option>
             <option value="department">department</option>
+            <option value="departmentNumber">departmentNumber (inetOrgPerson)</option>
             <option value="title">title</option>
             <option value="ou">ou (organizational unit)</option>
-            <option value="l">l (location)</option>
           </select>
+          <p class="text-xs text-gray-400 mt-1">Attribute used to group users into peer cohorts for comparison.</p>
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="text-xs text-gray-500">Anomaly threshold %</label>
@@ -349,10 +350,25 @@ async function loadRules() {
 async function handleAnalyze() {
   analyzing.value = true
   try {
-    const res = await call(() => runAnalysis(dirId.value), { successMsg: 'Analysis complete' })
-    analysisResult.value = res.data
+    // Capture pre-analysis snapshot timestamp for comparison
+    const preSummary = await getFindingsSummary(dirId.value)
+    const preCaptured = preSummary.data?.lastAnalysisAt
+
+    await call(() => runAnalysis(dirId.value), { successMsg: 'Analysis started…' })
+
+    // Poll until a new snapshot appears (analysis complete)
+    let attempts = 0
+    const maxAttempts = 30
+    while (attempts < maxAttempts) {
+      await new Promise(r => setTimeout(r, 2000))
+      attempts++
+      const res = await getFindingsSummary(dirId.value)
+      const newCaptured = res.data?.lastAnalysisAt
+      if (newCaptured && newCaptured !== preCaptured) break
+    }
     await loadFindings()
     await loadSummary()
+    vizData.value = null // reset visualization to reload with new data
   } catch { /* handled */ }
   analyzing.value = false
 }
