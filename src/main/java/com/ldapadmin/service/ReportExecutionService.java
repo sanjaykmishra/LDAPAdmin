@@ -522,10 +522,23 @@ public class ReportExecutionService {
     }
 
     private ReportData runAuditLogReportData(UUID directoryId, Map<String, Object> params) {
-        OffsetDateTime from = OffsetDateTime.now().minusDays(lookbackDays(params));
-        var page = auditEventRepo.findAll(directoryId, null, null, null, from, null,
+        // Parse from/to date params
+        OffsetDateTime from = parseDateTime(params, "from");
+        OffsetDateTime to = parseDateTime(params, "to");
+        if (from == null) from = OffsetDateTime.now().minusDays(lookbackDays(params));
+
+        // Parse action filter
+        String actionStr = params.containsKey("action") ? (String) params.get("action") : null;
+        String actionDbValue = null;
+        if (actionStr != null && !actionStr.isBlank()) {
+            try {
+                actionDbValue = AuditAction.valueOf(actionStr).getDbValue();
+            } catch (IllegalArgumentException ignored) { }
+        }
+
+        var page = auditEventRepo.findAll(directoryId, null, actionDbValue, null, from, to,
                 org.springframework.data.domain.PageRequest.of(0, MAX_LDAP_RESULTS));
-        List<String> columns = List.of("Time", "Action", "Actor", "Target", "Directory");
+        List<String> columns = List.of("Time", "Action", "Actor", "Target", "Directory", "Detail");
         List<Map<String, String>> rows = new ArrayList<>();
         for (var e : page.getContent()) {
             Map<String, String> row = new LinkedHashMap<>();
@@ -534,9 +547,38 @@ public class ReportExecutionService {
             row.put("Actor", e.getActorUsername() != null ? e.getActorUsername() : "");
             row.put("Target", e.getTargetDn() != null ? e.getTargetDn() : "");
             row.put("Directory", e.getDirectoryName() != null ? e.getDirectoryName() : "");
+            row.put("Detail", formatDetail(e.getDetail()));
             rows.add(row);
         }
         return new ReportData(columns, rows);
+    }
+
+    private String formatDetail(Map<String, Object> detail) {
+        if (detail == null || detail.isEmpty()) return "";
+        return detail.entrySet().stream()
+                .map(entry -> entry.getKey() + ": " + entry.getValue())
+                .reduce((a, b) -> a + "\n" + b)
+                .orElse("");
+    }
+
+    private OffsetDateTime parseDateTime(Map<String, Object> params, String key) {
+        Object raw = params.get(key);
+        if (raw == null) return null;
+        String s = raw.toString().trim();
+        if (s.isBlank()) return null;
+        try {
+            return OffsetDateTime.parse(s);
+        } catch (Exception e1) {
+            try {
+                return java.time.LocalDateTime.parse(s).atOffset(java.time.ZoneOffset.UTC);
+            } catch (Exception e2) {
+                try {
+                    return java.time.LocalDate.parse(s).atStartOfDay().atOffset(java.time.ZoneOffset.UTC);
+                } catch (Exception e3) {
+                    return null;
+                }
+            }
+        }
     }
 
     private String buildGroupFilter(Map<String, Object> params) {
