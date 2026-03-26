@@ -73,6 +73,11 @@ public enum AuditAction {
     HR_EMPLOYEE_MATCHED  ("hr.employee_matched"),
     HR_ORPHAN_DETECTED   ("hr.orphan_detected"),
 
+    // ── Auditor portal ──────────────────────────────────────────────────────
+    AUDITOR_LINK_CREATED ("auditor.link_created"),
+    AUDITOR_LINK_REVOKED ("auditor.link_revoked"),
+    AUDITOR_LINK_ACCESSED("auditor.link_accessed"),
+
     // ── Changelog-sourced (raw LDAP changelog entry) ──────────────────────────
     LDAP_CHANGE          ("ldap.change");
 
