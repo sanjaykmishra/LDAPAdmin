@@ -147,6 +147,7 @@ public class ScheduledReportJobController {
      */
     @PostMapping("/reports/run-data")
     @RequiresFeature(FeatureKey.REPORTS_RUN)
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public ReportExecutionService.ReportData runData(
             @DirectoryId @PathVariable UUID directoryId,
             @AuthenticationPrincipal AuthPrincipal principal,

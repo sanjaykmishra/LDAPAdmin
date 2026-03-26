@@ -10,7 +10,7 @@
 
     <!-- Report runner -->
     <section class="bg-white border border-gray-200 rounded-xl p-5 mb-6">
-      <div class="grid grid-cols-4 gap-3 items-end">
+      <div class="grid grid-cols-2 gap-3 mb-3">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
           <select v-model="runForm.reportType" class="input w-full">
@@ -23,14 +23,14 @@
           <DnPicker v-else-if="currentRunType?.param === 'branchDn'" v-model="runForm.paramValue" :directory-id="dirId" />
           <input v-else v-model="runForm.paramValue" type="text" :placeholder="paramPlaceholder" class="input w-full" />
         </div>
-        <div>
+        <div v-if="needsLookback">
           <label class="block text-sm font-medium text-gray-700 mb-1">Lookback Days</label>
           <input v-model.number="runForm.lookbackDays" type="number" min="1" class="input w-full" placeholder="30" />
         </div>
-        <button @click="doRun" :disabled="running" class="btn-primary h-[38px]">
-          {{ running ? 'Running…' : 'Run Report' }}
-        </button>
       </div>
+      <button @click="doRun" :disabled="running" class="btn-primary">
+        {{ running ? 'Running…' : 'Run Report' }}
+      </button>
     </section>
 
     <!-- Results -->
@@ -210,15 +210,15 @@ const dirId = route.params.dirId
 const PAGE_SIZE = 50
 
 const reportTypes = [
-  { value: 'USERS_IN_GROUP',       label: 'Users in Group',         param: 'groupDn',  paramLabel: 'Group DN',  paramPlaceholder: 'cn=admins,dc=example,dc=com' },
-  { value: 'USERS_IN_BRANCH',      label: 'Users in Branch',        param: 'branchDn', paramLabel: 'Branch DN', paramPlaceholder: 'ou=people,dc=example,dc=com' },
-  { value: 'USERS_WITH_NO_GROUP',  label: 'Users with No Group',    param: null },
-  { value: 'RECENTLY_ADDED',       label: 'Recently Added',         param: null },
-  { value: 'RECENTLY_MODIFIED',    label: 'Recently Modified',      param: null },
-  { value: 'RECENTLY_DELETED',     label: 'Recently Deleted',       param: null },
-  { value: 'DISABLED_ACCOUNTS',    label: 'Disabled Accounts',      param: null },
-  { value: 'MISSING_PROFILE_GROUPS', label: 'Missing Profile Groups', param: null },
-  { value: 'SOD_VIOLATIONS',       label: 'SoD Violations',         param: null },
+  { value: 'USERS_IN_GROUP',       label: 'Users in Group',         param: 'groupDn',  paramLabel: 'Group DN',  paramPlaceholder: 'cn=admins,dc=example,dc=com', lookback: false },
+  { value: 'USERS_IN_BRANCH',      label: 'Users in Branch',        param: 'branchDn', paramLabel: 'Branch DN', paramPlaceholder: 'ou=people,dc=example,dc=com', lookback: false },
+  { value: 'USERS_WITH_NO_GROUP',  label: 'Users with No Group',    param: null, lookback: false },
+  { value: 'RECENTLY_ADDED',       label: 'Recently Added',         param: null, lookback: true },
+  { value: 'RECENTLY_MODIFIED',    label: 'Recently Modified',      param: null, lookback: true },
+  { value: 'RECENTLY_DELETED',     label: 'Recently Deleted',       param: null, lookback: true },
+  { value: 'DISABLED_ACCOUNTS',    label: 'Disabled Accounts',      param: null, lookback: false },
+  { value: 'MISSING_PROFILE_GROUPS', label: 'Missing Profile Groups', param: null, lookback: false },
+  { value: 'SOD_VIOLATIONS',       label: 'SoD Violations',         param: null, lookback: false },
 ]
 
 function labelFor(type) { return reportTypes.find(t => t.value === type)?.label ?? type }
@@ -240,6 +240,7 @@ const currentRunType = computed(() => reportTypes.find(t => t.value === runForm.
 const needsParam     = computed(() => !!currentRunType.value?.param)
 const paramLabel     = computed(() => currentRunType.value?.paramLabel ?? '')
 const paramPlaceholder = computed(() => currentRunType.value?.paramPlaceholder ?? '')
+const needsLookback  = computed(() => !!currentRunType.value?.lookback)
 
 // Show max 10 columns in table (dn + 9 attributes)
 const visibleColumns = computed(() => resultColumns.value.slice(0, 10))
