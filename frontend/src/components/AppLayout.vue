@@ -48,7 +48,7 @@
       </div>
 
       <!-- Navigation -->
-      <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav :class="['flex-1 py-4 space-y-1 overflow-y-auto', collapsed ? 'px-1 nav-collapsed' : 'px-3']">
         <!-- Admin navigation (directory-scoped) -->
         <template v-if="!auth.isSuperadmin">
           <template v-if="currentDirId">
@@ -334,6 +334,9 @@ async function handleLogout() {
 @reference "tailwindcss";
 .nav-item {
   @apply flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-white/70 hover:bg-white/10 hover:text-white transition-colors;
+}
+.nav-collapsed .nav-item {
+  @apply justify-center px-0 gap-0;
 }
 .nav-item.router-link-active {
   @apply bg-white/10 text-white;
