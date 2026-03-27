@@ -119,5 +119,4 @@ onMounted(() => load(0))
 
 <style scoped>
 @reference "tailwindcss";
-.badge-gray    { @apply inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700; }
 </style>

@@ -316,7 +316,4 @@ onMounted(async () => {
 
 <style scoped>
 @reference "tailwindcss";
-.btn-danger    { @apply px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700; }
-.btn-sm        { @apply text-xs; }
-.badge-blue    { @apply inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800; }
 </style>

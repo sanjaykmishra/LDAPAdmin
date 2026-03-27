@@ -141,5 +141,4 @@ onMounted(load)
 
 <style scoped>
 @reference "tailwindcss";
-.btn-sm { @apply px-3 py-1 border border-slate-200 text-slate-600 rounded-lg text-xs hover:bg-slate-50 disabled:opacity-50; }
 </style>

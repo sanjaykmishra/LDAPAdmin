@@ -211,7 +211,5 @@ onMounted(load)
 @reference "tailwindcss";
 .view-btn { @apply px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors; }
 .view-btn.active { @apply bg-slate-100 text-slate-900 font-medium; }
-.input-sm { @apply border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-slate-300; }
 .th-sort { @apply text-left py-2 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700 select-none whitespace-nowrap; }
-.btn-sm { @apply px-3 py-1 border border-slate-200 text-slate-600 rounded-lg text-xs hover:bg-slate-50 disabled:opacity-50; }
 </style>

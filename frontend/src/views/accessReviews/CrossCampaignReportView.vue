@@ -6,15 +6,15 @@
     <div class="flex flex-wrap items-end gap-4 mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">From</label>
-        <input type="date" v-model="fromDate" class="input-field" />
+        <input type="date" v-model="fromDate" class="input" />
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">To</label>
-        <input type="date" v-model="toDate" class="input-field" />
+        <input type="date" v-model="toDate" class="input" />
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-        <select v-model="statusFilter" class="input-field">
+        <select v-model="statusFilter" class="input">
           <option value="">All statuses</option>
           <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
         </select>
@@ -213,7 +213,6 @@ function statusClass(status) {
 
 <style scoped>
 @reference "tailwindcss";
-.input-field  { @apply px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500; }
 .stat-card    { @apply p-4 bg-white border border-gray-200 rounded-lg; }
 .stat-label   { @apply text-xs text-gray-500 mb-1; }
 .stat-value   { @apply text-xl font-bold text-gray-900; }

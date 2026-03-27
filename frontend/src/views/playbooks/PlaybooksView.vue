@@ -450,11 +450,5 @@ function parsedStepResults(json) {
 
 <style scoped>
 @reference "tailwindcss";
-.input { @apply border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none; }
 .badge { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium; }
-.badge-blue { @apply bg-blue-100 text-blue-800; }
-.badge-red { @apply bg-red-100 text-red-800; }
-.badge-green { @apply bg-green-100 text-green-800; }
-.badge-yellow { @apply bg-yellow-100 text-yellow-800; }
-.badge-gray { @apply bg-gray-100 text-gray-700; }
 </style>

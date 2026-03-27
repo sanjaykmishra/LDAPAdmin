@@ -523,5 +523,4 @@ async function completeSetup() {
 <style scoped>
 @reference "tailwindcss";
 .label { @apply block text-xs font-medium text-gray-600 mb-1; }
-.input { @apply w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500; }
 </style>
