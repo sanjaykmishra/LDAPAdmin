@@ -365,8 +365,11 @@ const effectiveGroups = computed(() => {
 function toggleAdditionalProfile(profileId) {
   const ids = profile.value.additionalProfileIds
   const idx = ids.indexOf(profileId)
-  if (idx >= 0) ids.splice(idx, 1)
-  else ids.push(profileId)
+  if (idx >= 0) {
+    profile.value.additionalProfileIds = ids.filter((_, i) => i !== idx)
+  } else {
+    profile.value.additionalProfileIds = [...ids, profileId]
+  }
 }
 
 async function handleGroupChangePreview() {
