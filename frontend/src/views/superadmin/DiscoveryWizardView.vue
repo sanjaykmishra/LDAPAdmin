@@ -204,7 +204,7 @@ const maxStep = computed(() => includeGroups.value ? 5 : 4)
         <h1 class="text-2xl font-bold text-gray-900">Directory Discovery Wizard</h1>
         <p v-if="directory" class="text-sm text-gray-500 mt-0.5">{{ directory.displayName || directory.name }}</p>
       </div>
-      <button @click="router.push('/superadmin/directories')" class="btn-secondary btn-sm">Cancel</button>
+      <button @click="router.push('/superadmin/directories')" class="btn-neutral btn-sm">Cancel</button>
     </div>
 
     <!-- Step indicator -->
@@ -369,7 +369,7 @@ const maxStep = computed(() => includeGroups.value ? 5 : 4)
       </div>
 
       <div class="flex justify-between">
-        <button @click="step = 1" class="btn-secondary">Back</button>
+        <button @click="step = 1" class="btn-neutral">Back</button>
         <button @click="step = 3" :disabled="!includedProfiles.length" class="btn-primary">
           Next: Review Profiles ({{ includedProfiles.length }})
         </button>
@@ -458,7 +458,7 @@ const maxStep = computed(() => includeGroups.value ? 5 : 4)
       </div>
 
       <div class="flex justify-between">
-        <button @click="step = 2" class="btn-secondary">Back</button>
+        <button @click="step = 2" class="btn-neutral">Back</button>
         <button @click="step = includeGroups ? 4 : 5" class="btn-primary">
           Next: {{ includeGroups ? 'Group Assignments' : 'Review & Commit' }}
         </button>
@@ -516,7 +516,7 @@ const maxStep = computed(() => includeGroups.value ? 5 : 4)
       </div>
 
       <div class="flex justify-between">
-        <button @click="step = 3" class="btn-secondary">Back</button>
+        <button @click="step = 3" class="btn-neutral">Back</button>
         <button @click="step = 5" class="btn-primary">Next: Review &amp; Commit</button>
       </div>
     </div>
@@ -578,7 +578,7 @@ const maxStep = computed(() => includeGroups.value ? 5 : 4)
       </div>
 
       <div class="flex justify-between">
-        <button @click="step = includeGroups ? 4 : 3" class="btn-secondary">Back</button>
+        <button @click="step = includeGroups ? 4 : 3" class="btn-neutral">Back</button>
         <button @click="doCommit" :disabled="committing || !commitSummary.profileCount" class="btn-primary">
           <template v-if="committing">
             <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" fill="none" viewBox="0 0 24 24">
