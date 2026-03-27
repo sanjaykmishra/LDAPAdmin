@@ -8,7 +8,6 @@ import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.service.ApplicationSettingsService;
 import com.ldapadmin.service.AuditorLinkService;
 import com.ldapadmin.service.AuditorPortalService;
-import com.ldapadmin.service.CryptoService;
 import com.ldapadmin.service.EvidencePackageService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -22,8 +21,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,7 +44,6 @@ public class AuditorPortalController {
     private final AuditorPortalService portalService;
     private final ApplicationSettingsService settingsService;
     private final EvidencePackageService evidencePackageService;
-    private final CryptoService cryptoService;
     private final IpRateLimiter ipRateLimiter;
 
     // ── Portal metadata (landing page) ─────────────────────────────────────
@@ -151,31 +147,22 @@ public class AuditorPortalController {
         return portalResponse(portalService.getApprovals(link));
     }
 
-    // ── HMAC verification ──────────────────────────────────────────────────
+    // ── Integrity verification ───────────────────────────────────────────
 
     @GetMapping("/verify")
     public ResponseEntity<Map<String, Object>> verify(
             @PathVariable String token, HttpServletRequest request) {
         AuditorLink link = validate(token, request);
 
-        String signatureInput = link.getToken() + link.getDirectory().getId()
-                + link.getCampaignIds() + link.isIncludeSod()
-                + link.isIncludeEntitlements() + link.isIncludeAuditEvents()
-                + link.getExpiresAt().toInstant().getEpochSecond();
-        String computedHmac = cryptoService.hmacSha256(
-                signatureInput.getBytes(StandardCharsets.UTF_8));
-
-        boolean verified = MessageDigest.isEqual(
-                computedHmac.getBytes(StandardCharsets.UTF_8),
-                link.getHmacSignature().getBytes(StandardCharsets.UTF_8));
-
+        // The token was validated (exists, not revoked, not expired).
+        // Scope and expiry are enforced from the DB at access time.
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("verified", verified);
-        result.put("algorithm", "HMAC-SHA256");
-        result.put("signature", link.getHmacSignature());
-        result.put("coveredFields", List.of(
-                "token", "directoryId", "campaignIds", "includeSod",
-                "includeEntitlements", "includeAuditEvents", "expiresAt"));
+        result.put("verified", true);
+        result.put("tokenValid", true);
+        result.put("revoked", link.isRevoked());
+        result.put("expired", link.isExpired());
+        result.put("expiresAt", link.getExpiresAt().toString());
+        result.put("accessCount", link.getAccessCount());
         result.put("verifiedAt", OffsetDateTime.now().toString());
 
         return portalResponse(result);

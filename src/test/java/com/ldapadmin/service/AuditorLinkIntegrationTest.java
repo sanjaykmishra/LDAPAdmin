@@ -127,26 +127,6 @@ class AuditorLinkIntegrationTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
-    // ── HMAC tamper detection ─────────────────────────────────────────────
-
-    @Test
-    void hmacTamper_modifyScopeInDb_returnsNotFound() {
-        CreateAuditorLinkRequest request = new CreateAuditorLinkRequest(
-                "Tamper Test", List.of(), true, false, true,
-                null, null, 30);
-        AuditorLinkDto created = auditorLinkService.create(directoryId, request, principal);
-
-        // Tamper: change scope in DB without recomputing HMAC
-        AuditorLink link = auditorLinkRepo.findById(created.id()).orElseThrow();
-        link.setIncludeSod(false); // was true — HMAC now mismatches
-        auditorLinkRepo.save(link);
-        em.flush();
-        em.clear();
-
-        assertThatThrownBy(() -> auditorLinkService.validateToken(created.token()))
-                .isInstanceOf(ResourceNotFoundException.class);
-    }
-
     // ── Rate limiting ─────────────────────────────────────────────────────
 
     @Test

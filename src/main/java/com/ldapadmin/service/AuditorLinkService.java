@@ -16,8 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +24,10 @@ import java.util.UUID;
 /**
  * Manages the lifecycle of auditor links: creation, revocation, listing,
  * and token validation for portal access.
+ *
+ * <p>The token itself (256-bit cryptographically random, Base64URL-encoded)
+ * is the sole credential. Scope and expiry are enforced by reading from
+ * the database at access time.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -39,8 +41,7 @@ public class AuditorLinkService {
     private final AuditService auditService;
 
     /**
-     * Creates a new auditor link with a cryptographically random token and
-     * HMAC signature covering the token, scope, and expiry.
+     * Creates a new auditor link with a cryptographically random token.
      */
     @Transactional
     public AuditorLinkDto create(UUID directoryId, CreateAuditorLinkRequest request,
@@ -64,12 +65,8 @@ public class AuditorLinkService {
                 .dataFrom(request.dataFrom())
                 .dataTo(request.dataTo())
                 .expiresAt(expiresAt)
-                .hmacSignature("pending") // placeholder — computed below from entity fields
                 .createdBy(creator)
                 .build();
-
-        // Compute HMAC from entity fields (must match validateToken exactly)
-        link.setHmacSignature(computeHmac(link));
 
         AuditorLink saved = auditorLinkRepo.save(link);
 
@@ -123,24 +120,15 @@ public class AuditorLinkService {
     }
 
     /**
-     * Validates a token for portal access. Checks that the link exists,
-     * is not revoked, is not expired, and that the HMAC signature matches
-     * (tamper detection). On success, increments the access counter.
-     *
-     * @return the validated AuditorLink entity
-     * @throws ResourceNotFoundException if the token is invalid, revoked, or expired
-     */
-    /**
      * Validates a token for portal access with optional IP/user-agent logging.
      */
     @Transactional
     public AuditorLink validateToken(String token, String clientIp, String userAgent) {
         AuditorLink link = validateToken(token);
-        // Fire-and-forget audit event with IP metadata
         if (clientIp != null) {
             try {
                 var systemPrincipal = new AuthPrincipal(
-                        com.ldapadmin.auth.PrincipalType.SUPERADMIN, new java.util.UUID(0, 0), "auditor-portal");
+                        com.ldapadmin.auth.PrincipalType.SUPERADMIN, new UUID(0, 0), "auditor-portal");
                 auditService.record(systemPrincipal, link.getDirectory().getId(),
                         AuditAction.AUDITOR_LINK_ACCESSED, null,
                         Map.of("linkId", link.getId().toString(),
@@ -153,6 +141,14 @@ public class AuditorLinkService {
         return link;
     }
 
+    /**
+     * Validates a token for portal access. Checks that the link exists,
+     * is not revoked, and is not expired. On success, increments the
+     * access counter.
+     *
+     * @return the validated AuditorLink entity
+     * @throws ResourceNotFoundException if the token is invalid, revoked, or expired
+     */
     @Transactional
     public AuditorLink validateToken(String token) {
         AuditorLink link = auditorLinkRepo.findByTokenAndRevokedFalse(token)
@@ -162,37 +158,10 @@ public class AuditorLinkService {
             throw new ResourceNotFoundException("Auditor link not found");
         }
 
-        // Verify HMAC signature (tamper detection)
-        String expectedHmac = computeHmac(link);
-
-        if (!MessageDigest.isEqual(
-                expectedHmac.getBytes(StandardCharsets.UTF_8),
-                link.getHmacSignature().getBytes(StandardCharsets.UTF_8))) {
-            log.warn("HMAC mismatch for auditor link token — possible tampering");
-            throw new ResourceNotFoundException("Auditor link not found");
-        }
-
-        // Update access tracking
         link.setAccessCount(link.getAccessCount() + 1);
         link.setLastAccessedAt(OffsetDateTime.now());
         auditorLinkRepo.save(link);
 
         return link;
-    }
-
-    /**
-     * Computes the HMAC-SHA256 signature for the given link entity.
-     * Used by both create (to sign) and validateToken (to verify).
-     * The input string must be identical in both paths to avoid mismatches.
-     */
-    private String computeHmac(AuditorLink link) {
-        String signatureInput = link.getToken()
-                + link.getDirectory().getId()
-                + link.getCampaignIds()
-                + link.isIncludeSod()
-                + link.isIncludeEntitlements()
-                + link.isIncludeAuditEvents()
-                + link.getExpiresAt().toInstant().getEpochSecond();
-        return cryptoService.hmacSha256(signatureInput.getBytes(StandardCharsets.UTF_8));
     }
 }

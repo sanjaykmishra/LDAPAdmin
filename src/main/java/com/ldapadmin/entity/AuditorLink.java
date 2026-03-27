@@ -81,9 +81,10 @@ public class AuditorLink {
 
     // ── Signature ──────────────────────────────────────────────────────────────
 
-    /** HMAC-SHA256 over (token + directoryId + scope + expiresAt). */
+    /** Deprecated — no longer verified. Retained for schema compatibility. */
     @Column(name = "hmac_signature", nullable = false, length = 128)
-    private String hmacSignature;
+    @Builder.Default
+    private String hmacSignature = "unused";
 
     // ── Tracking ───────────────────────────────────────────────────────────────
 
