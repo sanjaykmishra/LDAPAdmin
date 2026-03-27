@@ -400,3 +400,7 @@ onUnmounted(() => {
     </template>
   </div>
 </template>
+
+<style scoped>
+@reference "tailwindcss";
+</style>

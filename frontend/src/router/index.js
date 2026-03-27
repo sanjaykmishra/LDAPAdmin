@@ -427,6 +427,14 @@ const router = createRouter({
       ],
     },
 
+    // Auditor print report (standalone — no layout shell)
+    {
+      path: '/auditor/:token/print',
+      name: 'auditorPrintReport',
+      component: () => import('@/views/auditor/AuditorPrintReport.vue'),
+      meta: { public: true },
+    },
+
     // Catch-all
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
