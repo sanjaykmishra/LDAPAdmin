@@ -33,48 +33,16 @@
             </button>
           </div>
 
-          <!-- Search bar -->
-          <div class="px-4 py-2 border-b border-gray-100 shrink-0">
-            <div class="flex items-center gap-2">
-              <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-              </svg>
-              <input ref="searchInputRef" v-model="searchQuery" type="text"
-                     class="flex-1 text-sm outline-none bg-transparent placeholder-gray-400"
-                     :placeholder="props.superadmin ? 'Search by name, DN, or uid...' : 'Filter loaded entries...'"
-                     @input="debouncedSearch" />
-              <button v-if="searchQuery" @click="searchQuery = ''; searchResults = null" class="text-gray-400 hover:text-gray-600 text-xs">Clear</button>
-            </div>
-          </div>
-
           <div class="flex-1 overflow-y-auto p-3 min-h-0">
-            <!-- Search results -->
-            <template v-if="searchResults !== null">
-              <div v-if="searching" class="text-sm text-gray-400 text-center py-8">Searching...</div>
-              <div v-else-if="searchResults.length === 0" class="text-sm text-gray-400 text-center py-8">No entries match "{{ searchQuery }}"</div>
-              <div v-else class="space-y-0.5">
-                <button v-for="entry in searchResults" :key="entry.dn"
-                        @click="pickerSelectedDn = entry.dn"
-                        :class="['w-full text-left px-3 py-2 rounded-lg text-sm transition-colors',
-                          pickerSelectedDn === entry.dn ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50 text-gray-700']">
-                  <div class="font-medium truncate">{{ entry.rdn || entry.dn.split(',')[0] }}</div>
-                  <div class="text-[10px] font-mono text-gray-400 truncate">{{ entry.dn }}</div>
-                </button>
-              </div>
-            </template>
-
-            <!-- Tree browser (when not searching) -->
-            <template v-else>
-              <div v-if="treeLoading" class="text-sm text-gray-400 text-center py-8">Loading...</div>
-              <div v-else-if="treeNodes.length === 0" class="text-sm text-gray-400 text-center py-8">No entries found.</div>
-              <DnTree
-                v-else
-                :nodes="treeNodes"
-                :selected-dn="pickerSelectedDn"
-                :load-children="loadChildren"
-                @select="onNodeSelect"
-              />
-            </template>
+            <div v-if="treeLoading" class="text-sm text-gray-400 text-center py-8">Loading...</div>
+            <div v-else-if="treeNodes.length === 0" class="text-sm text-gray-400 text-center py-8">No entries found.</div>
+            <DnTree
+              v-else
+              :nodes="treeNodes"
+              :selected-dn="pickerSelectedDn"
+              :load-children="loadChildren"
+              @select="onNodeSelect"
+            />
           </div>
 
           <div class="px-5 py-3 border-t border-gray-200 shrink-0">
@@ -95,8 +63,8 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
-import { browse, directoryBrowse, searchEntries } from '@/api/browse'
+import { ref } from 'vue'
+import { browse, directoryBrowse } from '@/api/browse'
 import DnTree from '@/components/DnTree.vue'
 
 const props = defineProps({
@@ -112,18 +80,11 @@ const showPicker       = ref(false)
 const treeLoading      = ref(false)
 const treeNodes        = ref([])
 const pickerSelectedDn = ref('')
-const searchQuery      = ref('')
-const searchResults    = ref(null)
-const searching        = ref(false)
-const searchInputRef   = ref(null)
-let searchTimeout      = null
 
 async function openPicker() {
   if (!props.directoryId) return
   showPicker.value = true
   pickerSelectedDn.value = props.modelValue || ''
-  searchQuery.value = ''
-  searchResults.value = null
 
   const browseFn = props.superadmin ? browse : directoryBrowse
   treeLoading.value = true
@@ -141,9 +102,6 @@ async function openPicker() {
   } finally {
     treeLoading.value = false
   }
-
-  await nextTick()
-  searchInputRef.value?.focus()
 }
 
 async function loadChildren(dn) {
@@ -161,68 +119,6 @@ async function loadChildren(dn) {
     console.warn('Failed to load children for', dn, e)
     return []
   }
-}
-
-function debouncedSearch() {
-  clearTimeout(searchTimeout)
-  if (!searchQuery.value.trim()) {
-    searchResults.value = null
-    return
-  }
-  searchTimeout = setTimeout(doSearch, 300)
-}
-
-async function doSearch() {
-  const q = searchQuery.value.trim()
-  if (!q) { searchResults.value = null; return }
-
-  // Search is only available via superadmin browse API
-  if (!props.superadmin) {
-    // For non-superadmin, filter the already-loaded tree nodes client-side
-    searchResults.value = filterTreeClientSide(q)
-    return
-  }
-
-  searching.value = true
-  try {
-    const escaped = q.replace(/[\\*()]/g, c => '\\' + c.charCodeAt(0).toString(16))
-    const filter = `(|(cn=*${escaped}*)(uid=*${escaped}*)(sAMAccountName=*${escaped}*)(ou=*${escaped}*))`
-    const { data } = await searchEntries(props.directoryId, {
-      filter,
-      baseDn: '',
-      scope: 'SUB',
-      attributes: 'dn',
-      limit: 50,
-    })
-    searchResults.value = (data || []).map(entry => ({
-      dn: entry.dn,
-      rdn: entry.dn?.split(',')[0] || entry.dn,
-    }))
-  } catch {
-    searchResults.value = []
-  }
-  searching.value = false
-}
-
-/** Client-side fallback: search through any nodes the tree has already loaded */
-function filterTreeClientSide(query) {
-  const q = query.toLowerCase()
-  const results = []
-  // Search the root node
-  for (const node of treeNodes.value) {
-    if (node.dn.toLowerCase().includes(q) || (node.rdn || '').toLowerCase().includes(q)) {
-      results.push({ dn: node.dn, rdn: node.rdn || node.dn.split(',')[0] })
-    }
-    // Search preloaded children
-    if (node._preloaded) {
-      for (const child of node._preloaded) {
-        if (child.dn.toLowerCase().includes(q) || (child.rdn || '').toLowerCase().includes(q)) {
-          results.push({ dn: child.dn, rdn: child.rdn || child.dn.split(',')[0] })
-        }
-      }
-    }
-  }
-  return results
 }
 
 function onNodeSelect(dn) {
