@@ -134,14 +134,14 @@
       </div>
     </div>
 
-    <!-- Verification detail drawer -->
+    <!-- Link status drawer -->
     <div v-if="showVerifyDrawer" class="fixed inset-0 z-50 flex justify-end"
          @click.self="showVerifyDrawer = false" @keydown.escape="showVerifyDrawer = false"
-         role="dialog" aria-label="Integrity Verification" tabindex="-1" ref="verifyDrawerRef">
+         role="dialog" aria-label="Link Status" tabindex="-1" ref="verifyDrawerRef">
       <div class="fixed inset-0 bg-black/30" @click="showVerifyDrawer = false" />
       <div class="relative w-full max-w-md bg-white shadow-xl p-6 overflow-y-auto">
         <div class="flex items-center justify-between mb-6">
-          <h3 class="text-lg font-semibold text-slate-900">Integrity Verification</h3>
+          <h3 class="text-lg font-semibold text-slate-900">Link Status</h3>
           <button @click="showVerifyDrawer = false" class="text-slate-400 hover:text-slate-600">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -149,60 +149,75 @@
           </button>
         </div>
 
-        <div v-if="verification.verified === true" class="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
+        <div v-if="verification.verified === true" class="bg-green-50 border border-green-200 rounded-xl p-4 mb-5">
           <div class="flex items-center gap-2 text-green-700 font-medium text-sm mb-1">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            Integrity Verified
+            Link Active
           </div>
-          <p class="text-xs text-green-600">The evidence package has not been tampered with. The cryptographic signature matches the data.</p>
+          <p class="text-xs text-green-600">This evidence package link is valid and accessible.</p>
         </div>
-        <div v-else-if="verification.verified === false" class="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
-          <div class="flex items-center gap-2 text-red-700 font-medium text-sm mb-1">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-            </svg>
-            Verification Failed
-          </div>
-          <p class="text-xs text-red-600">The cryptographic signature does not match. This evidence may have been tampered with.</p>
-        </div>
-        <div v-else-if="verification.error" class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+        <div v-else-if="verification.error" class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5">
           <div class="flex items-center gap-2 text-amber-700 font-medium text-sm mb-1">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
             </svg>
-            Verification Unavailable
+            Status Unavailable
           </div>
-          <p class="text-xs text-amber-600">Could not reach the verification service. This does not indicate tampering — please try again later.</p>
+          <p class="text-xs text-amber-600">Could not verify link status. Please try again later.</p>
         </div>
 
-        <dl class="space-y-3 text-sm">
+        <dl class="space-y-4 text-sm">
           <div>
-            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wider">Algorithm</dt>
-            <dd class="font-mono text-slate-700">{{ verification.algorithm || '...' }}</dd>
+            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wider">Status</dt>
+            <dd class="mt-1"><span class="badge-green">Active</span></dd>
           </div>
           <div>
-            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wider">Signature</dt>
-            <dd class="font-mono text-xs text-slate-600 break-all bg-slate-50 rounded p-2">{{ verification.signature || '...' }}</dd>
+            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wider">Expires</dt>
+            <dd class="text-slate-700 mt-1">
+              {{ formatDate(metadata.expiresAt) }}
+              <span v-if="daysRemaining !== null" class="text-slate-400 ml-1">({{ daysRemaining }} day{{ daysRemaining !== 1 ? 's' : '' }} remaining)</span>
+            </dd>
+          </div>
+          <div v-if="verification.accessCount !== undefined">
+            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wider">Access Count</dt>
+            <dd class="text-slate-700 mt-1">{{ verification.accessCount }} visit{{ verification.accessCount !== 1 ? 's' : '' }}</dd>
           </div>
           <div>
-            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wider">Covered Fields</dt>
+            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wider">Created</dt>
+            <dd class="text-slate-700 mt-1">{{ formatDate(metadata.createdAt) }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Scope</dt>
             <dd>
-              <ul class="space-y-0.5 mt-1">
-                <li v-for="f in (verification.coveredFields || [])" :key="f"
-                    class="text-xs text-slate-600 flex items-center gap-1">
-                  <svg class="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                  </svg>
-                  {{ f }}
+              <ul class="space-y-1">
+                <li v-if="(metadata.scope?.campaignIds || []).length > 0" class="text-xs text-slate-600 flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                  {{ (metadata.scope?.campaignIds || []).length }} Access Review Campaign{{ (metadata.scope?.campaignIds || []).length !== 1 ? 's' : '' }}
+                </li>
+                <li v-if="metadata.scope?.includeSod" class="text-xs text-slate-600 flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                  Separation of Duties
+                </li>
+                <li v-if="metadata.scope?.includeEntitlements" class="text-xs text-slate-600 flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                  User Entitlements
+                </li>
+                <li v-if="metadata.scope?.includeAuditEvents" class="text-xs text-slate-600 flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                  Audit Log
+                </li>
+                <li class="text-xs text-slate-600 flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                  Approval History
                 </li>
               </ul>
             </dd>
           </div>
           <div v-if="verification.verifiedAt">
-            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wider">Verified At</dt>
-            <dd class="text-slate-700">{{ formatDate(verification.verifiedAt) }}</dd>
+            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wider">Last Checked</dt>
+            <dd class="text-slate-700 mt-1">{{ formatDate(verification.verifiedAt) }}</dd>
           </div>
         </dl>
       </div>
@@ -248,10 +263,9 @@ const daysRemaining = computed(() => {
 })
 
 const verifyLabel = computed(() => {
-  if (verification.value.verified === true) return 'Integrity Verified'
-  if (verification.value.verified === false) return 'Verification Failed'
-  if (verification.value.error) return 'Verification Unavailable'
-  return 'Verifying...'
+  if (verification.value.verified === true) return 'Link Valid'
+  if (verification.value.error) return 'Status Unavailable'
+  return 'Checking...'
 })
 
 const verifyBadgeClass = computed(() => {
