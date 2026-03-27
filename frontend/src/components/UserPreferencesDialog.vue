@@ -74,7 +74,7 @@
         <p v-if="saveError" class="text-xs text-red-600">{{ saveError }}</p>
         <p v-if="saveSuccess" class="text-xs text-green-600">{{ saveSuccess }}</p>
         <div class="flex gap-2 ml-auto">
-          <button @click="$emit('close')" class="btn-secondary text-sm">Cancel</button>
+          <button @click="$emit('close')" class="btn-neutral text-sm">Cancel</button>
           <button @click="doSavePrefs" :disabled="saving" class="btn-primary text-sm">
             {{ saving ? 'Saving…' : 'Save' }}
           </button>
@@ -182,6 +182,4 @@ async function doChangePassword() {
 <style scoped>
 @reference "tailwindcss";
 .input { @apply border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500; }
-.btn-primary { @apply px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50; }
-.btn-secondary { @apply px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50; }
 </style>

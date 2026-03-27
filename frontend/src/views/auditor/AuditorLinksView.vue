@@ -131,7 +131,7 @@
       </div>
 
       <template #footer>
-        <button @click="showCreate = false" class="btn-secondary">Cancel</button>
+        <button @click="showCreate = false" class="btn-neutral">Cancel</button>
         <button @click="createLink" :disabled="creating" class="btn-primary">
           {{ creating ? 'Creating...' : 'Generate Link' }}
         </button>
@@ -161,7 +161,7 @@
         The auditor will immediately lose access.
       </p>
       <template #footer>
-        <button @click="showRevokeConfirm = false" class="btn-secondary">Cancel</button>
+        <button @click="showRevokeConfirm = false" class="btn-neutral">Cancel</button>
         <button @click="doRevoke" :disabled="revoking"
                 class="bg-red-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50">
           {{ revoking ? 'Revoking...' : 'Revoke' }}
@@ -336,7 +336,5 @@ onMounted(async () => {
 
 <style scoped>
 @reference "tailwindcss";
-.btn-primary   { @apply px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50; }
-.btn-secondary { @apply px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50; }
 .input         { @apply border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500; }
 </style>

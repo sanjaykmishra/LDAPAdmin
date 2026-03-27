@@ -198,7 +198,7 @@
             placeholder="Business justification..."></textarea>
         </div>
         <div class="flex gap-2 justify-end">
-          <button @click="exemptDialog = null" class="btn-secondary text-sm">Cancel</button>
+          <button @click="exemptDialog = null" class="btn-neutral text-sm">Cancel</button>
           <button @click="submitExempt" :disabled="!exemptReason.trim()" class="btn-primary text-sm">Confirm</button>
         </div>
       </div>
@@ -270,7 +270,7 @@
             class="btn-primary text-sm w-full">Add Rule</button>
         </div>
         <div class="flex justify-end mt-4">
-          <button @click="showRulesModal = false" class="btn-secondary text-sm">Close</button>
+          <button @click="showRulesModal = false" class="btn-neutral text-sm">Close</button>
         </div>
       </div>
     </div>
@@ -453,6 +453,4 @@ onMounted(loadAll)
 <style scoped>
 @reference "tailwindcss";
 .input { @apply w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500; }
-.btn-primary { @apply px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50; }
-.btn-secondary { @apply px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50; }
 </style>

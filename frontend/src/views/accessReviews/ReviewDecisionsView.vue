@@ -136,7 +136,7 @@
             placeholder="Reason for revocation..."></textarea>
         </div>
         <div class="flex gap-2 justify-end">
-          <button @click="revokeModal = false" class="btn-secondary">Cancel</button>
+          <button @click="revokeModal = false" class="btn-neutral">Cancel</button>
           <button @click="doRevoke"
             class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Revoke</button>
         </div>
@@ -156,7 +156,7 @@
             placeholder="Reason for revocation..."></textarea>
         </div>
         <div class="flex gap-2 justify-end">
-          <button @click="bulkRevokeModal = false" class="btn-secondary">Cancel</button>
+          <button @click="bulkRevokeModal = false" class="btn-neutral">Cancel</button>
           <button @click="doBulkRevoke"
             class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Revoke {{ selected.size }}</button>
         </div>
@@ -369,6 +369,5 @@ onMounted(loadDecisions)
 
 <style scoped>
 @reference "tailwindcss";
-.btn-secondary { @apply px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50; }
 .btn-sm { @apply px-3 py-1 border border-gray-200 text-gray-600 rounded-lg text-xs hover:bg-gray-50 disabled:opacity-50; }
 </style>

@@ -83,7 +83,7 @@
         </button>
       </div>
       <template #footer>
-        <button @click="showTemplatePicker = false" class="btn-secondary">Cancel</button>
+        <button @click="showTemplatePicker = false" class="btn-neutral">Cancel</button>
       </template>
     </AppModal>
 
@@ -91,7 +91,7 @@
     <AppModal v-model="showModal" :title="editingDn ? 'Edit User' : 'New User'" size="lg">
       <UserForm :data="form" :is-edit="!!editingDn" :user-template-config="profileConfig" :dir-id="dirId" :profile-id="selectedProfileId" @update="v => form = v" />
       <template #footer>
-        <button @click="showModal = false" class="btn-secondary">Cancel</button>
+        <button @click="showModal = false" class="btn-neutral">Cancel</button>
         <button @click="save" :disabled="saving" class="btn-primary">{{ saving ? 'Saving…' : 'Save' }}</button>
       </template>
     </AppModal>
@@ -100,7 +100,7 @@
     <AppModal v-model="showMove" title="Move User" size="sm">
       <FormField label="New Parent DN" v-model="newParentDn" placeholder="ou=people,dc=example,dc=com" required />
       <template #footer>
-        <button @click="showMove = false" class="btn-secondary">Cancel</button>
+        <button @click="showMove = false" class="btn-neutral">Cancel</button>
         <button @click="doMove" :disabled="saving" class="btn-primary">Move</button>
       </template>
     </AppModal>
@@ -153,7 +153,7 @@
         <p v-if="resetPwError" class="text-sm text-red-600">{{ resetPwError }}</p>
       </div>
       <template #footer>
-        <button @click="showResetPassword = false" class="btn-secondary">Cancel</button>
+        <button @click="showResetPassword = false" class="btn-neutral">Cancel</button>
         <button @click="doResetPassword" :disabled="saving || !resetPwNew || resetPwNew !== resetPwConfirm" class="btn-primary">
           {{ saving ? 'Resetting…' : 'Reset Password' }}
         </button>
@@ -195,7 +195,7 @@
         </div>
       </div>
       <template #footer>
-        <button @click="showBulkUpdate = false" class="btn-secondary">Close</button>
+        <button @click="showBulkUpdate = false" class="btn-neutral">Close</button>
         <button @click="doBulkUpdate" :disabled="bulkUpdating || !canBulkUpdate" class="btn-primary">
           {{ bulkUpdating ? 'Updating…' : 'Apply Changes' }}
         </button>
@@ -209,7 +209,7 @@
       </div>
       <EntryTimeline v-if="timelineTarget" :directory-id="dirId" :target-dn="timelineTarget.dn" />
       <template #footer>
-        <button @click="showTimeline = false" class="btn-secondary">Close</button>
+        <button @click="showTimeline = false" class="btn-neutral">Close</button>
       </template>
     </AppModal>
 
@@ -240,7 +240,7 @@
         </div>
       </div>
       <template #footer>
-        <button @click="showPlaybookModal = false" class="btn-secondary">Cancel</button>
+        <button @click="showPlaybookModal = false" class="btn-neutral">Cancel</button>
         <button @click="doPlaybookExecute" :disabled="playbookExecuting || !playbookPreview" class="btn-primary">
           {{ playbookExecuting ? 'Executing...' : 'Execute' }}
         </button>
@@ -755,8 +755,6 @@ onMounted(async () => {
 
 <style scoped>
 @reference "tailwindcss";
-.btn-primary   { @apply px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700; }
-.btn-secondary { @apply px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50; }
 .btn-danger    { @apply px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700; }
 .btn-sm        { @apply text-xs; }
 .badge-green   { @apply inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800; }
