@@ -1,6 +1,6 @@
 <template>
-  <div class="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-8">
+  <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-200 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-8 animate-fade-in">
       <div class="text-center mb-8">
         <svg class="w-12 h-12 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
           <rect width="32" height="32" rx="6" :fill="settings.primaryColour"/>
@@ -25,12 +25,14 @@
         <button
           type="submit"
           :disabled="loading"
-          class="w-full text-white font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-50"
+          class="w-full text-white font-semibold py-2.5 rounded-lg transition-all disabled:opacity-50 hover:brightness-90 active:scale-[0.98] flex items-center justify-center gap-2"
           :style="{ backgroundColor: settings.primaryColour }"
-          @mouseenter="$event.target.style.filter = 'brightness(0.9)'"
-          @mouseleave="$event.target.style.filter = ''"
         >
-          {{ loading ? 'Signing in…' : 'Sign in' }}
+          <svg v-if="loading" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          {{ loading ? 'Signing in...' : 'Sign in' }}
         </button>
       </form>
 
