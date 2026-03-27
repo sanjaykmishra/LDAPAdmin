@@ -2,11 +2,14 @@ package com.ldapadmin.service;
 
 import com.ldapadmin.dto.notification.NotificationDto;
 import com.ldapadmin.entity.Account;
+import com.ldapadmin.entity.AdminFeaturePermission;
 import com.ldapadmin.entity.Notification;
 import com.ldapadmin.entity.enums.AccountRole;
+import com.ldapadmin.entity.enums.BaseRole;
 import com.ldapadmin.entity.enums.FeatureKey;
 import com.ldapadmin.repository.AccountRepository;
 import com.ldapadmin.repository.AdminFeaturePermissionRepository;
+import com.ldapadmin.repository.AdminProfileRoleRepository;
 import com.ldapadmin.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +21,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -32,6 +37,21 @@ public class NotificationService {
     private final NotificationRepository notificationRepo;
     private final AccountRepository accountRepo;
     private final AdminFeaturePermissionRepository featurePermRepo;
+    private final AdminProfileRoleRepository profileRoleRepo;
+
+    /**
+     * Features available to all admins (including READ_ONLY) by default.
+     * Must stay in sync with {@link com.ldapadmin.auth.PermissionService}.
+     */
+    private static final Set<FeatureKey> READONLY_DEFAULT_FEATURES = Set.of(
+            FeatureKey.BULK_EXPORT,
+            FeatureKey.REPORTS_RUN,
+            FeatureKey.DIRECTORY_BROWSE,
+            FeatureKey.SCHEMA_READ,
+            FeatureKey.USER_READ,
+            FeatureKey.GROUP_READ,
+            FeatureKey.APPROVAL_MANAGE
+    );
 
     // ── Send ──────────────────────────────────────────────────────────────────
 
@@ -72,11 +92,29 @@ public class NotificationService {
                         .body(body).link(link).directoryId(directoryId).build());
             }
 
-            // Admins with explicit feature override enabled
+            // Admins who have the feature (via explicit override or base-role default)
+            // AND have access to the target directory
             List<Account> admins = accountRepo.findAllByRoleAndActiveTrue(AccountRole.ADMIN);
             for (Account admin : admins) {
-                boolean hasFeature = featurePermRepo
-                        .existsByAdminAccountIdAndFeatureKeyAndEnabledTrue(admin.getId(), feature);
+                // Check directory access — admin must have a profile role in the directory
+                if (directoryId != null &&
+                        !profileRoleRepo.existsByAdminAccountIdAndProfileDirectoryId(admin.getId(), directoryId)) {
+                    continue;
+                }
+
+                // Check feature: explicit override takes priority
+                Optional<AdminFeaturePermission> override =
+                        featurePermRepo.findByAdminAccountIdAndFeatureKey(admin.getId(), feature);
+                boolean hasFeature;
+                if (override.isPresent()) {
+                    hasFeature = override.get().isEnabled();
+                } else {
+                    // Fall back to base-role defaults
+                    boolean hasAdminRole = profileRoleRepo
+                            .existsByAdminAccountIdAndBaseRole(admin.getId(), BaseRole.ADMIN);
+                    hasFeature = hasAdminRole || READONLY_DEFAULT_FEATURES.contains(feature);
+                }
+
                 if (hasFeature) {
                     notificationRepo.save(Notification.builder()
                             .accountId(admin.getId()).type(type).title(title)

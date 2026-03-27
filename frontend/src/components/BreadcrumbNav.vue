@@ -50,6 +50,7 @@ const LABEL_MAP = {
   'approvals': 'Approvals',
   'cross-campaign-report': 'Cross-Campaign Report',
   'notifications': 'Notifications',
+  'discover': 'Discovery Wizard',
 }
 
 const crumbs = computed(() => {
