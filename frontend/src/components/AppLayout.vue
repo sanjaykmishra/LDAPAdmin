@@ -102,77 +102,92 @@
           </RouterLink>
 
           <!-- Explore -->
-          <p v-if="!collapsed" class="nav-header">Explore</p>
+          <button v-if="!collapsed" @click="sections.explore = !sections.explore" class="nav-section-toggle">
+            Explore
+            <svg :class="['w-3 h-3 transition-transform', sections.explore ? '' : '-rotate-90']" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+          </button>
+          <template v-if="sections.explore || collapsed">
           <RouterLink to="/superadmin/directory-browser" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h5l2 2h7a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M8 10h4M10 8v4"/></svg>
-            Directory Browser
+            <span v-if="!collapsed">Directory Browser</span>
           </RouterLink>
           <RouterLink to="/superadmin/directory-search" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M14 14l4 4"/></svg>
-            Directory Search
+            <span v-if="!collapsed">Directory Search</span>
           </RouterLink>
           <RouterLink to="/superadmin/directory-schema" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M18 18l-4-4"/></svg>
-            Schema Browser
+            <span v-if="!collapsed">Schema Browser</span>
           </RouterLink>
+          </template>
 
           <!-- Report -->
-          <p v-if="!collapsed" class="nav-header">Report</p>
+          <button v-if="!collapsed" @click="sections.report = !sections.report" class="nav-section-toggle">
+            Report
+            <svg :class="['w-3 h-3 transition-transform', sections.report ? '' : '-rotate-90']" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+          </button>
+          <template v-if="sections.report || collapsed">
           <RouterLink to="/superadmin/reports" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V10M10 16V4M15 16v-4"/></svg>
-            Operational Reports
+            <span v-if="!collapsed">Operational Reports</span>
           </RouterLink>
           <RouterLink to="/superadmin/audit-reports" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-4z"/><path d="M7 10l2 2 4-4"/></svg>
-            Compliance Reports
+            <span v-if="!collapsed">Compliance Reports</span>
           </RouterLink>
           <RouterLink to="/superadmin/auditor-links" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.94a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L5.25 8.25"/></svg>
-            Auditor Links
+            <span v-if="!collapsed">Auditor Links</span>
           </RouterLink>
+          </template>
 
           <!-- Configure -->
-          <p v-if="!collapsed" class="nav-header">Configure</p>
+          <button v-if="!collapsed" @click="sections.configure = !sections.configure" class="nav-section-toggle">
+            Configure
+            <svg :class="['w-3 h-3 transition-transform', sections.configure ? '' : '-rotate-90']" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+          </button>
+          <template v-if="sections.configure || collapsed">
           <RouterLink to="/superadmin/directories" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2V5z"/><path d="M6.5 3v14"/><path d="M2.5 7h4M2.5 11h4"/></svg>
-            Directory Connections
+            <span v-if="!collapsed">Directory Connections</span>
           </RouterLink>
           <RouterLink to="/superadmin/hr" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="5" r="2.5"/><path d="M2 14c0-2.76 2.24-5 5-5s5 2.24 5 5"/><path d="M14 6h4M14 9h3M14 12h2"/></svg>
-            HR Integration
+            <span v-if="!collapsed">HR Integration</span>
           </RouterLink>
           <RouterLink to="/superadmin/audit-sources" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16z"/><path d="M10 6v4l2.5 2.5"/></svg>
-            Audit Sources
+            <span v-if="!collapsed">Audit Sources</span>
           </RouterLink>
           <RouterLink to="/superadmin/access-reviews" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M9 11l8-8"/><path d="M14 3h3v3"/></svg>
-            Access Reviews
+            <span v-if="!collapsed">Access Reviews</span>
           </RouterLink>
           <RouterLink to="/superadmin/sod-policies" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h5v5H4zM11 4h5v5h-5zM4 11h5v5H4z"/><path d="M11 11h5v5h-5"/><path d="M11 11l5 5M16 11l-5 5"/></svg>
-            SoD Policy
+            <span v-if="!collapsed">SoD Policy</span>
           </RouterLink>
           <RouterLink to="/superadmin/access-drift" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l4-8 4 4 6-10"/><path d="M14 3h4v4"/></svg>
-            Access Drift Policy
+            <span v-if="!collapsed">Access Drift Policy</span>
           </RouterLink>
           <RouterLink to="/superadmin/profiles" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><path d="M7 6h6M7 10h6M7 14h3"/><path d="M14 13l1.5 1.5 3-3"/></svg>
-            Provisioning Profiles
+            <span v-if="!collapsed">Provisioning Profiles</span>
           </RouterLink>
           <RouterLink to="/superadmin/playbooks" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12M4 8h12M4 12h8M4 16h6"/><path d="M15 12l2 2-2 2"/></svg>
-            Lifecycle Playbooks
+            <span v-if="!collapsed">Lifecycle Playbooks</span>
           </RouterLink>
           <RouterLink to="/settings" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.5"/><path d="M10 1.5v2M10 16.5v2M18.5 10h-2M3.5 10h-2M16 4l-1.4 1.4M5.4 14.6 4 16M16 16l-1.4-1.4M5.4 5.4 4 4"/></svg>
-            Application Settings
+            <span v-if="!collapsed">Application Settings</span>
           </RouterLink>
           <RouterLink to="/superadmin/admins" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="5.5" r="3.25"/><path d="M3.5 18c0-3.59 2.91-6.5 6.5-6.5s6.5 2.91 6.5 6.5"/><path d="M13.5 2.5l1 2 2 .5-1.5 1.5.5 2-2-1.25L11.5 8.5l.5-2L10.5 5l2-.5 1-2z"/></svg>
-            Application Accounts
+            <span v-if="!collapsed">Application Accounts</span>
           </RouterLink>
+          </template>
         </template>
       </nav>
 
@@ -229,6 +244,7 @@ const showNoProfiles = ref(false)
 const pendingCount   = ref(0)
 const activeReviewCount = ref(0)
 const collapsed      = ref(false)
+const sections       = ref({ explore: true, report: true, configure: true })
 const showPreferences = ref(false)
 
 // Derive the directory id from the selected profile
@@ -328,4 +344,7 @@ async function handleLogout() {
 }
 .nav-icon { @apply w-5 h-5 shrink-0; }
 .nav-header { @apply text-xs text-gray-400 uppercase tracking-wider mt-4 mb-1 px-3; }
+.nav-section-toggle {
+  @apply flex items-center justify-between w-full text-xs text-gray-400 uppercase tracking-wider mt-4 mb-1 px-3 py-1 rounded hover:text-white/70 transition-colors cursor-pointer;
+}
 </style>
