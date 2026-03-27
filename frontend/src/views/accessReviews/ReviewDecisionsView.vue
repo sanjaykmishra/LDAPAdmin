@@ -92,13 +92,13 @@
               <td class="px-4 py-3">
                 <div class="font-medium text-gray-900">{{ row.memberDisplay || '—' }}</div>
               </td>
-              <td class="px-4 py-3 font-mono text-xs text-gray-500 max-w-xs truncate" :title="row.memberDn">{{ row.memberDn }}</td>
+              <td class="px-4 py-3 text-gray-500 max-w-xs truncate" :title="row.memberDn">{{ row.memberDn }}</td>
               <td class="px-4 py-3">
                 <span v-if="row.decision" :class="decisionBadge(row.decision)">{{ row.decision }}</span>
                 <span v-else class="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">PENDING</span>
               </td>
               <td class="px-4 py-3 text-gray-600">{{ row.decidedByUsername || '—' }}</td>
-              <td class="px-4 py-3 text-gray-500 font-mono text-xs whitespace-nowrap">{{ fmtDateTime(row.decidedAt) }}</td>
+              <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ fmtDateTime(row.decidedAt) }}</td>
               <td class="px-4 py-3 text-right">
                 <div v-if="!row.decision" class="flex gap-1 justify-end">
                   <button @click="handleDecision(row, 'CONFIRM')" :disabled="loading"

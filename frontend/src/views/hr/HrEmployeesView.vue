@@ -45,7 +45,7 @@
               </span>
             </td>
             <td class="px-4 py-3 text-gray-600">{{ emp.hireDate }}</td>
-            <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ emp.matchedLdapDn || '—' }}</td>
+            <td class="px-4 py-3 text-gray-600">{{ emp.matchedLdapDn || '—' }}</td>
             <td class="px-4 py-3">
               <span v-if="emp.matchConfidence" :class="confidenceClass(emp.matchConfidence)" class="px-2 py-0.5 rounded text-xs font-medium">
                 {{ emp.matchConfidence }}

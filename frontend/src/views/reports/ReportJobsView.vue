@@ -147,10 +147,10 @@
           <tbody class="divide-y divide-gray-50">
             <tr v-for="job in jobs" :key="job.id" class="hover:bg-gray-50">
               <td class="px-3 py-2 font-medium text-gray-900">{{ job.name }}</td>
-              <td class="px-3 py-2 text-gray-600 text-xs">{{ labelFor(job.reportType) }}</td>
-              <td class="px-3 py-2 text-gray-600 font-mono text-xs">{{ job.cronExpression }}</td>
-              <td class="px-3 py-2 text-gray-600 text-xs">{{ job.outputFormat || 'CSV' }}</td>
-              <td class="px-3 py-2 text-gray-600 text-xs">{{ job.deliveryMethod }}</td>
+              <td class="px-3 py-2 text-gray-600">{{ labelFor(job.reportType) }}</td>
+              <td class="px-3 py-2 text-gray-600">{{ job.cronExpression }}</td>
+              <td class="px-3 py-2 text-gray-600">{{ job.outputFormat || 'CSV' }}</td>
+              <td class="px-3 py-2 text-gray-600">{{ job.deliveryMethod }}</td>
               <td class="px-3 py-2 text-gray-500 text-xs">
                 <span v-if="job.lastRunAt">{{ fmtDate(job.lastRunAt) }}</span>
                 <span v-else class="text-gray-300">—</span>

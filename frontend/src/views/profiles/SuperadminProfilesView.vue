@@ -744,10 +744,10 @@ function toggleApprover(accountId) {
         <span class="font-medium">{{ row.name }}</span>
       </template>
       <template #cell-targetOuDn="{ value }">
-        <span class="font-mono text-xs text-gray-600">{{ value }}</span>
+        <span class="text-gray-600 truncate block max-w-xs" :title="value">{{ value }}</span>
       </template>
       <template #cell-objectClassNames="{ value }">
-        <span class="text-xs text-gray-600">{{ value.join(', ') }}</span>
+        <span class="text-gray-600">{{ value.join(', ') }}</span>
       </template>
       <template #cell-enabled="{ value }">
         <span :class="value ? 'text-green-600' : 'text-gray-400'">{{ value ? 'Enabled' : 'Disabled' }}</span>
