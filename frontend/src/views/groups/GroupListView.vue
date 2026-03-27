@@ -25,7 +25,7 @@
     <DataTable :columns="cols" :rows="groups" :loading="loading" row-key="dn">
       <template #cell-dn="{ value }">
         <span class="inline-flex items-center gap-1">
-          <code class="text-xs">{{ value }}</code>
+          <span class="text-xs truncate max-w-xs" :title="value">{{ value }}</span>
           <CopyButton :text="value" />
         </span>
       </template>
@@ -93,7 +93,7 @@
       </div>
       <ul class="divide-y divide-gray-100 max-h-80 overflow-y-auto">
         <li v-for="dn in members" :key="dn" class="flex items-center justify-between py-2 text-sm">
-          <code class="text-xs">{{ dn }}</code>
+          <span class="text-xs text-gray-700 truncate" :title="dn">{{ dn }}</span>
           <button @click="removeMember(dn)" class="text-red-500 hover:text-red-700 text-xs">Remove</button>
         </li>
         <li v-if="!members.length" class="py-4 text-center text-gray-400 text-sm">No members</li>

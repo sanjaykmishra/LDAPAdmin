@@ -4,7 +4,6 @@
     <div class="flex items-center justify-between mb-6">
       <div>
         <h1 class="text-2xl font-bold text-gray-900">Users</h1>
-        <p class="text-sm text-gray-500 mt-1">Directory: <code class="text-xs bg-gray-100 px-1 rounded">{{ dirId }}</code></p>
       </div>
       <div class="flex items-center gap-3">
         <div v-if="allProfiles.length > 1" class="flex items-center gap-2">
@@ -38,7 +37,7 @@
       empty-text="No users found" empty-icon="users">
       <template #cell-dn="{ value }">
         <span class="inline-flex items-center gap-1">
-          <code class="text-xs">{{ value }}</code>
+          <span class="text-xs truncate max-w-xs" :title="value">{{ value }}</span>
           <CopyButton :text="value" />
         </span>
       </template>

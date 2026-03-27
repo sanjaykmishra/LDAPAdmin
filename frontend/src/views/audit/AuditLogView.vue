@@ -28,9 +28,9 @@
       <template #cell-action="{ value }">
         <span class="badge-gray">{{ value }}</span>
       </template>
-      <template #cell-targetDn="{ value }"><code class="text-xs">{{ value }}</code></template>
+      <template #cell-targetDn="{ value }"><span class="text-xs truncate block max-w-xs" :title="value">{{ value }}</span></template>
       <template #cell-detail="{ value }">
-        <code v-if="value" class="text-xs whitespace-pre-wrap">{{ formatDetail(value) }}</code>
+        <span v-if="value" class="text-xs whitespace-pre-wrap">{{ formatDetail(value) }}</span>
       </template>
     </DataTable>
 

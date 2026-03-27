@@ -1,7 +1,7 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getDashboard } from '@/api/dashboard'
+import { getAdminDashboard } from '@/api/dashboard'
 import RelativeTime from '@/components/RelativeTime.vue'
 
 const router = useRouter()
@@ -22,44 +22,19 @@ const ACTION_LABELS = {
   'GROUP_DELETE': 'Group deleted',
   'GROUP_MEMBER_ADD': 'Member added',
   'GROUP_MEMBER_REMOVE': 'Member removed',
-  'GROUP_BULK_IMPORT': 'Group bulk import',
-  'ENTRY_CREATE': 'Entry created',
-  'ENTRY_UPDATE': 'Entry updated',
-  'ENTRY_DELETE': 'Entry deleted',
-  'ENTRY_MOVE': 'Entry moved',
-  'ENTRY_RENAME': 'Entry renamed',
-  'LDIF_IMPORT': 'LDIF imported',
-  'INTEGRITY_CHECK': 'Integrity check',
-  'BULK_ATTRIBUTE_UPDATE': 'Bulk attribute update',
   'APPROVAL_SUBMITTED': 'Approval submitted',
   'APPROVAL_APPROVED': 'Request approved',
-  'APPROVAL_AUTO_APPROVED': 'Request auto-approved',
+  'APPROVAL_AUTO_APPROVED': 'Auto-approved',
   'APPROVAL_REJECTED': 'Request rejected',
-  'APPROVAL_REQUEST_EDITED': 'Request edited',
   'CAMPAIGN_CREATED': 'Campaign created',
   'CAMPAIGN_ACTIVATED': 'Campaign activated',
   'CAMPAIGN_CLOSED': 'Campaign closed',
-  'CAMPAIGN_CANCELLED': 'Campaign cancelled',
-  'CAMPAIGN_EXPIRED': 'Campaign expired',
   'REVIEW_CONFIRMED': 'Review confirmed',
   'REVIEW_REVOKED': 'Review revoked',
-  'REVIEW_AUTO_REVOKED': 'Review auto-revoked',
   'PLAYBOOK_EXECUTED': 'Playbook executed',
-  'PLAYBOOK_ROLLED_BACK': 'Playbook rolled back',
-  'LDAP_CHANGE': 'LDAP change',
-  'SOD_POLICY_CREATED': 'SoD policy created',
-  'SOD_POLICY_UPDATED': 'SoD policy updated',
-  'SOD_POLICY_DELETED': 'SoD policy deleted',
-  'SOD_SCAN_EXECUTED': 'SoD scan executed',
-  'SOD_VIOLATION_DETECTED': 'SoD violation detected',
-  'SOD_VIOLATION_EXEMPTED': 'SoD violation exempted',
-  'SOD_VIOLATION_BLOCKED': 'SoD violation blocked',
-  'SOD_VIOLATION_RESOLVED': 'SoD violation resolved',
-  'HR_SYNC_STARTED': 'HR sync started',
+  'SOD_VIOLATION_DETECTED': 'SoD violation',
+  'SOD_VIOLATION_RESOLVED': 'SoD resolved',
   'HR_SYNC_COMPLETED': 'HR sync completed',
-  'HR_SYNC_FAILED': 'HR sync failed',
-  'HR_EMPLOYEE_MATCHED': 'HR employee matched',
-  'HR_ORPHAN_DETECTED': 'HR orphan detected',
 }
 
 function actionLabel(action) {
@@ -67,11 +42,11 @@ function actionLabel(action) {
 }
 
 function actionColor(action) {
-  if (action?.includes('DELETE') || action?.includes('REVOKED') || action?.includes('ROLLED_BACK') || action?.includes('BLOCKED'))
+  if (action?.includes('DELETE') || action?.includes('REVOKED') || action?.includes('BLOCKED'))
     return 'text-red-600 bg-red-50'
   if (action?.includes('CREATE') || action?.includes('APPROVED') || action?.includes('CONFIRMED'))
     return 'text-green-600 bg-green-50'
-  if (action?.includes('DISABLE') || action?.includes('REJECTED') || action?.includes('CANCELLED') || action?.includes('EXPIRED') || action?.includes('DETECTED'))
+  if (action?.includes('DISABLE') || action?.includes('REJECTED') || action?.includes('DETECTED'))
     return 'text-amber-600 bg-amber-50'
   return 'text-blue-600 bg-blue-50'
 }
@@ -82,29 +57,7 @@ function shortDn(dn) {
   return first || dn
 }
 
-// ── Compliance posture helpers ──────────────────────────────────────────
-
-function postureSeverity(metric) {
-  // Returns color class based on metric thresholds
-  if (metric === 'sodViolations') {
-    if (!data.value) return 'gray'
-    return data.value.openSodViolations === 0 ? 'green' : data.value.openSodViolations <= 5 ? 'yellow' : 'red'
-  }
-  if (metric === 'campaignCompletion') {
-    if (!data.value || data.value.campaignCompletionPercent == null) return 'gray'
-    return data.value.campaignCompletionPercent >= 90 ? 'green' : data.value.campaignCompletionPercent >= 50 ? 'yellow' : 'red'
-  }
-  if (metric === 'overdue') {
-    if (!data.value) return 'gray'
-    return data.value.overdueCampaigns === 0 ? 'green' : 'red'
-  }
-  if (metric === 'unreviewed') {
-    if (!data.value) return 'gray'
-    return data.value.usersNotReviewedIn90Days === 0 ? 'green' : data.value.usersNotReviewedIn90Days <= 10 ? 'yellow' : 'red'
-  }
-  return 'gray'
-}
-
+// ── Severity helpers ──────────────────────────────────────────────────────
 function cardBorder(severity) {
   switch (severity) {
     case 'green': return 'border-green-200 bg-green-50/30'
@@ -123,6 +76,27 @@ function cardValueColor(severity) {
   }
 }
 
+const pendingSeverity = computed(() => {
+  if (!data.value) return 'gray'
+  const v = data.value.totalPendingApprovals
+  return v === 0 ? 'green' : v <= 5 ? 'yellow' : 'red'
+})
+
+const sodSeverity = computed(() => {
+  if (!data.value) return 'gray'
+  return data.value.openSodViolations === 0 ? 'green' : data.value.openSodViolations <= 5 ? 'yellow' : 'red'
+})
+
+const campaignSeverity = computed(() => {
+  if (!data.value || data.value.campaignCompletionPercent == null) return 'gray'
+  return data.value.campaignCompletionPercent >= 90 ? 'green' : data.value.campaignCompletionPercent >= 50 ? 'yellow' : 'red'
+})
+
+const overdueSeverity = computed(() => {
+  if (!data.value) return 'gray'
+  return data.value.overdueCampaigns === 0 ? 'green' : 'red'
+})
+
 const agingTotal = computed(() => data.value?.approvalAging?.total ?? 0)
 
 function agingBarWidth(count) {
@@ -130,23 +104,19 @@ function agingBarWidth(count) {
   return Math.max(2, (count / agingTotal.value) * 100) + '%'
 }
 
-function goToSodViolations() {
-  router.push('/superadmin/sod-violations')
+// ── Navigation helpers ────────────────────────────────────────────────────
+function dirPath(suffix) {
+  const dirId = data.value?.firstDirectoryId
+  if (!dirId) return '#'
+  return `/directories/${dirId}/${suffix}`
 }
 
-function goToAccessReviews() {
-  router.push('/superadmin/access-reviews')
-}
-
-function goToApprovals() {
-  router.push('/superadmin/approvals')
-}
-
+// ── Data loading ──────────────────────────────────────────────────────────
 let refreshTimer = null
 
 async function loadDashboard() {
   try {
-    const { data: d } = await getDashboard()
+    const { data: d } = await getAdminDashboard()
     data.value = d
     error.value = null
   } catch (e) {
@@ -158,11 +128,9 @@ async function loadDashboard() {
 
 onMounted(() => {
   loadDashboard()
-  // Auto-refresh every 60 seconds
   refreshTimer = setInterval(loadDashboard, 60000)
 })
 
-import { onUnmounted } from 'vue'
 onUnmounted(() => {
   if (refreshTimer) clearInterval(refreshTimer)
 })
@@ -171,105 +139,104 @@ onUnmounted(() => {
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Compliance Posture Dashboard</h1>
-      <button @click="loadDashboard" :disabled="loading" class="text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <p class="text-sm text-gray-500 mt-0.5">Overview of your managed directories</p>
+      </div>
+      <button @click="loadDashboard" :disabled="loading"
+              class="text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50">
         {{ loading ? 'Refreshing...' : 'Refresh' }}
       </button>
     </div>
 
     <!-- Loading skeleton -->
     <div v-if="loading" class="space-y-6 animate-pulse">
-      <div class="grid grid-cols-4 gap-5">
-        <div v-for="i in 4" :key="i" class="bg-white rounded-xl border border-gray-200 p-6">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div v-for="i in 4" :key="i" class="bg-white rounded-xl border border-gray-200 p-5">
           <div class="h-3 bg-gray-200 rounded w-1/2 mb-3" />
           <div class="h-8 bg-gray-200 rounded w-1/3" />
         </div>
       </div>
-      <div class="grid grid-cols-3 gap-5">
-        <div v-for="i in 3" :key="i" class="bg-white rounded-xl border border-gray-200 p-6">
+      <div class="grid grid-cols-3 gap-4">
+        <div v-for="i in 3" :key="i" class="bg-white rounded-xl border border-gray-200 p-5">
           <div class="h-3 bg-gray-200 rounded w-2/3 mb-3" />
           <div class="h-6 bg-gray-200 rounded w-1/4" />
         </div>
       </div>
-      <div class="bg-white rounded-xl border border-gray-200 p-6">
-        <div class="h-4 bg-gray-200 rounded w-1/4 mb-4" />
-        <div v-for="i in 4" :key="i" class="h-3 bg-gray-100 rounded w-full mb-2" />
-      </div>
     </div>
-    <div v-else-if="error" class="text-red-500">{{ error }}</div>
+
+    <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-xl p-6 text-red-700">
+      <p class="font-medium">Failed to load dashboard</p>
+      <p class="text-sm mt-1">{{ error }}</p>
+    </div>
+
     <template v-else-if="data">
 
-      <!-- ── Top row: Compliance posture stat cards ──────────────────────── -->
-      <div class="grid grid-cols-4 gap-4 mb-6">
-        <!-- SoD Violations -->
-        <div class="rounded-xl border-2 p-5 cursor-pointer shadow-sm transition-shadow hover:shadow-md"
-             :class="cardBorder(postureSeverity('sodViolations'))"
-             @click="goToSodViolations">
-          <p class="text-sm font-medium text-gray-500 mb-1">Open SoD Violations</p>
-          <p class="text-3xl font-bold" :class="cardValueColor(postureSeverity('sodViolations'))">
-            {{ data.openSodViolations }}
-          </p>
-          <p class="text-xs text-gray-400 mt-1">Click to view violations</p>
-        </div>
-
-        <!-- Campaign Completion -->
-        <div class="rounded-xl border-2 p-5 cursor-pointer shadow-sm transition-shadow hover:shadow-md"
-             :class="cardBorder(postureSeverity('campaignCompletion'))"
-             @click="goToAccessReviews">
-          <p class="text-sm font-medium text-gray-500 mb-1">Campaign Completion</p>
-          <p class="text-3xl font-bold" :class="cardValueColor(postureSeverity('campaignCompletion'))">
-            {{ data.campaignCompletionPercent != null ? data.campaignCompletionPercent + '%' : 'N/A' }}
-          </p>
-          <p class="text-xs text-gray-400 mt-1">Across {{ data.campaignProgress.length }} active campaigns</p>
-        </div>
-
+      <!-- ── Top row: Key metrics ──────────────────────────────────────────── -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <!-- Pending Approvals -->
         <div class="rounded-xl border-2 p-5 cursor-pointer shadow-sm transition-shadow hover:shadow-md"
-             :class="cardBorder(data.totalPendingApprovals > 10 ? 'red' : data.totalPendingApprovals > 0 ? 'yellow' : 'green')"
-             @click="goToApprovals">
+             :class="cardBorder(pendingSeverity)"
+             @click="router.push(dirPath('approvals'))">
           <p class="text-sm font-medium text-gray-500 mb-1">Pending Approvals</p>
-          <p class="text-3xl font-bold" :class="data.totalPendingApprovals > 0 ? 'text-amber-600' : 'text-green-700'">
+          <p class="text-3xl font-bold" :class="cardValueColor(pendingSeverity)">
             {{ data.totalPendingApprovals }}
           </p>
           <p class="text-xs text-gray-400 mt-1">Click to review</p>
         </div>
 
+        <!-- Active Campaigns -->
+        <div class="rounded-xl border-2 p-5 cursor-pointer shadow-sm transition-shadow hover:shadow-md"
+             :class="cardBorder(campaignSeverity)"
+             @click="router.push(dirPath('access-reviews'))">
+          <p class="text-sm font-medium text-gray-500 mb-1">Campaign Completion</p>
+          <p class="text-3xl font-bold" :class="cardValueColor(campaignSeverity)">
+            {{ data.campaignCompletionPercent != null ? data.campaignCompletionPercent + '%' : 'N/A' }}
+          </p>
+          <p class="text-xs text-gray-400 mt-1">{{ data.activeAccessReviewCampaigns }} active campaigns</p>
+        </div>
+
+        <!-- SoD Violations -->
+        <div class="rounded-xl border-2 p-5 cursor-pointer shadow-sm transition-shadow hover:shadow-md"
+             :class="cardBorder(sodSeverity)"
+             @click="router.push(dirPath('sod-violations'))">
+          <p class="text-sm font-medium text-gray-500 mb-1">Open SoD Violations</p>
+          <p class="text-3xl font-bold" :class="cardValueColor(sodSeverity)">
+            {{ data.openSodViolations }}
+          </p>
+          <p class="text-xs text-gray-400 mt-1">Click to view</p>
+        </div>
+
         <!-- Overdue Campaigns -->
         <div class="rounded-xl border-2 p-5 cursor-pointer shadow-sm transition-shadow hover:shadow-md"
-             :class="cardBorder(postureSeverity('overdue'))"
-             @click="goToAccessReviews">
+             :class="cardBorder(overdueSeverity)"
+             @click="router.push(dirPath('access-reviews'))">
           <p class="text-sm font-medium text-gray-500 mb-1">Overdue Campaigns</p>
-          <p class="text-3xl font-bold" :class="cardValueColor(postureSeverity('overdue'))">
+          <p class="text-3xl font-bold" :class="cardValueColor(overdueSeverity)">
             {{ data.overdueCampaigns }}
           </p>
-          <p class="text-xs text-gray-400 mt-1">Past deadline &amp; still active</p>
+          <p class="text-xs text-gray-400 mt-1">Past deadline</p>
         </div>
       </div>
 
-      <!-- ── Second row: Counts + Unreviewed ─────────────────────────────── -->
-      <div class="grid grid-cols-3 gap-4 mb-6">
-        <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <!-- ── Second row: User/Group totals ─────────────────────────────────── -->
+      <div class="grid grid-cols-2 gap-4 mb-6">
+        <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
           <p class="text-sm text-gray-500 mb-1">Total Users</p>
           <p class="text-3xl font-bold text-gray-900">{{ data.totalUsers.toLocaleString() }}</p>
+          <p class="text-xs text-gray-400 mt-1">Across {{ data.directories.length }} directories</p>
         </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
           <p class="text-sm text-gray-500 mb-1">Total Groups</p>
           <p class="text-3xl font-bold text-gray-900">{{ data.totalGroups.toLocaleString() }}</p>
-        </div>
-        <div class="rounded-xl border-2 p-5"
-             :class="cardBorder(postureSeverity('unreviewed'))">
-          <p class="text-sm font-medium text-gray-500 mb-1">Users Not Reviewed (90d)</p>
-          <p class="text-3xl font-bold" :class="cardValueColor(postureSeverity('unreviewed'))">
-            {{ data.usersNotReviewedIn90Days.toLocaleString() }}
-          </p>
-          <p class="text-xs text-gray-400 mt-1">No review decision in last 90 days</p>
+          <p class="text-xs text-gray-400 mt-1">Across {{ data.directories.length }} directories</p>
         </div>
       </div>
 
-      <!-- ── Middle row: Approval aging + Campaign progress ──────────────── -->
-      <div class="grid grid-cols-2 gap-6 mb-6">
+      <!-- ── Middle row: Approval aging + Campaign progress ────────────────── -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <!-- Approval aging -->
-        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <div class="px-5 py-3 border-b border-gray-100">
             <h2 class="text-sm font-semibold text-gray-700">Approval Aging</h2>
           </div>
@@ -295,12 +262,12 @@ onUnmounted(() => {
         </div>
 
         <!-- Campaign progress -->
-        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <div class="px-5 py-3 border-b border-gray-100">
             <h2 class="text-sm font-semibold text-gray-700">Active Campaign Progress</h2>
           </div>
           <div v-if="!data.campaignProgress.length" class="px-5 py-8 text-center text-sm text-gray-400">
-            No active campaigns.
+            No active access review campaigns.
           </div>
           <div v-else class="p-5 space-y-4">
             <div v-for="c in data.campaignProgress" :key="c.campaignId">
@@ -328,11 +295,12 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- ── Bottom row: Directories + Recent activity ───────────────────── -->
-      <div class="grid grid-cols-2 gap-6">
-        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <!-- ── Bottom row: Directories + Recent Activity ─────────────────────── -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- My Directories -->
+        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <div class="px-5 py-3 border-b border-gray-100">
-            <h2 class="text-sm font-semibold text-gray-700">Directories</h2>
+            <h2 class="text-sm font-semibold text-gray-700">My Directories</h2>
           </div>
           <table class="w-full text-sm">
             <thead class="bg-gray-50">
@@ -341,12 +309,13 @@ onUnmounted(() => {
                 <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Users</th>
                 <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Groups</th>
                 <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Pending</th>
-                <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Campaigns</th>
                 <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">SoD</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-50">
-              <tr v-for="dir in data.directories" :key="dir.id" class="hover:bg-gray-50">
+              <tr v-for="dir in data.directories" :key="dir.id"
+                  class="hover:bg-gray-50 cursor-pointer"
+                  @click="router.push(`/directories/${dir.id}/users`)">
                 <td class="px-4 py-2.5">
                   <div class="flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full" :class="dir.enabled ? 'bg-green-400' : 'bg-gray-300'"></span>
@@ -360,10 +329,6 @@ onUnmounted(() => {
                   <span v-else class="text-gray-400">0</span>
                 </td>
                 <td class="px-4 py-2.5 text-right">
-                  <span v-if="dir.activeCampaigns > 0" class="text-blue-600 font-medium">{{ dir.activeCampaigns }}</span>
-                  <span v-else class="text-gray-400">0</span>
-                </td>
-                <td class="px-4 py-2.5 text-right">
                   <span v-if="dir.openSodViolations > 0" class="text-red-600 font-medium">{{ dir.openSodViolations }}</span>
                   <span v-else class="text-green-600">0</span>
                 </td>
@@ -372,14 +337,19 @@ onUnmounted(() => {
           </table>
         </div>
 
-        <!-- Recent activity -->
-        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div class="px-5 py-3 border-b border-gray-100">
+        <!-- Recent Activity -->
+        <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
             <h2 class="text-sm font-semibold text-gray-700">Recent Activity</h2>
+            <button v-if="data.firstDirectoryId"
+                    @click="router.push(dirPath('audit'))"
+                    class="text-xs text-blue-600 hover:text-blue-800">View all</button>
           </div>
-          <div v-if="!data.recentAudit.length" class="px-5 py-8 text-center text-sm text-gray-400">No recent events.</div>
+          <div v-if="!data.recentActivity || !data.recentActivity.length" class="px-5 py-8 text-center text-sm text-gray-400">
+            No recent events.
+          </div>
           <ul v-else class="divide-y divide-gray-50">
-            <li v-for="evt in data.recentAudit" :key="evt.id" class="px-4 py-2.5 flex items-start gap-3">
+            <li v-for="evt in data.recentActivity" :key="evt.id" class="px-4 py-2.5 flex items-start gap-3">
               <span class="mt-0.5 shrink-0 text-[11px] font-medium px-1.5 py-0.5 rounded" :class="actionColor(evt.action)">
                 {{ actionLabel(evt.action) }}
               </span>
@@ -395,6 +365,38 @@ onUnmounted(() => {
           </ul>
         </div>
       </div>
+
+      <!-- ── Quick Actions ─────────────────────────────────────────────────── -->
+      <div v-if="data.firstDirectoryId" class="mt-6 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        <h2 class="text-sm font-semibold text-gray-700 mb-3">Quick Actions</h2>
+        <div class="flex flex-wrap gap-3">
+          <button @click="router.push(dirPath('users'))" class="btn-primary btn-sm">
+            <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 20 20" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="6" r="3.25"/><path d="M3.5 17.5c0-3.59 2.91-6.5 6.5-6.5s6.5 2.91 6.5 6.5" stroke-linecap="round"/></svg>
+            Browse Users
+          </button>
+          <button @click="router.push(dirPath('groups'))" class="btn-primary btn-sm">
+            <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 20 20" stroke="currentColor" stroke-width="1.5"><circle cx="7.5" cy="6" r="2.75"/><circle cx="13.5" cy="6" r="2.75"/><path d="M1.5 17c0-3.04 2.46-5.5 5.5-5.5 1.26 0 2.42.42 3.35 1.14M12 11.64A5.48 5.48 0 0 1 18.5 17" stroke-linecap="round"/></svg>
+            Browse Groups
+          </button>
+          <button @click="router.push(dirPath('approvals'))" class="btn-neutral btn-sm">
+            <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 20 20" stroke="currentColor" stroke-width="1.5"><path d="M10 2l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-4z" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 10l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Review Approvals
+          </button>
+          <button @click="router.push(dirPath('access-reviews'))" class="btn-neutral btn-sm">
+            <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 20 20" stroke="currentColor" stroke-width="1.5"><path d="M9 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 11l8-8M14 3h3v3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Access Reviews
+          </button>
+          <button @click="router.push(dirPath('reports'))" class="btn-neutral btn-sm">
+            <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 20 20" stroke="currentColor" stroke-width="1.5"><path d="M5 16V10M10 16V4M15 16v-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Run Reports
+          </button>
+          <button @click="router.push(dirPath('audit'))" class="btn-neutral btn-sm">
+            <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 20 20" stroke="currentColor" stroke-width="1.5"><rect x="3" y="2" width="14" height="16" rx="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 6h6M7 10h6M7 14h3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Audit Log
+          </button>
+        </div>
+      </div>
+
     </template>
   </div>
 </template>

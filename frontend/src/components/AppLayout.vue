@@ -51,6 +51,10 @@
       <nav :class="['flex-1 py-4 space-y-1 overflow-y-auto', collapsed ? 'px-1 nav-collapsed' : 'px-3']">
         <!-- Admin navigation (directory-scoped) -->
         <template v-if="!auth.isSuperadmin">
+          <RouterLink to="/dashboard" class="nav-item">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg>
+            <span v-if="!collapsed">Dashboard</span>
+          </RouterLink>
           <template v-if="currentDirId">
             <RouterLink :to="{ path: `/directories/${currentDirId}/users` }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="6" r="3.25"/><path d="M3.5 17.5c0-3.59 2.91-6.5 6.5-6.5s6.5 2.91 6.5 6.5"/></svg>
@@ -159,6 +163,10 @@
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M9 11l8-8"/><path d="M14 3h3v3"/></svg>
             <span v-if="!collapsed">Access Reviews</span>
           </RouterLink>
+          <RouterLink to="/superadmin/approvals" class="nav-item">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-4z"/><path d="M7 10l2 2 4-4"/></svg>
+            <span v-if="!collapsed">Approvals</span>
+          </RouterLink>
           <RouterLink to="/superadmin/sod-policies" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h5v5H4zM11 4h5v5h-5zM4 11h5v5H4z"/><path d="M11 11h5v5h-5"/><path d="M11 11l5 5M16 11l-5 5"/></svg>
             <span v-if="!collapsed">SoD Policy</span>
@@ -206,10 +214,8 @@
     <!-- Main content -->
     <main class="flex-1 overflow-y-auto">
       <BreadcrumbNav />
-      <RouterView v-slot="{ Component }">
-        <Transition name="page-fade" mode="out-in">
-          <component :is="Component" :key="$route.path" />
-        </Transition>
+      <RouterView v-slot="{ Component, route }">
+        <component :is="Component" :key="route.path" />
       </RouterView>
     </main>
 
