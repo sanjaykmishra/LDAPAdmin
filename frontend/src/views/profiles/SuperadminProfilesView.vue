@@ -260,11 +260,21 @@ async function doDelete() {
   }
 }
 
-async function doClone(p) {
-  const name = prompt('New profile name:', p.name + ' (Copy)')
-  if (!name) return
+const cloneTarget = ref(null)
+const cloneName = ref('')
+const showCloneModal = ref(false)
+
+function openClone(p) {
+  cloneTarget.value = p
+  cloneName.value = p.name + ' (Copy)'
+  showCloneModal.value = true
+}
+
+async function doClone() {
+  if (!cloneName.value.trim() || !cloneTarget.value) return
+  showCloneModal.value = false
   try {
-    await cloneProfile(p.directoryId, p.id, name)
+    await cloneProfile(cloneTarget.value.directoryId, cloneTarget.value.id, cloneName.value.trim())
     notif.success('Profile cloned')
     await reload()
   } catch (e) {
@@ -714,7 +724,7 @@ function toggleApprover(accountId) {
       <template #actions="{ row }">
         <div class="flex gap-3 justify-end whitespace-nowrap">
           <button class="text-blue-600 hover:text-blue-800 text-xs font-medium" @click="openEdit(row)">Edit</button>
-          <button class="text-blue-600 hover:text-blue-800 text-xs font-medium" @click="doClone(row)">Clone</button>
+          <button class="text-blue-600 hover:text-blue-800 text-xs font-medium" @click="openClone(row)">Clone</button>
           <button class="text-red-500 hover:text-red-700 text-xs font-medium" @click="confirmDelete(row)">Delete</button>
         </div>
       </template>
@@ -769,7 +779,7 @@ function toggleApprover(accountId) {
                   <option value="">Select object class…</option>
                   <option v-for="oc in availableObjectClasses" :key="oc" :value="oc">{{ oc }}</option>
                 </select>
-                <button class="btn-secondary" @click="addObjectClass" :disabled="!ocToAdd">Add</button>
+                <button class="btn-primary text-xs" @click="addObjectClass" :disabled="!ocToAdd">Add</button>
               </div>
             </div>
             <div>
@@ -785,10 +795,10 @@ function toggleApprover(accountId) {
           </div>
           <div class="flex gap-6">
             <label class="flex items-center gap-2 text-sm">
-              <input type="checkbox" v-model="profile.enabled" /> Enabled
+              <input type="checkbox" v-model="profile.enabled" /> Profile is enabled
             </label>
             <label class="flex items-center gap-2 text-sm">
-              <input type="checkbox" v-model="profile.selfRegistrationAllowed" /> Self-registration
+              <input type="checkbox" v-model="profile.selfRegistrationAllowed" /> Self-registration is enabled for this profile
             </label>
           </div>
 
@@ -797,7 +807,7 @@ function toggleApprover(accountId) {
         <!-- Attributes Tab -->
         <div v-if="modalTab === 'attributes'" class="space-y-3">
           <div>
-            <button class="btn-secondary text-sm" :disabled="availableAttributes.length === 0" @click="toggleAttrPicker">
+            <button class="btn-primary text-sm" :disabled="availableAttributes.length === 0" @click="toggleAttrPicker">
               {{ showAttrPicker ? 'Cancel' : 'Add Attributes' }}
             </button>
             <div v-if="showAttrPicker" class="mt-2 border rounded-lg p-3 space-y-2 bg-gray-50">
@@ -1131,6 +1141,22 @@ function toggleApprover(accountId) {
             {{ applyingGroupChanges ? 'Applying...' : 'Apply Changes' }}
           </button>
         </div>
+      </template>
+    </AppModal>
+
+    <!-- Clone modal -->
+    <AppModal v-model="showCloneModal" title="Clone Profile" size="sm">
+      <div class="space-y-3">
+        <p class="text-sm text-gray-600">Create a copy of <strong>{{ cloneTarget?.name }}</strong> with a new name.</p>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">New Profile Name</label>
+          <input v-model="cloneName" class="input w-full" placeholder="Profile name"
+                 @keydown.enter="doClone" />
+        </div>
+      </div>
+      <template #footer>
+        <button @click="showCloneModal = false" class="btn-neutral">Cancel</button>
+        <button @click="doClone" :disabled="!cloneName.trim()" class="btn-primary">Clone</button>
       </template>
     </AppModal>
   </div>

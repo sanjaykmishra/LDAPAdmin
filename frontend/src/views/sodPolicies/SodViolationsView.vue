@@ -62,7 +62,7 @@
           <button v-if="v.status === 'OPEN'" @click="openExempt(v)" class="btn-secondary text-xs">
             Exempt
           </button>
-          <button v-if="v.status === 'OPEN'" @click="handleResolve(v)" class="btn-secondary text-xs">
+          <button v-if="v.status === 'OPEN'" @click="confirmResolve(v)" class="btn-secondary text-xs">
             Resolve
           </button>
         </div>
@@ -145,6 +145,9 @@
       </div>
     </div>
   </div>
+  <ConfirmDialog v-model="showResolveConfirm"
+    message="Mark this violation as resolved?"
+    confirmLabel="Resolve" @confirm="handleResolve" />
 </template>
 
 <script setup>
@@ -153,6 +156,7 @@ import { useApi } from '@/composables/useApi'
 import { useDirectoryPicker } from '@/composables/useDirectoryPicker'
 import { listViolations, exemptViolation, resolveViolation } from '@/api/sodPolicies'
 import { searchEntries } from '@/api/browse'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { dirId, directories, selectedDir, loadingDirs, showPicker } = useDirectoryPicker()
 const { loading, call } = useApi()
@@ -201,8 +205,18 @@ async function submitExempt() {
   } catch { /* handled */ }
 }
 
-async function handleResolve(v) {
-  if (!confirm('Mark this violation as resolved?')) return
+const showResolveConfirm = ref(false)
+const resolveTarget = ref(null)
+
+function confirmResolve(v) {
+  resolveTarget.value = v
+  showResolveConfirm.value = true
+}
+
+async function handleResolve() {
+  const v = resolveTarget.value
+  showResolveConfirm.value = false
+  if (!v) return
   try {
     await call(() => resolveViolation(dirId.value, v.id), { successMsg: 'Violation resolved' })
     await loadViolations()

@@ -81,13 +81,16 @@
           {{ loading ? 'Saving...' : (isEdit ? 'Update Policy' : 'Create Policy') }}
         </button>
         <button type="button" @click="$router.back()" class="btn-neutral">Cancel</button>
-        <button v-if="isEdit" type="button" @click="handleDelete" :disabled="loading"
+        <button v-if="isEdit" type="button" @click="showDeleteConfirm = true" :disabled="loading"
           class="ml-auto text-sm px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700">
           Delete Policy
         </button>
       </div>
     </form>
   </div>
+  <ConfirmDialog v-model="showDeleteConfirm"
+    message="Delete this SoD policy? All associated violations will also be removed."
+    confirmLabel="Delete" :danger="true" @confirm="handleDelete" />
 </template>
 
 <script setup>
@@ -96,6 +99,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '@/composables/useApi'
 import { getPolicy, createPolicy, updatePolicy, deletePolicy } from '@/api/sodPolicies'
 import GroupDnPicker from '@/components/GroupDnPicker.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -128,8 +132,10 @@ async function handleSubmit() {
   } catch { /* handled by useApi */ }
 }
 
+const showDeleteConfirm = ref(false)
+
 async function handleDelete() {
-  if (!confirm('Delete this SoD policy? All associated violations will also be removed.')) return
+  showDeleteConfirm.value = false
   try {
     await call(() => deletePolicy(dirId, policyId), { successMsg: 'Policy deleted' })
     router.push({ name: 'sodPolicies', params: { dirId } })

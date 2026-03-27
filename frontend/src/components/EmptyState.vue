@@ -27,7 +27,9 @@
     <p v-if="description" class="text-sm text-gray-400 dark:text-gray-500 max-w-sm">{{ description }}</p>
 
     <!-- Optional action -->
-    <slot name="action" />
+    <div v-if="$slots.action" class="mt-4">
+      <slot name="action" />
+    </div>
   </div>
 </template>
 

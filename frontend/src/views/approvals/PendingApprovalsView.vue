@@ -234,7 +234,7 @@ async function savePayload() {
     if (idx >= 0) approvals.value[idx] = data
     editMode.value = false
   } catch (e) {
-    alert(e.response?.data?.detail || 'Failed to save changes')
+    notif.error(e.response?.data?.detail || 'Failed to save changes')
   } finally {
     savingPayload.value = false
   }
