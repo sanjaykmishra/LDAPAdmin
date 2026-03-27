@@ -241,7 +241,7 @@
               <div class="text-sm font-medium text-gray-900">{{ r.name }}</div>
               <div class="text-xs text-gray-500">Attribute: {{ r.groupingAttribute }} | Anomaly &lt; {{ r.anomalyThresholdPct }}%</div>
             </div>
-            <button @click="handleDeleteRule(r)" class="text-red-500 hover:text-red-700 text-xs">Delete</button>
+            <button @click="confirmDeleteRule(r)" class="text-red-500 hover:text-red-700 text-xs">Delete</button>
           </div>
         </div>
         <div v-else class="text-sm text-gray-400 mb-4">No rules configured.</div>
@@ -275,6 +275,9 @@
       </div>
     </div>
   </div>
+  <ConfirmDialog v-model="showDeleteRuleConfirm"
+    :message="`Delete rule '${deleteRuleTarget?.name}'? This cannot be undone.`"
+    confirmLabel="Delete" :danger="true" @confirm="handleDeleteRule" />
 </template>
 
 <script setup>
@@ -286,6 +289,7 @@ import {
   runAnalysis, listFindings, getFindingsSummary,
   acknowledgeFinding, exemptFinding, getDriftVisualization,
 } from '@/api/accessDrift'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { dirId, directories, selectedDir, loadingDirs, showPicker } = useDirectoryPicker()
 const { loading, call } = useApi()
@@ -431,8 +435,18 @@ async function handleCreateRule() {
   } catch { /* handled */ }
 }
 
-async function handleDeleteRule(r) {
-  if (!confirm(`Delete rule "${r.name}"?`)) return
+const showDeleteRuleConfirm = ref(false)
+const deleteRuleTarget = ref(null)
+
+function confirmDeleteRule(r) {
+  deleteRuleTarget.value = r
+  showDeleteRuleConfirm.value = true
+}
+
+async function handleDeleteRule() {
+  const r = deleteRuleTarget.value
+  showDeleteRuleConfirm.value = false
+  if (!r) return
   try {
     await call(() => deleteRule(dirId.value, r.id), { successMsg: 'Rule deleted' })
     await loadRules()

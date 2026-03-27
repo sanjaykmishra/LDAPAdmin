@@ -181,14 +181,32 @@ onUnmounted(() => {
       </button>
     </div>
 
-    <div v-if="loading" class="text-gray-400">Loading...</div>
+    <!-- Loading skeleton -->
+    <div v-if="loading" class="space-y-6 animate-pulse">
+      <div class="grid grid-cols-4 gap-5">
+        <div v-for="i in 4" :key="i" class="bg-white rounded-xl border border-gray-200 p-6">
+          <div class="h-3 bg-gray-200 rounded w-1/2 mb-3" />
+          <div class="h-8 bg-gray-200 rounded w-1/3" />
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-5">
+        <div v-for="i in 3" :key="i" class="bg-white rounded-xl border border-gray-200 p-6">
+          <div class="h-3 bg-gray-200 rounded w-2/3 mb-3" />
+          <div class="h-6 bg-gray-200 rounded w-1/4" />
+        </div>
+      </div>
+      <div class="bg-white rounded-xl border border-gray-200 p-6">
+        <div class="h-4 bg-gray-200 rounded w-1/4 mb-4" />
+        <div v-for="i in 4" :key="i" class="h-3 bg-gray-100 rounded w-full mb-2" />
+      </div>
+    </div>
     <div v-else-if="error" class="text-red-500">{{ error }}</div>
     <template v-else-if="data">
 
       <!-- ── Top row: Compliance posture stat cards ──────────────────────── -->
       <div class="grid grid-cols-4 gap-4 mb-6">
         <!-- SoD Violations -->
-        <div class="rounded-xl border-2 p-5 cursor-pointer transition-shadow hover:shadow-md"
+        <div class="rounded-xl border-2 p-5 cursor-pointer shadow-sm transition-shadow hover:shadow-md"
              :class="cardBorder(postureSeverity('sodViolations'))"
              @click="goToSodViolations">
           <p class="text-sm font-medium text-gray-500 mb-1">Open SoD Violations</p>
@@ -199,7 +217,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Campaign Completion -->
-        <div class="rounded-xl border-2 p-5 cursor-pointer transition-shadow hover:shadow-md"
+        <div class="rounded-xl border-2 p-5 cursor-pointer shadow-sm transition-shadow hover:shadow-md"
              :class="cardBorder(postureSeverity('campaignCompletion'))"
              @click="goToAccessReviews">
           <p class="text-sm font-medium text-gray-500 mb-1">Campaign Completion</p>
@@ -210,7 +228,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Pending Approvals -->
-        <div class="rounded-xl border-2 p-5 cursor-pointer transition-shadow hover:shadow-md"
+        <div class="rounded-xl border-2 p-5 cursor-pointer shadow-sm transition-shadow hover:shadow-md"
              :class="cardBorder(data.totalPendingApprovals > 10 ? 'red' : data.totalPendingApprovals > 0 ? 'yellow' : 'green')"
              @click="goToApprovals">
           <p class="text-sm font-medium text-gray-500 mb-1">Pending Approvals</p>
@@ -221,7 +239,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Overdue Campaigns -->
-        <div class="rounded-xl border-2 p-5 cursor-pointer transition-shadow hover:shadow-md"
+        <div class="rounded-xl border-2 p-5 cursor-pointer shadow-sm transition-shadow hover:shadow-md"
              :class="cardBorder(postureSeverity('overdue'))"
              @click="goToAccessReviews">
           <p class="text-sm font-medium text-gray-500 mb-1">Overdue Campaigns</p>

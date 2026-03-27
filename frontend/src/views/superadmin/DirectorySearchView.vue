@@ -163,6 +163,22 @@
       </div>
     </div>
   </div>
+
+  <!-- Save search modal -->
+  <AppModal v-model="showSaveSearchModal" title="Save Search" size="sm">
+    <div class="space-y-3">
+      <p class="text-sm text-gray-600">Save the current search parameters for quick access later.</p>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Search Name</label>
+        <input v-model="saveSearchName" class="input w-full" placeholder="e.g. Active users in ou=people"
+               @keydown.enter="doSaveSearch" />
+      </div>
+    </div>
+    <template #footer>
+      <button @click="showSaveSearchModal = false" class="btn-neutral">Cancel</button>
+      <button @click="doSaveSearch" :disabled="!saveSearchName.trim()" class="btn-primary">Save</button>
+    </template>
+  </AppModal>
 </template>
 
 <script setup>
@@ -171,6 +187,7 @@ import { useNotificationStore } from '@/stores/notifications'
 import { listDirectories } from '@/api/directories'
 import { searchEntries } from '@/api/browse'
 import DnPicker from '@/components/DnPicker.vue'
+import AppModal from '@/components/AppModal.vue'
 
 const HISTORY_KEY = 'ldap-search-history'
 const SAVED_KEY   = 'ldap-saved-searches'
@@ -329,10 +346,19 @@ function loadSavedSearches() {
   try { return JSON.parse(localStorage.getItem(SAVED_KEY) || '[]') } catch { return [] }
 }
 
+const showSaveSearchModal = ref(false)
+const saveSearchName = ref('')
+
 function promptSaveSearch() {
-  const name = prompt('Name for this search:')
-  if (!name?.trim()) return
-  const entry = { name: name.trim(), baseDn: form.value.baseDn, scope: form.value.scope, filter: form.value.filter, attributes: form.value.attributes, limit: form.value.limit }
+  saveSearchName.value = ''
+  showSaveSearchModal.value = true
+}
+
+function doSaveSearch() {
+  const name = saveSearchName.value.trim()
+  if (!name) return
+  showSaveSearchModal.value = false
+  const entry = { name, baseDn: form.value.baseDn, scope: form.value.scope, filter: form.value.filter, attributes: form.value.attributes, limit: form.value.limit }
   savedSearches.value = [...savedSearches.value.filter(s => s.name !== entry.name), entry]
   try { localStorage.setItem(SAVED_KEY, JSON.stringify(savedSearches.value)) } catch {}
 }
