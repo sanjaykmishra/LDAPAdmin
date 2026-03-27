@@ -38,7 +38,6 @@ class AuditorPortalControllerTest extends BaseControllerTest {
     @MockBean private AuditorPortalService portalService;
     @MockBean private ApplicationSettingsService settingsService;
     @MockBean private EvidencePackageService evidencePackageService;
-    @MockBean private CryptoService cryptoService;
     @MockBean private IpRateLimiter ipRateLimiter;
 
     private static final String TOKEN = "valid-test-token";
@@ -226,23 +225,10 @@ class AuditorPortalControllerTest extends BaseControllerTest {
 
     @Test
     void verify_returnsVerifiedTrue() throws Exception {
-        when(cryptoService.hmacSha256(any(byte[].class))).thenReturn("test-hmac");
-
         mvc.perform(get(BASE + "/verify"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.verified").value(true))
-                .andExpect(jsonPath("$.algorithm").value("HMAC-SHA256"))
-                .andExpect(jsonPath("$.signature").value("test-hmac"))
-                .andExpect(jsonPath("$.coveredFields", hasSize(7)));
-    }
-
-    @Test
-    void verify_tamperedSignature_returnsVerifiedFalse() throws Exception {
-        when(cryptoService.hmacSha256(any(byte[].class))).thenReturn("different-hmac");
-
-        mvc.perform(get(BASE + "/verify"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.verified").value(false));
+                .andExpect(jsonPath("$.tokenValid").value(true));
     }
 
     // ── Export ─────────────────────────────────────────────────────────────

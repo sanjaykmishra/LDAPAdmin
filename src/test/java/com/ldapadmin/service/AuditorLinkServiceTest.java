@@ -68,7 +68,6 @@ class AuditorLinkServiceTest {
         when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
         when(accountRepo.findById(accountId)).thenReturn(Optional.of(account));
         when(cryptoService.generateToken()).thenReturn("test-token-abc");
-        when(cryptoService.hmacSha256(any(byte[].class))).thenReturn("hmac-signature-hex");
         when(auditorLinkRepo.save(any(AuditorLink.class))).thenAnswer(inv -> {
             AuditorLink link = inv.getArgument(0);
             link.setId(UUID.randomUUID());
@@ -90,8 +89,6 @@ class AuditorLinkServiceTest {
         assertThat(result.includeAuditEvents()).isTrue();
         assertThat(result.createdBy()).isEqualTo("admin");
 
-        // Verify HMAC was computed
-        verify(cryptoService).hmacSha256(any(byte[].class));
         // Verify audit event recorded
         verify(auditService).record(eq(principal), eq(directoryId), any(), isNull(), any());
     }
@@ -101,7 +98,6 @@ class AuditorLinkServiceTest {
         when(directoryRepo.findById(directoryId)).thenReturn(Optional.of(directory));
         when(accountRepo.findById(accountId)).thenReturn(Optional.of(account));
         when(cryptoService.generateToken()).thenReturn("token");
-        when(cryptoService.hmacSha256(any(byte[].class))).thenReturn("sig");
         when(auditorLinkRepo.save(any(AuditorLink.class))).thenAnswer(inv -> {
             AuditorLink link = inv.getArgument(0);
             link.setId(UUID.randomUUID());
@@ -142,7 +138,6 @@ class AuditorLinkServiceTest {
                 .directory(directory)
                 .token("token")
                 .expiresAt(OffsetDateTime.now().plusDays(30))
-                .hmacSignature("sig")
                 .createdBy(account)
                 .build();
         link.setId(linkId);
@@ -164,7 +159,6 @@ class AuditorLinkServiceTest {
                 .directory(directory)
                 .token("token")
                 .expiresAt(OffsetDateTime.now().plusDays(30))
-                .hmacSignature("sig")
                 .createdBy(account)
                 .revoked(true)
                 .build();
@@ -199,7 +193,6 @@ class AuditorLinkServiceTest {
                 .directory(directory)
                 .token("token")
                 .expiresAt(OffsetDateTime.now().plusDays(30))
-                .hmacSignature("sig")
                 .createdBy(account)
                 .build();
         link.setId(UUID.randomUUID());
@@ -224,21 +217,12 @@ class AuditorLinkServiceTest {
                 .token("valid-token")
                 .campaignIds(List.of())
                 .expiresAt(OffsetDateTime.now().plusDays(30))
-                .hmacSignature("expected-hmac")
                 .createdBy(account)
                 .build();
         link.setId(UUID.randomUUID());
 
         when(auditorLinkRepo.findByTokenAndRevokedFalse("valid-token"))
                 .thenReturn(Optional.of(link));
-
-        // Reconstruct the same signature input that create() would have used
-        String signatureInput = link.getToken() + link.getDirectory().getId()
-                + link.getCampaignIds() + link.isIncludeSod()
-                + link.isIncludeEntitlements() + link.isIncludeAuditEvents()
-                + link.getExpiresAt();
-        when(cryptoService.hmacSha256(eq(signatureInput.getBytes(java.nio.charset.StandardCharsets.UTF_8))))
-                .thenReturn("expected-hmac");
 
         when(auditorLinkRepo.save(any(AuditorLink.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -263,7 +247,6 @@ class AuditorLinkServiceTest {
                 .directory(directory)
                 .token("expired-token")
                 .expiresAt(OffsetDateTime.now().minusMinutes(1))
-                .hmacSignature("sig")
                 .createdBy(account)
                 .build();
 
@@ -274,23 +257,4 @@ class AuditorLinkServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
-    @Test
-    void validateToken_hmacMismatch_throws() {
-        AuditorLink link = AuditorLink.builder()
-                .directory(directory)
-                .token("tampered-token")
-                .campaignIds(List.of())
-                .expiresAt(OffsetDateTime.now().plusDays(30))
-                .hmacSignature("original-hmac")
-                .createdBy(account)
-                .build();
-
-        when(auditorLinkRepo.findByTokenAndRevokedFalse("tampered-token"))
-                .thenReturn(Optional.of(link));
-        when(cryptoService.hmacSha256(any(byte[].class)))
-                .thenReturn("different-hmac"); // Doesn't match stored signature
-
-        assertThatThrownBy(() -> service.validateToken("tampered-token"))
-                .isInstanceOf(ResourceNotFoundException.class);
-    }
 }
