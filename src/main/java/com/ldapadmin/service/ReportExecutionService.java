@@ -15,6 +15,7 @@ import com.ldapadmin.ldap.LdapGroupService;
 import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.ldap.model.LdapGroup;
 import com.ldapadmin.ldap.model.LdapUser;
+import com.ldapadmin.entity.AuditEvent;
 import com.ldapadmin.repository.AuditEventRepository;
 import com.ldapadmin.repository.ProvisioningProfileRepository;
 import com.ldapadmin.repository.SodViolationRepository;
@@ -110,9 +111,9 @@ public class ReportExecutionService {
                     "(|(objectClass=inetOrgPerson)(objectClass=person))", requireString(params, "branchDn"));
             case USERS_WITH_NO_GROUP    -> runUsersWithNoGroupReportData(dc);
             case RECENTLY_ADDED         -> runLdapReportData(dc,
-                    "(createTimestamp>=" + lookbackTimestamp(params) + ")", null);
+                    buildRecentFilter("createTimestamp", params), null);
             case RECENTLY_MODIFIED      -> runLdapReportData(dc,
-                    "(modifyTimestamp>=" + lookbackTimestamp(params) + ")", null);
+                    buildRecentFilter("modifyTimestamp", params), null);
             case RECENTLY_DELETED       -> runDeletedReportData(directoryId, params);
             case DISABLED_ACCOUNTS      -> runDisabledAccountsReportData(dc);
             case MISSING_PROFILE_GROUPS -> runMissingProfileGroupsReportData(dc, directoryId);
@@ -371,23 +372,42 @@ public class ReportExecutionService {
     private ReportData runDeletedReportData(UUID directoryId, Map<String, Object> params) {
         int lookbackDays = lookbackDays(params);
         OffsetDateTime from = OffsetDateTime.now().minusDays(lookbackDays);
+        Object objectType = params.get("objectType");
+        boolean includeUsers = objectType == null || objectType.toString().isBlank() || "USER".equalsIgnoreCase(objectType.toString());
+        boolean includeGroups = objectType == null || objectType.toString().isBlank() || "GROUP".equalsIgnoreCase(objectType.toString());
 
-        // Internal deletes
-        var internalDeletes = auditEventRepo.findAll(
-                directoryId, null, AuditAction.USER_DELETE.getDbValue(),
-                null, from, null, Pageable.unpaged());
+        List<AuditEvent> allDeletes = new ArrayList<>();
+
+        // User deletes
+        if (includeUsers) {
+            var internalDeletes = auditEventRepo.findAll(
+                    directoryId, null, AuditAction.USER_DELETE.getDbValue(),
+                    null, from, null, Pageable.unpaged());
+            allDeletes.addAll(internalDeletes.getContent());
+        }
+
+        // Group deletes
+        if (includeGroups) {
+            var groupDeletes = auditEventRepo.findAll(
+                    directoryId, null, AuditAction.GROUP_DELETE.getDbValue(),
+                    null, from, null, Pageable.unpaged());
+            allDeletes.addAll(groupDeletes.getContent());
+        }
+
+        // Treat combined list as "internal deletes"
+        var internalDeletes = new org.springframework.data.domain.PageImpl<>(allDeletes);
 
         // Changelog deletes (LDAP_CHANGE events where detail contains delete indicators)
         var changelogDeletes = auditEventRepo.findAll(
                 directoryId, null, AuditAction.LDAP_CHANGE.getDbValue(),
                 null, from, null, Pageable.unpaged());
 
-        List<String> columns = List.of("User", "Deleted By", "Deleted At", "Source");
+        List<String> columns = List.of("Entry", "Deleted By", "Deleted At", "Source");
         List<Map<String, String>> rows = new ArrayList<>();
 
         internalDeletes.getContent().forEach(e -> {
             Map<String, String> row = new LinkedHashMap<>();
-            row.put("User",       e.getTargetDn() != null ? e.getTargetDn() : "");
+            row.put("Entry",      e.getTargetDn() != null ? e.getTargetDn() : "");
             row.put("Deleted By", e.getActorUsername() != null ? e.getActorUsername() : "");
             row.put("Deleted At", e.getOccurredAt() != null ? e.getOccurredAt().toString() : "");
             row.put("Source",     "Internal");
@@ -398,7 +418,7 @@ public class ReportExecutionService {
                 .filter(e -> e.getDetail() != null && isDeleteChange(e.getDetail()))
                 .forEach(e -> {
                     Map<String, String> row = new LinkedHashMap<>();
-                    row.put("User",       e.getTargetDn() != null ? e.getTargetDn() : "");
+                    row.put("Entry",      e.getTargetDn() != null ? e.getTargetDn() : "");
                     row.put("Deleted By", "Changelog");
                     row.put("Deleted At", e.getOccurredAt() != null ? e.getOccurredAt().toString() : "");
                     row.put("Source",     "Changelog");
@@ -746,6 +766,26 @@ public class ReportExecutionService {
     private String buildGroupFilter(Map<String, Object> params) {
         String groupDn = requireString(params, "groupDn");
         return "(memberOf=" + Filter.encodeValue(groupDn) + ")";
+    }
+
+    /**
+     * Builds an LDAP filter for recently-added/modified reports with optional
+     * object type filtering (USER, GROUP, or all).
+     */
+    private String buildRecentFilter(String timestampAttr, Map<String, Object> params) {
+        String ts = lookbackTimestamp(params);
+        String timeFilter = "(" + timestampAttr + ">=" + ts + ")";
+        Object objectType = params.get("objectType");
+        if (objectType == null || objectType.toString().isBlank()) {
+            return timeFilter;
+        }
+        String typeFilter = switch (objectType.toString().toUpperCase()) {
+            case "USER" -> "(|(objectClass=inetOrgPerson)(&(objectClass=user)(!(objectClass=computer))))";
+            case "GROUP" -> "(|(objectClass=groupOfNames)(objectClass=groupOfUniqueNames)(objectClass=posixGroup)(objectClass=group))";
+            default -> "";
+        };
+        if (typeFilter.isEmpty()) return timeFilter;
+        return "(&" + timeFilter + typeFilter + ")";
     }
 
     private String lookbackTimestamp(Map<String, Object> params) {
