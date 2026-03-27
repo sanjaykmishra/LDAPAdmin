@@ -20,14 +20,21 @@
     </Teleport>
 
     <!-- Sidebar -->
-    <aside class="w-60 text-white flex flex-col shrink-0" :style="{ backgroundColor: settings.secondaryColour }">
-      <!-- Logo -->
-      <div class="px-5 py-4 border-b border-white/15">
-        <span class="text-lg font-bold tracking-tight">{{ settings.appName }}</span>
+    <aside :class="['text-white flex flex-col shrink-0 transition-all duration-200', collapsed ? 'w-14' : 'w-60']"
+           :style="{ backgroundColor: settings.secondaryColour }">
+      <!-- Logo + collapse toggle -->
+      <div class="px-3 py-4 border-b border-white/15 flex items-center justify-between">
+        <span v-if="!collapsed" class="text-lg font-bold tracking-tight pl-2">{{ settings.appName }}</span>
+        <button @click="collapsed = !collapsed" class="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors" :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path v-if="collapsed" stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+            <path v-else stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+          </svg>
+        </button>
       </div>
 
       <!-- Profile picker (admin users only) -->
-      <div v-if="!auth.isSuperadmin" class="px-3 py-3 border-b border-white/15">
+      <div v-if="!auth.isSuperadmin && !collapsed" class="px-3 py-3 border-b border-white/15">
         <label class="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Profile</label>
         <select
           v-model="pickerValue"
@@ -47,40 +54,37 @@
           <template v-if="currentDirId">
             <RouterLink :to="{ path: `/directories/${currentDirId}/users` }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="6" r="3.25"/><path d="M3.5 17.5c0-3.59 2.91-6.5 6.5-6.5s6.5 2.91 6.5 6.5"/></svg>
-              Users
+              <span v-if="!collapsed">Users</span>
             </RouterLink>
             <RouterLink :to="{ path: `/directories/${currentDirId}/groups` }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="6" r="2.75"/><circle cx="13.5" cy="6" r="2.75"/><path d="M1.5 17c0-3.04 2.46-5.5 5.5-5.5 1.26 0 2.42.42 3.35 1.14M12 11.64A5.48 5.48 0 0 1 18.5 17"/></svg>
-              Groups
-            </RouterLink>
-            <RouterLink :to="{ path: `/directories/${currentDirId}/audit` }" class="nav-item">
-              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><path d="M7 6h6M7 10h6M7 14h3"/></svg>
-              Audit Log
-            </RouterLink>
-            <RouterLink :to="{ path: `/directories/${currentDirId}/bulk` }" class="nav-item">
-              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v12M10 2l4 4M10 2 6 6"/><path d="M3 13v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
-              Bulk Import/Export
-            </RouterLink>
-            <RouterLink :to="{ path: `/directories/${currentDirId}/reports` }" class="nav-item">
-              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V10M10 16V4M15 16v-4"/></svg>
-              Reports
-            </RouterLink>
-            <RouterLink :to="{ path: `/directories/${currentDirId}/hr` }" class="nav-item">
-              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="5" r="2.5"/><path d="M2 14c0-2.76 2.24-5 5-5s5 2.24 5 5"/><path d="M14 6h4M14 9h3M14 12h2"/></svg>
-              HR Integration
-            </RouterLink>
-            <RouterLink :to="{ path: `/directories/${currentDirId}/playbooks` }" class="nav-item">
-              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12M4 8h12M4 12h8M4 16h6"/><path d="M15 12l2 2-2 2"/></svg>
-              Playbooks
+              <span v-if="!collapsed">Groups</span>
             </RouterLink>
             <RouterLink :to="{ path: `/directories/${currentDirId}/approvals` }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-4z"/><path d="M7 10l2 2 4-4"/></svg>
-              Approvals
+              <span v-if="!collapsed">Approvals</span>
               <span v-if="pendingCount > 0" class="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{{ pendingCount }}</span>
+            </RouterLink>
+            <RouterLink :to="{ path: `/directories/${currentDirId}/playbooks` }" class="nav-item">
+              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12M4 8h12M4 12h8M4 16h6"/><path d="M15 12l2 2-2 2"/></svg>
+              <span v-if="!collapsed">Playbooks</span>
+            </RouterLink>
+            <RouterLink :to="{ path: `/directories/${currentDirId}/reports` }" class="nav-item">
+              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V10M10 16V4M15 16v-4"/></svg>
+              <span v-if="!collapsed">Reports</span>
+            </RouterLink>
+            <RouterLink :to="{ path: `/directories/${currentDirId}/bulk` }" class="nav-item">
+              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v12M10 2l4 4M10 2 6 6"/><path d="M3 13v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
+              <span v-if="!collapsed">Bulk Import/Export</span>
             </RouterLink>
             <RouterLink :to="{ path: `/directories/${currentDirId}/access-reviews` }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M9 11l8-8"/><path d="M14 3h3v3"/></svg>
-              Access Reviews
+              <span v-if="!collapsed">Access Reviews</span>
+              <span v-if="activeReviewCount > 0" class="ml-auto bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{{ activeReviewCount }}</span>
+            </RouterLink>
+            <RouterLink :to="{ path: `/directories/${currentDirId}/audit` }" class="nav-item">
+              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><path d="M7 6h6M7 10h6M7 14h3"/></svg>
+              <span v-if="!collapsed">Audit Log</span>
             </RouterLink>
           </template>
 
@@ -90,91 +94,109 @@
         <template v-if="auth.isSuperadmin">
           <RouterLink to="/superadmin/dashboard" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg>
-            Dashboard
+            <span v-if="!collapsed">Dashboard</span>
           </RouterLink>
 
           <!-- Explore -->
-          <p class="nav-header">Explore</p>
+          <button v-if="!collapsed" @click="sections.explore = !sections.explore" class="nav-section-toggle">
+            Explore
+            <svg :class="['w-3 h-3 transition-transform', sections.explore ? '' : '-rotate-90']" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+          </button>
+          <template v-if="sections.explore || collapsed">
           <RouterLink to="/superadmin/directory-browser" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h5l2 2h7a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M8 10h4M10 8v4"/></svg>
-            Directory Browser
+            <span v-if="!collapsed">Directory Browser</span>
           </RouterLink>
           <RouterLink to="/superadmin/directory-search" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M14 14l4 4"/></svg>
-            Directory Search
+            <span v-if="!collapsed">Directory Search</span>
           </RouterLink>
           <RouterLink to="/superadmin/directory-schema" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M18 18l-4-4"/></svg>
-            Schema Browser
+            <span v-if="!collapsed">Schema Browser</span>
           </RouterLink>
+          </template>
 
           <!-- Report -->
-          <p class="nav-header">Report</p>
+          <button v-if="!collapsed" @click="sections.report = !sections.report" class="nav-section-toggle">
+            Report
+            <svg :class="['w-3 h-3 transition-transform', sections.report ? '' : '-rotate-90']" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+          </button>
+          <template v-if="sections.report || collapsed">
           <RouterLink to="/superadmin/reports" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V10M10 16V4M15 16v-4"/></svg>
-            Operational Reports
+            <span v-if="!collapsed">Operational Reports</span>
           </RouterLink>
           <RouterLink to="/superadmin/audit-reports" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-4z"/><path d="M7 10l2 2 4-4"/></svg>
-            Compliance Reports
+            <span v-if="!collapsed">Compliance Reports</span>
           </RouterLink>
           <RouterLink to="/superadmin/auditor-links" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.94a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L5.25 8.25"/></svg>
-            Auditor Links
+            <span v-if="!collapsed">Auditor Links</span>
           </RouterLink>
+          </template>
 
           <!-- Configure -->
-          <p class="nav-header">Configure</p>
+          <button v-if="!collapsed" @click="sections.configure = !sections.configure" class="nav-section-toggle">
+            Configure
+            <svg :class="['w-3 h-3 transition-transform', sections.configure ? '' : '-rotate-90']" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+          </button>
+          <template v-if="sections.configure || collapsed">
           <RouterLink to="/superadmin/directories" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2V5z"/><path d="M6.5 3v14"/><path d="M2.5 7h4M2.5 11h4"/></svg>
-            Directory Connections
+            <span v-if="!collapsed">Directory Connections</span>
           </RouterLink>
           <RouterLink to="/superadmin/hr" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="5" r="2.5"/><path d="M2 14c0-2.76 2.24-5 5-5s5 2.24 5 5"/><path d="M14 6h4M14 9h3M14 12h2"/></svg>
-            HR Integration
+            <span v-if="!collapsed">HR Integration</span>
           </RouterLink>
           <RouterLink to="/superadmin/audit-sources" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16z"/><path d="M10 6v4l2.5 2.5"/></svg>
-            Audit Sources
+            <span v-if="!collapsed">Audit Sources</span>
           </RouterLink>
           <RouterLink to="/superadmin/access-reviews" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M9 11l8-8"/><path d="M14 3h3v3"/></svg>
-            Access Reviews
+            <span v-if="!collapsed">Access Reviews</span>
           </RouterLink>
           <RouterLink to="/superadmin/sod-policies" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h5v5H4zM11 4h5v5h-5zM4 11h5v5H4z"/><path d="M11 11h5v5h-5"/><path d="M11 11l5 5M16 11l-5 5"/></svg>
-            SoD Policy
+            <span v-if="!collapsed">SoD Policy</span>
           </RouterLink>
           <RouterLink to="/superadmin/access-drift" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l4-8 4 4 6-10"/><path d="M14 3h4v4"/></svg>
-            Access Drift Policy
+            <span v-if="!collapsed">Access Drift Policy</span>
           </RouterLink>
           <RouterLink to="/superadmin/profiles" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><path d="M7 6h6M7 10h6M7 14h3"/><path d="M14 13l1.5 1.5 3-3"/></svg>
-            Provisioning Profiles
+            <span v-if="!collapsed">Provisioning Profiles</span>
           </RouterLink>
           <RouterLink to="/superadmin/playbooks" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12M4 8h12M4 12h8M4 16h6"/><path d="M15 12l2 2-2 2"/></svg>
-            Lifecycle Playbooks
+            <span v-if="!collapsed">Lifecycle Playbooks</span>
           </RouterLink>
           <RouterLink to="/settings" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.5"/><path d="M10 1.5v2M10 16.5v2M18.5 10h-2M3.5 10h-2M16 4l-1.4 1.4M5.4 14.6 4 16M16 16l-1.4-1.4M5.4 5.4 4 4"/></svg>
-            Application Settings
+            <span v-if="!collapsed">Application Settings</span>
           </RouterLink>
           <RouterLink to="/superadmin/admins" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="5.5" r="3.25"/><path d="M3.5 18c0-3.59 2.91-6.5 6.5-6.5s6.5 2.91 6.5 6.5"/><path d="M13.5 2.5l1 2 2 .5-1.5 1.5.5 2-2-1.25L11.5 8.5l.5-2L10.5 5l2-.5 1-2z"/></svg>
-            Application Accounts
+            <span v-if="!collapsed">Application Accounts</span>
           </RouterLink>
+          </template>
         </template>
       </nav>
 
       <!-- User info / logout -->
-      <div class="px-4 py-3 border-t border-white/15 flex items-center justify-between">
-        <button @click="showPreferences = true" class="text-sm truncate text-left hover:text-white/90 transition-colors" title="User Preferences">
-          <p class="font-medium">{{ auth.username }}</p>
-          <p class="text-xs text-gray-400">{{ auth.isSuperadmin ? 'Superadmin' : 'Admin' }}</p>
+      <div class="px-3 py-3 border-t border-white/15 flex items-center justify-between">
+        <button @click="showPreferences = true" class="text-sm truncate text-left hover:text-white/90 transition-colors" :title="auth.username">
+          <template v-if="!collapsed">
+            <p class="font-medium">{{ auth.username }}</p>
+            <p class="text-xs text-gray-400">{{ auth.isSuperadmin ? 'Superadmin' : 'Admin' }}</p>
+          </template>
+          <div v-else class="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">{{ (auth.username || '?')[0].toUpperCase() }}</div>
         </button>
-        <button @click="handleLogout" class="text-gray-400 hover:text-white text-xs ml-2">Logout</button>
+        <button v-if="!collapsed" @click="handleLogout" class="text-gray-400 hover:text-white text-xs ml-2">Logout</button>
       </div>
     </aside>
 
@@ -195,14 +217,17 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { usePermissions } from '@/composables/usePermissions'
 import { useSettingsStore } from '@/stores/settings'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { myProfiles } from '@/api/auth'
 import { countPendingApprovals } from '@/api/approvals'
+import { listCampaigns } from '@/api/accessReviews'
 import KeyboardShortcutsHelp from '@/components/KeyboardShortcutsHelp.vue'
 import UserPreferencesDialog from '@/components/UserPreferencesDialog.vue'
 
 const auth     = useAuthStore()
+const { hasFeature } = usePermissions()
 const settings = useSettingsStore()
 
 onMounted(() => settings.init())
@@ -213,6 +238,9 @@ const profiles       = ref([])   // flat list of authorized profiles (admin only
 const pickerValue    = ref('')   // profile id
 const showNoProfiles = ref(false)
 const pendingCount   = ref(0)
+const activeReviewCount = ref(0)
+const collapsed      = ref(false)
+const sections       = ref({ explore: true, report: true, configure: true })
 const showPreferences = ref(false)
 
 // Derive the directory id from the selected profile
@@ -281,6 +309,15 @@ watch(currentDirId, async (newDirId) => {
   } catch { pendingCount.value = 0 }
 }, { immediate: true })
 
+// Load active review count for badge
+watch(currentDirId, async (newDirId) => {
+  if (!newDirId) { activeReviewCount.value = 0; return }
+  try {
+    const { data } = await listCampaigns(newDirId, { size: 1, status: 'ACTIVE' })
+    activeReviewCount.value = data.totalElements || 0
+  } catch { activeReviewCount.value = 0 }
+}, { immediate: true })
+
 async function handleNoProfilesOk() {
   showNoProfiles.value = false
   await auth.logout()
@@ -303,4 +340,7 @@ async function handleLogout() {
 }
 .nav-icon { @apply w-5 h-5 shrink-0; }
 .nav-header { @apply text-xs text-gray-400 uppercase tracking-wider mt-4 mb-1 px-3; }
+.nav-section-toggle {
+  @apply flex items-center justify-between w-full text-xs text-gray-400 uppercase tracking-wider mt-4 mb-1 px-3 py-1 rounded hover:text-white/70 transition-colors cursor-pointer;
+}
 </style>
