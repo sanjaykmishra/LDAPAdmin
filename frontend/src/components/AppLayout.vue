@@ -65,7 +65,7 @@
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V10M10 16V4M15 16v-4"/></svg>
               Reports
             </RouterLink>
-            <RouterLink :to="{ path: `/directories/${currentDirId}/hr` }" class="nav-item">
+            <RouterLink v-if="hasFeature('hr.manage')" :to="{ path: `/directories/${currentDirId}/hr` }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="5" r="2.5"/><path d="M2 14c0-2.76 2.24-5 5-5s5 2.24 5 5"/><path d="M14 6h4M14 9h3M14 12h2"/></svg>
               HR Integration
             </RouterLink>
@@ -195,6 +195,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { usePermissions } from '@/composables/usePermissions'
 import { useSettingsStore } from '@/stores/settings'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { myProfiles } from '@/api/auth'
@@ -203,6 +204,7 @@ import KeyboardShortcutsHelp from '@/components/KeyboardShortcutsHelp.vue'
 import UserPreferencesDialog from '@/components/UserPreferencesDialog.vue'
 
 const auth     = useAuthStore()
+const { hasFeature } = usePermissions()
 const settings = useSettingsStore()
 
 onMounted(() => settings.init())
