@@ -158,7 +158,7 @@ async function doCommit() {
       `${data.userBaseDnsAdded} user base DNs added, ${data.groupBaseDnsAdded} group base DNs added.`)
 
     if (data.warnings?.length) {
-      for (const w of data.warnings) notif.warn(w)
+      for (const w of data.warnings) notif.warning(w)
     }
 
     router.push('/superadmin/profiles')

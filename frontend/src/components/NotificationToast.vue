@@ -4,7 +4,7 @@
       <div
         v-for="n in store.items"
         :key="n.id"
-        class="pointer-events-auto relative overflow-hidden rounded-xl shadow-lg border"
+        class="pointer-events-auto relative overflow-hidden rounded-xl shadow-lg border-l-4"
         :class="toastClass(n.type)"
       >
         <div class="flex items-start gap-3 px-4 py-3">
@@ -44,10 +44,10 @@ const store = useNotificationStore()
 
 function toastClass(type) {
   switch (type) {
-    case 'success': return 'bg-white border-green-200 text-green-800'
-    case 'error':   return 'bg-white border-red-200 text-red-800'
-    case 'warning': return 'bg-white border-amber-200 text-amber-800'
-    default:        return 'bg-white border-blue-200 text-blue-800'
+    case 'success': return 'bg-green-50 border-green-500 text-green-800'
+    case 'error':   return 'bg-red-50 border-red-500 text-red-800'
+    case 'warning': return 'bg-amber-50 border-amber-500 text-amber-800'
+    default:        return 'bg-blue-50 border-blue-500 text-blue-800'
   }
 }
 </script>
