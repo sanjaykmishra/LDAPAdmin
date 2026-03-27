@@ -26,10 +26,10 @@
         <tbody class="divide-y divide-gray-50">
           <tr v-for="d in dirs" :key="d.id" class="hover:bg-gray-50">
             <td class="px-4 py-3 font-medium text-gray-900">{{ d.displayName }}</td>
-            <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ d.host }}</td>
+            <td class="px-4 py-3 text-gray-600">{{ d.host }}</td>
             <td class="px-4 py-3 text-gray-600">{{ d.port }}</td>
-            <td class="px-4 py-3 text-gray-600 text-xs">{{ d.sslMode }}</td>
-            <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ d.baseDn }}</td>
+            <td class="px-4 py-3 text-gray-600">{{ d.sslMode }}</td>
+            <td class="px-4 py-3 text-gray-600">{{ d.baseDn }}</td>
             <td class="px-4 py-3">
               <span :class="d.enabled ? 'text-green-600' : 'text-gray-400'" class="text-xs font-medium">
                 {{ d.enabled ? 'Yes' : 'No' }}

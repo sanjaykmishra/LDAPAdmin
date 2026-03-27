@@ -133,6 +133,7 @@ public class ProvisioningProfileService {
 
         // Replace group assignments
         groupAssignmentRepo.deleteAllByProfileId(profileId);
+        groupAssignmentRepo.flush();
         saveGroupAssignments(profile, req.groupAssignments());
 
         return toResponse(profile);

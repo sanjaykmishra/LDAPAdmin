@@ -1,7 +1,10 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Groups</h1>
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">Groups</h1>
+        <p class="text-sm text-gray-500 mt-1">Manage groups in this directory</p>
+      </div>
       <div class="flex items-center gap-2">
         <div v-if="allProfiles.length > 1" class="flex items-center gap-2">
           <label class="text-sm text-gray-600 font-medium">Profile:</label>

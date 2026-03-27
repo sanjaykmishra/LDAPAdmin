@@ -1,7 +1,10 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Separation of Duties Policies</h1>
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">Separation of Duties Policies</h1>
+        <p class="text-sm text-gray-500 mt-1">Define conflicting group pairs to detect segregation of duties violations</p>
+      </div>
       <router-link :to="{ name: 'sodPolicyCreate', params: { dirId } }" v-if="dirId" class="btn-primary text-sm">
           New Policy
         </router-link>

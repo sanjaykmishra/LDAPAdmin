@@ -1,6 +1,7 @@
 <template>
   <div class="p-6">
     <h1 class="text-2xl font-bold text-gray-900 mb-6">Referential Integrity Checker</h1>
+    <p class="text-sm text-gray-500 mt-1">Detect broken group membership references and orphaned entries</p>
 
     <!-- Configuration form -->
     <div class="bg-white border border-gray-200 rounded-xl p-5 mb-6">

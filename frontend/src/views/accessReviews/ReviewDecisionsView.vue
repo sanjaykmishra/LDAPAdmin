@@ -4,7 +4,10 @@
       <button @click="$router.back()" class="text-gray-400 hover:text-gray-600">
         <svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
       </button>
-      <h1 class="text-2xl font-bold text-gray-900">Review Decisions</h1>
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">Review Decisions</h1>
+        <p class="text-sm text-gray-500 mt-1">Review and decide on group membership access</p>
+      </div>
     </div>
 
     <!-- Progress summary -->
@@ -92,13 +95,13 @@
               <td class="px-4 py-3">
                 <div class="font-medium text-gray-900">{{ row.memberDisplay || '—' }}</div>
               </td>
-              <td class="px-4 py-3 font-mono text-xs text-gray-500 max-w-xs truncate" :title="row.memberDn">{{ row.memberDn }}</td>
+              <td class="px-4 py-3 text-gray-500 max-w-xs truncate" :title="row.memberDn">{{ row.memberDn }}</td>
               <td class="px-4 py-3">
                 <span v-if="row.decision" :class="decisionBadge(row.decision)">{{ row.decision }}</span>
                 <span v-else class="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">PENDING</span>
               </td>
               <td class="px-4 py-3 text-gray-600">{{ row.decidedByUsername || '—' }}</td>
-              <td class="px-4 py-3 text-gray-500 font-mono text-xs whitespace-nowrap">{{ fmtDateTime(row.decidedAt) }}</td>
+              <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ fmtDateTime(row.decidedAt) }}</td>
               <td class="px-4 py-3 text-right">
                 <div v-if="!row.decision" class="flex gap-1 justify-end">
                   <button @click="handleDecision(row, 'CONFIRM')" :disabled="loading"

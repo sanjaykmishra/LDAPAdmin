@@ -1,6 +1,7 @@
 <template>
   <div class="p-6 h-full flex flex-col">
     <h1 class="text-2xl font-bold text-gray-900 mb-4">Directory Browser</h1>
+    <p class="text-sm text-gray-500 mt-1">Browse and manage the LDAP directory tree</p>
 
     <!-- Directory picker -->
     <div class="mb-4">

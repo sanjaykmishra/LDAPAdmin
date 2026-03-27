@@ -324,11 +324,42 @@ const autoIncludedProfiles = computed(() => {
     .map(p => ({ id: p.id, name: p.name }))
 })
 
-// Effective groups shown in the response
+// Effective groups — live preview merging own + additional + auto-include groups
 const effectiveGroups = computed(() => {
-  // Find the current profile in the profiles list
-  const current = profiles.value.find(p => p.id === editing.value)
-  return current?.effectiveGroupAssignments || []
+  const seen = new Map()
+
+  // 1. Own groups (from dialog state)
+  for (const g of profile.value.groupAssignments) {
+    if (g.groupDn && !seen.has(g.groupDn)) {
+      seen.set(g.groupDn, { groupDn: g.groupDn, memberAttribute: g.memberAttribute })
+    }
+  }
+
+  // 2. Explicit additional profiles (selected in dialog)
+  for (const apId of profile.value.additionalProfileIds) {
+    const ap = profiles.value.find(p => p.id === apId)
+    if (!ap) continue
+    for (const g of (ap.groupAssignments || [])) {
+      if (!seen.has(g.groupDn)) {
+        seen.set(g.groupDn, { groupDn: g.groupDn, memberAttribute: g.memberAttribute })
+      }
+    }
+  }
+
+  // 3. Auto-include profiles (unless excluded)
+  if (!profile.value.excludeAutoIncludes) {
+    for (const ai of autoIncludedProfiles.value) {
+      const ap = profiles.value.find(p => p.id === ai.id)
+      if (!ap) continue
+      for (const g of (ap.groupAssignments || [])) {
+        if (!seen.has(g.groupDn)) {
+          seen.set(g.groupDn, { groupDn: g.groupDn, memberAttribute: g.memberAttribute })
+        }
+      }
+    }
+  }
+
+  return [...seen.values()]
 })
 
 function toggleAdditionalProfile(profileId) {
@@ -704,7 +735,10 @@ function toggleApprover(accountId) {
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Provisioning Profiles</h1>
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">Provisioning Profiles</h1>
+        <p class="text-sm text-gray-500 mt-1">Configure provisioning profiles and attribute mappings</p>
+      </div>
       <button class="btn-primary" @click="openCreate">+ Create Profile</button>
     </div>
 
@@ -713,10 +747,10 @@ function toggleApprover(accountId) {
         <span class="font-medium">{{ row.name }}</span>
       </template>
       <template #cell-targetOuDn="{ value }">
-        <span class="font-mono text-xs text-gray-600">{{ value }}</span>
+        <span class="text-gray-600 truncate block max-w-xs" :title="value">{{ value }}</span>
       </template>
       <template #cell-objectClassNames="{ value }">
-        <span class="text-xs text-gray-600">{{ value.join(', ') }}</span>
+        <span class="text-gray-600">{{ value.join(', ') }}</span>
       </template>
       <template #cell-enabled="{ value }">
         <span :class="value ? 'text-green-600' : 'text-gray-400'">{{ value ? 'Enabled' : 'Disabled' }}</span>

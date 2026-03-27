@@ -1,7 +1,10 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Operational Reports</h1>
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">Operational Reports</h1>
+        <p class="text-sm text-gray-500 mt-1">Run and schedule directory reports</p>
+      </div>
       <button @click="openSchedules" class="bg-blue-50 border border-blue-200 text-blue-600 rounded-full px-4 py-1.5 text-sm font-medium hover:bg-blue-100 transition-colors flex items-center gap-1.5">
         <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2.5"/></svg>
         Scheduled Jobs
@@ -147,10 +150,10 @@
           <tbody class="divide-y divide-gray-50">
             <tr v-for="job in jobs" :key="job.id" class="hover:bg-gray-50">
               <td class="px-3 py-2 font-medium text-gray-900">{{ job.name }}</td>
-              <td class="px-3 py-2 text-gray-600 text-xs">{{ labelFor(job.reportType) }}</td>
-              <td class="px-3 py-2 text-gray-600 font-mono text-xs">{{ job.cronExpression }}</td>
-              <td class="px-3 py-2 text-gray-600 text-xs">{{ job.outputFormat || 'CSV' }}</td>
-              <td class="px-3 py-2 text-gray-600 text-xs">{{ job.deliveryMethod }}</td>
+              <td class="px-3 py-2 text-gray-600">{{ labelFor(job.reportType) }}</td>
+              <td class="px-3 py-2 text-gray-600">{{ job.cronExpression }}</td>
+              <td class="px-3 py-2 text-gray-600">{{ job.outputFormat || 'CSV' }}</td>
+              <td class="px-3 py-2 text-gray-600">{{ job.deliveryMethod }}</td>
               <td class="px-3 py-2 text-gray-500 text-xs">
                 <span v-if="job.lastRunAt">{{ fmtDate(job.lastRunAt) }}</span>
                 <span v-else class="text-gray-300">—</span>
