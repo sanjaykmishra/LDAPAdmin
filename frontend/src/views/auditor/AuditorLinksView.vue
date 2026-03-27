@@ -3,11 +3,8 @@
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Auditor Links</h1>
       <button @click="showCreate = true" :disabled="!dirId"
-              class="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5">
-        <svg class="w-4 h-4" fill="none" viewBox="0 0 20 20" stroke="currentColor" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.94a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L5.25 8.25" />
-        </svg>
-        Share with Auditor
+              class="btn-primary">
+        + Generate Auditor Link
       </button>
     </div>
 
