@@ -27,11 +27,11 @@
         <tbody class="divide-y divide-gray-50">
           <tr v-for="s in sources" :key="s.id" class="hover:bg-gray-50">
             <td class="px-4 py-3 font-medium text-gray-900">{{ s.displayName }}</td>
-            <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ s.host }}</td>
+            <td class="px-4 py-3 text-gray-600">{{ s.host }}</td>
             <td class="px-4 py-3 text-gray-600">{{ s.port }}</td>
-            <td class="px-4 py-3 text-gray-600 text-xs">{{ s.sslMode }}</td>
-            <td class="px-4 py-3 text-gray-600 text-xs">{{ formatLabels[s.changelogFormat] || s.changelogFormat }}</td>
-            <td class="px-4 py-3 text-gray-600 font-mono text-xs">{{ s.changelogBaseDn }}</td>
+            <td class="px-4 py-3 text-gray-600">{{ s.sslMode }}</td>
+            <td class="px-4 py-3 text-gray-600">{{ formatLabels[s.changelogFormat] || s.changelogFormat }}</td>
+            <td class="px-4 py-3 text-gray-600">{{ s.changelogBaseDn }}</td>
             <td class="px-4 py-3">
               <span :class="s.enabled ? 'text-green-600' : 'text-gray-400'" class="text-xs font-medium">
                 {{ s.enabled ? 'Yes' : 'No' }}

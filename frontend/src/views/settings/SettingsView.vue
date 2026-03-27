@@ -1,6 +1,7 @@
 <template>
   <div class="p-6 max-w-3xl">
     <h1 class="text-2xl font-bold text-gray-900 mb-4">Application Settings</h1>
+    <p class="text-sm text-gray-500 mt-1">Configure application-wide settings and branding</p>
 
     <div v-if="loading" class="text-gray-500 text-sm">Loading…</div>
 

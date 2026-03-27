@@ -1,6 +1,7 @@
 <template>
   <div class="p-6">
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Cross-Campaign Report</h1>
+    <h1 class="text-2xl font-bold text-gray-900">Cross-Campaign Report</h1>
+    <p class="text-sm text-gray-500 mt-1 mb-6">Compare decisions across multiple access review campaigns</p>
 
     <!-- Filters -->
     <div class="flex flex-wrap items-end gap-4 mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">

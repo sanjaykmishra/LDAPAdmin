@@ -1,6 +1,7 @@
 <template>
   <div class="p-6 max-w-5xl">
     <h1 class="text-2xl font-bold text-gray-900 mb-6">HR Integration</h1>
+    <p class="text-sm text-gray-500 mt-1">Connect to your HR system for identity lifecycle management</p>
 
     <!-- Directory picker -->
     <div v-if="showPicker" class="mb-6">

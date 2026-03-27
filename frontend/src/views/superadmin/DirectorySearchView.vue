@@ -1,6 +1,7 @@
 <template>
   <div class="p-6">
     <h1 class="text-2xl font-bold text-gray-900 mb-4">Directory Search</h1>
+    <p class="text-sm text-gray-500 mt-1">Search for entries across directories using LDAP filters</p>
 
     <!-- Directory picker -->
     <div class="mb-4">

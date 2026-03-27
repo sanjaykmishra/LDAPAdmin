@@ -1,6 +1,7 @@
 <template>
   <div class="p-6 max-w-3xl">
     <h1 class="text-2xl font-bold text-gray-900 mb-4">Bulk Import / Export</h1>
+    <p class="text-sm text-gray-500 mt-1">Import and export users and groups via CSV</p>
 
     <!-- Entity type selector -->
     <div class="flex gap-2 mb-4">

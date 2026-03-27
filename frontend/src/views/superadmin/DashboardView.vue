@@ -171,7 +171,10 @@ onUnmounted(() => {
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Compliance Posture Dashboard</h1>
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">Compliance Posture Dashboard</h1>
+        <p class="text-sm text-gray-500 mt-1">Compliance posture overview across all directories</p>
+      </div>
       <button @click="loadDashboard" :disabled="loading" class="text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50">
         {{ loading ? 'Refreshing...' : 'Refresh' }}
       </button>

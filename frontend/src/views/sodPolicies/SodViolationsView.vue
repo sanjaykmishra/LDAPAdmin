@@ -1,7 +1,10 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">SoD Violations</h1>
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">SoD Violations</h1>
+        <p class="text-sm text-gray-500 mt-1">Users who violate separation of duties policies</p>
+      </div>
       <div class="flex gap-2 items-center" v-if="dirId">
         <label class="text-sm text-gray-600">Filter:</label>
         <select v-model="statusFilter" @change="loadViolations"

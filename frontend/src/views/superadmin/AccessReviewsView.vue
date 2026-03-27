@@ -1,7 +1,10 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Access Reviews</h1>
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">Access Reviews</h1>
+        <p class="text-sm text-gray-500 mt-1">Manage access review campaigns across all directories</p>
+      </div>
       <button v-if="selectedDir" @click="goCreate" class="btn-primary">New Campaign</button>
     </div>
 
