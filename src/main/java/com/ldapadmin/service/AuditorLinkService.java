@@ -53,12 +53,6 @@ public class AuditorLinkService {
         String token = cryptoService.generateToken();
         OffsetDateTime expiresAt = OffsetDateTime.now().plusDays(request.expiryDays());
 
-        // Compute HMAC over (token + directoryId + scope + expiresAt)
-        String signatureInput = token + directoryId + request.campaignIds()
-                + request.includeSod() + request.includeEntitlements()
-                + request.includeAuditEvents() + expiresAt;
-        String hmac = cryptoService.hmacSha256(signatureInput.getBytes(StandardCharsets.UTF_8));
-
         AuditorLink link = AuditorLink.builder()
                 .directory(directory)
                 .token(token)
@@ -70,9 +64,12 @@ public class AuditorLinkService {
                 .dataFrom(request.dataFrom())
                 .dataTo(request.dataTo())
                 .expiresAt(expiresAt)
-                .hmacSignature(hmac)
+                .hmacSignature("pending") // placeholder — computed below from entity fields
                 .createdBy(creator)
                 .build();
+
+        // Compute HMAC from entity fields (must match validateToken exactly)
+        link.setHmacSignature(computeHmac(link));
 
         AuditorLink saved = auditorLinkRepo.save(link);
 
@@ -166,12 +163,7 @@ public class AuditorLinkService {
         }
 
         // Verify HMAC signature (tamper detection)
-        String signatureInput = link.getToken() + link.getDirectory().getId()
-                + link.getCampaignIds() + link.isIncludeSod()
-                + link.isIncludeEntitlements() + link.isIncludeAuditEvents()
-                + link.getExpiresAt();
-        String expectedHmac = cryptoService.hmacSha256(
-                signatureInput.getBytes(StandardCharsets.UTF_8));
+        String expectedHmac = computeHmac(link);
 
         if (!MessageDigest.isEqual(
                 expectedHmac.getBytes(StandardCharsets.UTF_8),
@@ -186,5 +178,21 @@ public class AuditorLinkService {
         auditorLinkRepo.save(link);
 
         return link;
+    }
+
+    /**
+     * Computes the HMAC-SHA256 signature for the given link entity.
+     * Used by both create (to sign) and validateToken (to verify).
+     * The input string must be identical in both paths to avoid mismatches.
+     */
+    private String computeHmac(AuditorLink link) {
+        String signatureInput = link.getToken()
+                + link.getDirectory().getId()
+                + link.getCampaignIds()
+                + link.isIncludeSod()
+                + link.isIncludeEntitlements()
+                + link.isIncludeAuditEvents()
+                + link.getExpiresAt();
+        return cryptoService.hmacSha256(signatureInput.getBytes(StandardCharsets.UTF_8));
     }
 }
