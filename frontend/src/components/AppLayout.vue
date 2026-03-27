@@ -98,7 +98,7 @@
         <template v-if="auth.isSuperadmin">
           <RouterLink to="/superadmin/dashboard" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg>
-            Dashboard
+            <span v-if="!collapsed">Dashboard</span>
           </RouterLink>
 
           <!-- Explore -->
