@@ -130,6 +130,7 @@
                         @update:model-value="v => { local.attributes[attr.attributeName] = v }"
                         :directory-id="dirId"
                         :placeholder="'Select a DN'"
+                        :superadmin="false"
                       />
                     </template>
                     <FormField
@@ -206,6 +207,7 @@
                         v-model="local.attributes[attr.attributeName]"
                         :directory-id="dirId"
                         :placeholder="'Select a DN'"
+                        :superadmin="false"
                         :disabled="!attr.editableOnUpdate"
                       />
                     </template>
