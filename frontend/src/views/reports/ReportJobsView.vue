@@ -36,6 +36,14 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">Lookback Days</label>
           <input v-model.number="runForm.lookbackDays" type="number" min="1" class="input w-full" placeholder="30" />
         </div>
+        <div v-if="needsObjectTypeFilter">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Object Type</label>
+          <select v-model="runForm.objectType" class="input w-full">
+            <option value="">All</option>
+            <option value="USER">Users</option>
+            <option value="GROUP">Groups</option>
+          </select>
+        </div>
         <!-- Integrity check options -->
         <div v-if="isIntegrityCheck">
           <label class="block text-sm font-medium text-gray-700 mb-1">Checks to Run</label>
@@ -290,7 +298,7 @@ function fmtDate(iso) { return new Date(iso).toLocaleString() }
 // ── Report runner ─────────────────────────────────────────────────────────────
 
 const runForm = ref({
-  reportType: 'RECENTLY_ADDED', paramValue: '', lookbackDays: 30,
+  reportType: 'RECENTLY_ADDED', paramValue: '', lookbackDays: 30, objectType: '',
   integrityChecks: ['BROKEN_MEMBER', 'ORPHANED_ENTRY', 'EMPTY_GROUP'],
 })
 const running = ref(false)
@@ -307,6 +315,8 @@ const needsParam       = computed(() => !!currentRunType.value?.param)
 const paramLabel       = computed(() => currentRunType.value?.paramLabel ?? '')
 const paramPlaceholder = computed(() => currentRunType.value?.paramPlaceholder ?? '')
 const needsLookback    = computed(() => !!currentRunType.value?.lookback)
+const RECENTLY_TYPES = new Set(['RECENTLY_ADDED', 'RECENTLY_MODIFIED', 'RECENTLY_DELETED'])
+const needsObjectTypeFilter = computed(() => RECENTLY_TYPES.has(runForm.value.reportType))
 const isIntegrityCheck = computed(() => runForm.value.reportType === 'INTEGRITY_CHECK')
 
 // Show max 10 columns, hide internal columns like 'id'
@@ -341,6 +351,7 @@ function toggleSort(col) {
 function buildReportParams() {
   const params = { lookbackDays: runForm.value.lookbackDays || 30 }
   if (currentRunType.value?.param) params[currentRunType.value.param] = runForm.value.paramValue
+  if (runForm.value.objectType) params.objectType = runForm.value.objectType
   return params
 }
 
