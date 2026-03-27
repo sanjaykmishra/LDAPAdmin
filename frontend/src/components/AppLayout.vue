@@ -205,7 +205,12 @@
 
     <!-- Main content -->
     <main class="flex-1 overflow-y-auto">
-      <RouterView />
+      <BreadcrumbNav />
+      <RouterView v-slot="{ Component }">
+        <Transition name="page-fade" mode="out-in">
+          <component :is="Component" :key="$route.path" />
+        </Transition>
+      </RouterView>
     </main>
 
     <!-- Keyboard shortcuts help -->
@@ -213,6 +218,9 @@
 
     <!-- User preferences dialog -->
     <UserPreferencesDialog v-if="showPreferences" @close="showPreferences = false" />
+
+    <!-- Command palette (Cmd+K) -->
+    <CommandPalette />
   </div>
 </template>
 
@@ -229,6 +237,8 @@ import { listCampaigns } from '@/api/accessReviews'
 import KeyboardShortcutsHelp from '@/components/KeyboardShortcutsHelp.vue'
 import UserPreferencesDialog from '@/components/UserPreferencesDialog.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
+import BreadcrumbNav from '@/components/BreadcrumbNav.vue'
+import CommandPalette from '@/components/CommandPalette.vue'
 
 const auth     = useAuthStore()
 const { hasFeature } = usePermissions()
