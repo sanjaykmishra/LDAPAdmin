@@ -67,7 +67,7 @@
     </div>
 
     <!-- Create modal -->
-    <AppModal v-model="showCreate" title="Share with Auditor" size="lg">
+    <AppModal v-model="showCreate" title="New Auditor Link" size="lg">
       <div class="grid gap-4 md:grid-cols-2">
         <div class="md:col-span-2">
           <label class="block text-sm font-medium text-gray-700 mb-1">Label</label>
