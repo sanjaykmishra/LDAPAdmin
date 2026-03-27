@@ -295,8 +295,9 @@ const maxStep = computed(() => includeGroups.value ? 5 : 4)
 
       <!-- User OUs -->
       <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-        <div class="px-5 py-3 border-b border-gray-100">
+        <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
           <h2 class="text-sm font-semibold text-gray-700">Discovered User OUs ({{ proposal.profiles.length }})</h2>
+          <p class="text-xs text-gray-500">Select which OUs to create provisioning profiles for</p>
         </div>
         <div v-if="!proposal.profiles.length" class="px-5 py-8 text-center text-gray-400 text-sm">
           No user OUs discovered.
@@ -304,7 +305,7 @@ const maxStep = computed(() => includeGroups.value ? 5 : 4)
         <table v-else class="w-full text-sm">
           <thead class="bg-gray-50">
             <tr>
-              <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase w-10"></th>
+              <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Create Profile</th>
               <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">OU</th>
               <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Users</th>
               <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Object Classes</th>
