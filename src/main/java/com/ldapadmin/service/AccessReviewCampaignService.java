@@ -37,6 +37,7 @@ public class AccessReviewCampaignService {
     private final AccountRepository accountRepo;
     private final AuditService auditService;
     private final AccessReviewNotificationService notificationService;
+    private final NotificationService inAppNotificationService;
     private final CampaignReminderRepository reminderRepo;
 
     @Transactional
@@ -130,8 +131,18 @@ public class AccessReviewCampaignService {
         // Force-initialize lazy collections before passing to @Async notification
         campaign.getReviewGroups().forEach(g -> g.getReviewer().getUsername());
 
-        // Notify reviewers
+        // Notify reviewers (email + in-app)
         notificationService.notifyReviewersAssigned(campaign);
+        for (AccessReviewGroup group : campaign.getReviewGroups()) {
+            if (group.getReviewer() != null) {
+                inAppNotificationService.send(group.getReviewer().getId(),
+                        "REVIEW_ASSIGNED",
+                        "You've been assigned to review " + group.getGroupName() + " in " + campaign.getName(),
+                        null,
+                        "/directories/" + dir.getId() + "/access-reviews/" + campaignId,
+                        dir.getId());
+            }
+        }
 
         auditService.record(principal, dir.getId(), AuditAction.CAMPAIGN_ACTIVATED,
                 null, Map.of("campaignId", campaignId.toString(), "campaignName", campaign.getName()));
@@ -173,6 +184,16 @@ public class AccessReviewCampaignService {
         campaign.getCreatedBy().getUsername();
 
         notificationService.notifyCampaignClosed(campaign);
+        if (campaign.getCreatedBy() != null) {
+            long confirmed = decisionRepo.countByCampaignIdAndDecision(campaignId, com.ldapadmin.entity.enums.ReviewDecision.CONFIRM);
+            long revoked = decisionRepo.countByCampaignIdAndDecision(campaignId, com.ldapadmin.entity.enums.ReviewDecision.REVOKE);
+            inAppNotificationService.send(campaign.getCreatedBy().getId(),
+                    "CAMPAIGN_CLOSED",
+                    campaign.getName() + " closed: " + confirmed + " confirmed, " + revoked + " revoked",
+                    null,
+                    "/directories/" + dir.getId() + "/access-reviews/" + campaignId,
+                    dir.getId());
+        }
 
         auditService.record(principal, dir.getId(), AuditAction.CAMPAIGN_CLOSED,
                 null, Map.of("campaignId", campaignId.toString(), "campaignName", campaign.getName()));
