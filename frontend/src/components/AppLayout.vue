@@ -210,10 +210,8 @@
     <!-- Main content -->
     <main class="flex-1 overflow-y-auto">
       <BreadcrumbNav />
-      <RouterView v-slot="{ Component }">
-        <Transition name="page-fade" mode="out-in">
-          <component :is="Component" :key="$route.path" />
-        </Transition>
+      <RouterView v-slot="{ Component, route }">
+        <component :is="Component" :key="route.path" />
       </RouterView>
     </main>
 
