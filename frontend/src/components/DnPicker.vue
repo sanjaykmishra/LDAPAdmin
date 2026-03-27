@@ -39,8 +39,9 @@
               <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
               </svg>
-              <input ref="searchInputRef" v-model="searchQuery" type="text" placeholder="Search by name, DN, or uid..."
+              <input ref="searchInputRef" v-model="searchQuery" type="text"
                      class="flex-1 text-sm outline-none bg-transparent placeholder-gray-400"
+                     :placeholder="props.superadmin ? 'Search by name, DN, or uid...' : 'Filter loaded entries...'"
                      @input="debouncedSearch" />
               <button v-if="searchQuery" @click="searchQuery = ''; searchResults = null" class="text-gray-400 hover:text-gray-600 text-xs">Clear</button>
             </div>
@@ -153,8 +154,13 @@ async function loadChildren(dn) {
     return children
   }
   const browseFn = props.superadmin ? browse : directoryBrowse
-  const { data } = await browseFn(props.directoryId, dn)
-  return data.children
+  try {
+    const { data } = await browseFn(props.directoryId, dn)
+    return data.children || []
+  } catch (e) {
+    console.warn('Failed to load children for', dn, e)
+    return []
+  }
 }
 
 function debouncedSearch() {
@@ -170,9 +176,15 @@ async function doSearch() {
   const q = searchQuery.value.trim()
   if (!q) { searchResults.value = null; return }
 
+  // Search is only available via superadmin browse API
+  if (!props.superadmin) {
+    // For non-superadmin, filter the already-loaded tree nodes client-side
+    searchResults.value = filterTreeClientSide(q)
+    return
+  }
+
   searching.value = true
   try {
-    // Build an LDAP filter that matches common attributes
     const escaped = q.replace(/[\\*()]/g, c => '\\' + c.charCodeAt(0).toString(16))
     const filter = `(|(cn=*${escaped}*)(uid=*${escaped}*)(sAMAccountName=*${escaped}*)(ou=*${escaped}*))`
     const { data } = await searchEntries(props.directoryId, {
@@ -190,6 +202,27 @@ async function doSearch() {
     searchResults.value = []
   }
   searching.value = false
+}
+
+/** Client-side fallback: search through any nodes the tree has already loaded */
+function filterTreeClientSide(query) {
+  const q = query.toLowerCase()
+  const results = []
+  // Search the root node
+  for (const node of treeNodes.value) {
+    if (node.dn.toLowerCase().includes(q) || (node.rdn || '').toLowerCase().includes(q)) {
+      results.push({ dn: node.dn, rdn: node.rdn || node.dn.split(',')[0] })
+    }
+    // Search preloaded children
+    if (node._preloaded) {
+      for (const child of node._preloaded) {
+        if (child.dn.toLowerCase().includes(q) || (child.rdn || '').toLowerCase().includes(q)) {
+          results.push({ dn: child.dn, rdn: child.rdn || child.dn.split(',')[0] })
+        }
+      }
+    }
+  }
+  return results
 }
 
 function onNodeSelect(dn) {
