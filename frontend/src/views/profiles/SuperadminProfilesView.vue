@@ -1105,7 +1105,7 @@ function toggleApprover(accountId) {
 
       <template #footer>
         <div class="flex justify-end gap-3">
-          <button class="btn-secondary" @click="showModal = false">Cancel</button>
+          <button class="btn-neutral" @click="showModal = false">Cancel</button>
           <button class="btn-primary" @click="save" :disabled="saving">
             {{ saving ? 'Saving…' : (editing ? 'Update' : 'Create') }}
           </button>
