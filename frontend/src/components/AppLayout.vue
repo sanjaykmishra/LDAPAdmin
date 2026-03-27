@@ -86,10 +86,6 @@
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><path d="M7 6h6M7 10h6M7 14h3"/></svg>
               <span v-if="!collapsed">Audit Log</span>
             </RouterLink>
-            <RouterLink v-if="hasFeature('hr.manage')" :to="{ path: `/directories/${currentDirId}/hr` }" class="nav-item">
-              <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="5" r="2.5"/><path d="M2 14c0-2.76 2.24-5 5-5s5 2.24 5 5"/><path d="M14 6h4M14 9h3M14 12h2"/></svg>
-              <span v-if="!collapsed">HR Integration</span>
-            </RouterLink>
           </template>
 
         </template>
