@@ -130,20 +130,16 @@ function agingBarWidth(count) {
   return Math.max(2, (count / agingTotal.value) * 100) + '%'
 }
 
-// Navigate to the first directory's SoD violations page
 function goToSodViolations() {
-  const dir = data.value?.directories?.find(d => d.enabled)
-  if (dir) router.push(`/directories/${dir.id}/sod-violations`)
+  router.push('/superadmin/sod-violations')
 }
 
 function goToAccessReviews() {
-  const dir = data.value?.directories?.find(d => d.enabled)
-  if (dir) router.push(`/directories/${dir.id}/access-reviews`)
+  router.push('/superadmin/access-reviews')
 }
 
 function goToApprovals() {
-  const dir = data.value?.directories?.find(d => d.enabled)
-  if (dir) router.push(`/directories/${dir.id}/approvals`)
+  router.push('/superadmin/approvals')
 }
 
 let refreshTimer = null

@@ -269,6 +269,12 @@ const router = createRouter({
 
         // Superadmin directory-scoped pages (with inline directory picker)
         {
+          path: 'superadmin/approvals',
+          name: 'superadminApprovals',
+          component: () => import('@/views/approvals/PendingApprovalsView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
+        {
           path: 'superadmin/sod-policies',
           name: 'superadminSodPolicies',
           component: () => import('@/views/sodPolicies/SodPoliciesView.vue'),
