@@ -132,7 +132,7 @@
             <span v-if="!collapsed">Compliance Reports</span>
           </RouterLink>
           <RouterLink to="/superadmin/auditor-links" class="nav-item">
-            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.94a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L5.25 8.25"/></svg>
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13.5V17a1.5 1.5 0 001.5 1.5h11A1.5 1.5 0 0017 17v-3.5M10 2v11M10 2l4 4M10 2L6 6"/></svg>
             <span v-if="!collapsed">Auditor Links</span>
           </RouterLink>
           </template>
