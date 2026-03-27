@@ -593,3 +593,7 @@ const maxStep = computed(() => includeGroups.value ? 5 : 4)
     </div>
   </div>
 </template>
+
+<style scoped>
+@reference "tailwindcss";
+</style>
