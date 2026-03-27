@@ -161,7 +161,7 @@ public class AuditorPortalController {
         String signatureInput = link.getToken() + link.getDirectory().getId()
                 + link.getCampaignIds() + link.isIncludeSod()
                 + link.isIncludeEntitlements() + link.isIncludeAuditEvents()
-                + link.getExpiresAt();
+                + link.getExpiresAt().toInstant().getEpochSecond();
         String computedHmac = cryptoService.hmacSha256(
                 signatureInput.getBytes(StandardCharsets.UTF_8));
 

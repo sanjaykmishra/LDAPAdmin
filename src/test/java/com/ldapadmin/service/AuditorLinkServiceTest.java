@@ -236,7 +236,7 @@ class AuditorLinkServiceTest {
         String signatureInput = link.getToken() + link.getDirectory().getId()
                 + link.getCampaignIds() + link.isIncludeSod()
                 + link.isIncludeEntitlements() + link.isIncludeAuditEvents()
-                + link.getExpiresAt();
+                + link.getExpiresAt().toInstant().getEpochSecond();
         when(cryptoService.hmacSha256(eq(signatureInput.getBytes(java.nio.charset.StandardCharsets.UTF_8))))
                 .thenReturn("expected-hmac");
 

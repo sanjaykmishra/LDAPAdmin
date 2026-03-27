@@ -83,6 +83,10 @@ class AuditorLinkIntegrationTest {
         assertThat(created.token()).isNotBlank();
         assertThat(created.label()).isEqualTo("Integration Test Link");
 
+        // Flush + clear to force DB round-trip (catches timestamp precision issues)
+        em.flush();
+        em.clear();
+
         // Access portal
         AuditorLink validated = auditorLinkService.validateToken(created.token());
         assertThat(validated.getAccessCount()).isEqualTo(1);

@@ -192,7 +192,7 @@ public class AuditorLinkService {
                 + link.isIncludeSod()
                 + link.isIncludeEntitlements()
                 + link.isIncludeAuditEvents()
-                + link.getExpiresAt();
+                + link.getExpiresAt().toInstant().getEpochSecond();
         return cryptoService.hmacSha256(signatureInput.getBytes(StandardCharsets.UTF_8));
     }
 }
