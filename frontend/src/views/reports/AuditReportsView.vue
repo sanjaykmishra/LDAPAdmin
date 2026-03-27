@@ -2,10 +2,10 @@
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Compliance Reports</h1>
-      <button @click="openEvidencePackage" :disabled="!dirId" class="bg-blue-50 text-blue-600 rounded-full px-4 py-1.5 text-sm font-medium hover:bg-blue-100 transition-colors disabled:opacity-50 flex items-center gap-1.5">
-        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v12M10 2l4 4M10 2 6 6"/><path d="M3 13v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
-        Evidence Package
-      </button>
+      <RouterLink to="/superadmin/auditor-links" class="bg-blue-50 border border-blue-200 text-blue-600 rounded-full px-4 py-1.5 text-sm font-medium hover:bg-blue-100 transition-colors flex items-center gap-1.5">
+        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.94a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L5.25 8.25"/></svg>
+        Auditor Links
+      </RouterLink>
     </div>
 
     <!-- Directory picker (superadmin only) -->
@@ -243,71 +243,18 @@
       </div>
     </AppModal>
 
-    <!-- Evidence Package Modal -->
-    <AppModal v-model="showEvidence" title="Evidence Package" size="xl">
-      <p class="text-sm text-gray-500 mb-5">
-        Generate a comprehensive ZIP package containing all compliance artifacts: PDF reports,
-        campaign decisions, SoD data, approval history, and user entitlements.
-      </p>
-      <div class="grid gap-6 md:grid-cols-2">
-        <div>
-          <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Include Campaigns</label>
-          <div v-if="!campaigns.length" class="text-sm text-gray-400">No campaigns available.</div>
-          <div v-else class="max-h-48 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
-            <label v-for="c in campaigns" :key="c.id" class="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-              <input type="checkbox" :value="c.id" v-model="evidencePackageCampaignIds" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-              <div class="min-w-0">
-                <span class="text-sm font-medium text-gray-900 block truncate">{{ c.name }}</span>
-                <span class="text-xs text-gray-400">{{ c.status }}</span>
-              </div>
-            </label>
-          </div>
-        </div>
-        <div class="space-y-4">
-          <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Options</label>
-          <label class="flex items-start gap-3 cursor-pointer">
-            <input type="checkbox" v-model="evidenceIncludeSod" class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-            <div>
-              <span class="text-sm font-medium text-gray-900">Include SoD Policies &amp; Violations</span>
-              <p class="text-xs text-gray-500">Exports all separation-of-duties policy definitions and open violations.</p>
-            </div>
-          </label>
-          <label class="flex items-start gap-3 cursor-pointer">
-            <input type="checkbox" v-model="evidenceIncludeEntitlements" class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-            <div>
-              <span class="text-sm font-medium text-gray-900">Include Entitlement Snapshot</span>
-              <p class="text-xs text-gray-500">Exports a point-in-time snapshot of all users and their group memberships from LDAP.</p>
-            </div>
-          </label>
-          <button @click="downloadEvidencePackage"
-                  :disabled="loadingEvidence || evidencePackageCampaignIds.length === 0"
-                  class="w-full bg-green-600 text-white text-sm font-medium rounded-lg px-4 py-2.5 hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
-            <svg v-if="loadingEvidence" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            {{ loadingEvidence ? 'Generating package...' : 'Download Evidence Package (ZIP)' }}
-          </button>
-        </div>
-      </div>
-      <div v-if="evidenceSuccess" class="mt-4 bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
-        <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-        Evidence package downloaded successfully ({{ evidenceFileSize }}).
-      </div>
-    </AppModal>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { useNotificationStore } from '@/stores/notifications'
 import { runReport, runReportData } from '@/api/reports'
 import { listDirectories } from '@/api/directories'
 import { listCampaigns } from '@/api/accessReviews'
 import { listPolicies, exemptViolation, resolveViolation } from '@/api/sodPolicies'
 import { acknowledgeFinding, exemptFinding } from '@/api/accessDrift'
-import { generateEvidencePackage } from '@/api/complianceReports'
 import { downloadBlob } from '@/composables/useApi'
 import {
   statusBadgeClass, severityBadgeClass, decisionBadgeClass, actionBadgeClass,
@@ -597,58 +544,6 @@ async function doExport(format) {
     notif.error(e.response?.data?.detail || e.message)
   } finally {
     exporting.value = false
-  }
-}
-
-// ── Evidence Package ─────────────────────────────────────────────────────────
-
-const showEvidence = ref(false)
-const loadingEvidence = ref(false)
-const evidencePackageCampaignIds = ref([])
-const evidenceIncludeSod = ref(true)
-const evidenceIncludeEntitlements = ref(false)
-const evidenceSuccess = ref(false)
-const evidenceFileSize = ref('')
-
-function openEvidencePackage() { showEvidence.value = true }
-
-function formatBytes(bytes) {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-}
-
-function triggerDownload(blob, filename) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = filename
-  document.body.appendChild(a); a.click()
-  document.body.removeChild(a); URL.revokeObjectURL(url)
-}
-
-async function downloadEvidencePackage() {
-  loadingEvidence.value = true
-  evidenceSuccess.value = false
-  try {
-    const body = {
-      campaignIds: evidencePackageCampaignIds.value,
-      includeSod: evidenceIncludeSod.value,
-      includeEntitlements: evidenceIncludeEntitlements.value,
-    }
-    const { data } = await generateEvidencePackage(dirId.value, body)
-    const today = new Date().toISOString().slice(0, 10)
-    triggerDownload(data, `evidence-package-${today}.zip`)
-    evidenceFileSize.value = formatBytes(data.size)
-    evidenceSuccess.value = true
-    setTimeout(() => { evidenceSuccess.value = false }, 10000)
-  } catch (e) {
-    if (e.response?.status === 429) {
-      notif.error('An evidence package is already being generated. Please wait and try again.')
-    } else {
-      notif.error('Failed to generate Evidence Package: ' + (e.response?.data?.message || e.message))
-    }
-  } finally {
-    loadingEvidence.value = false
   }
 }
 
