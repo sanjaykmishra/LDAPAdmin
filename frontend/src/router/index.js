@@ -225,6 +225,12 @@ const router = createRouter({
           meta: { requiresSuperadmin: true },
         },
         {
+          path: 'superadmin/directories/:directoryId/discover',
+          name: 'discoveryWizard',
+          component: () => import('@/views/superadmin/DiscoveryWizardView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
+        {
           path: 'superadmin/audit-log',
           name: 'superadminAuditLog',
           component: () => import('@/views/audit/AuditLogView.vue'),

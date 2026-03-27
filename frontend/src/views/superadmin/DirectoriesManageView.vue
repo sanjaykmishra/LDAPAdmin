@@ -36,6 +36,7 @@
               </span>
             </td>
             <td class="px-4 py-3 text-right whitespace-nowrap">
+              <button v-if="d.enabled" @click="$router.push(`/superadmin/directories/${d.id}/discover`)" class="text-green-600 hover:text-green-800 text-xs font-medium mr-2">Discover</button>
               <button @click="doEvictPool(d)" class="text-amber-600 hover:text-amber-800 text-xs font-medium mr-2">Evict Pool</button>
               <button @click="openEdit(d)" class="text-blue-600 hover:text-blue-800 text-xs font-medium mr-2">Edit</button>
               <button @click="confirmDelete(d)" class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
