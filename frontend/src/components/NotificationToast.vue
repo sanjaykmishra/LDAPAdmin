@@ -1,20 +1,38 @@
 <template>
-  <div class="fixed top-4 right-4 z-50 flex flex-col gap-2 w-80">
+  <div class="fixed top-4 right-4 z-50 flex flex-col gap-2 w-80 pointer-events-none">
     <TransitionGroup name="toast">
       <div
         v-for="n in store.items"
         :key="n.id"
-        :class="[
-          'flex items-start gap-3 rounded-lg px-4 py-3 shadow-lg text-sm font-medium',
-          n.type === 'success' && 'bg-green-600 text-white',
-          n.type === 'error'   && 'bg-red-600 text-white',
-          n.type === 'info'    && 'bg-blue-600 text-white',
-        ]"
+        class="pointer-events-auto relative overflow-hidden rounded-xl shadow-lg border"
+        :class="toastClass(n.type)"
       >
-        <span class="flex-1">{{ n.message }}</span>
-        <button v-if="n.onUndo" @click="store.undo(n.id)"
-          class="underline font-semibold hover:opacity-80 shrink-0">Undo</button>
-        <button @click="store.remove(n.id)" class="opacity-70 hover:opacity-100 shrink-0">✕</button>
+        <div class="flex items-start gap-3 px-4 py-3">
+          <!-- Icon -->
+          <svg v-if="n.type === 'success'" class="w-5 h-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <svg v-else-if="n.type === 'error'" class="w-5 h-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+          <svg v-else class="w-5 h-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+          </svg>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium">{{ n.message }}</p>
+            <p v-if="n.detail" class="text-xs opacity-80 mt-0.5">{{ n.detail }}</p>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button v-if="n.action" @click="n.action.fn(); store.remove(n.id)"
+              class="text-xs font-semibold underline hover:opacity-80">{{ n.action.label }}</button>
+            <button @click="store.remove(n.id)" class="opacity-60 hover:opacity-100 text-lg leading-none">&times;</button>
+          </div>
+        </div>
+        <!-- Progress bar -->
+        <div class="h-0.5 bg-current opacity-20">
+          <div class="h-full bg-current opacity-60 transition-all ease-linear"
+               :style="{ width: (n.remaining / n.duration * 100) + '%' }" />
+        </div>
       </div>
     </TransitionGroup>
   </div>
@@ -23,10 +41,20 @@
 <script setup>
 import { useNotificationStore } from '@/stores/notifications'
 const store = useNotificationStore()
+
+function toastClass(type) {
+  switch (type) {
+    case 'success': return 'bg-white border-green-200 text-green-800'
+    case 'error':   return 'bg-white border-red-200 text-red-800'
+    case 'warning': return 'bg-white border-amber-200 text-amber-800'
+    default:        return 'bg-white border-blue-200 text-blue-800'
+  }
+}
 </script>
 
 <style scoped>
 .toast-enter-active, .toast-leave-active { transition: all 0.3s ease; }
 .toast-enter-from { opacity: 0; transform: translateX(100%); }
-.toast-leave-to   { opacity: 0; transform: translateX(100%); }
+.toast-leave-to   { opacity: 0; transform: translateX(100%) scale(0.95); }
+.toast-move { transition: transform 0.3s ease; }
 </style>

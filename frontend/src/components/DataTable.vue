@@ -1,5 +1,8 @@
 <template>
-  <div class="overflow-x-auto rounded-lg border border-gray-200">
+  <div class="overflow-x-auto rounded-lg border border-gray-200" tabindex="0"
+       @keydown.down.prevent="moveDown" @keydown.up.prevent="moveUp"
+       @keydown.enter.prevent="selectFocused" @keydown.escape="focusedIndex = -1"
+       @keydown.space.prevent="toggleFocusedSelection" ref="tableRef">
     <table class="min-w-full divide-y divide-gray-200 text-sm">
       <thead class="bg-gray-50">
         <tr>
@@ -30,8 +33,12 @@
           v-else
           v-for="(row, i) in rows"
           :key="rowKey ? row[rowKey] : i"
-          class="hover:bg-gray-50 transition-colors"
-          :class="{ 'bg-blue-50': selectable && isSelected(row) }"
+          class="hover:bg-gray-50 transition-colors cursor-pointer"
+          :class="{
+            'bg-blue-50': selectable && isSelected(row),
+            'ring-2 ring-inset ring-blue-400': i === focusedIndex,
+          }"
+          @click="focusedIndex = i; emit('row-click', row)"
         >
           <td v-if="selectable" class="px-3 py-3 w-10">
             <input type="checkbox" :checked="isSelected(row)"
@@ -52,11 +59,11 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import EmptyState from '@/components/EmptyState.vue'
 
 const props = defineProps({
-  columns: { type: Array, required: true },   // [{ key, label }]
+  columns: { type: Array, required: true },
   rows:    { type: Array, default: () => [] },
   rowKey:  { type: String, default: 'id' },
   loading: { type: Boolean, default: false },
@@ -66,12 +73,14 @@ const props = defineProps({
   selectedKeys: { type: Set, default: () => new Set() },
 })
 
-const emit = defineEmits(['update:selectedKeys'])
+const emit = defineEmits(['update:selectedKeys', 'row-click'])
+
+const focusedIndex = ref(-1)
+const tableRef = ref(null)
 
 const totalCols = computed(() => {
   let c = props.columns.length
   if (props.selectable) c++
-  // We can't easily check for slot existence in computed, so use a safe estimate
   return c + 1
 })
 
@@ -96,5 +105,24 @@ function toggleAll() {
   } else {
     emit('update:selectedKeys', new Set(props.rows.map(r => r[props.rowKey])))
   }
+}
+
+function moveDown() {
+  if (focusedIndex.value < props.rows.length - 1) focusedIndex.value++
+}
+
+function moveUp() {
+  if (focusedIndex.value > 0) focusedIndex.value--
+}
+
+function selectFocused() {
+  if (focusedIndex.value >= 0 && focusedIndex.value < props.rows.length) {
+    emit('row-click', props.rows[focusedIndex.value])
+  }
+}
+
+function toggleFocusedSelection() {
+  if (!props.selectable || focusedIndex.value < 0) return
+  toggleRow(props.rows[focusedIndex.value])
 }
 </script>
