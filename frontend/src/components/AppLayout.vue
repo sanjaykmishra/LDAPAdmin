@@ -51,6 +51,10 @@
       <nav :class="['flex-1 py-4 space-y-1 overflow-y-auto', collapsed ? 'px-1 nav-collapsed' : 'px-3']">
         <!-- Admin navigation (directory-scoped) -->
         <template v-if="!auth.isSuperadmin">
+          <RouterLink to="/dashboard" class="nav-item">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg>
+            <span v-if="!collapsed">Dashboard</span>
+          </RouterLink>
           <template v-if="currentDirId">
             <RouterLink :to="{ path: `/directories/${currentDirId}/users` }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="6" r="3.25"/><path d="M3.5 17.5c0-3.59 2.91-6.5 6.5-6.5s6.5 2.91 6.5 6.5"/></svg>

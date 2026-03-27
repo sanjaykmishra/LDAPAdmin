@@ -34,6 +34,13 @@ const router = createRouter({
         { path: '', name: 'home', redirect: () => '/superadmin/dashboard' },
         { path: 'no-access', name: 'noAccess', component: { template: '<div />' } },
 
+        // Admin Dashboard
+        {
+          path: 'dashboard',
+          name: 'adminDashboard',
+          component: () => import('@/views/AdminDashboardView.vue'),
+        },
+
         // Notifications
         {
           path: 'notifications',
@@ -422,7 +429,7 @@ async function resolveHomePath(auth) {
   if (auth.isSuperadmin) return '/superadmin/dashboard'
   try {
     const { data } = await myProfiles()
-    if (data.length) return `/directories/${data[0].directoryId}/users`
+    if (data.length) return '/dashboard'
   } catch (e) { console.warn('Failed to resolve home path:', e) }
   return '/no-access'
 }
