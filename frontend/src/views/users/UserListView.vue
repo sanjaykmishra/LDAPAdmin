@@ -37,7 +37,7 @@
       empty-text="No users found" empty-icon="users">
       <template #cell-dn="{ value }">
         <span class="inline-flex items-center gap-1">
-          <code class="text-xs">{{ value }}</code>
+          <span class="text-xs truncate max-w-xs" :title="value">{{ value }}</span>
           <CopyButton :text="value" />
         </span>
       </template>
