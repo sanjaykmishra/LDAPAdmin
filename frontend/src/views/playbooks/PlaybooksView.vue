@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
 import { useDirectoryPicker } from '@/composables/useDirectoryPicker'
+import { usePermissions } from '@/composables/usePermissions'
 import {
   listPlaybooks, createPlaybook, updatePlaybook, deletePlaybook,
   previewPlaybook, executePlaybook, rollbackExecution, listExecutions
@@ -14,6 +15,9 @@ import DnPicker from '@/components/DnPicker.vue'
 
 const { dirId, directories, selectedDir, loadingDirs, showPicker } = useDirectoryPicker()
 const notif = useNotificationStore()
+const { hasFeature } = usePermissions()
+const canManage = computed(() => hasFeature('playbook.manage'))
+const canExecute = computed(() => hasFeature('playbook.execute'))
 
 const playbooks = ref([])
 const loading = ref(false)
@@ -227,7 +231,7 @@ function parsedStepResults(json) {
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold text-gray-900">Lifecycle Playbooks</h1>
-      <button class="btn-primary" @click="openCreate" v-if="dirId">New Playbook</button>
+      <button class="btn-primary" @click="openCreate" v-if="dirId && canManage">New Playbook</button>
     </div>
 
     <!-- Directory picker -->
@@ -248,10 +252,10 @@ function parsedStepResults(json) {
       </template>
       <template #cell-actions="{ row }">
         <div class="flex gap-3 justify-end whitespace-nowrap">
-          <button @click="openRunDialog(row)" class="text-green-600 hover:text-green-800 text-xs font-medium">Run</button>
+          <button v-if="canExecute" @click="openRunDialog(row)" class="text-green-600 hover:text-green-800 text-xs font-medium">Run</button>
           <button @click="openHistory(row)" class="text-gray-500 hover:text-gray-700 text-xs font-medium">History</button>
-          <button @click="openEdit(row)" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Edit</button>
-          <button @click="confirmDelete(row)" class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
+          <button v-if="canManage" @click="openEdit(row)" class="text-blue-600 hover:text-blue-800 text-xs font-medium">Edit</button>
+          <button v-if="canManage" @click="confirmDelete(row)" class="text-red-500 hover:text-red-700 text-xs font-medium">Delete</button>
         </div>
       </template>
     </DataTable>
