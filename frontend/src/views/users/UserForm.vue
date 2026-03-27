@@ -303,6 +303,7 @@
           <button @click="searchAvailableGroups" class="btn-primary text-xs">Search</button>
         </div>
         <div v-if="loadingGroups" class="text-sm text-gray-400 py-3 text-center">Loading…</div>
+        <p v-else-if="!groupFilter.trim() && !isEdit && availableGroups.length === 0" class="text-xs text-gray-400 py-3 text-center">Type a group name and click Search to find groups.</p>
         <ul v-else-if="availableGroups.length" class="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
           <li v-for="g in availableGroups" :key="g.dn" class="flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50">
             <div>
@@ -582,9 +583,20 @@ watch(() => props.data, v => {
 
 async function loadGroups() {
   if (!props.dirId) return
+  // In create mode, only load groups if user has typed a search query
+  // to avoid fetching every group in the directory
+  if (!props.isEdit && !groupFilter.value.trim()) {
+    allGroups.value = []
+    availableGroups.value = []
+    return
+  }
   loadingGroups.value = true
   try {
-    const { data } = await groupsApi.searchGroups(props.dirId, {})
+    const params = {}
+    if (groupFilter.value.trim()) {
+      params.filter = `(cn=*${groupFilter.value.trim()}*)`
+    }
+    const { data } = await groupsApi.searchGroups(props.dirId, params)
     const entries = Array.isArray(data) ? data : (data?.entries || [])
     allGroups.value = entries.map(e => ({
       dn: e.dn,
