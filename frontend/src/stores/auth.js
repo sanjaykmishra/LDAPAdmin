@@ -35,6 +35,7 @@ export const useAuthStore = defineStore('auth', () => {
         authType:        data.authType || null,
         email:           data.email || null,
         displayName:     data.displayName || null,
+        features:        data.features || [],
       }
       // Check if first-run setup wizard is needed for superadmins
       if (data.accountType === 'SUPERADMIN') {
@@ -98,9 +99,13 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function hasFeature(featureDbValue) {
+    return principal.value?.features?.includes(featureDbValue) ?? false
+  }
+
   return {
     principal, isLoggedIn, isSuperadmin, isSelfService, username,
-    themePreference, authType,
+    themePreference, authType, hasFeature,
     setupPending, init, login, selfServiceLogin, logout,
     markSetupComplete, updatePrincipal,
   }

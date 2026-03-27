@@ -50,6 +50,7 @@ class AuthControllerTest extends BaseControllerTest {
     @MockBean ProvisioningProfileRepository provisioningProfileRepository;
     @MockBean DirectoryConnectionRepository directoryConnectionRepository;
     @MockBean AccountRepository accountRepository;
+    @MockBean com.ldapadmin.repository.AdminFeaturePermissionRepository featurePermRepo;
     @MockBean org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     @MockBean LdapConnectionFactory ldapConnectionFactory;
     @MockBean LdapUserService ldapUserService;

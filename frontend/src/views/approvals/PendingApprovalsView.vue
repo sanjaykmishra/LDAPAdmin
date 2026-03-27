@@ -62,7 +62,7 @@
           <div class="flex gap-2">
             <button @click="savePayload" :disabled="savingPayload"
               class="btn-primary text-sm">{{ savingPayload ? 'Saving...' : 'Save Changes' }}</button>
-            <button @click="editMode = false" class="btn-secondary text-sm">Cancel</button>
+            <button @click="editMode = false" class="btn-neutral text-sm">Cancel</button>
           </div>
         </div>
 
@@ -92,7 +92,7 @@
           class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           placeholder="Enter rejection reason..."></textarea>
         <div class="flex gap-2 justify-end">
-          <button @click="rejectModal = false" class="btn-secondary">Cancel</button>
+          <button @click="rejectModal = false" class="btn-neutral">Cancel</button>
           <button @click="handleReject" :disabled="!rejectReason.trim()"
             class="px-4 py-2 rounded-lg text-red-600 bg-red-50 hover:bg-red-100 font-medium disabled:opacity-50">
             Reject
@@ -282,7 +282,4 @@ onMounted(loadApprovals)
 
 <style scoped>
 @reference "tailwindcss";
-.btn-primary { @apply px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50; }
-.btn-secondary { @apply px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50; }
-.input { @apply border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500; }
 </style>

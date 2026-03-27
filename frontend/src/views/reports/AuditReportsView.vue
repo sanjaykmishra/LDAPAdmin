@@ -236,7 +236,7 @@
         </div>
       </div>
       <div class="flex justify-end gap-2 mt-5">
-        <button @click="showExemptModal = false" class="btn-secondary text-sm">Cancel</button>
+        <button @click="showExemptModal = false" class="btn-neutral text-sm">Cancel</button>
         <button @click="bulkExempt" :disabled="!exemptReason.trim() || actioning" class="bg-amber-500 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-amber-600 disabled:opacity-50">
           {{ actioning ? 'Processing...' : 'Exempt' }}
         </button>
@@ -691,7 +691,4 @@ onMounted(async () => {
 
 <style scoped>
 @reference "tailwindcss";
-.btn-primary   { @apply px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50; }
-.btn-secondary { @apply px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50; }
-.input         { @apply border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500; }
 </style>

@@ -21,12 +21,12 @@
           </div>
         </div>
         <div class="flex gap-2">
-          <button v-if="campaign.status === 'UPCOMING'" @click="handleActivate" :disabled="loading" class="btn-primary text-sm">Activate</button>
-          <button v-if="campaign.status === 'ACTIVE'" @click="handleClose(false)" :disabled="loading" class="btn-primary text-sm">Close</button>
-          <button v-if="campaign.status === 'ACTIVE'" @click="handleClose(true)" :disabled="loading" class="text-sm px-3 py-1.5 rounded-lg bg-orange-600 text-white hover:bg-orange-700">Force Close</button>
-          <button v-if="campaign.status === 'UPCOMING' || campaign.status === 'ACTIVE'" @click="handleCancel" :disabled="loading" class="text-sm px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700">Cancel</button>
-          <button @click="handleSaveAsTemplate" :disabled="loading" class="btn-secondary text-sm">Save as Template</button>
-          <button @click="handleExport" class="btn-secondary text-sm">Export CSV</button>
+          <button v-if="canManage && campaign.status === 'UPCOMING'" @click="handleActivate" :disabled="loading" class="btn-primary text-sm">Activate</button>
+          <button v-if="canManage && campaign.status === 'ACTIVE'" @click="handleClose(false)" :disabled="loading" class="btn-primary text-sm">Close</button>
+          <button v-if="canManage && campaign.status === 'ACTIVE'" @click="handleClose(true)" :disabled="loading" class="text-sm px-3 py-1.5 rounded-lg bg-orange-600 text-white hover:bg-orange-700">Force Close</button>
+          <button v-if="canManage && (campaign.status === 'UPCOMING' || campaign.status === 'ACTIVE')" @click="handleCancel" :disabled="loading" class="text-sm px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700">Cancel</button>
+          <button v-if="canManage" @click="handleSaveAsTemplate" :disabled="loading" class="btn-secondary text-sm">Save as Template</button>
+          <button v-if="canManage" @click="handleExport" class="btn-secondary text-sm">Export CSV</button>
         </div>
       </div>
 
@@ -156,6 +156,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useApi, downloadBlob } from '@/composables/useApi'
 import { getCampaign, activateCampaign, closeCampaign, cancelCampaign, exportCampaign, listCampaignReminders } from '@/api/accessReviews'
 import { saveAsTemplate } from '@/api/campaignTemplates'
+import { usePermissions } from '@/composables/usePermissions'
 import DataTable from '@/components/DataTable.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import RelativeTime from '@/components/RelativeTime.vue'
@@ -163,6 +164,7 @@ import RelativeTime from '@/components/RelativeTime.vue'
 const route = useRoute()
 const router = useRouter()
 const { loading, call } = useApi()
+const { canManageAccessReviews: canManage } = usePermissions()
 const dirId = route.params.dirId
 const campaignId = route.params.campaignId
 
@@ -266,6 +268,4 @@ onMounted(() => {
 
 <style scoped>
 @reference "tailwindcss";
-.btn-primary   { @apply px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50; }
-.btn-secondary { @apply px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50; }
 </style>

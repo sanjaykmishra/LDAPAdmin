@@ -69,7 +69,7 @@
         </div>
       </form>
       <template #footer>
-        <button @click="showForm = false" class="btn-secondary">Cancel</button>
+        <button @click="showForm = false" class="btn-neutral">Cancel</button>
         <button @click="save" :disabled="saving || !form.username.trim()" class="btn-primary">
           {{ saving ? 'Saving…' : (editing ? 'Save changes' : 'Create') }}
         </button>
@@ -142,7 +142,7 @@
 
       </div>
       <template #footer>
-        <button @click="showPerms = false" class="btn-secondary">Close</button>
+        <button @click="showPerms = false" class="btn-neutral">Close</button>
       </template>
     </AppModal>
 
@@ -369,13 +369,4 @@ async function changeFeature(featureKey, state) {
 
 <style scoped>
 @reference "tailwindcss";
-.btn-primary   { @apply px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors; }
-.btn-secondary { @apply px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors; }
-.btn-danger    { @apply px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors; }
-.btn-sm        { @apply text-xs; }
-.badge-green   { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800; }
-.badge-gray    { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600; }
-.badge-blue    { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800; }
-.badge-red     { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700; }
-.input         { @apply border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500; }
 </style>
