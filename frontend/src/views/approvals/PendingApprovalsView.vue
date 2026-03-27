@@ -1,8 +1,19 @@
 <template>
   <div class="p-6">
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Pending Approvals</h1>
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-gray-900">Pending Approvals</h1>
+      <div v-if="showPicker" class="flex items-center gap-2">
+        <label class="text-sm text-gray-500">Directory:</label>
+        <select v-model="selectedDir" class="input w-64">
+          <option value="">— select directory —</option>
+          <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName || d.name }}</option>
+        </select>
+      </div>
+    </div>
 
-    <DataTable :columns="cols" :rows="approvals" :loading="loading" row-key="id"
+    <div v-if="showPicker && !selectedDir" class="text-center text-gray-400 py-12">Select a directory to view approvals.</div>
+
+    <DataTable v-else :columns="cols" :rows="approvals" :loading="loading || loadingDirs" row-key="id"
       empty-text="No pending approvals" empty-icon="shield">
       <template #cell-status="{ value }">
         <span :class="statusClass(value)">{{ value }}</span>
@@ -14,9 +25,11 @@
       <template #cell-actions="{ row }">
         <div class="flex gap-2" v-if="row.status === 'PENDING'">
           <button @click="openDetail(row)" class="btn-secondary text-xs">View</button>
-          <button v-if="!isOwnRequest(row)" @click="handleApprove(row)" class="text-xs px-3 py-1 rounded-lg text-green-600 bg-green-50 hover:bg-green-100 font-medium">Approve</button>
-          <button v-if="!isOwnRequest(row)" @click="openReject(row)" class="text-xs px-3 py-1 rounded-lg text-red-600 bg-red-50 hover:bg-red-100 font-medium">Reject</button>
-          <span v-if="isOwnRequest(row)" class="text-xs text-gray-400 italic self-center">Own request</span>
+          <template v-if="canAct">
+            <button v-if="!isOwnRequest(row)" @click="handleApprove(row)" class="text-xs px-3 py-1 rounded-lg text-green-600 bg-green-50 hover:bg-green-100 font-medium">Approve</button>
+            <button v-if="!isOwnRequest(row)" @click="openReject(row)" class="text-xs px-3 py-1 rounded-lg text-red-600 bg-red-50 hover:bg-red-100 font-medium">Reject</button>
+            <span v-if="isOwnRequest(row)" class="text-xs text-gray-400 italic self-center">Own request</span>
+          </template>
         </div>
         <div v-else>
           <button @click="openDetail(row)" class="btn-secondary text-xs">View</button>
@@ -72,7 +85,7 @@
           <pre class="mt-2 bg-gray-50 border rounded p-3 text-xs overflow-auto max-h-64">{{ formatPayload(selectedApproval.payload) }}</pre>
         </details>
 
-        <div v-if="selectedApproval.status === 'PENDING'" class="flex gap-2 mt-4 pt-4 border-t">
+        <div v-if="selectedApproval.status === 'PENDING' && canAct" class="flex gap-2 mt-4 pt-4 border-t">
           <template v-if="!isOwnRequest(selectedApproval)">
             <button v-if="!editMode && isEditablePayload(selectedApproval)"
               @click="startEdit(selectedApproval)" class="btn-secondary">Edit</button>
@@ -113,22 +126,21 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notifications'
 import { useApi } from '@/composables/useApi'
+import { useDirectoryPicker } from '@/composables/useDirectoryPicker'
 import { listPendingApprovals, approveRequest, rejectRequest, updateApprovalPayload } from '@/api/approvals'
 import DataTable from '@/components/DataTable.vue'
 import AppModal from '@/components/AppModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import RelativeTime from '@/components/RelativeTime.vue'
 
-const route = useRoute()
 const auth = useAuthStore()
 const { loading, call } = useApi()
 const notif = useNotificationStore()
-const dirId = route.params.dirId
+const { dirId, directories, selectedDir, loadingDirs, showPicker } = useDirectoryPicker()
 
 const approvals = ref([])
 const selectedApproval = ref(null)
@@ -227,7 +239,7 @@ async function savePayload() {
       dn: editPayload.dn,
       attributes: cleanAttrs
     })
-    const { data } = await updateApprovalPayload(dirId, selectedApproval.value.id, newPayload)
+    const { data } = await updateApprovalPayload(dirId.value, selectedApproval.value.id, newPayload)
     // Update the local approval data
     selectedApproval.value = data
     const idx = approvals.value.findIndex(a => a.id === data.id)
@@ -253,7 +265,7 @@ function handleApprove(approval) {
 
 async function doApprove() {
   confirmApprove.value = false
-  const res = await call(() => approveRequest(dirId, approvalToAction.value.id))
+  const res = await call(() => approveRequest(dirId.value, approvalToAction.value.id))
   if (res?.data?.provisionError) {
     // Provisioning failed — reload list and open detail to show the error
     await loadApprovals()
@@ -268,16 +280,20 @@ async function doApprove() {
 
 async function handleReject() {
   rejectModal.value = false
-  await call(() => rejectRequest(dirId, approvalToAction.value.id, rejectReason.value), { successMsg: 'Request rejected' })
+  await call(() => rejectRequest(dirId.value, approvalToAction.value.id, rejectReason.value), { successMsg: 'Request rejected' })
   await loadApprovals()
 }
 
+const canAct = !auth.isSuperadmin
+
 async function loadApprovals() {
-  const res = await call(() => listPendingApprovals(dirId))
+  if (!dirId.value) { approvals.value = []; return }
+  const res = await call(() => listPendingApprovals(dirId.value))
   approvals.value = res.data
 }
 
-onMounted(loadApprovals)
+watch(dirId, (v) => { if (v) loadApprovals() })
+onMounted(() => { if (dirId.value) loadApprovals() })
 </script>
 
 <style scoped>
