@@ -6,7 +6,7 @@
         <button @click="$router.push({ name: 'crossCampaignReport', params: { dirId } })" class="btn-secondary">
           Cross-Campaign Report
         </button>
-        <button v-if="isSuperadmin" @click="$router.push({ name: 'accessReviewCreate', params: { dirId } })" class="btn-primary">
+        <button v-if="isSuperadmin && canManage" @click="$router.push({ name: 'accessReviewCreate', params: { dirId } })" class="btn-primary">
           New Campaign
         </button>
       </div>
@@ -59,6 +59,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useApi } from '@/composables/useApi'
 import { useAuthStore } from '@/stores/auth'
+import { usePermissions } from '@/composables/usePermissions'
 import { listCampaigns } from '@/api/accessReviews'
 import DataTable from '@/components/DataTable.vue'
 import RelativeTime from '@/components/RelativeTime.vue'
@@ -68,6 +69,7 @@ const { loading, call } = useApi()
 const auth = useAuthStore()
 const dirId = route.params.dirId
 const isSuperadmin = computed(() => auth.isSuperadmin)
+const { canManageAccessReviews: canManage } = usePermissions()
 
 const campaigns = ref([])
 const activeTab = ref('ALL')

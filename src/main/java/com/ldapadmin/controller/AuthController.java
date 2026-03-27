@@ -9,6 +9,7 @@ import com.ldapadmin.auth.PrincipalType;
 import com.ldapadmin.auth.dto.LoginRequest;
 import com.ldapadmin.auth.dto.LoginResponse;
 import com.ldapadmin.config.AppProperties;
+import com.ldapadmin.entity.AdminFeaturePermission;
 import com.ldapadmin.entity.AdminProfileRole;
 import com.ldapadmin.entity.DirectoryConnection;
 import com.ldapadmin.entity.ProvisioningProfile;
@@ -17,6 +18,7 @@ import com.ldapadmin.ldap.LdapConnectionFactory;
 import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.ldap.model.LdapUser;
 import com.ldapadmin.repository.AccountRepository;
+import com.ldapadmin.repository.AdminFeaturePermissionRepository;
 import com.ldapadmin.repository.AdminProfileRoleRepository;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.repository.ProvisioningProfileRepository;
@@ -81,6 +83,7 @@ public class AuthController {
     private final LdapConnectionFactory         ldapConnectionFactory;
     private final LdapUserService               ldapUserService;
     private final AccountRepository                              accountRepo;
+    private final AdminFeaturePermissionRepository               featurePermRepo;
     private final PasswordEncoder                                passwordEncoder;
     private final com.ldapadmin.service.ApplicationSettingsService applicationSettingsService;
 
@@ -152,6 +155,38 @@ public class AuthController {
             body.put("email", acct.getEmail());
             body.put("displayName", acct.getDisplayName());
         });
+
+        // Include effective feature permissions (mirrors PermissionService.requireFeature logic)
+        if (principal.isSuperadmin()) {
+            body.put("features", java.util.Arrays.stream(com.ldapadmin.entity.enums.FeatureKey.values())
+                    .map(com.ldapadmin.entity.enums.FeatureKey::getDbValue)
+                    .toList());
+        } else if (principal.type() == PrincipalType.SELF_SERVICE) {
+            body.put("features", List.of());
+        } else {
+            // Build explicit override map
+            Map<com.ldapadmin.entity.enums.FeatureKey, Boolean> overrides = new java.util.EnumMap<>(com.ldapadmin.entity.enums.FeatureKey.class);
+            for (AdminFeaturePermission p : featurePermRepo.findAllByAdminAccountId(principal.id())) {
+                overrides.put(p.getFeatureKey(), p.isEnabled());
+            }
+            // Determine base role — ADMIN gets all features by default, READ_ONLY gets subset
+            boolean hasAdminRole = profileRoleRepo
+                    .existsByAdminAccountIdAndBaseRole(principal.id(), com.ldapadmin.entity.enums.BaseRole.ADMIN);
+            java.util.Set<String> readOnlyDefaults = java.util.Set.of(
+                    "bulk.export", "reports.run", "directory.browse", "schema.read",
+                    "user.read", "group.read", "approval.manage");
+
+            List<String> features = java.util.Arrays.stream(com.ldapadmin.entity.enums.FeatureKey.values())
+                    .filter(fk -> {
+                        Boolean override = overrides.get(fk);
+                        if (override != null) return override; // explicit override
+                        return hasAdminRole || readOnlyDefaults.contains(fk.getDbValue()); // base role
+                    })
+                    .map(com.ldapadmin.entity.enums.FeatureKey::getDbValue)
+                    .toList();
+            body.put("features", features);
+        }
+
         return ResponseEntity.ok(body);
     }
 
