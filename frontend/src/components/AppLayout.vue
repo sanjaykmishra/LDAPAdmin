@@ -188,7 +188,7 @@
       </nav>
 
       <!-- User info / logout -->
-      <div :class="['px-3 py-3 border-t border-white/15 flex items-center', collapsed ? 'justify-center' : 'justify-between']">
+      <div :class="['px-3 py-3 border-t border-white/15 flex items-center gap-2', collapsed ? 'justify-center' : 'justify-between']">
         <button @click="showPreferences = true" class="text-sm truncate text-left hover:text-white/90 transition-colors" :title="auth.username">
           <template v-if="!collapsed">
             <p class="font-medium">{{ auth.username }}</p>
@@ -196,7 +196,10 @@
           </template>
           <div v-else class="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">{{ (auth.username || '?')[0].toUpperCase() }}</div>
         </button>
-        <button v-if="!collapsed" @click="handleLogout" class="text-gray-400 hover:text-white text-xs ml-2">Logout</button>
+        <div v-if="!collapsed" class="flex items-center gap-1">
+          <NotificationBell />
+          <button @click="handleLogout" class="text-gray-400 hover:text-white text-xs">Logout</button>
+        </div>
       </div>
     </aside>
 
@@ -225,6 +228,7 @@ import { countPendingApprovals } from '@/api/approvals'
 import { listCampaigns } from '@/api/accessReviews'
 import KeyboardShortcutsHelp from '@/components/KeyboardShortcutsHelp.vue'
 import UserPreferencesDialog from '@/components/UserPreferencesDialog.vue'
+import NotificationBell from '@/components/NotificationBell.vue'
 
 const auth     = useAuthStore()
 const { hasFeature } = usePermissions()

@@ -47,6 +47,7 @@ public class ApprovalWorkflowService {
     private final LdapOperationService ldapOperationService;
     private final AuditService auditService;
     private final ApprovalNotificationService notificationService;
+    private final NotificationService inAppNotificationService;
     private final ObjectMapper objectMapper;
 
     // Lazy to break circular dependency: SelfServiceService → ApprovalWorkflowService → SelfServiceService
@@ -147,6 +148,12 @@ public class ApprovalWorkflowService {
             autoApprove(pa, requester);
         } else {
             notificationService.notifyApproversOfNewRequest(pa);
+            inAppNotificationService.sendToFeatureHolders(directoryId,
+                    com.ldapadmin.entity.enums.FeatureKey.APPROVAL_MANAGE,
+                    "APPROVAL_SUBMITTED",
+                    "New " + type.name().replace('_', ' ').toLowerCase() + " approval request",
+                    null,
+                    "/directories/" + directoryId + "/approvals");
         }
 
         return pa;
@@ -232,6 +239,10 @@ public class ApprovalWorkflowService {
                 null, buildAuditDetail(pa, null));
 
         notificationService.notifyRequesterApproved(pa);
+        inAppNotificationService.send(pa.getRequestedBy(),
+                "APPROVAL_RESOLVED", "Your request was approved",
+                null, "/directories/" + pa.getDirectoryId() + "/approvals",
+                pa.getDirectoryId());
 
         return toResponse(pa);
     }
@@ -267,6 +278,10 @@ public class ApprovalWorkflowService {
                 null, buildAuditDetail(pa, Map.of("reason", reason)));
 
         notificationService.notifyRequesterRejected(pa);
+        inAppNotificationService.send(pa.getRequestedBy(),
+                "APPROVAL_RESOLVED", "Your request was rejected" + (reason != null ? ": " + reason : ""),
+                null, "/directories/" + pa.getDirectoryId() + "/approvals",
+                pa.getDirectoryId());
 
         return toResponse(pa);
     }

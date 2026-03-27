@@ -41,6 +41,7 @@ class AccessReviewCampaignServiceTest {
     @Mock private AccountRepository accountRepo;
     @Mock private AuditService auditService;
     @Mock private AccessReviewNotificationService notificationService;
+    @Mock private NotificationService inAppNotificationService;
     @Mock private CampaignReminderRepository reminderRepo;
 
     private AccessReviewCampaignService service;
@@ -60,7 +61,7 @@ class AccessReviewCampaignServiceTest {
         service = new AccessReviewCampaignService(
                 campaignRepo, groupRepo, decisionRepo, historyRepo,
                 ldapGroupService, ldapUserService, directoryRepo, accountRepo,
-                auditService, notificationService, reminderRepo);
+                auditService, notificationService, inAppNotificationService, reminderRepo);
 
         directory = new DirectoryConnection();
         directory.setId(directoryId);

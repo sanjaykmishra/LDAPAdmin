@@ -34,6 +34,13 @@ const router = createRouter({
         { path: '', name: 'home', redirect: () => '/superadmin/dashboard' },
         { path: 'no-access', name: 'noAccess', component: { template: '<div />' } },
 
+        // Notifications
+        {
+          path: 'notifications',
+          name: 'notifications',
+          component: () => import('@/views/NotificationsView.vue'),
+        },
+
         // Users
         {
           path: 'directories/:dirId/users',
