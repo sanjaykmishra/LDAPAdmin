@@ -23,7 +23,7 @@
     <aside :class="['text-white flex flex-col shrink-0 transition-all duration-200', collapsed ? 'w-14' : 'w-60']"
            :style="{ backgroundColor: settings.secondaryColour }">
       <!-- Logo + collapse toggle -->
-      <div class="px-3 py-4 border-b border-white/15 flex items-center justify-between">
+      <div :class="['px-3 py-4 border-b border-white/15 flex items-center', collapsed ? 'justify-center' : 'justify-between']">
         <span v-if="!collapsed" class="text-lg font-bold tracking-tight pl-2">{{ settings.appName }}</span>
         <button @click="collapsed = !collapsed" class="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors" :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
