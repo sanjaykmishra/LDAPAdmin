@@ -1,6 +1,7 @@
 <template>
   <div class="p-6 max-w-3xl">
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">{{ isEdit ? 'Edit SoD Policy' : 'New SoD Policy' }}</h1>
+    <h1 class="text-2xl font-bold text-gray-900">{{ isEdit ? 'Edit SoD Policy' : 'New SoD Policy' }}</h1>
+    <p class="text-sm text-gray-500 mt-1 mb-6">Define conflicting group pairs and enforcement rules</p>
 
     <form @submit.prevent="handleSubmit" class="space-y-6">
       <div class="bg-white rounded-lg border p-5 space-y-4">

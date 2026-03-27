@@ -1,6 +1,7 @@
 <template>
   <div class="p-6 max-w-3xl">
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">{{ isEdit ? 'Edit' : 'New' }} Campaign Template</h1>
+    <h1 class="text-2xl font-bold text-gray-900">{{ isEdit ? 'Edit' : 'New' }} Campaign Template</h1>
+    <p class="text-sm text-gray-500 mt-1 mb-6">Define a reusable campaign configuration</p>
 
     <form @submit.prevent="handleSubmit" class="space-y-6">
       <!-- Template details -->

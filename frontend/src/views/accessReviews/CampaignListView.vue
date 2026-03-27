@@ -1,7 +1,10 @@
 <template>
   <div class="p-6">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Access Reviews</h1>
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">Access Reviews</h1>
+        <p class="text-sm text-gray-500 mt-1">Access review campaigns for this directory</p>
+      </div>
       <div class="flex gap-2">
         <button @click="$router.push({ name: 'crossCampaignReport', params: { dirId } })" class="btn-secondary">
           Cross-Campaign Report

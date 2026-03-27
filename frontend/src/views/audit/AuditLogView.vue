@@ -1,6 +1,7 @@
 <template>
   <div class="p-6">
     <h1 class="text-2xl font-bold text-gray-900 mb-4">Audit Log</h1>
+    <p class="text-sm text-gray-500 mt-1">Directory change events and administrative actions</p>
 
     <!-- Directory picker (superadmin only) -->
     <div v-if="showPicker" class="mb-4">

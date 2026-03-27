@@ -1,6 +1,7 @@
 <template>
   <div class="p-6 max-w-4xl">
     <h1 class="text-2xl font-bold text-gray-900 mb-6">Schema Browser</h1>
+    <p class="text-sm text-gray-500 mt-1">Browse LDAP schema object classes and attribute types</p>
 
     <!-- Directory picker -->
     <div class="mb-6">

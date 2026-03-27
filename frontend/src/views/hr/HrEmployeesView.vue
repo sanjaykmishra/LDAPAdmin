@@ -1,7 +1,10 @@
 <template>
   <div class="p-6 max-w-6xl mx-auto">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">HR Employees</h1>
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">HR Employees</h1>
+        <p class="text-sm text-gray-500 mt-1">HR employee records and LDAP account matching</p>
+      </div>
       <RouterLink :to="{ path: `/directories/${dirId}/hr` }" class="text-sm text-blue-600 hover:text-blue-800">
         ← Back to HR Connection
       </RouterLink>
