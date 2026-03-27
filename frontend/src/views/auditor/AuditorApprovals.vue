@@ -156,6 +156,4 @@ onMounted(load)
 
 <style scoped>
 @reference "tailwindcss";
-.input-sm { @apply border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-slate-300; }
-.btn-sm { @apply px-3 py-1 border border-slate-200 text-slate-600 rounded-lg text-xs hover:bg-slate-50 disabled:opacity-50; }
 </style>

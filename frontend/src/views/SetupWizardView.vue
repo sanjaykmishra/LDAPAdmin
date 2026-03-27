@@ -90,7 +90,7 @@
           </div>
 
           <div class="flex justify-between mt-6">
-            <button @click="step = 1" class="btn-secondary">Back</button>
+            <button @click="step = 1" class="btn-neutral">Back</button>
             <div class="flex gap-3">
               <button @click="testConnection" :disabled="!canTest || testing" class="btn-secondary">
                 {{ testing ? 'Testing...' : 'Test Connection' }}
@@ -137,7 +137,7 @@
             </div>
           </div>
           <div class="flex justify-between mt-6">
-            <button @click="step = 2" class="btn-secondary">Back</button>
+            <button @click="step = 2" class="btn-neutral">Back</button>
             <button @click="step = 4" :disabled="verifying" class="btn-primary">Continue</button>
           </div>
         </template>
@@ -184,7 +184,7 @@
             </div>
           </div>
           <div class="flex justify-between mt-6">
-            <button @click="step = 3" class="btn-secondary">Back</button>
+            <button @click="step = 3" class="btn-neutral">Back</button>
             <button @click="saveProfile" :disabled="!canSaveProfile || saving" class="btn-primary">
               {{ saving ? 'Saving...' : 'Save & Continue' }}
             </button>
@@ -211,7 +211,7 @@
             <div v-if="error" class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">{{ error }}</div>
           </div>
           <div class="flex justify-between mt-6">
-            <button @click="step = 4" class="btn-secondary">Back</button>
+            <button @click="step = 4" class="btn-neutral">Back</button>
             <div class="flex gap-3">
               <button @click="step = 6" class="btn-secondary">Skip</button>
               <button @click="createReview" :disabled="!campaign.groupDn || campaign.deadlineDays < 1 || saving" class="btn-primary">
@@ -523,7 +523,4 @@ async function completeSetup() {
 <style scoped>
 @reference "tailwindcss";
 .label { @apply block text-xs font-medium text-gray-600 mb-1; }
-.input { @apply w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500; }
-.btn-primary { @apply bg-blue-600 text-white text-sm font-medium rounded-lg px-5 py-2 hover:bg-blue-700 disabled:opacity-50; }
-.btn-secondary { @apply bg-white text-gray-700 text-sm font-medium rounded-lg px-5 py-2 border border-gray-300 hover:bg-gray-50 disabled:opacity-50; }
 </style>

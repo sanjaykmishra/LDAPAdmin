@@ -10,7 +10,7 @@
         <button @click="handleSave" :disabled="saving" class="btn-primary">
           {{ saving ? 'Saving...' : 'Save Changes' }}
         </button>
-        <button @click="cancelEdit" class="btn-secondary">Cancel</button>
+        <button @click="cancelEdit" class="btn-neutral">Cancel</button>
       </div>
     </div>
 
@@ -272,6 +272,4 @@ async function handleSave() {
 
 <style scoped>
 @reference "tailwindcss";
-.btn-primary   { @apply px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50; }
-.btn-secondary { @apply px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50; }
 </style>

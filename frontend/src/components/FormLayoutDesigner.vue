@@ -692,6 +692,4 @@ function onSectionDrop(e, targetSIdx) {
 
 <style scoped>
 @reference "tailwindcss";
-.btn-primary   { @apply px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-50; }
-.btn-secondary { @apply px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs font-medium hover:bg-gray-50; }
 </style>

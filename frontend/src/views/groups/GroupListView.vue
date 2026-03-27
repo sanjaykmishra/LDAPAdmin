@@ -53,7 +53,7 @@
       <FormField label="Owner" v-model="createForm.owner" placeholder="DN of the group owner" />
       <FormField label="Description" v-model="createForm.description" placeholder="Group description" />
       <template #footer>
-        <button @click="showCreate = false" class="btn-secondary">Cancel</button>
+        <button @click="showCreate = false" class="btn-neutral">Cancel</button>
         <button @click="doCreate" :disabled="saving" class="btn-primary">Create</button>
       </template>
     </AppModal>
@@ -63,7 +63,7 @@
       <FormField label="Owner" v-model="editForm.owner" placeholder="DN of the group owner" />
       <FormField label="Description" v-model="editForm.description" placeholder="Group description" />
       <template #footer>
-        <button @click="showEdit = false" class="btn-secondary">Cancel</button>
+        <button @click="showEdit = false" class="btn-neutral">Cancel</button>
         <button @click="doEdit" :disabled="saving" class="btn-primary">{{ saving ? 'Saving…' : 'Save' }}</button>
       </template>
     </AppModal>
@@ -316,9 +316,4 @@ onMounted(async () => {
 
 <style scoped>
 @reference "tailwindcss";
-.btn-primary   { @apply px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700; }
-.btn-secondary { @apply px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50; }
-.btn-danger    { @apply px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700; }
-.btn-sm        { @apply text-xs; }
-.badge-blue    { @apply inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800; }
 </style>
