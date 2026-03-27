@@ -106,7 +106,7 @@ class EvidencePackageServiceTest {
         assertThat(entries).containsKey("manifest.json");
         assertThat(entries).containsKey("reports/user-access-report.pdf");
         assertThat(entries).containsKey("reports/privileged-account-inventory.pdf");
-        assertThat(entries).containsKey("approval-history/approvals.json");
+        assertThat(entries).containsKey("approval-history/approvals.csv");
     }
 
     @Test
@@ -133,7 +133,7 @@ class EvidencePackageServiceTest {
         Map<String, byte[]> entries = extractZip(zip);
         assertThat(entries).containsKey("campaigns/q1_review/access-review-summary.pdf");
         assertThat(entries).containsKey("campaigns/q1_review/decisions.csv");
-        assertThat(entries).containsKey("campaigns/q1_review/history.json");
+        assertThat(entries).containsKey("campaigns/q1_review/history.csv");
     }
 
     @Test
@@ -203,11 +203,10 @@ class EvidencePackageServiceTest {
                 directoryId, List.of(), true, false, false, "admin");
 
         Map<String, byte[]> entries = extractZip(zip);
-        assertThat(entries).containsKey("sod/violations.json");
-
-        List<Map<String, Object>> violations = objectMapper.readValue(
-                entries.get("sod/violations.json"), new TypeReference<>() {});
-        assertThat(violations).hasSize(2);
+        assertThat(entries).containsKey("sod/violations.csv");
+        String violationsCsv = new String(entries.get("sod/violations.csv"));
+        // Header + 2 data rows
+        assertThat(violationsCsv.split("\n")).hasSize(3);
     }
 
     @Test
@@ -237,12 +236,11 @@ class EvidencePackageServiceTest {
                 directoryId, List.of(), false, true, false, "admin");
 
         Map<String, byte[]> entries = extractZip(zip);
-        assertThat(entries).containsKey("entitlements/user-entitlements.json");
-
-        List<Map<String, Object>> entitlements = objectMapper.readValue(
-                entries.get("entitlements/user-entitlements.json"), new TypeReference<>() {});
-        assertThat(entitlements).hasSize(1);
-        assertThat(entitlements.get(0).get("dn")).isEqualTo("cn=jdoe,ou=users,dc=example,dc=com");
+        assertThat(entries).containsKey("entitlements/user-entitlements.csv");
+        String entitlementsCsv = new String(entries.get("entitlements/user-entitlements.csv"));
+        // Header + 1 data row
+        assertThat(entitlementsCsv.split("\n")).hasSize(2);
+        assertThat(entitlementsCsv).contains("cn=jdoe,ou=users,dc=example,dc=com");
     }
 
     @Test

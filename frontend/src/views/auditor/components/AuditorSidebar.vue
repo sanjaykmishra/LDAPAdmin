@@ -32,7 +32,7 @@ defineEmits(['navigate'])
 const links = computed(() => {
   const base = `/auditor/${props.token}`
   const items = [
-    { to: `${base}/campaigns`, label: 'Campaigns', icon: 'campaigns' },
+    { to: `${base}/campaigns`, label: 'Access Review Campaigns', icon: 'campaigns' },
   ]
   if (props.scope?.includeSod) {
     items.push({ to: `${base}/sod`, label: 'Separation of Duties', icon: 'sod' })

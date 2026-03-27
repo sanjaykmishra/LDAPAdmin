@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ldapadmin.dto.audit.AuditEventResponse;
 import com.ldapadmin.entity.*;
 import com.ldapadmin.entity.enums.AuditAction;
-import com.ldapadmin.entity.enums.SodViolationStatus;
 import com.ldapadmin.ldap.LdapGroupService;
 import com.ldapadmin.ldap.LdapUserService;
 import com.ldapadmin.ldap.model.LdapGroup;
@@ -167,21 +166,19 @@ public class EvidencePackageService {
                 log.warn("Failed to export CSV for campaign {}: {}", campaignId, e.getMessage());
             }
 
-            // Campaign history JSON
+            // Campaign history CSV
             try {
                 List<AccessReviewCampaignHistory> history =
                         historyRepo.findByCampaignIdOrderByChangedAtAsc(campaignId);
-                List<Map<String, Object>> historyData = history.stream().map(h -> {
-                    Map<String, Object> entry = new LinkedHashMap<>();
-                    entry.put("id", h.getId().toString());
-                    entry.put("oldStatus", h.getOldStatus() != null ? h.getOldStatus().name() : null);
-                    entry.put("newStatus", h.getNewStatus() != null ? h.getNewStatus().name() : null);
-                    entry.put("changedBy", h.getChangedBy() != null ? h.getChangedBy().getUsername() : null);
-                    entry.put("changedAt", h.getChangedAt() != null ? h.getChangedAt().toString() : null);
-                    entry.put("note", h.getNote());
-                    return entry;
-                }).toList();
-                files.put(prefix + "history.json", objectMapper.writeValueAsBytes(historyData));
+                StringBuilder csv = new StringBuilder("Old Status,New Status,Changed By,Changed At,Note\n");
+                for (AccessReviewCampaignHistory h : history) {
+                    csv.append(csvEscape(h.getOldStatus() != null ? h.getOldStatus().name() : "")).append(',');
+                    csv.append(csvEscape(h.getNewStatus() != null ? h.getNewStatus().name() : "")).append(',');
+                    csv.append(csvEscape(h.getChangedBy() != null ? h.getChangedBy().getUsername() : "")).append(',');
+                    csv.append(csvEscape(h.getChangedAt() != null ? h.getChangedAt().toString() : "")).append(',');
+                    csv.append(csvEscape(h.getNote() != null ? h.getNote() : "")).append('\n');
+                }
+                files.put(prefix + "history.csv", csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
             } catch (Exception e) {
                 log.warn("Failed to export history for campaign {}: {}", campaignId, e.getMessage());
             }
@@ -193,23 +190,19 @@ public class EvidencePackageService {
     private void addSodData(Map<String, byte[]> files, UUID directoryId) {
         try {
             List<SodPolicy> policies = sodPolicyRepo.findByDirectoryId(directoryId);
-            List<Map<String, Object>> policyData = policies.stream().map(p -> {
-                Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("id", p.getId().toString());
-                entry.put("name", p.getName());
-                entry.put("description", p.getDescription());
-                entry.put("groupADn", p.getGroupADn());
-                entry.put("groupBDn", p.getGroupBDn());
-                entry.put("groupAName", p.getGroupAName());
-                entry.put("groupBName", p.getGroupBName());
-                entry.put("severity", p.getSeverity() != null ? p.getSeverity().name() : null);
-                entry.put("action", p.getAction() != null ? p.getAction().name() : null);
-                entry.put("enabled", p.isEnabled());
-                entry.put("createdBy", p.getCreatedBy() != null ? p.getCreatedBy().getUsername() : null);
-                entry.put("createdAt", p.getCreatedAt() != null ? p.getCreatedAt().toString() : null);
-                return entry;
-            }).toList();
-            files.put("sod/policies.json", objectMapper.writeValueAsBytes(policyData));
+            StringBuilder csv = new StringBuilder("Name,Description,Group A,Group B,Severity,Action,Enabled,Created By,Created At\n");
+            for (SodPolicy p : policies) {
+                csv.append(csvEscape(p.getName())).append(',');
+                csv.append(csvEscape(p.getDescription())).append(',');
+                csv.append(csvEscape(p.getGroupAName())).append(',');
+                csv.append(csvEscape(p.getGroupBName())).append(',');
+                csv.append(csvEscape(p.getSeverity() != null ? p.getSeverity().name() : "")).append(',');
+                csv.append(csvEscape(p.getAction() != null ? p.getAction().name() : "")).append(',');
+                csv.append(p.isEnabled()).append(',');
+                csv.append(csvEscape(p.getCreatedBy() != null ? p.getCreatedBy().getUsername() : "")).append(',');
+                csv.append(csvEscape(p.getCreatedAt() != null ? p.getCreatedAt().toString() : "")).append('\n');
+            }
+            files.put("sod/policies.csv", csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
         } catch (Exception e) {
             log.warn("Failed to export SoD policies: {}", e.getMessage());
         }
@@ -217,22 +210,18 @@ public class EvidencePackageService {
         // Export ALL violations (OPEN, EXEMPTED, RESOLVED) for complete audit picture
         try {
             List<SodViolation> violations = sodViolationRepo.findByDirectoryId(directoryId);
-            List<Map<String, Object>> violationData = violations.stream().map(v -> {
-                Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("id", v.getId().toString());
-                entry.put("policyId", v.getPolicy() != null ? v.getPolicy().getId().toString() : null);
-                entry.put("policyName", v.getPolicy() != null ? v.getPolicy().getName() : null);
-                entry.put("userDn", v.getUserDn());
-                entry.put("userDisplayName", v.getUserDisplayName());
-                entry.put("status", v.getStatus() != null ? v.getStatus().name() : null);
-                entry.put("detectedAt", v.getDetectedAt() != null ? v.getDetectedAt().toString() : null);
-                entry.put("resolvedAt", v.getResolvedAt() != null ? v.getResolvedAt().toString() : null);
-                entry.put("exemptedBy", v.getExemptedBy() != null ? v.getExemptedBy().getUsername() : null);
-                entry.put("exemptionReason", v.getExemptionReason());
-                entry.put("exemptionExpiresAt", v.getExemptionExpiresAt() != null ? v.getExemptionExpiresAt().toString() : null);
-                return entry;
-            }).toList();
-            files.put("sod/violations.json", objectMapper.writeValueAsBytes(violationData));
+            StringBuilder csv = new StringBuilder("Policy,User DN,User Name,Status,Detected At,Resolved At,Exempted By,Exemption Reason\n");
+            for (SodViolation v : violations) {
+                csv.append(csvEscape(v.getPolicy() != null ? v.getPolicy().getName() : "")).append(',');
+                csv.append(csvEscape(v.getUserDn())).append(',');
+                csv.append(csvEscape(v.getUserDisplayName())).append(',');
+                csv.append(csvEscape(v.getStatus() != null ? v.getStatus().name() : "")).append(',');
+                csv.append(csvEscape(v.getDetectedAt() != null ? v.getDetectedAt().toString() : "")).append(',');
+                csv.append(csvEscape(v.getResolvedAt() != null ? v.getResolvedAt().toString() : "")).append(',');
+                csv.append(csvEscape(v.getExemptedBy() != null ? v.getExemptedBy().getUsername() : "")).append(',');
+                csv.append(csvEscape(v.getExemptionReason() != null ? v.getExemptionReason() : "")).append('\n');
+            }
+            files.put("sod/violations.csv", csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
         } catch (Exception e) {
             log.warn("Failed to export SoD violations: {}", e.getMessage());
         }
@@ -242,23 +231,19 @@ public class EvidencePackageService {
 
     private void addApprovalHistory(Map<String, byte[]> files, UUID directoryId) {
         try {
-            // Pre-load account lookup for resolving UUIDs to usernames
             Map<UUID, String> accountNames = new HashMap<>();
-
             List<PendingApproval> approvals = approvalRepo.findAllByDirectoryIdOrderByCreatedAtDesc(directoryId);
-            List<Map<String, Object>> approvalData = approvals.stream().map(a -> {
-                Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("id", a.getId().toString());
-                entry.put("requestType", a.getRequestType() != null ? a.getRequestType().name() : null);
-                entry.put("status", a.getStatus() != null ? a.getStatus().name() : null);
-                entry.put("requestedBy", resolveAccountName(a.getRequestedBy(), accountNames));
-                entry.put("reviewedBy", resolveAccountName(a.getReviewedBy(), accountNames));
-                entry.put("createdAt", a.getCreatedAt() != null ? a.getCreatedAt().toString() : null);
-                entry.put("reviewedAt", a.getReviewedAt() != null ? a.getReviewedAt().toString() : null);
-                entry.put("rejectReason", a.getRejectReason());
-                return entry;
-            }).toList();
-            files.put("approval-history/approvals.json", objectMapper.writeValueAsBytes(approvalData));
+            StringBuilder csv = new StringBuilder("Request Type,Status,Requested By,Reviewed By,Created At,Reviewed At,Reject Reason\n");
+            for (PendingApproval a : approvals) {
+                csv.append(csvEscape(a.getRequestType() != null ? a.getRequestType().name() : "")).append(',');
+                csv.append(csvEscape(a.getStatus() != null ? a.getStatus().name() : "")).append(',');
+                csv.append(csvEscape(resolveAccountName(a.getRequestedBy(), accountNames))).append(',');
+                csv.append(csvEscape(resolveAccountName(a.getReviewedBy(), accountNames))).append(',');
+                csv.append(csvEscape(a.getCreatedAt() != null ? a.getCreatedAt().toString() : "")).append(',');
+                csv.append(csvEscape(a.getReviewedAt() != null ? a.getReviewedAt().toString() : "")).append(',');
+                csv.append(csvEscape(a.getRejectReason() != null ? a.getRejectReason() : "")).append('\n');
+            }
+            files.put("approval-history/approvals.csv", csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
         } catch (Exception e) {
             log.warn("Failed to export approval history: {}", e.getMessage());
         }
@@ -274,12 +259,18 @@ public class EvidencePackageService {
 
     private void addAuditEvents(Map<String, byte[]> files, UUID directoryId) {
         try {
-            // Export last 90 days of audit events for this directory
             OffsetDateTime from = OffsetDateTime.now().minusDays(90);
             Page<AuditEventResponse> events = auditQueryService.query(
                     directoryId, null, null, from, null, 0, 10_000);
 
-            files.put("audit/events.json", objectMapper.writeValueAsBytes(events.getContent()));
+            StringBuilder csv = new StringBuilder("Occurred At,Actor,Action,Target DN\n");
+            for (AuditEventResponse e : events.getContent()) {
+                csv.append(csvEscape(e.occurredAt() != null ? e.occurredAt().toString() : "")).append(',');
+                csv.append(csvEscape(e.actorUsername() != null ? e.actorUsername() : "")).append(',');
+                csv.append(csvEscape(e.action() != null ? e.action().name() : "")).append(',');
+                csv.append(csvEscape(e.targetDn() != null ? e.targetDn() : "")).append('\n');
+            }
+            files.put("audit/events.csv", csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
             log.info("Exported {} audit events for evidence package", events.getNumberOfElements());
         } catch (Exception e) {
             log.warn("Failed to export audit events: {}", e.getMessage());
@@ -309,25 +300,22 @@ public class EvidencePackageService {
                 }
             }
 
-            List<Map<String, Object>> entitlements = users.stream().map(u -> {
-                Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("dn", u.getDn());
-                entry.put("cn", u.getCn());
-                entry.put("loginName", u.getLoginName());
-                entry.put("displayName", u.getDisplayName());
-                entry.put("mail", u.getMail());
-
-                // Combine memberOf attribute + reverse group membership lookup
+            StringBuilder csv = new StringBuilder("DN,CN,Login Name,Display Name,Email,Groups\n");
+            for (LdapUser u : users) {
                 Set<String> groupNames = new LinkedHashSet<>();
                 List<String> memberOf = u.getMemberOf();
                 if (memberOf != null) groupNames.addAll(memberOf);
                 List<String> fromGroups = userToGroups.get(u.getDn().toLowerCase());
                 if (fromGroups != null) groupNames.addAll(fromGroups);
 
-                entry.put("groups", new ArrayList<>(groupNames));
-                return entry;
-            }).toList();
-            files.put("entitlements/user-entitlements.json", objectMapper.writeValueAsBytes(entitlements));
+                csv.append(csvEscape(u.getDn())).append(',');
+                csv.append(csvEscape(u.getCn())).append(',');
+                csv.append(csvEscape(u.getLoginName())).append(',');
+                csv.append(csvEscape(u.getDisplayName())).append(',');
+                csv.append(csvEscape(u.getMail())).append(',');
+                csv.append(csvEscape(String.join("; ", groupNames))).append('\n');
+            }
+            files.put("entitlements/user-entitlements.csv", csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
         } catch (Exception e) {
             log.warn("Failed to export user entitlements: {}", e.getMessage());
         }
@@ -425,5 +413,14 @@ public class EvidencePackageService {
     private static String sanitizeFilename(String name) {
         if (name == null) return "unnamed";
         return name.replaceAll("[^a-zA-Z0-9_\\-]", "_").toLowerCase();
+    }
+
+    /** RFC 4180 CSV field escaping. */
+    private static String csvEscape(String value) {
+        if (value == null) return "";
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 }
