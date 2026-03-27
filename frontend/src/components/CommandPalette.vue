@@ -55,52 +55,100 @@ const query = ref('')
 const activeIndex = ref(0)
 const inputRef = ref(null)
 
-// Build the command list based on user role
+// Label map for route path segments
+const LABEL_MAP = {
+  'dashboard': 'Dashboard',
+  'admins': 'Application Accounts',
+  'directories': 'Directory Connections',
+  'directory-browser': 'Directory Browser',
+  'directory-search': 'Directory Search',
+  'directory-schema': 'Schema Browser',
+  'integrity': 'Integrity Check',
+  'audit-log': 'Audit Log',
+  'audit-sources': 'Audit Sources',
+  'audit-reports': 'Compliance Reports',
+  'auditor-links': 'Auditor Links',
+  'profiles': 'Provisioning Profiles',
+  'playbooks': 'Lifecycle Playbooks',
+  'reports': 'Reports',
+  'settings': 'Application Settings',
+  'sod-policies': 'SoD Policies',
+  'sod-violations': 'SoD Violations',
+  'access-drift': 'Access Drift',
+  'access-reviews': 'Access Reviews',
+  'campaign-templates': 'Campaign Templates',
+  'hr': 'HR Integration',
+  'users': 'Users',
+  'groups': 'Groups',
+  'audit': 'Audit Log',
+  'bulk': 'Bulk Import/Export',
+  'approvals': 'Approvals',
+  'notifications': 'Notifications',
+  'cross-campaign-report': 'Cross-Campaign Report',
+}
+
+// Section map for grouping in command palette
+const SECTION_MAP = {
+  'superadmin/dashboard': 'Overview',
+  'superadmin/directory-browser': 'Explore',
+  'superadmin/directory-search': 'Explore',
+  'superadmin/directory-schema': 'Explore',
+  'superadmin/reports': 'Report',
+  'superadmin/audit-reports': 'Report',
+  'superadmin/auditor-links': 'Report',
+  'settings': 'Configure',
+}
+
+// Auto-derive commands from the router
 const commands = computed(() => {
   const dirId = route.params.dirId || ''
   const items = []
+  const seen = new Set()
 
-  if (auth.isSuperadmin) {
-    items.push(
-      { label: 'Dashboard', path: '/superadmin/dashboard', section: 'Overview' },
-      { label: 'Directory Browser', path: '/superadmin/directory-browser', section: 'Explore' },
-      { label: 'Directory Search', path: '/superadmin/directory-search', section: 'Explore' },
-      { label: 'Schema Browser', path: '/superadmin/directory-schema', section: 'Explore' },
-      { label: 'Operational Reports', path: '/superadmin/reports', section: 'Report' },
-      { label: 'Compliance Reports', path: '/superadmin/audit-reports', section: 'Report' },
-      { label: 'Auditor Links', path: '/superadmin/auditor-links', section: 'Report' },
-      { label: 'Directory Connections', path: '/superadmin/directories', section: 'Configure' },
-      { label: 'HR Integration', path: '/superadmin/hr', section: 'Configure' },
-      { label: 'Audit Sources', path: '/superadmin/audit-sources', section: 'Configure' },
-      { label: 'Access Reviews', path: '/superadmin/access-reviews', section: 'Configure' },
-      { label: 'SoD Policies', path: '/superadmin/sod-policies', section: 'Configure' },
-      { label: 'SoD Violations', path: '/superadmin/sod-violations', section: 'Configure' },
-      { label: 'Access Drift', path: '/superadmin/access-drift', section: 'Configure' },
-      { label: 'Provisioning Profiles', path: '/superadmin/profiles', section: 'Configure' },
-      { label: 'Lifecycle Playbooks', path: '/superadmin/playbooks', section: 'Configure' },
-      { label: 'Application Settings', path: '/settings', section: 'Configure' },
-      { label: 'Application Accounts', path: '/superadmin/admins', section: 'Configure' },
-      { label: 'Audit Log', path: '/superadmin/audit-log', section: 'Configure' },
-      { label: 'Integrity Check', path: '/superadmin/integrity', section: 'Configure' },
-    )
+  // Walk all resolved routes in the app shell (children of '/')
+  const appRoutes = router.getRoutes().filter(r => {
+    const p = r.path
+    // Skip parameterized detail routes, catch-alls, empty redirects, and auditor/self-service
+    if (p.includes(':campaignId') || p.includes(':groupId') || p.includes(':templateId')) return false
+    if (p.includes(':token') || p.includes(':requestId')) return false
+    if (p === '/' || p.includes('pathMatch') || p.includes('no-access')) return false
+    if (p.startsWith('/login') || p.startsWith('/oidc') || p.startsWith('/setup')) return false
+    if (p.startsWith('/self-service') || p.startsWith('/register') || p.startsWith('/auditor')) return false
+    return true
+  })
+
+  for (const r of appRoutes) {
+    let path = r.path
+
+    // Skip superadmin routes for non-superadmins
+    if (path.includes('superadmin') && !auth.isSuperadmin) continue
+    if (r.meta?.requiresSuperadmin && !auth.isSuperadmin) continue
+
+    // For directory-scoped routes, substitute the current dirId
+    if (path.includes(':dirId')) {
+      if (!dirId) continue
+      path = path.replace(':dirId', dirId)
+    }
+
+    if (seen.has(path)) continue
+    seen.add(path)
+
+    // Derive label from the last meaningful segment
+    const segments = path.split('/').filter(Boolean)
+    const lastSeg = segments[segments.length - 1]
+    const label = LABEL_MAP[lastSeg] || lastSeg.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+
+    // Derive section
+    const pathKey = segments.filter(s => !s.match(/^[0-9a-f]{8}-/)).join('/')
+    let section = SECTION_MAP[pathKey]
+    if (!section) {
+      if (path.includes('superadmin')) section = 'Configure'
+      else if (path.includes('directories/')) section = 'Directory'
+      else section = 'General'
+    }
+
+    items.push({ label, path, section })
   }
-
-  if (dirId) {
-    items.push(
-      { label: 'Users', path: `/directories/${dirId}/users`, section: 'Directory' },
-      { label: 'Groups', path: `/directories/${dirId}/groups`, section: 'Directory' },
-      { label: 'Approvals', path: `/directories/${dirId}/approvals`, section: 'Directory' },
-      { label: 'Playbooks', path: `/directories/${dirId}/playbooks`, section: 'Directory' },
-      { label: 'Reports', path: `/directories/${dirId}/reports`, section: 'Directory' },
-      { label: 'Bulk Import/Export', path: `/directories/${dirId}/bulk`, section: 'Directory' },
-      { label: 'Access Reviews', path: `/directories/${dirId}/access-reviews`, section: 'Directory' },
-      { label: 'Audit Log', path: `/directories/${dirId}/audit`, section: 'Directory' },
-    )
-  }
-
-  items.push(
-    { label: 'Notifications', path: '/notifications', section: 'General' },
-  )
 
   return items
 })
