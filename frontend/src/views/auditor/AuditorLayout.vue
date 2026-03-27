@@ -284,7 +284,8 @@ function formatDate(iso) {
 }
 
 function handlePrint() {
-  window.print()
+  const url = `/auditor/${token.value}/print`
+  window.open(url, '_blank')
 }
 
 async function downloadZip() {
