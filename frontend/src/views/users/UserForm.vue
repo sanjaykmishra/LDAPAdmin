@@ -122,7 +122,18 @@
                     v-else-if="!attr.rdn"
                     :style="{ gridColumn: `span ${attr.columnSpan || 6}` }"
                   >
+                    <!-- DN Lookup: use DnPicker instead of text input -->
+                    <template v-if="attr.inputType === 'DN_LOOKUP'">
+                      <label class="block text-sm font-medium text-gray-700 mb-1">{{ attr.customLabel || attr.attributeName }}</label>
+                      <DnPicker
+                        :model-value="local.attributes[attr.attributeName]"
+                        @update:model-value="v => { local.attributes[attr.attributeName] = v }"
+                        :directory-id="dirId"
+                        :placeholder="'Select a DN'"
+                      />
+                    </template>
                     <FormField
+                      v-else
                       :label="attr.customLabel || attr.attributeName"
                       :model-value="attr.computedExpression ? computedAttrValues[attr.attributeName] : local.attributes[attr.attributeName]"
                       @update:model-value="v => { if (!attr.computedExpression) local.attributes[attr.attributeName] = v }"
@@ -188,7 +199,18 @@
                     v-if="!attr.rdn"
                     :style="{ gridColumn: `span ${attr.columnSpan || 6}` }"
                   >
+                    <!-- DN Lookup: use DnPicker instead of text input -->
+                    <template v-if="attr.inputType === 'DN_LOOKUP'">
+                      <label class="block text-sm font-medium text-gray-700 mb-1">{{ attr.customLabel || attr.attributeName }}</label>
+                      <DnPicker
+                        v-model="local.attributes[attr.attributeName]"
+                        :directory-id="dirId"
+                        :placeholder="'Select a DN'"
+                        :disabled="!attr.editableOnUpdate"
+                      />
+                    </template>
                     <FormField
+                      v-else
                       :label="attr.customLabel || attr.attributeName"
                       v-model="local.attributes[attr.attributeName]"
                       :type="mapInputType(attr.inputType)"
@@ -297,6 +319,7 @@
 import { reactive, ref, watch, nextTick, computed, onMounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
 import FormField from '@/components/FormField.vue'
+import DnPicker from '@/components/DnPicker.vue'
 import * as groupsApi from '@/api/groups'
 import { generatePassword } from '@/api/profiles'
 
