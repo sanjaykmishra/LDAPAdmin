@@ -23,7 +23,7 @@
     <aside :class="['text-white flex flex-col shrink-0 transition-all duration-200', collapsed ? 'w-14' : 'w-60']"
            :style="{ backgroundColor: settings.secondaryColour }">
       <!-- Logo + collapse toggle -->
-      <div class="px-3 py-4 border-b border-white/15 flex items-center justify-between">
+      <div :class="['px-3 py-4 border-b border-white/15 flex items-center', collapsed ? 'justify-center' : 'justify-between']">
         <span v-if="!collapsed" class="text-lg font-bold tracking-tight pl-2">{{ settings.appName }}</span>
         <button @click="collapsed = !collapsed" class="p-1 rounded hover:bg-white/10 text-white/60 hover:text-white transition-colors" :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -48,7 +48,7 @@
       </div>
 
       <!-- Navigation -->
-      <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav :class="['flex-1 py-4 space-y-1 overflow-y-auto', collapsed ? 'px-1 nav-collapsed' : 'px-3']">
         <!-- Admin navigation (directory-scoped) -->
         <template v-if="!auth.isSuperadmin">
           <template v-if="currentDirId">
@@ -63,7 +63,7 @@
             <RouterLink :to="{ path: `/directories/${currentDirId}/approvals` }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-4z"/><path d="M7 10l2 2 4-4"/></svg>
               <span v-if="!collapsed">Approvals</span>
-              <span v-if="pendingCount > 0" class="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{{ pendingCount }}</span>
+              <span v-if="pendingCount > 0 && !collapsed" class="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{{ pendingCount }}</span>
             </RouterLink>
             <RouterLink :to="{ path: `/directories/${currentDirId}/playbooks` }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12M4 8h12M4 12h8M4 16h6"/><path d="M15 12l2 2-2 2"/></svg>
@@ -80,7 +80,7 @@
             <RouterLink :to="{ path: `/directories/${currentDirId}/access-reviews` }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M9 11l8-8"/><path d="M14 3h3v3"/></svg>
               <span v-if="!collapsed">Access Reviews</span>
-              <span v-if="activeReviewCount > 0" class="ml-auto bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{{ activeReviewCount }}</span>
+              <span v-if="activeReviewCount > 0 && !collapsed" class="ml-auto bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{{ activeReviewCount }}</span>
             </RouterLink>
             <RouterLink :to="{ path: `/directories/${currentDirId}/audit` }" class="nav-item">
               <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="2"/><path d="M7 6h6M7 10h6M7 14h3"/></svg>
@@ -188,7 +188,7 @@
       </nav>
 
       <!-- User info / logout -->
-      <div class="px-3 py-3 border-t border-white/15 flex items-center justify-between">
+      <div :class="['px-3 py-3 border-t border-white/15 flex items-center', collapsed ? 'justify-center' : 'justify-between']">
         <button @click="showPreferences = true" class="text-sm truncate text-left hover:text-white/90 transition-colors" :title="auth.username">
           <template v-if="!collapsed">
             <p class="font-medium">{{ auth.username }}</p>
@@ -334,6 +334,9 @@ async function handleLogout() {
 @reference "tailwindcss";
 .nav-item {
   @apply flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-white/70 hover:bg-white/10 hover:text-white transition-colors;
+}
+.nav-collapsed .nav-item {
+  @apply justify-center px-0 gap-0;
 }
 .nav-item.router-link-active {
   @apply bg-white/10 text-white;

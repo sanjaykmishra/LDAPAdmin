@@ -115,10 +115,13 @@ class AuditorPortalControllerTest extends BaseControllerTest {
 
     @Test
     void metadata_rateLimited_returns429() throws Exception {
+        // Rate limiter fires only on failed token lookups
+        when(auditorLinkService.validateToken(eq("brute-force"), any(), any()))
+                .thenThrow(new ResourceNotFoundException("not found"));
         doThrow(new TooManyRequestsException("Rate limit exceeded"))
                 .when(ipRateLimiter).check(any());
 
-        mvc.perform(get(BASE))
+        mvc.perform(get("/api/v1/auditor/brute-force"))
                 .andExpect(status().isTooManyRequests());
     }
 

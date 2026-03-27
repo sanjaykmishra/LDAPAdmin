@@ -71,7 +71,7 @@ const copied = ref(false)
 const sections = computed(() => {
   const items = [
     { key: 'overview', label: 'Overview' },
-    { key: 'campaigns', label: 'Campaigns' },
+    { key: 'campaigns', label: 'Access Review Campaigns' },
   ]
   if (props.scope?.includeSod) items.push({ key: 'sod', label: 'Separation of Duties' })
   if (props.scope?.includeEntitlements) items.push({ key: 'entitlements', label: 'Entitlements' })

@@ -194,9 +194,14 @@ public class AuditorPortalController {
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     private AuditorLink validate(String token, HttpServletRequest request) {
-        ipRateLimiter.check(request.getRemoteAddr());
-        return auditorLinkService.validateToken(token,
-                request.getRemoteAddr(), request.getHeader("User-Agent"));
+        try {
+            return auditorLinkService.validateToken(token,
+                    request.getRemoteAddr(), request.getHeader("User-Agent"));
+        } catch (ResourceNotFoundException e) {
+            // Rate-limit only failed lookups (brute-force protection)
+            ipRateLimiter.check(request.getRemoteAddr());
+            throw e;
+        }
     }
 
     private static HttpHeaders portalHeaders() {

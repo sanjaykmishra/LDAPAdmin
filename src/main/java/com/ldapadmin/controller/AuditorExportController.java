@@ -109,9 +109,13 @@ public class AuditorExportController {
     // ── Helpers ────────────────────────────────────────────────────────────
 
     private AuditorLink validate(String token, HttpServletRequest request) {
-        ipRateLimiter.check(request.getRemoteAddr());
-        return auditorLinkService.validateToken(token,
-                request.getRemoteAddr(), request.getHeader("User-Agent"));
+        try {
+            return auditorLinkService.validateToken(token,
+                    request.getRemoteAddr(), request.getHeader("User-Agent"));
+        } catch (com.ldapadmin.exception.ResourceNotFoundException e) {
+            ipRateLimiter.check(request.getRemoteAddr());
+            throw e;
+        }
     }
 
     private static HttpHeaders portalHeaders() {

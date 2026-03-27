@@ -3,7 +3,6 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useNotificationStore } from '@/stores/notifications'
 import {
   listAllProfiles, createProfile, updateProfile, deleteProfile, cloneProfile,
-  getLifecyclePolicy, setLifecyclePolicy, deleteLifecyclePolicy,
   getApprovalConfig, setApprovalConfig, getApprovers, setApprovers,
   evaluateGroupChanges, applyGroupChanges
 } from '@/api/profiles'
@@ -48,8 +47,6 @@ const ocSchemaCache = ref({})
 // Profile form
 const profile = ref(emptyProfile())
 
-// Lifecycle form
-const lifecycle = ref(emptyLifecycle())
 
 // Group change preview dialog
 const showGroupChangeDialog = ref(false)
@@ -71,14 +68,6 @@ function emptyProfile() {
     autoIncludeGroups: false, excludeAutoIncludes: false,
     additionalProfileIds: [],
     attributeConfigs: [], groupAssignments: []
-  }
-}
-
-function emptyLifecycle() {
-  return {
-    expiresAfterDays: null, maxRenewals: null, renewalDays: null,
-    onExpiryAction: 'DISABLE', onExpiryMoveDn: '', onExpiryRemoveGroups: true,
-    onExpiryNotify: true, warningDaysBefore: null
   }
 }
 
@@ -122,7 +111,6 @@ watch(selectedDirId, async (dirId) => {
 function openCreate() {
   editing.value = null
   profile.value = emptyProfile()
-  lifecycle.value = emptyLifecycle()
   approval.value = emptyApproval()
   profileApprovers.value = []
   schemaRequiredAttrs.value = new Set()
@@ -186,12 +174,7 @@ async function openEdit(p) {
     } catch { /* schema lookup optional */ }
   }
 
-  // Load lifecycle & approval data
-  try {
-    const { data } = await getLifecyclePolicy(p.id)
-    lifecycle.value = { ...data }
-  } catch { lifecycle.value = emptyLifecycle() }
-
+  // Load approval data
   try {
     const { data } = await getApprovalConfig(p.id)
     approval.value = { ...data }
@@ -222,10 +205,6 @@ async function save() {
   try {
     if (editing.value) {
       await updateProfile(selectedDirId.value, editing.value, profile.value)
-      // Save lifecycle
-      if (lifecycle.value.expiresAfterDays != null) {
-        await setLifecyclePolicy(editing.value, lifecycle.value)
-      }
       // Save approval config
       await setApprovalConfig(editing.value, approval.value)
       await setApprovers(editing.value, { accountIds: profileApprovers.value })
@@ -240,10 +219,6 @@ async function save() {
       editing.value = null
     } else {
       const { data } = await createProfile(selectedDirId.value, profile.value)
-      // Save lifecycle if configured
-      if (lifecycle.value.expiresAfterDays != null) {
-        await setLifecyclePolicy(data.id, lifecycle.value)
-      }
       // Save approval config
       await setApprovalConfig(data.id, approval.value)
       if (profileApprovers.value.length > 0) {
@@ -707,7 +682,6 @@ const modalTabs = [
   { id: 'layout', label: 'Forms' },
   { id: 'groups', label: 'Groups' },
   { id: 'policy', label: 'Policy' },
-  { id: 'lifecycle', label: 'Lifecycle' },
 ]
 
 function toggleApprover(accountId) {
@@ -1082,53 +1056,10 @@ function toggleApprover(accountId) {
               Email generated password to user on creation
             </label>
           </fieldset>
-        </div>
 
-        <!-- Lifecycle Tab -->
-        <div v-if="modalTab === 'lifecycle'" class="space-y-4">
-          <div class="grid grid-cols-3 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Expires After (days)</label>
-              <input v-model.number="lifecycle.expiresAfterDays" type="number" class="input w-full" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Max Renewals</label>
-              <input v-model.number="lifecycle.maxRenewals" type="number" class="input w-full" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Renewal Days</label>
-              <input v-model.number="lifecycle.renewalDays" type="number" class="input w-full" />
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">On Expiry Action</label>
-              <select v-model="lifecycle.onExpiryAction" class="input w-full">
-                <option>DISABLE</option>
-                <option>DELETE</option>
-                <option>MOVE</option>
-              </select>
-            </div>
-            <div v-if="lifecycle.onExpiryAction === 'MOVE'">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Move to DN</label>
-              <input v-model="lifecycle.onExpiryMoveDn" class="input w-full font-mono text-sm" />
-            </div>
-          </div>
-          <div class="flex gap-6">
-            <label class="flex items-center gap-2 text-sm">
-              <input type="checkbox" v-model="lifecycle.onExpiryRemoveGroups" /> Remove from groups on expiry
-            </label>
-            <label class="flex items-center gap-2 text-sm">
-              <input type="checkbox" v-model="lifecycle.onExpiryNotify" /> Send notification on expiry
-            </label>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Warning Days Before Expiry</label>
-            <input v-model.number="lifecycle.warningDaysBefore" type="number" class="input w-48" />
-          </div>
-
-          <!-- Approval -->
-          <div class="border-t border-gray-200 pt-4 mt-2 space-y-4">
+          <!-- Approvals -->
+          <fieldset class="border border-gray-300 rounded-lg p-3 space-y-3">
+            <legend class="text-sm font-semibold text-gray-800 px-1">Approvals</legend>
             <label class="flex items-center gap-2 text-sm font-medium">
               <input type="checkbox" v-model="approval.requireApproval" /> Require approval for user creation
             </label>
@@ -1158,7 +1089,7 @@ function toggleApprover(accountId) {
                 </div>
               </div>
             </div>
-          </div>
+          </fieldset>
         </div>
       </div>
 

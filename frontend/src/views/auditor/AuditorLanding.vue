@@ -26,7 +26,7 @@
 
     <!-- Metrics cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      <MetricCard label="Campaigns" :value="metrics.campaignCount" icon="campaigns" />
+      <MetricCard label="Access Reviews" :value="metrics.campaignCount" icon="campaigns" />
       <MetricCard label="Decisions Complete" :value="metrics.completionPct + '%'" :sub="metrics.completedDecisions + ' / ' + metrics.totalDecisions" icon="decisions" />
       <MetricCard label="SoD Violations" :value="metrics.sodViolations" :sub="metrics.sodOpen + ' open'" icon="sod"
                   :alert="metrics.sodOpen > 0" />
@@ -169,7 +169,7 @@ const sodSegments = computed(() => {
 const sections = computed(() => {
   const base = `/auditor/${props.token}`
   const items = [
-    { to: `${base}/campaigns`, label: 'Access Review Campaigns', desc: `${campaigns.value.length} campaigns with decision data` },
+    { to: `${base}/campaigns`, label: 'Access Review Campaigns', desc: `${campaigns.value.length} access review campaign${campaigns.value.length !== 1 ? 's' : ''} with decision data` },
   ]
   if (props.scope.includeSod) {
     items.push({ to: `${base}/sod`, label: 'Separation of Duties', desc: `${metrics.value.sodPolicies} policies, ${metrics.value.sodViolations} violations` })
