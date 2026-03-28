@@ -213,6 +213,18 @@ const router = createRouter({
           meta: { requiresSuperadmin: true },
         },
         {
+          path: 'superadmin/alerts',
+          name: 'alerts',
+          component: () => import('@/views/superadmin/AlertDashboardView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
+        {
+          path: 'superadmin/alert-rules',
+          name: 'alertRules',
+          component: () => import('@/views/superadmin/AlertRulesView.vue'),
+          meta: { requiresSuperadmin: true },
+        },
+        {
           path: 'superadmin/admins',
           name: 'adminUsers',
           component: () => import('@/views/superadmin/AdminUsersView.vue'),

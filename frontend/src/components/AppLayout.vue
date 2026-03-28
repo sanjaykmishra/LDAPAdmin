@@ -100,6 +100,10 @@
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg>
             <span v-if="!collapsed">Dashboard</span>
           </RouterLink>
+          <RouterLink to="/superadmin/alerts" class="nav-item">
+            <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-4z"/><path d="M10 8v3M10 14h.01"/></svg>
+            <span v-if="!collapsed">Alerts</span>
+          </RouterLink>
 
           <!-- Explore -->
           <button v-if="!collapsed" @click="sections.explore = !sections.explore" class="nav-section-toggle">
