@@ -4,7 +4,7 @@ import { useNotificationStore } from '@/stores/notifications'
 import {
   listAllProfiles, createProfile, updateProfile, deleteProfile, cloneProfile,
   getApprovalConfig, setApprovalConfig, getApprovers, setApprovers,
-  evaluateGroupChanges, applyGroupChanges
+  evaluateGroupChanges, applySelectiveGroupChanges
 } from '@/api/profiles'
 import { listDirectories } from '@/api/directories'
 import { listObjectClasses, getObjectClass } from '@/api/schema'
@@ -49,8 +49,7 @@ const profile = ref(emptyProfile())
 
 
 // Group change preview dialog
-const showGroupChangeDialog = ref(false)
-const groupChangePreview = ref(null)
+// Group compliance check state is declared near checkCompliance()
 const applyingGroupChanges = ref(false)
 
 // Approval form
@@ -209,14 +208,9 @@ async function save() {
       await setApprovalConfig(editing.value, approval.value)
       await setApprovers(editing.value, { accountIds: profileApprovers.value })
       notif.success('Profile updated')
-      // Check if group membership changes are needed for existing users
-      const savedProfileId = editing.value
       showModal.value = false
-      await reload()
-      // Use saved ID since editing.value gets cleared
-      editing.value = savedProfileId
-      await handleGroupChangePreview()
       editing.value = null
+      await reload()
     } else {
       const { data } = await createProfile(selectedDirId.value, profile.value)
       // Save approval config
@@ -225,17 +219,9 @@ async function save() {
         await setApprovers(data.id, { accountIds: profileApprovers.value })
       }
       notif.success('Profile created')
-      // If this new profile is auto-include, check impact on other profiles
-      if (profile.value.autoIncludeGroups && profile.value.groupAssignments.length > 0) {
-        showModal.value = false
-        await reload()
-        editing.value = data.id
-        await handleGroupChangePreview()
-        editing.value = null
-      } else {
-        showModal.value = false
-        await reload()
-      }
+      showModal.value = false
+      editing.value = null
+      await reload()
     }
   } catch (e) {
     notif.error(e.response?.data?.detail || e.response?.data?.message || e.message)
@@ -372,29 +358,58 @@ function toggleAdditionalProfile(profileId) {
   }
 }
 
-async function handleGroupChangePreview() {
+// ── Group membership compliance check ─────────────────────────────────────
+const complianceRows = ref([])
+const complianceLoading = ref(false)
+const complianceChecked = ref(false)
+
+async function checkCompliance() {
   if (!editing.value) return
+  complianceLoading.value = true
+  complianceChecked.value = false
   try {
     const { data } = await evaluateGroupChanges(selectedDirId.value, editing.value)
-    if (data.changes && data.changes.length > 0) {
-      groupChangePreview.value = data
-      showGroupChangeDialog.value = true
+    // Flatten to one row per user+group
+    const rows = []
+    for (const change of (data.changes || [])) {
+      for (const g of (change.groupsToAdd || [])) {
+        rows.push({
+          userDn: change.userDn,
+          groupDn: g.groupDn,
+          memberAttribute: g.memberAttribute,
+          selected: false,
+        })
+      }
     }
+    complianceRows.value = rows
+    complianceChecked.value = true
   } catch (e) {
-    // Non-critical — just means we can't preview
-    console.warn('Group change evaluation failed:', e)
+    notif.error('Compliance check failed: ' + (e.response?.data?.detail || e.message))
+  } finally {
+    complianceLoading.value = false
   }
 }
 
-async function confirmApplyGroupChanges() {
+const complianceSelectedCount = computed(() => complianceRows.value.filter(r => r.selected).length)
+
+function toggleAllCompliance(checked) {
+  complianceRows.value.forEach(r => { r.selected = checked })
+}
+
+async function applySelectedCompliance() {
+  const entries = complianceRows.value
+    .filter(r => r.selected)
+    .map(r => ({ userDn: r.userDn, groupDn: r.groupDn, memberAttribute: r.memberAttribute }))
+  if (!entries.length) return
+
   applyingGroupChanges.value = true
   try {
-    await applyGroupChanges(selectedDirId.value, editing.value)
-    notif.success('Group memberships updated')
-    showGroupChangeDialog.value = false
-    groupChangePreview.value = null
+    const { data } = await applySelectiveGroupChanges(selectedDirId.value, entries)
+    notif.success(`Added ${data.applied} group membership(s)`)
+    // Re-check to refresh the list
+    await checkCompliance()
   } catch (e) {
-    notif.error(e.response?.data?.detail || e.response?.data?.message || e.message)
+    notif.error(e.response?.data?.detail || e.message)
   } finally {
     applyingGroupChanges.value = false
   }
@@ -1060,10 +1075,65 @@ function toggleApprover(accountId) {
             <legend class="text-sm font-semibold text-gray-700 px-1">Effective Group Set</legend>
             <p class="text-sm text-gray-500">The combined set of groups that will be assigned on provisioning (own + additional + auto-included).</p>
             <div class="space-y-1">
-              <div v-for="g in effectiveGroups" :key="g.groupDn" class="text-sm font-mono text-gray-700 bg-gray-50 px-2 py-1 rounded">
+              <div v-for="g in effectiveGroups" :key="g.groupDn" class="text-sm text-gray-700 bg-gray-50 px-2 py-1 rounded">
                 {{ g.groupDn }} <span class="text-gray-400">({{ g.memberAttribute }})</span>
               </div>
             </div>
+          </fieldset>
+
+          <!-- Group membership compliance check -->
+          <fieldset v-if="editing && effectiveGroups.length > 0" class="border border-gray-300 rounded-lg p-4 space-y-3">
+            <legend class="text-sm font-semibold text-gray-700 px-1">Membership Compliance</legend>
+            <p class="text-sm text-gray-500">Check which users in this profile's OU are missing group memberships from the effective group set.</p>
+
+            <button @click="checkCompliance" :disabled="complianceLoading" class="btn-secondary text-sm">
+              {{ complianceLoading ? 'Checking...' : 'Check Compliance' }}
+            </button>
+
+            <template v-if="complianceChecked">
+              <div v-if="complianceRows.length === 0" class="text-sm text-green-700 bg-green-50 rounded-lg px-4 py-3">
+                All users are members of all effective groups.
+              </div>
+
+              <template v-else>
+                <div class="flex items-center justify-between">
+                  <p class="text-sm text-gray-600">{{ complianceRows.length }} missing membership(s) found</p>
+                  <div class="flex items-center gap-3">
+                    <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                      <input type="checkbox" @change="toggleAllCompliance($event.target.checked)"
+                             :checked="complianceSelectedCount === complianceRows.length && complianceRows.length > 0"
+                             class="rounded" />
+                      Select all
+                    </label>
+                    <button @click="applySelectedCompliance" :disabled="complianceSelectedCount === 0 || applyingGroupChanges"
+                            class="btn-primary text-xs">
+                      {{ applyingGroupChanges ? 'Applying...' : `Add ${complianceSelectedCount} to Groups` }}
+                    </button>
+                  </div>
+                </div>
+
+                <div class="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
+                  <table class="w-full text-sm">
+                    <thead class="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 w-10"></th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500">User</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500">Missing Group</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                      <tr v-for="(row, i) in complianceRows" :key="i" :class="row.selected ? 'bg-blue-50/50' : ''">
+                        <td class="px-3 py-1.5">
+                          <input type="checkbox" v-model="row.selected" class="rounded" />
+                        </td>
+                        <td class="px-3 py-1.5 text-gray-700 truncate max-w-xs" :title="row.userDn">{{ row.userDn }}</td>
+                        <td class="px-3 py-1.5 text-gray-600 truncate max-w-xs" :title="row.groupDn">{{ row.groupDn }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </template>
+            </template>
           </fieldset>
         </div>
 
@@ -1154,32 +1224,7 @@ function toggleApprover(accountId) {
       :message="`Delete profile '${deleteTarget?.name}'? This cannot be undone.`"
       confirmLabel="Delete" :danger="true" @confirm="doDelete" />
 
-    <!-- Group change preview dialog -->
-    <AppModal v-model="showGroupChangeDialog" title="Group Membership Changes" size="lg">
-      <template v-if="groupChangePreview">
-        <p class="text-sm text-gray-600 mb-3">
-          The following group membership changes are needed for <strong>{{ groupChangePreview.totalUsersAffected }}</strong> existing user(s):
-        </p>
-        <div class="max-h-80 overflow-y-auto space-y-3">
-          <div v-for="change in groupChangePreview.changes" :key="change.userDn"
-            class="border border-gray-300 rounded-lg p-3 text-sm">
-            <div class="font-mono text-gray-800 mb-1">{{ change.userDn }}</div>
-            <div v-for="g in change.groupsToAdd" :key="g.groupDn" class="text-green-700 ml-4">
-              + Add to {{ g.groupDn }}
-            </div>
-            <div v-for="g in change.groupsToRemove" :key="g.groupDn" class="text-red-700 ml-4">
-              - Remove from {{ g.groupDn }}
-            </div>
-          </div>
-        </div>
-        <div class="flex justify-end gap-2 mt-4">
-          <button class="btn-secondary" @click="showGroupChangeDialog = false; groupChangePreview = null">Skip</button>
-          <button class="btn-primary" :disabled="applyingGroupChanges" @click="confirmApplyGroupChanges">
-            {{ applyingGroupChanges ? 'Applying...' : 'Apply Changes' }}
-          </button>
-        </div>
-      </template>
-    </AppModal>
+    <!-- Group change preview dialog removed — compliance check is now inline on the Groups tab -->
 
     <!-- Clone modal -->
     <AppModal v-model="showCloneModal" title="Clone Profile" size="sm">

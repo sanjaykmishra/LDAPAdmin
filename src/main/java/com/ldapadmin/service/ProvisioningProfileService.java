@@ -810,4 +810,32 @@ public class ProvisioningProfileService {
 
         return preview;
     }
+
+    /**
+     * Applies only the selected group membership changes.
+     */
+    @Transactional
+    public int applySelectiveGroupChanges(UUID directoryId,
+                                           SelectiveGroupChangeRequest request,
+                                           AuthPrincipal principal) {
+        DirectoryConnection dc = requireDirectory(directoryId);
+        int applied = 0;
+
+        for (SelectiveGroupChangeRequest.GroupMembershipEntry entry : request.entries()) {
+            try {
+                ldapGroupService.addMember(dc, entry.groupDn(),
+                        entry.memberAttribute(), entry.userDn());
+                auditService.record(principal, directoryId,
+                        AuditAction.GROUP_MEMBER_ADD, entry.groupDn(),
+                        Map.of("attribute", entry.memberAttribute(),
+                                "member", entry.userDn(),
+                                "source", "compliance_check"));
+                applied++;
+            } catch (Exception e) {
+                log.warn("Failed to add {} to group {}: {}",
+                        entry.userDn(), entry.groupDn(), e.getMessage());
+            }
+        }
+        return applied;
+    }
 }

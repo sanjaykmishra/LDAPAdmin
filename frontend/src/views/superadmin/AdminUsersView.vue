@@ -120,7 +120,7 @@
               <option value="ADMIN">ADMIN</option>
               <option value="READ_ONLY">READ_ONLY</option>
             </select>
-            <button @click="doAddProfileRole" :disabled="!newProfileId" class="btn-primary btn-sm px-3 py-1 disabled:opacity-50">Add</button>
+            <button @click="doAddProfileRole" :disabled="!newProfileId" class="btn-primary text-xs">Add</button>
           </div>
         </section>
 
