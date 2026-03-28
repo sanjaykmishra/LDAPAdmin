@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
 import { listAlertRules, updateAlertRule, initializeAlertRules } from '@/api/alerts'
 import { listDirectories } from '@/api/directories'
 import { useNotificationStore } from '@/stores/notifications'
@@ -108,6 +109,7 @@ onMounted(loadData)
         <h1 class="text-2xl font-bold text-gray-900">Alert Rules</h1>
         <p class="text-sm text-gray-500 mt-1">Configure monitoring rules and thresholds per directory</p>
       </div>
+      <RouterLink to="/superadmin/alerts" class="btn-secondary btn-sm">&larr; Back to Alerts</RouterLink>
     </div>
 
     <div v-if="loading" class="text-center py-12 text-gray-400">Loading rules...</div>

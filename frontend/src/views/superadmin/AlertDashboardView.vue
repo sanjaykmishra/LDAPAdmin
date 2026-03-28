@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { listAlerts, getAlertSummary, acknowledgeAlert, dismissAlert, resolveAlert } from '@/api/alerts'
+import { listDirectories } from '@/api/directories'
 import { useNotificationStore } from '@/stores/notifications'
 import RelativeTime from '@/components/RelativeTime.vue'
 
@@ -9,6 +10,8 @@ const notif = useNotificationStore()
 const loading = ref(true)
 const summary = ref({ openCount: 0, acknowledgedCount: 0, criticalCount: 0, highCount: 0, mediumCount: 0, lowCount: 0 })
 const alerts = ref([])
+const directories = ref([])
+const dirFilter = ref('')
 const page = ref(0)
 const totalPages = ref(1)
 const statusFilter = ref('OPEN')
@@ -30,7 +33,12 @@ async function loadData() {
   try {
     const [summaryRes, alertsRes] = await Promise.all([
       getAlertSummary(),
-      listAlerts({ status: statusFilter.value || undefined, page: page.value, size: 20 }),
+      listAlerts({
+        status: statusFilter.value || undefined,
+        directoryId: dirFilter.value || undefined,
+        page: page.value,
+        size: 20,
+      }),
     ])
     summary.value = summaryRes.data
     alerts.value = alertsRes.data.content || []
@@ -61,7 +69,14 @@ function changeFilter(status) {
   loadData()
 }
 
-onMounted(() => {
+function changeDirFilter(val) {
+  dirFilter.value = val
+  page.value = 0
+  loadData()
+}
+
+onMounted(async () => {
+  try { const { data } = await listDirectories(); directories.value = data } catch {}
   loadData()
   refreshTimer = setInterval(loadData, 30000)
 })
@@ -105,14 +120,23 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
       </div>
     </div>
 
-    <!-- Filter tabs -->
-    <div class="flex gap-1 mb-4 border-b">
-      <button v-for="s in ['OPEN', 'ACKNOWLEDGED', null]" :key="s || 'all'"
-              :class="['px-4 py-2 text-sm font-medium border-b-2 -mb-px',
-                statusFilter === s ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']"
-              @click="changeFilter(s)">
-        {{ s === 'OPEN' ? 'Open (' + summary.openCount + ')' : s === 'ACKNOWLEDGED' ? 'Acknowledged (' + summary.acknowledgedCount + ')' : 'All' }}
-      </button>
+    <!-- Filters -->
+    <div class="flex items-center justify-between mb-4 border-b">
+      <div class="flex gap-1">
+        <button v-for="s in ['OPEN', 'ACKNOWLEDGED', null]" :key="s || 'all'"
+                :class="['px-4 py-2 text-sm font-medium border-b-2 -mb-px',
+                  statusFilter === s ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']"
+                @click="changeFilter(s)">
+          {{ s === 'OPEN' ? 'Open (' + summary.openCount + ')' : s === 'ACKNOWLEDGED' ? 'Acknowledged (' + summary.acknowledgedCount + ')' : 'All' }}
+        </button>
+      </div>
+      <div class="flex items-center gap-2 pb-2">
+        <label class="text-xs text-gray-500">Directory:</label>
+        <select :value="dirFilter" @change="changeDirFilter($event.target.value)" class="input input-sm text-xs">
+          <option value="">All</option>
+          <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName || d.name }}</option>
+        </select>
+      </div>
     </div>
 
     <!-- Loading -->
