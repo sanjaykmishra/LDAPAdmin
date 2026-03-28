@@ -4,7 +4,7 @@
       <div
         v-for="n in store.items"
         :key="n.id"
-        class="pointer-events-auto relative overflow-hidden rounded-xl shadow-lg bg-slate-800 text-white"
+        class="pointer-events-auto relative overflow-hidden rounded-xl shadow-lg bg-gray-600 text-white"
       >
         <div class="flex items-start gap-3 px-4 py-3">
           <!-- Icon (colored per type) -->
@@ -22,16 +22,16 @@
           </svg>
           <div class="flex-1 min-w-0">
             <p class="text-sm font-medium text-white">{{ n.message }}</p>
-            <p v-if="n.detail" class="text-xs text-slate-300 mt-0.5">{{ n.detail }}</p>
+            <p v-if="n.detail" class="text-xs text-gray-300 mt-0.5">{{ n.detail }}</p>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             <button v-if="n.action" @click="n.action.fn(); store.remove(n.id)"
-              class="text-xs font-semibold underline text-slate-300 hover:text-white">{{ n.action.label }}</button>
-            <button @click="store.remove(n.id)" class="text-slate-400 hover:text-white text-lg leading-none">&times;</button>
+              class="text-xs font-semibold underline text-gray-300 hover:text-white">{{ n.action.label }}</button>
+            <button @click="store.remove(n.id)" class="text-gray-400 hover:text-white text-lg leading-none">&times;</button>
           </div>
         </div>
         <!-- Progress bar -->
-        <div class="h-0.5 bg-slate-700">
+        <div class="h-0.5 bg-gray-500">
           <div class="h-full transition-all ease-linear" :class="progressClass(n.type)"
                :style="{ width: (n.remaining / n.duration * 100) + '%' }" />
         </div>

@@ -71,6 +71,20 @@ async function updateCooldown(rule, hours) {
   }
 }
 
+function hasEditableParams(rule) {
+  return rule.params && Object.keys(rule.params).length > 0
+}
+
+async function updateParam(rule, key, value) {
+  try {
+    const newParams = { ...rule.params, [key]: value }
+    const { data } = await updateAlertRule(rule.id, { params: newParams })
+    Object.assign(rule, data)
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  }
+}
+
 async function toggleEmail(rule) {
   try {
     const { data } = await updateAlertRule(rule.id, { notifyEmail: !rule.notifyEmail })
@@ -165,7 +179,26 @@ onMounted(loadData)
                 <td class="px-4 py-2.5">
                   <input type="checkbox" :checked="r.enabled" @change="toggleEnabled(r)" class="rounded accent-blue-600" />
                 </td>
-                <td class="px-4 py-2.5 font-medium text-gray-900">{{ humanize(r.ruleType) }}</td>
+                <td class="px-4 py-2.5">
+                  <div class="font-medium text-gray-900">{{ humanize(r.ruleType) }}</div>
+                  <div v-if="hasEditableParams(r)" class="flex flex-wrap gap-2 mt-1.5">
+                    <div v-for="(val, key) in r.params" :key="key" class="flex items-center gap-1">
+                      <label class="text-[10px] text-gray-400">{{ humanize(key) }}:</label>
+                      <input v-if="typeof val === 'number'" type="number"
+                             :value="val" min="0"
+                             @change="updateParam(r, key, Number($event.target.value))"
+                             class="input input-sm w-14 text-xs" />
+                      <input v-else-if="Array.isArray(val)" type="text"
+                             :value="val.join(', ')"
+                             @change="updateParam(r, key, $event.target.value.split(',').map(s => s.trim()).filter(Boolean))"
+                             class="input input-sm w-40 text-xs" placeholder="value1, value2" />
+                      <input v-else type="text"
+                             :value="val"
+                             @change="updateParam(r, key, $event.target.value)"
+                             class="input input-sm w-24 text-xs" />
+                    </div>
+                  </div>
+                </td>
                 <td class="px-4 py-2.5">
                   <select :value="r.severity" @change="updateSeverity(r, $event.target.value)" class="input input-sm text-xs">
                     <option v-for="s in severityOptions" :key="s" :value="s">{{ s }}</option>
