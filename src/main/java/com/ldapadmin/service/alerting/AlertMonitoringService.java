@@ -7,6 +7,7 @@ import com.ldapadmin.entity.enums.AlertStatus;
 import com.ldapadmin.repository.AlertInstanceRepository;
 import com.ldapadmin.repository.AlertRuleRepository;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
+import com.ldapadmin.service.ApprovalNotificationService;
 import com.ldapadmin.service.NotificationService;
 import com.ldapadmin.entity.enums.FeatureKey;
 import lombok.extern.slf4j.Slf4j;
@@ -32,17 +33,20 @@ public class AlertMonitoringService {
     private final AlertInstanceRepository instanceRepo;
     private final DirectoryConnectionRepository dirRepo;
     private final NotificationService notificationService;
+    private final ApprovalNotificationService emailService;
     private final Map<String, AlertChecker> checkerRegistry = new HashMap<>();
 
     public AlertMonitoringService(AlertRuleRepository ruleRepo,
                                    AlertInstanceRepository instanceRepo,
                                    DirectoryConnectionRepository dirRepo,
                                    NotificationService notificationService,
+                                   ApprovalNotificationService emailService,
                                    List<AlertChecker> checkers) {
         this.ruleRepo = ruleRepo;
         this.instanceRepo = instanceRepo;
         this.dirRepo = dirRepo;
         this.notificationService = notificationService;
+        this.emailService = emailService;
 
         for (AlertChecker checker : checkers) {
             checkerRegistry.put(checker.ruleType().name(), checker);
@@ -128,16 +132,38 @@ public class AlertMonitoringService {
 
     private void sendNotifications(AlertRule rule, AlertChecker.AlertCandidate candidate) {
         UUID directoryId = rule.getDirectory() != null ? rule.getDirectory().getId() : null;
+        String dirName = rule.getDirectory() != null ? rule.getDirectory().getDisplayName() : "Global";
         String link = "/superadmin/alerts";
 
         if (rule.isNotifyInApp()) {
             notificationService.sendToFeatureHolders(
                     directoryId,
-                    FeatureKey.APPROVAL_MANAGE,  // all admins
+                    FeatureKey.APPROVAL_MANAGE,
                     "ALERT_" + rule.getRuleType().name(),
                     "[" + rule.getSeverity() + "] " + candidate.title(),
                     candidate.detail(),
                     link);
+        }
+
+        if (rule.isNotifyEmail() && rule.getEmailRecipients() != null
+                && !rule.getEmailRecipients().isBlank()) {
+            String subject = "[" + rule.getSeverity() + "] " + candidate.title();
+            String body = "Alert: " + candidate.title() + "\n"
+                    + "Severity: " + rule.getSeverity() + "\n"
+                    + "Directory: " + dirName + "\n"
+                    + "Rule: " + rule.getRuleType().name().replace('_', ' ') + "\n\n"
+                    + (candidate.detail() != null ? candidate.detail() : "");
+
+            for (String recipient : rule.getEmailRecipients().split(",")) {
+                String trimmed = recipient.trim();
+                if (!trimmed.isEmpty()) {
+                    try {
+                        emailService.sendGenericEmail(trimmed, subject, body);
+                    } catch (Exception e) {
+                        log.warn("Failed to send alert email to {}: {}", trimmed, e.getMessage());
+                    }
+                }
+            }
         }
     }
 }
