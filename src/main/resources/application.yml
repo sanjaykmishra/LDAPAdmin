@@ -79,6 +79,8 @@ ldapadmin:
     scan-cron:               ${SOD_SCAN_CRON:0 0 3 * * ?}
   drift:
     analysis-cron:           ${DRIFT_ANALYSIS_CRON:0 0 4 * * ?}
+  monitoring:
+    cron:                    ${MONITORING_CRON:0 */15 * * * ?}
   hr:
     poll-interval-ms:       ${HR_POLL_INTERVAL_MS:60000}
     sync-timeout-minutes:   ${HR_SYNC_TIMEOUT_MINUTES:30}

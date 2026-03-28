@@ -36,6 +36,9 @@ public enum AlertRuleType {
     CHANGELOG_GAP,
     HIGH_CHANGE_VOLUME,
 
+    // ── Integrity ────────────────────────────────────────────────────────
+    INTEGRITY_VIOLATION,
+
     // ── Compliance ───────────────────────────────────────────────────────
     SCHEDULED_REPORT_FAILURE,
     AUDITOR_LINK_EXPIRING,

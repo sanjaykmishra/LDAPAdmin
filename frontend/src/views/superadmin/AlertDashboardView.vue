@@ -12,6 +12,7 @@ const summary = ref({ openCount: 0, acknowledgedCount: 0, criticalCount: 0, high
 const alerts = ref([])
 const directories = ref([])
 const dirFilter = ref('')
+const severityFilter = ref('')
 const page = ref(0)
 const totalPages = ref(1)
 const statusFilter = ref('OPEN')
@@ -36,6 +37,7 @@ async function loadData() {
       listAlerts({
         status: statusFilter.value || undefined,
         directoryId: dirFilter.value || undefined,
+        severity: severityFilter.value || undefined,
         page: page.value,
         size: 20,
       }),
@@ -130,12 +132,21 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
           {{ s === 'OPEN' ? 'Open (' + summary.openCount + ')' : s === 'ACKNOWLEDGED' ? 'Acknowledged (' + summary.acknowledgedCount + ')' : 'All' }}
         </button>
       </div>
-      <div class="flex items-center gap-2 pb-2">
-        <label class="text-xs text-gray-500">Directory:</label>
-        <select :value="dirFilter" @change="changeDirFilter($event.target.value)" class="input input-sm text-xs">
-          <option value="">All</option>
-          <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName || d.name }}</option>
-        </select>
+      <div class="flex items-center gap-4 pb-2">
+        <div class="flex items-center gap-2">
+          <label class="text-xs text-gray-500">Severity:</label>
+          <select v-model="severityFilter" @change="page = 0; loadData()" class="input input-sm text-xs">
+            <option value="">All</option>
+            <option v-for="s in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']" :key="s" :value="s">{{ s }}</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="text-xs text-gray-500">Directory:</label>
+          <select :value="dirFilter" @change="changeDirFilter($event.target.value)" class="input input-sm text-xs">
+            <option value="">All</option>
+            <option v-for="d in directories" :key="d.id" :value="d.id">{{ d.displayName || d.name }}</option>
+          </select>
+        </div>
       </div>
     </div>
 

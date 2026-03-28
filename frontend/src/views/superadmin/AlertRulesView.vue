@@ -89,6 +89,17 @@ async function updateRecipients(rule, recipients) {
   }
 }
 
+async function bulkToggle(group, enabled) {
+  try {
+    await Promise.all(group.rules
+      .filter(r => r.enabled !== enabled)
+      .map(r => updateAlertRule(r.id, { enabled }).then(({ data }) => Object.assign(r, data))))
+    notif.success(enabled ? 'All rules enabled' : 'All rules disabled')
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  }
+}
+
 async function doInitialize(directoryId) {
   try {
     await initializeAlertRules(directoryId)
@@ -129,7 +140,13 @@ onMounted(loadData)
 
       <!-- Rules by directory -->
       <div v-for="group in rulesByDirectory" :key="group.directoryId || 'global'" class="mb-8">
-        <h2 class="text-lg font-semibold text-gray-800 mb-3">{{ group.name }}</h2>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-semibold text-gray-800">{{ group.name }}</h2>
+          <div class="flex gap-2">
+            <button @click="bulkToggle(group, true)" class="text-xs text-blue-600 hover:text-blue-800">Enable All</button>
+            <button @click="bulkToggle(group, false)" class="text-xs text-gray-500 hover:text-gray-700">Disable All</button>
+          </div>
+        </div>
         <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <table class="w-full text-sm">
             <thead class="bg-gray-50">
