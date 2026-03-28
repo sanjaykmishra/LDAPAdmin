@@ -14,6 +14,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -118,6 +120,16 @@ public class ProvisioningProfileController {
                                                 @PathVariable UUID profileId,
                                                 @AuthenticationPrincipal AuthPrincipal principal) {
         return service.applyGroupChanges(directoryId, profileId, principal);
+    }
+
+    @PostMapping("/api/v1/directories/{directoryId}/profiles/apply-selective-group-changes")
+    @PreAuthorize("hasRole('SUPERADMIN')")
+    public Map<String, Integer> applySelectiveGroupChanges(
+            @PathVariable UUID directoryId,
+            @RequestBody SelectiveGroupChangeRequest request,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        int applied = service.applySelectiveGroupChanges(directoryId, request, principal);
+        return Map.of("applied", applied);
     }
 
     // ── Password Generation ──────────────────────────────────────────────────

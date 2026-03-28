@@ -30,3 +30,4 @@ export const setApprovers  = (profileId, data) => client.put(`/profiles/${profil
 // Group change evaluation
 export const evaluateGroupChanges = (dirId, profileId) => client.post(`${dirBase(dirId)}/${profileId}/evaluate-group-changes`)
 export const applyGroupChanges    = (dirId, profileId) => client.post(`${dirBase(dirId)}/${profileId}/apply-group-changes`)
+export const applySelectiveGroupChanges = (dirId, entries) => client.post(`${dirBase(dirId)}/apply-selective-group-changes`, { entries })
