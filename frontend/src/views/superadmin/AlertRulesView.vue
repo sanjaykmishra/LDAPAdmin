@@ -70,6 +70,24 @@ async function updateCooldown(rule, hours) {
   }
 }
 
+async function toggleEmail(rule) {
+  try {
+    const { data } = await updateAlertRule(rule.id, { notifyEmail: !rule.notifyEmail })
+    Object.assign(rule, data)
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  }
+}
+
+async function updateRecipients(rule, recipients) {
+  try {
+    const { data } = await updateAlertRule(rule.id, { emailRecipients: recipients })
+    Object.assign(rule, data)
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  }
+}
+
 async function doInitialize(directoryId) {
   try {
     await initializeAlertRules(directoryId)
@@ -119,6 +137,8 @@ onMounted(loadData)
                 <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase w-32">Severity</th>
                 <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase w-28">Cooldown</th>
                 <th class="px-4 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase w-16">In-App</th>
+                <th class="px-4 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase w-16">Email</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Recipients</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-50">
@@ -143,6 +163,15 @@ onMounted(loadData)
                 <td class="px-4 py-2.5 text-center">
                   <span v-if="r.notifyInApp" class="text-green-600 text-xs">Yes</span>
                   <span v-else class="text-gray-400 text-xs">No</span>
+                </td>
+                <td class="px-4 py-2.5 text-center">
+                  <input type="checkbox" :checked="r.notifyEmail" @change="toggleEmail(r)" class="rounded accent-blue-600" />
+                </td>
+                <td class="px-4 py-2.5">
+                  <input v-if="r.notifyEmail" type="text" :value="r.emailRecipients || ''"
+                         @change="updateRecipients(r, $event.target.value)"
+                         class="input input-sm text-xs w-full" placeholder="email@example.com, ..." />
+                  <span v-else class="text-gray-400 text-xs">—</span>
                 </td>
               </tr>
             </tbody>
