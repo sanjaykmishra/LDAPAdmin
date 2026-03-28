@@ -30,19 +30,10 @@ public class AlertService {
 
     @Transactional(readOnly = true)
     public Page<AlertInstanceResponse> listInstances(UUID directoryId, AlertStatus status,
-                                                      int page, int size) {
+                                                      AlertSeverity severity, int page, int size) {
         PageRequest pageable = PageRequest.of(page, Math.min(size, 100));
-        Page<AlertInstance> instances;
-
-        if (directoryId != null && status != null) {
-            instances = instanceRepo.findAllByDirectoryIdAndStatusOrderByCreatedAtDesc(directoryId, status, pageable);
-        } else if (directoryId != null) {
-            instances = instanceRepo.findAllByDirectoryIdOrderByCreatedAtDesc(directoryId, pageable);
-        } else if (status != null) {
-            instances = instanceRepo.findAllByStatusOrderByCreatedAtDesc(status, pageable);
-        } else {
-            instances = instanceRepo.findAllByOrderByCreatedAtDesc(pageable);
-        }
+        Page<AlertInstance> instances = instanceRepo.findFiltered(
+                directoryId, status, severity, pageable);
 
         return instances.map(i -> {
             String dirName = resolveDirectoryName(i.getDirectoryId());
@@ -176,6 +167,7 @@ public class AlertService {
             new RuleDef(AlertRuleType.DIRECTORY_UNREACHABLE, AlertSeverity.CRITICAL, true, Map.of(), 1),
             new RuleDef(AlertRuleType.CHANGELOG_GAP, AlertSeverity.HIGH, true, Map.of("hours", 6), 4),
             new RuleDef(AlertRuleType.HIGH_CHANGE_VOLUME, AlertSeverity.HIGH, false, Map.of("threshold", 100, "windowHours", 1), 4),
+            new RuleDef(AlertRuleType.INTEGRITY_VIOLATION, AlertSeverity.HIGH, false, Map.of(), 24),
             new RuleDef(AlertRuleType.SCHEDULED_REPORT_FAILURE, AlertSeverity.MEDIUM, true, Map.of(), 24),
             new RuleDef(AlertRuleType.AUDITOR_LINK_EXPIRING, AlertSeverity.MEDIUM, false, Map.of("days", 7), 24)
     );

@@ -2,12 +2,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getDashboard } from '@/api/dashboard'
+import { getAlertSummary } from '@/api/alerts'
 import RelativeTime from '@/components/RelativeTime.vue'
 
 const router = useRouter()
 const loading = ref(true)
 const data = ref(null)
 const error = ref(null)
+const alertSummary = ref({ criticalCount: 0, highCount: 0, openCount: 0 })
 
 const ACTION_LABELS = {
   'USER_CREATE': 'User created',
@@ -146,8 +148,12 @@ let refreshTimer = null
 
 async function loadDashboard() {
   try {
-    const { data: d } = await getDashboard()
-    data.value = d
+    const [dashRes, alertRes] = await Promise.all([
+      getDashboard(),
+      getAlertSummary().catch(() => ({ data: { criticalCount: 0, highCount: 0, openCount: 0 } })),
+    ])
+    data.value = dashRes.data
+    alertSummary.value = alertRes.data
     error.value = null
   } catch (e) {
     error.value = e.response?.data?.detail || e.message
@@ -203,7 +209,18 @@ onUnmounted(() => {
     <template v-else-if="data">
 
       <!-- ── Top row: Compliance posture stat cards ──────────────────────── -->
-      <div class="grid grid-cols-4 gap-4 mb-6">
+      <div class="grid grid-cols-5 gap-4 mb-6">
+        <!-- Active Alerts -->
+        <div class="rounded-xl border-2 p-5 cursor-pointer shadow-sm transition-shadow hover:shadow-md"
+             :class="alertSummary.criticalCount > 0 ? 'border-red-200 bg-red-50/30' : alertSummary.highCount > 0 ? 'border-orange-200 bg-orange-50/30' : 'border-gray-200'"
+             @click="router.push('/superadmin/alerts')">
+          <p class="text-sm font-medium text-gray-500 mb-1">Active Alerts</p>
+          <p class="text-3xl font-bold" :class="alertSummary.criticalCount > 0 ? 'text-red-600' : alertSummary.openCount > 0 ? 'text-orange-600' : 'text-green-700'">
+            {{ alertSummary.openCount }}
+          </p>
+          <p class="text-xs text-gray-400 mt-1">{{ alertSummary.criticalCount }} critical, {{ alertSummary.highCount }} high</p>
+        </div>
+
         <!-- SoD Violations -->
         <div class="rounded-xl border-2 p-5 cursor-pointer shadow-sm transition-shadow hover:shadow-md"
              :class="cardBorder(postureSeverity('sodViolations'))"

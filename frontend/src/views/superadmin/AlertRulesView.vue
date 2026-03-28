@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
 import { listAlertRules, updateAlertRule, initializeAlertRules } from '@/api/alerts'
 import { listDirectories } from '@/api/directories'
 import { useNotificationStore } from '@/stores/notifications'
@@ -70,6 +71,49 @@ async function updateCooldown(rule, hours) {
   }
 }
 
+function hasEditableParams(rule) {
+  return rule.params && Object.keys(rule.params).length > 0
+}
+
+async function updateParam(rule, key, value) {
+  try {
+    const newParams = { ...rule.params, [key]: value }
+    const { data } = await updateAlertRule(rule.id, { params: newParams })
+    Object.assign(rule, data)
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  }
+}
+
+async function toggleEmail(rule) {
+  try {
+    const { data } = await updateAlertRule(rule.id, { notifyEmail: !rule.notifyEmail })
+    Object.assign(rule, data)
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  }
+}
+
+async function updateRecipients(rule, recipients) {
+  try {
+    const { data } = await updateAlertRule(rule.id, { emailRecipients: recipients })
+    Object.assign(rule, data)
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  }
+}
+
+async function bulkToggle(group, enabled) {
+  try {
+    await Promise.all(group.rules
+      .filter(r => r.enabled !== enabled)
+      .map(r => updateAlertRule(r.id, { enabled }).then(({ data }) => Object.assign(r, data))))
+    notif.success(enabled ? 'All rules enabled' : 'All rules disabled')
+  } catch (e) {
+    notif.error(e.response?.data?.detail || e.message)
+  }
+}
+
 async function doInitialize(directoryId) {
   try {
     await initializeAlertRules(directoryId)
@@ -90,6 +134,7 @@ onMounted(loadData)
         <h1 class="text-2xl font-bold text-gray-900">Alert Rules</h1>
         <p class="text-sm text-gray-500 mt-1">Configure monitoring rules and thresholds per directory</p>
       </div>
+      <RouterLink to="/superadmin/alerts" class="btn-secondary btn-sm">&larr; Back to Alerts</RouterLink>
     </div>
 
     <div v-if="loading" class="text-center py-12 text-gray-400">Loading rules...</div>
@@ -109,7 +154,13 @@ onMounted(loadData)
 
       <!-- Rules by directory -->
       <div v-for="group in rulesByDirectory" :key="group.directoryId || 'global'" class="mb-8">
-        <h2 class="text-lg font-semibold text-gray-800 mb-3">{{ group.name }}</h2>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-semibold text-gray-800">{{ group.name }}</h2>
+          <div class="flex gap-2">
+            <button @click="bulkToggle(group, true)" class="text-xs text-blue-600 hover:text-blue-800">Enable All</button>
+            <button @click="bulkToggle(group, false)" class="text-xs text-gray-500 hover:text-gray-700">Disable All</button>
+          </div>
+        </div>
         <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <table class="w-full text-sm">
             <thead class="bg-gray-50">
@@ -119,6 +170,8 @@ onMounted(loadData)
                 <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase w-32">Severity</th>
                 <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase w-28">Cooldown</th>
                 <th class="px-4 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase w-16">In-App</th>
+                <th class="px-4 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase w-16">Email</th>
+                <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Recipients</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-50">
@@ -126,7 +179,26 @@ onMounted(loadData)
                 <td class="px-4 py-2.5">
                   <input type="checkbox" :checked="r.enabled" @change="toggleEnabled(r)" class="rounded accent-blue-600" />
                 </td>
-                <td class="px-4 py-2.5 font-medium text-gray-900">{{ humanize(r.ruleType) }}</td>
+                <td class="px-4 py-2.5">
+                  <div class="font-medium text-gray-900">{{ humanize(r.ruleType) }}</div>
+                  <div v-if="hasEditableParams(r)" class="flex flex-wrap gap-2 mt-1.5">
+                    <div v-for="(val, key) in r.params" :key="key" class="flex items-center gap-1">
+                      <label class="text-[10px] text-gray-400">{{ humanize(key) }}:</label>
+                      <input v-if="typeof val === 'number'" type="number"
+                             :value="val" min="0"
+                             @change="updateParam(r, key, Number($event.target.value))"
+                             class="input input-sm w-14 text-xs" />
+                      <input v-else-if="Array.isArray(val)" type="text"
+                             :value="val.join(', ')"
+                             @change="updateParam(r, key, $event.target.value.split(',').map(s => s.trim()).filter(Boolean))"
+                             class="input input-sm w-40 text-xs" placeholder="value1, value2" />
+                      <input v-else type="text"
+                             :value="val"
+                             @change="updateParam(r, key, $event.target.value)"
+                             class="input input-sm w-24 text-xs" />
+                    </div>
+                  </div>
+                </td>
                 <td class="px-4 py-2.5">
                   <select :value="r.severity" @change="updateSeverity(r, $event.target.value)" class="input input-sm text-xs">
                     <option v-for="s in severityOptions" :key="s" :value="s">{{ s }}</option>
@@ -143,6 +215,15 @@ onMounted(loadData)
                 <td class="px-4 py-2.5 text-center">
                   <span v-if="r.notifyInApp" class="text-green-600 text-xs">Yes</span>
                   <span v-else class="text-gray-400 text-xs">No</span>
+                </td>
+                <td class="px-4 py-2.5 text-center">
+                  <input type="checkbox" :checked="r.notifyEmail" @change="toggleEmail(r)" class="rounded accent-blue-600" />
+                </td>
+                <td class="px-4 py-2.5">
+                  <input v-if="r.notifyEmail" type="text" :value="r.emailRecipients || ''"
+                         @change="updateRecipients(r, $event.target.value)"
+                         class="input input-sm text-xs w-full" placeholder="email@example.com, ..." />
+                  <span v-else class="text-gray-400 text-xs">—</span>
                 </td>
               </tr>
             </tbody>

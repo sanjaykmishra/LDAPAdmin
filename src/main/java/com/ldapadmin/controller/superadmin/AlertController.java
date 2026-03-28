@@ -2,6 +2,7 @@ package com.ldapadmin.controller.superadmin;
 
 import com.ldapadmin.auth.AuthPrincipal;
 import com.ldapadmin.dto.alert.*;
+import com.ldapadmin.entity.enums.AlertSeverity;
 import com.ldapadmin.entity.enums.AlertStatus;
 import com.ldapadmin.service.alerting.AlertService;
 import lombok.RequiredArgsConstructor;
@@ -25,9 +26,10 @@ public class AlertController {
     public Page<AlertInstanceResponse> list(
             @RequestParam(required = false) UUID directoryId,
             @RequestParam(required = false) AlertStatus status,
+            @RequestParam(required = false) AlertSeverity severity,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return alertService.listInstances(directoryId, status, page, size);
+        return alertService.listInstances(directoryId, status, severity, page, size);
     }
 
     @GetMapping("/summary")

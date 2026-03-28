@@ -21,11 +21,11 @@ public interface SodViolationRepository extends JpaRepository<SodViolation, UUID
 
     long countByStatus(SodViolationStatus status);
 
-    @Query("SELECT v FROM SodViolation v WHERE v.policy.directory.id = :directoryId AND v.status = :status")
+    @Query("SELECT v FROM SodViolation v JOIN FETCH v.policy WHERE v.policy.directory.id = :directoryId AND v.status = :status")
     List<SodViolation> findByDirectoryIdAndStatus(@Param("directoryId") UUID directoryId,
                                                    @Param("status") SodViolationStatus status);
 
-    @Query("SELECT v FROM SodViolation v WHERE v.policy.directory.id = :directoryId")
+    @Query("SELECT v FROM SodViolation v JOIN FETCH v.policy WHERE v.policy.directory.id = :directoryId")
     List<SodViolation> findByDirectoryId(@Param("directoryId") UUID directoryId);
 
     @Query("SELECT v FROM SodViolation v WHERE v.policy.directory.id = :directoryId AND v.policy.id = :policyId")

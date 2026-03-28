@@ -12,6 +12,7 @@ import com.ldapadmin.entity.enums.SslMode;
 import com.ldapadmin.exception.ResourceNotFoundException;
 import com.ldapadmin.ldap.LdapConnectionFactory;
 import com.ldapadmin.ldap.SslHelper;
+import com.ldapadmin.service.alerting.AlertService;
 import com.ldapadmin.repository.AuditDataSourceRepository;
 import com.ldapadmin.repository.DirectoryConnectionRepository;
 import com.ldapadmin.repository.DirectoryGroupBaseDnRepository;
@@ -50,6 +51,7 @@ public class DirectoryConnectionService {
     private final AuditDataSourceRepository      auditSourceRepo;
     private final EncryptionService              encryptionService;
     private final LdapConnectionFactory          connectionFactory;
+    private final AlertService                   alertService;
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
 
@@ -74,6 +76,11 @@ public class DirectoryConnectionService {
 
         dc = dirRepo.save(dc);
         saveBaseDns(dc, req);
+
+        // Auto-initialize default alert rules for the new directory
+        try { alertService.initializeDefaults(dc.getId()); }
+        catch (Exception e) { log.warn("Failed to initialize alert rules for {}: {}", dc.getId(), e.getMessage()); }
+
         return toResponse(dc);
     }
 

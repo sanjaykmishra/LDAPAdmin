@@ -103,6 +103,7 @@
           <RouterLink to="/superadmin/alerts" class="nav-item">
             <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-4z"/><path d="M10 8v3M10 14h.01"/></svg>
             <span v-if="!collapsed">Alerts</span>
+            <span v-if="alertCount > 0 && !collapsed" class="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{{ alertCount > 9 ? '9+' : alertCount }}</span>
           </RouterLink>
 
           <!-- Explore -->
@@ -244,6 +245,7 @@ import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { myProfiles } from '@/api/auth'
 import { countPendingApprovals } from '@/api/approvals'
 import { listCampaigns } from '@/api/accessReviews'
+import { getAlertSummary } from '@/api/alerts'
 import KeyboardShortcutsHelp from '@/components/KeyboardShortcutsHelp.vue'
 import UserPreferencesDialog from '@/components/UserPreferencesDialog.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
@@ -263,6 +265,7 @@ const pickerValue    = ref('')   // profile id
 const showNoProfiles = ref(false)
 const pendingCount   = ref(0)
 const activeReviewCount = ref(0)
+const alertCount     = ref(0)
 const collapsed      = ref(false)
 const sections       = ref({ explore: true, report: true, configure: true })
 const showPreferences = ref(false)
@@ -280,6 +283,21 @@ const { showHelp: showShortcutsHelp } = useKeyboardShortcuts({
 })
 
 // Load profiles for admin users; superadmins don't need the picker
+// Load alert count for superadmin sidebar badge
+async function loadAlertCount() {
+  if (!auth.isSuperadmin) return
+  try {
+    const { data } = await getAlertSummary()
+    alertCount.value = (data.criticalCount || 0) + (data.highCount || 0)
+  } catch { alertCount.value = 0 }
+}
+onMounted(() => {
+  if (auth.isSuperadmin) {
+    loadAlertCount()
+    setInterval(loadAlertCount, 30000)
+  }
+})
+
 onMounted(async () => {
   if (auth.isSuperadmin) return
 
